@@ -1,0 +1,322 @@
+package bot
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"strings"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/redis/go-redis/v9"
+
+	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/service"
+)
+
+// Bot wraps the Telegram bot API with CopyLingo business logic.
+type Bot struct {
+	api      *tgbotapi.BotAPI
+	cfg      *config.Config
+	services *service.Services
+	rdb      *redis.Client
+	flow     *SessionFlow
+	stopCh   chan struct{}
+}
+
+// New creates a new Telegram bot instance.
+func New(cfg *config.Config, services *service.Services, rdb *redis.Client) (*Bot, error) {
+	api, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Telegram bot: %w", err)
+	}
+	api.Debug = cfg.Telegram.Debug
+	log.Printf("Telegram bot authorized as @%s", api.Self.UserName)
+
+	bot := &Bot{
+		api:      api,
+		cfg:      cfg,
+		services: services,
+		rdb:      rdb,
+		stopCh:   make(chan struct{}),
+	}
+	bot.flow = NewSessionFlow(bot)
+
+	return bot, nil
+}
+
+// Start begins listening for Telegram updates.
+func (b *Bot) Start() {
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+
+	updates := b.api.GetUpdatesChan(u)
+
+	for {
+		select {
+		case update := <-updates:
+			go b.handleUpdate(update)
+		case <-b.stopCh:
+			log.Println("Telegram bot stopped")
+			return
+		}
+	}
+}
+
+// Stop signals the bot to stop listening.
+func (b *Bot) Stop() {
+	close(b.stopCh)
+	b.api.StopReceivingUpdates()
+}
+
+// SendMessage sends a text message to a chat.
+func (b *Bot) SendMessage(chatID int64, text string) error {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	_, err := b.api.Send(msg)
+	return err
+}
+
+// SendMessageWithKeyboard sends a message with an inline keyboard.
+func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = keyboard
+	_, err := b.api.Send(msg)
+	return err
+}
+
+// EditMessage edits an existing message.
+func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *tgbotapi.InlineKeyboardMarkup) error {
+	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
+	edit.ParseMode = "HTML"
+	if keyboard != nil {
+		edit.ReplyMarkup = keyboard
+	}
+	_, err := b.api.Send(edit)
+	return err
+}
+
+func (b *Bot) handleUpdate(update tgbotapi.Update) {
+	ctx := context.Background()
+
+	if update.Message != nil {
+		b.handleMessage(ctx, update.Message)
+	} else if update.CallbackQuery != nil {
+		b.handleCallback(ctx, update.CallbackQuery)
+	}
+}
+
+func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
+	if !msg.IsCommand() {
+		return
+	}
+
+	switch msg.Command() {
+	case "start":
+		b.handleStart(ctx, msg)
+	case "menu":
+		b.handleMenu(ctx, msg)
+	case "stats":
+		b.handleStats(ctx, msg)
+	case "streak":
+		b.handleStreak(ctx, msg)
+	case "help":
+		b.handleHelp(ctx, msg)
+	default:
+		b.SendMessage(msg.Chat.ID, "❓ 알 수 없는 명령어입니다. /help 를 입력해 보세요.")
+	}
+}
+
+func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+	// Acknowledge callback to remove loading indicator
+	callback := tgbotapi.NewCallback(cb.ID, "")
+	b.api.Request(callback)
+
+	data := cb.Data
+
+	switch {
+	case data == "menu:main":
+		b.showMainMenu(ctx, cb.Message.Chat.ID, cb.From)
+	case data == "menu:study":
+		b.flow.StartStudy(ctx, cb)
+	case data == "menu:review":
+		b.flow.StartReview(ctx, cb)
+	case data == "menu:stats":
+		b.handleStatsCallback(ctx, cb)
+	case strings.HasPrefix(data, "session:"):
+		b.flow.HandleSessionCallback(ctx, cb)
+	case strings.HasPrefix(data, "q:"):
+		b.flow.HandleAnswerCallback(ctx, cb)
+	}
+}
+
+func (b *Bot) handleStart(ctx context.Context, msg *tgbotapi.Message) {
+	welcome := `🎌 <b>CopyLingo에 오신 것을 환영합니다!</b>
+
+일본어를 마스터하기 위한 여정을 시작합니다.
+JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
+
+📚 <b>학습 방식:</b>
+• 매일 오전/오후 학습 세션이 전송됩니다
+• 뉴스, 시험 대비 자료를 기반으로 문제가 생성됩니다
+• 틀린 문제는 간격 반복(SRS)으로 자동 복습됩니다
+• 주말에는 아티클 읽기 + AI 대화도 제공됩니다
+
+/menu 를 눌러 시작하세요! 🚀`
+
+	b.SendMessage(msg.Chat.ID, welcome)
+}
+
+func (b *Bot) handleMenu(ctx context.Context, msg *tgbotapi.Message) {
+	b.showMainMenu(ctx, msg.Chat.ID, msg.From)
+}
+
+func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.User) {
+	user, err := b.services.Grader.GetUser(ctx, from.ID, from.UserName)
+	if err != nil {
+		log.Printf("Error getting user: %v", err)
+	}
+
+	reviewCount, _ := b.services.SRS.GetDueCount(ctx)
+
+	streakEmoji := "🔥"
+	if user != nil && user.StreakDays == 0 {
+		streakEmoji = "💤"
+	}
+
+	streakDays := 0
+	lang := "ja"
+	level := "N5"
+	if user != nil {
+		streakDays = user.StreakDays
+		lang = user.Language
+		level = user.ProficiencyLevel
+	}
+
+	langName := languageDisplayName(lang)
+	text := fmt.Sprintf(`🎌 <b>CopyLingo</b>
+
+%s 스트릭: <b>%d일</b> 연속
+🌐 언어: <b>%s</b>
+📈 레벨: <b>%s</b>`, streakEmoji, streakDays, langName, level)
+
+	reviewLabel := fmt.Sprintf("🔄 복습하기 (%d개)", reviewCount)
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📚 학습하기", "menu:study"),
+			tgbotapi.NewInlineKeyboardButtonData(reviewLabel, "menu:review"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("📊 내 통계", "menu:stats"),
+			tgbotapi.NewInlineKeyboardButtonData("⚙️ 설정", "menu:settings"),
+		),
+	)
+
+	b.SendMessageWithKeyboard(chatID, text, keyboard)
+}
+
+func (b *Bot) handleStats(ctx context.Context, msg *tgbotapi.Message) {
+	stats, err := b.services.Analyzer.GetUserStats(ctx, msg.From.ID)
+	if err != nil {
+		b.SendMessage(msg.Chat.ID, "❌ 통계를 불러오는 데 실패했습니다.")
+		return
+	}
+
+	text := fmt.Sprintf(`📊 <b>학습 통계</b>
+
+📅 오늘: %d문제 풀음 (정답률 %.0f%%)
+🔥 스트릭: %d일 연속
+
+<b>카테고리별 정답률:</b>
+📝 어휘: %.0f%%
+📖 문법: %.0f%%
+🈲 한자: %.0f%%
+📚 독해: %.0f%%
+🎧 청해: %.0f%%`,
+		stats.TodayQuestions, stats.OverallAccuracy,
+		stats.CurrentStreak,
+		stats.VocabularyAccuracy,
+		stats.GrammarAccuracy,
+		stats.KanjiAccuracy,
+		stats.ReadingAccuracy,
+		stats.ListeningAccuracy,
+	)
+
+	b.SendMessage(msg.Chat.ID, text)
+}
+
+func (b *Bot) handleStatsCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+	stats, err := b.services.Analyzer.GetUserStats(ctx, cb.From.ID)
+	if err != nil {
+		return
+	}
+
+	text := fmt.Sprintf(`📊 <b>학습 통계</b>
+
+📅 오늘: %d문제 (정답률 %.0f%%)
+🔥 스트릭: %d일
+
+📝 어휘: %.0f%% | 📖 문법: %.0f%%
+🈲 한자: %.0f%% | 📚 독해: %.0f%%
+🎧 청해: %.0f%%`,
+		stats.TodayQuestions, stats.OverallAccuracy,
+		stats.CurrentStreak,
+		stats.VocabularyAccuracy, stats.GrammarAccuracy,
+		stats.KanjiAccuracy, stats.ReadingAccuracy,
+		stats.ListeningAccuracy,
+	)
+
+	backBtn := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", "menu:main"),
+		),
+	)
+
+	b.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &backBtn)
+}
+
+func (b *Bot) handleStreak(ctx context.Context, msg *tgbotapi.Message) {
+	stats, err := b.services.Analyzer.GetUserStats(ctx, msg.From.ID)
+	if err != nil {
+		b.SendMessage(msg.Chat.ID, "❌ 스트릭 정보를 불러올 수 없습니다.")
+		return
+	}
+
+	text := fmt.Sprintf("🔥 현재 스트릭: <b>%d일</b> 연속 학습 중!", stats.CurrentStreak)
+	b.SendMessage(msg.Chat.ID, text)
+}
+
+func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
+	help := `📖 <b>CopyLingo 도움말</b>
+
+<b>명령어:</b>
+/menu - 메인 메뉴
+/stats - 학습 통계
+/streak - 스트릭 확인
+/help - 도움말
+
+<b>학습 흐름:</b>
+1. 매일 오전 8시 / 오후 9시에 학습 세션이 전송됩니다
+2. 인라인 버튼으로 문제를 풀어주세요
+3. 틀린 문제는 SRS로 자동 복습됩니다
+4. /menu → 복습하기로 수동 복습도 가능합니다`
+
+	b.SendMessage(msg.Chat.ID, help)
+}
+
+// languageDisplayName returns a human-readable name for the language code.
+func languageDisplayName(code string) string {
+	switch code {
+	case "ja":
+		return "일본어"
+	case "el":
+		return "그리스어"
+	case "en":
+		return "영어"
+	case "ko":
+		return "한국어"
+	default:
+		return code
+	}
+}

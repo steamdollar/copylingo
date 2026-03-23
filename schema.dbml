@@ -1,0 +1,83 @@
+Table users {
+  id bigint [pk, note: 'Telegram user ID']
+  username varchar(255) [not null, default: '']
+  language varchar(10) [not null, default: 'ja', note: 'ISO 639-1: ja, el, en']
+  proficiency_level varchar(10) [not null, default: 'N5', note: 'JLPT: N5-N1, CEFR: A1-C2']
+  streak_days int [not null, default: 0]
+  streak_last_date date
+  morning_session_time time [not null, default: '08:00']
+  evening_session_time time [not null, default: '21:00']
+  timezone varchar(50) [not null, default: 'Asia/Seoul']
+}
+
+Table contents {
+  id serial [pk]
+  source_type varchar(20) [not null, note: 'news | exam_prep']
+  source_url text [not null, default: '', unique, note: 'Prevent duplicates']
+  title text [not null]
+  body text [not null]
+  language varchar(10) [not null, default: 'ja', note: 'ISO 639-1']
+  proficiency_level varchar(10) [not null, default: 'N5', note: 'Target level']
+  difficulty int [not null, default: 1, note: '1~10']
+  tags "text[]" [not null, default: '{}']
+  is_article boolean [not null, default: false]
+  collected_at timestamptz [not null, default: `NOW()`]
+}
+
+Table questions {
+  id serial [pk]
+  content_id int [ref: > contents.id]
+  type varchar(30) [not null]
+  language varchar(10) [not null, default: 'ja', note: 'ISO 639-1']
+  proficiency_level varchar(10) [not null, default: 'N5', note: 'Target level']
+  category varchar(30) [not null]
+  prompt text [not null]
+  options jsonb
+  correct_answer text [not null]
+  explanation text [not null, default: '']
+  audio_path text
+  difficulty int [not null, default: 1, note: '1~10']
+  times_served int [not null, default: 0]
+  times_correct int [not null, default: 0]
+  ease_factor double [not null, default: 2.5, note: 'SM-2']
+  interval_days int [not null, default: 0]
+  repetitions int [not null, default: 0]
+  next_review_at timestamptz [note: 'NULL = never reviewed']
+  last_reviewed_at timestamptz
+  created_at timestamptz [not null, default: `NOW()`]
+
+  indexes {
+    next_review_at [note: 'partial: WHERE NOT NULL']
+    (language, proficiency_level)
+  }
+}
+
+Table sessions {
+  id serial [pk]
+  user_id bigint [not null, ref: > users.id]
+  type varchar(20) [not null]
+  status varchar(20) [not null, default: 'pending']
+  total_questions int [not null, default: 0]
+  correct_count int [not null, default: 0]
+  started_at timestamptz
+  completed_at timestamptz
+  created_at timestamptz [not null, default: `NOW()`]
+
+  indexes {
+    created_at
+  }
+}
+
+Table session_questions {
+  id serial [pk]
+  session_id int [not null, ref: > sessions.id]
+  question_id int [not null, ref: > questions.id]
+  question_order int [not null]
+  is_review boolean [not null, default: false]
+  user_answer text [note: 'NULL = not answered']
+  is_correct boolean [note: 'NULL = not answered']
+
+  indexes {
+    session_id
+  }
+}

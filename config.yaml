@@ -1,0 +1,38 @@
+server:
+  port: 8080
+  mode: debug
+
+db:
+  host: localhost
+  port: 5432
+  user: copylingo
+  password: copylingo
+  dbname: copylingo
+  sslmode: disable
+
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+
+telegram:
+  token: ""  # Set via env: COPYLINGO_TELEGRAM_TOKEN
+  debug: true
+
+openai:
+  api_key: ""  # Set via env: COPYLINGO_OPENAI_API_KEY
+  model: gpt-4o-mini
+
+tts:
+  enabled: true
+  cred_path: ""  # Google Cloud credentials JSON path
+  audio_dir: ./data/audio
+  language_code: ja-JP
+  voice_name: ja-JP-Neural2-B
+
+schedule:
+  content_collect_cron: "0 3 * * *"    # 매일 03:00 - 콘텐츠 수집
+  morning_build_cron: "30 7 * * *"     # 매일 07:30 - 오전 세션 빌드
+  morning_push_cron: "0 8 * * *"       # 매일 08:00 - 오전 세션 푸시
+  evening_build_cron: "30 20 * * *"    # 매일 20:30 - 오후 세션 빌드
+  evening_push_cron: "0 21 * * *"      # 매일 21:00 - 오후 세션 푸시

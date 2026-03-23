@@ -1,0 +1,98 @@
+-- CopyLingo Initial Schema (Multi-language Support)
+-- 5 tables: users, contents, questions (with SRS), sessions, session_questions
+
+-----------------------------------------------------------
+-- users
+-----------------------------------------------------------
+CREATE TABLE users (
+    id                  BIGINT PRIMARY KEY,                     -- Telegram user ID
+    username            VARCHAR(255) NOT NULL DEFAULT '',
+    language            VARCHAR(10) NOT NULL DEFAULT 'ja',      -- ISO 639-1: 'ja', 'el', 'en', etc.
+    proficiency_level   VARCHAR(10) NOT NULL DEFAULT 'N5',      -- JLPT: N5-N1, CEFR: A1-C2
+    streak_days         INT NOT NULL DEFAULT 0,
+    streak_last_date    DATE,
+    morning_session_time TIME NOT NULL DEFAULT '08:00',
+    evening_session_time TIME NOT NULL DEFAULT '21:00',
+    timezone            VARCHAR(50) NOT NULL DEFAULT 'Asia/Seoul'
+);
+
+-----------------------------------------------------------
+-- contents (collected learning materials)
+-----------------------------------------------------------
+CREATE TABLE contents (
+    id              SERIAL PRIMARY KEY,
+    source_type     VARCHAR(20) NOT NULL,                       -- 'news' | 'exam_prep'
+    source_url      TEXT NOT NULL DEFAULT '',
+    title           TEXT NOT NULL,
+    body            TEXT NOT NULL,
+    language        VARCHAR(10) NOT NULL DEFAULT 'ja',          -- ISO 639-1
+    proficiency_level VARCHAR(10) NOT NULL DEFAULT 'N5',        -- Target level
+    difficulty      INT NOT NULL DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 10),
+    tags            TEXT[] NOT NULL DEFAULT '{}',
+    is_article      BOOLEAN NOT NULL DEFAULT FALSE,
+    collected_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (source_url)                                         -- Prevent duplicate collection
+);
+
+-----------------------------------------------------------
+-- questions (generated learning questions + SRS state)
+-----------------------------------------------------------
+CREATE TABLE questions (
+    id              SERIAL PRIMARY KEY,
+    content_id      INT REFERENCES contents(id) ON DELETE SET NULL,
+    type            VARCHAR(30) NOT NULL,                       -- multiple_choice, fill_blank, etc.
+    language        VARCHAR(10) NOT NULL DEFAULT 'ja',          -- ISO 639-1
+    proficiency_level VARCHAR(10) NOT NULL DEFAULT 'N5',        -- Target level
+    category        VARCHAR(30) NOT NULL,                       -- vocabulary, grammar, kanji, reading, listening
+    prompt          TEXT NOT NULL,
+    options         JSONB,                                      -- Array of option strings (for multiple choice)
+    correct_answer  TEXT NOT NULL,
+    explanation     TEXT NOT NULL DEFAULT '',
+    audio_path      TEXT,                                       -- Path to TTS audio file
+    difficulty      INT NOT NULL DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 10),
+    times_served    INT NOT NULL DEFAULT 0,
+    times_correct   INT NOT NULL DEFAULT 0,
+    -- SRS (SM-2) state
+    ease_factor     DOUBLE PRECISION NOT NULL DEFAULT 2.5,
+    interval_days   INT NOT NULL DEFAULT 0,
+    repetitions     INT NOT NULL DEFAULT 0,
+    next_review_at  TIMESTAMPTZ,
+    last_reviewed_at TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_questions_next_review ON questions(next_review_at)
+    WHERE next_review_at IS NOT NULL;
+CREATE INDEX idx_questions_language_level ON questions(language, proficiency_level);
+
+-----------------------------------------------------------
+-- sessions (learning sessions)
+-----------------------------------------------------------
+CREATE TABLE sessions (
+    id              SERIAL PRIMARY KEY,
+    user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type            VARCHAR(20) NOT NULL,                       -- morning, evening, review, article
+    status          VARCHAR(20) NOT NULL DEFAULT 'pending',     -- pending, in_progress, completed, expired
+    total_questions INT NOT NULL DEFAULT 0,
+    correct_count   INT NOT NULL DEFAULT 0,
+    started_at      TIMESTAMPTZ,
+    completed_at    TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_sessions_created_at ON sessions(created_at);
+
+-----------------------------------------------------------
+-- session_questions (join: session <-> question + user answer)
+-----------------------------------------------------------
+CREATE TABLE session_questions (
+    id              SERIAL PRIMARY KEY,
+    session_id      INT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    question_id     INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    question_order  INT NOT NULL,
+    is_review       BOOLEAN NOT NULL DEFAULT FALSE,
+    user_answer     TEXT,                                       -- NULL = not answered yet
+    is_correct      BOOLEAN                                     -- NULL = not answered yet
+);
+
+CREATE INDEX idx_session_questions_session_id ON session_questions(session_id);

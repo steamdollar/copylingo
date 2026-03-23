@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: copylingo-db
+    environment:
+      POSTGRES_USER: copylingo
+      POSTGRES_PASSWORD: copylingo
+      POSTGRES_DB: copylingo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U copylingo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: copylingo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: copylingo-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      COPYLINGO_DB_HOST: postgres
+      COPYLINGO_DB_PORT: 5432
+      COPYLINGO_DB_USER: copylingo
+      COPYLINGO_DB_PASSWORD: copylingo
+      COPYLINGO_DB_DBNAME: copylingo
+      COPYLINGO_DB_SSLMODE: disable
+      COPYLINGO_REDIS_ADDR: redis:6379
+      COPYLINGO_TELEGRAM_TOKEN: ${COPYLINGO_TELEGRAM_TOKEN}
+      COPYLINGO_OPENAI_API_KEY: ${COPYLINGO_OPENAI_API_KEY}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/audio:/app/data/audio
+      - ./config.yaml:/app/config.yaml
+
+volumes:
+  postgres_data:
+  redis_data:
