@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -78,6 +80,9 @@ func Load() (*Config, error) {
 	viper.AddConfigPath("./config")
 	viper.AddConfigPath("/etc/copylingo")
 
+	// Load .env file if it exists
+	_ = godotenv.Load()
+
 	// Environment variable overrides: COPYLINGO_DB_HOST, COPYLINGO_TELEGRAM_TOKEN, etc.
 	viper.SetEnvPrefix("COPYLINGO")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -131,7 +136,7 @@ func (c *Config) validate() error {
 		return fmt.Errorf("telegram.token is required")
 	}
 	if c.OpenAI.APIKey == "" {
-		return fmt.Errorf("openai.api_key is required")
+		log.Println("[WARN] openai.api_key is not set. AI features may be disabled.")
 	}
 	return nil
 }

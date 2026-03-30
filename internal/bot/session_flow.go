@@ -181,11 +181,6 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 		return
 	}
 
-	options, err := question.GetOptions()
-	if err != nil || len(options) == 0 {
-		return
-	}
-
 	reviewTag := ""
 	if sq.IsReview {
 		reviewTag = " 🔄"
@@ -194,24 +189,38 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 	text := fmt.Sprintf("📝 <b>문제 %d/%d</b>%s\n\n%s",
 		questionIdx+1, len(sqs), reviewTag, question.Prompt)
 
-	// Build inline keyboard with options (2 per row)
-	var rows [][]tgbotapi.InlineKeyboardButton
-	for i := 0; i < len(options); i += 2 {
-		var row []tgbotapi.InlineKeyboardButton
-		row = append(row, tgbotapi.NewInlineKeyboardButtonData(
-			options[i],
-			fmt.Sprintf("q:%d:%d:%d", sessionID, question.ID, i),
-		))
-		if i+1 < len(options) {
-			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
-				options[i+1],
-				fmt.Sprintf("q:%d:%d:%d", sessionID, question.ID, i+1),
-			))
-		}
-		rows = append(rows, row)
-	}
+	var keyboard tgbotapi.InlineKeyboardMarkup
 
-	keyboard := tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
+	if string(question.Type) == "fill_blank" {
+		// Set active question in Redis for 1 hour
+		key := fmt.Sprintf("user:%d:active_question", chatID)
+		state := fmt.Sprintf("%d:%d", sessionID, questionIdx)
+		f.bot.rdb.Set(ctx, key, state, 1*time.Hour)
+		text += "\n\n⌨️ 채팅창에 답안을 영어로 입력해 주세요 (예: a, ka)"
+	} else {
+		options, err := question.GetOptions()
+		if err != nil || len(options) == 0 {
+			return
+		}
+
+		// Build inline keyboard with options (2 per row)
+		var rows [][]tgbotapi.InlineKeyboardButton
+		for i := 0; i < len(options); i += 2 {
+			var row []tgbotapi.InlineKeyboardButton
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
+				options[i],
+				fmt.Sprintf("q:%d:%d:%d", sessionID, question.ID, i),
+			))
+			if i+1 < len(options) {
+				row = append(row, tgbotapi.NewInlineKeyboardButtonData(
+					options[i+1],
+					fmt.Sprintf("q:%d:%d:%d", sessionID, question.ID, i+1),
+				))
+			}
+			rows = append(rows, row)
+		}
+		keyboard = tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
+	}
 
 	key := fmt.Sprintf("session:%d:question_start", sessionID)
 	f.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
@@ -231,8 +240,44 @@ func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQu
 	}
 
 	selectedAnswer := options[optionIdx]
+	f.processAnswerText(ctx, cb.Message.Chat.ID, sessionID, questionID, selectedAnswer, cb.Message.MessageID)
+}
+
+// HandleTextInput intercepts text messages if there is an active text question.
+func (f *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Message) bool {
+	key := fmt.Sprintf("user:%d:active_question", msg.Chat.ID)
+	state, err := f.bot.rdb.Get(ctx, key).Result()
+	if err != nil {
+		return false
+	}
+
+	parts := strings.Split(state, ":")
+	if len(parts) != 2 {
+		return false
+	}
+	sessionID, _ := strconv.Atoi(parts[0])
+	questionIdx, _ := strconv.Atoi(parts[1])
+
+	f.bot.rdb.Del(ctx, key)
+
+	sqs, err := f.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+	if err != nil || questionIdx >= len(sqs) {
+		return false
+	}
+	questionID := sqs[questionIdx].QuestionID
+
+	f.processAnswerText(ctx, msg.Chat.ID, sessionID, questionID, strings.TrimSpace(msg.Text), 0)
+	return true
+}
+
+func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessionID, questionID int, selectedAnswer string, messageID int) {
+	question, err := f.bot.services.SessionBuilder.GetQuestion(ctx, questionID)
+	if err != nil {
+		return
+	}
 
 	// Grade the answer
+	selectedAnswer = strings.ToLower(selectedAnswer) // For Kana fill in the blank
 	isCorrect, err := f.bot.services.Grader.GradeAnswer(ctx, sessionID, questionID, selectedAnswer)
 	if err != nil {
 		log.Printf("Error grading answer: %v", err)
@@ -249,16 +294,14 @@ func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQu
 		}
 	}
 
-	// Build feedback message
 	var text string
 	if isCorrect {
 		text = fmt.Sprintf("✅ <b>정답!</b>\n\n%s", question.Explanation)
 	} else {
-		text = fmt.Sprintf("❌ <b>오답</b>\n\n선택: %s\n정답: <b>%s</b>\n\n%s",
+		text = fmt.Sprintf("❌ <b>오답</b>\n\n입력/선택: %s\n정답: <b>%s</b>\n\n%s",
 			selectedAnswer, question.CorrectAnswer, question.Explanation)
 	}
 
-	// Next button
 	nextLabel := "다음 문제 →"
 	if currentIdx+1 >= len(sqs) {
 		nextLabel = "📊 결과 보기"
@@ -277,7 +320,12 @@ func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQu
 		),
 	)
 
-	f.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
+	if messageID > 0 {
+		f.bot.EditMessage(chatID, messageID, text, &keyboard)
+	} else {
+		// Normal message replacement
+		f.bot.SendMessageWithKeyboard(chatID, text, keyboard)
+	}
 }
 
 func (f *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {

@@ -20,6 +20,12 @@
 
 ---
 
+## ⏭️ 다음
+
+- Phase 2.3: AI 문제 생성 엔진 (Gemini 연동)
+
+---
+
 ## 🚧 블로커
 
 - (없음)
@@ -30,6 +36,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-03-31 | config.go OPENAI_API_KEY 검증 완화 (선택적 사용) | `2603310041_remove_openai_key_validation.md` |
+| 2026-03-31 | Phase 2.1.5: 히라가나/가타카나 학습 구현 | `2603310027_phase_2_1_5_kana_module.md` |
 | 2026-03-22 | Phase 2.1: 3단계 파이프라인 + NHK 수집기 구현 | `2603222000_pipeline_nhk_collector.md` |
 | 2026-03-22 | cmd/server/main.go Run 패턴 적용 및 구조 정리 | `2603221930_refactor_main_go.md` |
 | 2026-03-22 | 다국어 지원 스키마 리팩토링 (ADR-009) | `2603222100_multilang_schema.md` |

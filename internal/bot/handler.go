@@ -108,6 +108,10 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if !msg.IsCommand() {
+		// Route plain text to session flow for FillBlank questions
+		if handled := b.flow.HandleTextInput(ctx, msg); !handled {
+			// Optional: Fallback to chat or ignore
+		}
 		return
 	}
 
