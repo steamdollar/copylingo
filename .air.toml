@@ -1,0 +1,38 @@
+# [Air Configuration]
+# Working directory for air
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+# Binary name
+bin = "./tmp/main"
+# Command to build the binary
+cmd = "go build -o ./tmp/main ./cmd/server"
+# Watch these directories
+include_dir = ["cmd", "internal"]
+# Watch these extensions
+include_ext = ["go", "yaml"]
+# Ignore these directories
+exclude_dir = ["bin", "data", "migrations", ".git", "tmp"]
+# Delay after file change
+delay = 1000
+# Stop on error
+stop_on_error = true
+# Log file
+log = "air_errors.log"
+
+[log]
+# Show main log
+main_log = true
+
+[color]
+# Color configuration
+main = "magenta"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[misc]
+# Clean up tmp directory on exit
+clean_on_exit = true

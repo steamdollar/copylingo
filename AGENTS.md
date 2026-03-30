@@ -21,6 +21,7 @@
 > - 작업 완료 시 반드시 `STATUS.md`를 업데이트하여 다음 에이전트가 이어갈 수 있게 하세요.
 > - 작업 중 새 의사결정이 있으면 `docs/ADR.md`에 ADR 항목을 추가하세요.
 > - 마일스톤 완료 시에만 `ROADMAP.md` 상태를 업데이트하세요.
+> - implementation plan, workthrough는 반드시 한글로 작성해주세요.
 
 ---
 

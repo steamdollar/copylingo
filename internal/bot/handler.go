@@ -80,7 +80,9 @@ func (b *Bot) SendMessage(chatID int64, text string) error {
 func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "HTML"
-	msg.ReplyMarkup = keyboard
+	if len(keyboard.InlineKeyboard) > 0 {
+		msg.ReplyMarkup = keyboard
+	}
 	_, err := b.api.Send(msg)
 	return err
 }
@@ -89,7 +91,7 @@ func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbota
 func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *tgbotapi.InlineKeyboardMarkup) error {
 	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	edit.ParseMode = "HTML"
-	if keyboard != nil {
+	if keyboard != nil && len(keyboard.InlineKeyboard) > 0 {
 		edit.ReplyMarkup = keyboard
 	}
 	_, err := b.api.Send(edit)
@@ -124,6 +126,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		b.handleStats(ctx, msg)
 	case "streak":
 		b.handleStreak(ctx, msg)
+	case "test":
+		b.handleTest(ctx, msg)
 	case "help":
 		b.handleHelp(ctx, msg)
 	default:
@@ -307,6 +311,38 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 4. /menu → 복습하기로 수동 복습도 가능합니다`
 
 	b.SendMessage(msg.Chat.ID, help)
+}
+
+func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {
+	// 1. Ensure user exists
+	user, err := b.services.Grader.GetUser(ctx, msg.From.ID, msg.From.UserName)
+	if err != nil {
+		log.Printf("Error getting user for /test: %v", err)
+		b.SendMessage(msg.Chat.ID, "❌ 사용자 정보를 확인할 수 없습니다.")
+		return
+	}
+
+	// 2. Build a morning session (9 new + 6 review)
+	session, err := b.services.SessionBuilder.BuildMorningSession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+	if err != nil {
+		log.Printf("Error building session for /test: %v", err)
+		b.SendMessage(msg.Chat.ID, "❌ 세션 생성 중 오류가 발생했습니다.")
+		return
+	}
+
+	if session == nil {
+		b.SendMessage(msg.Chat.ID, "⚠️ 현재 사용 가능한 문제가 없습니다. 컨텐츠가 수집되었는지 확인해 주세요.")
+		return
+	}
+
+	// 3. Push the session immediately
+	if err := b.PushSession(ctx, user.ID, session.ID, "morning"); err != nil {
+		log.Printf("Error pushing session for /test: %v", err)
+		b.SendMessage(msg.Chat.ID, "❌ 세션 발송에 실패했습니다.")
+		return
+	}
+
+	log.Printf("[Test] Manually triggered morning session for user %d", user.ID)
 }
 
 // languageDisplayName returns a human-readable name for the language code.

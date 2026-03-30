@@ -27,3 +27,7 @@ data/audio/*.ogg
 # Env
 .env
 .env.local
+
+server
+kana_seeder
+tmp/

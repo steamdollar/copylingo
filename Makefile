@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker-up docker-down migrate
+.PHONY: build run test clean docker-up docker-down migrate dev app-up app-logs restart-db restart-redis infra tmux tmux-stop
 
 # Build the application
 build:
@@ -7,6 +7,11 @@ build:
 # Run locally
 run:
 	go run ./cmd/server
+
+# Run with hot reload (requires air)
+dev: infra
+	docker stop copylingo-app || true
+	air
 
 # Run tests
 test:
@@ -30,6 +35,39 @@ docker-down:
 
 docker-build:
 	docker compose up -d --build
+
+# Fast app-only rebuild and restart
+app-up:
+	docker compose up -d --build app
+
+# Tail app logs
+app-logs:
+	docker compose logs -f app
+
+# Restart specific instances
+restart-db:
+	docker compose restart postgres
+
+restart-redis:
+	docker compose restart redis
+
+# Run everything in a detached tmux session as an All-in-One dashboard
+tmux: infra
+	@tmux kill-session -t copylingo 2>/dev/null || true
+	@docker stop copylingo-app 2>/dev/null || true
+	@tmux new-session -d -s copylingo -n 'Dashboard' "make dev"
+	@tmux split-window -h -t copylingo "docker compose logs -f postgres"
+	@tmux split-window -v -t copylingo "docker compose logs -f redis"
+	@tmux select-pane -t copylingo:0.0
+	@echo "--------------------------------------------------------"
+	@echo "🚀 All-in-One Dashboard started in session 'copylingo'"
+	@echo "Monitor App, DB, and Redis in a single screen."
+	@echo "--------------------------------------------------------"
+	@echo "Use: tmux attach -t copylingo"
+
+# Kill the tmux session
+tmux-stop:
+	tmux kill-session -t copylingo || true
 
 # Run database migration (requires psql)
 migrate:

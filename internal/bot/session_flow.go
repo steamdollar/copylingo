@@ -135,7 +135,10 @@ func (f *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Cal
 	if parts[2] == "next" {
 		currentIdx := 0
 		fmt.Sscanf(parts[3], "%d", &currentIdx)
-		f.showQuestion(ctx, cb.Message.Chat.ID, cb.Message.MessageID, sessionID, currentIdx+1)
+		// 1. Remove the "Next" button from current feedback to avoid confusion
+		f.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, cb.Message.Text, nil)
+		// 2. Show next question as a NEW message (0 messageID)
+		f.showQuestion(ctx, cb.Message.Chat.ID, 0, sessionID, currentIdx+1)
 		return
 	}
 
@@ -171,7 +174,11 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 				tgbotapi.NewInlineKeyboardButtonData("📊 결과 보기", fmt.Sprintf("session:%d:finish", sessionID)),
 			),
 		)
-		f.bot.EditMessage(chatID, messageID, "✅ 모든 문제를 풀었습니다!", &keyboard)
+		if messageID > 0 {
+			f.bot.EditMessage(chatID, messageID, "✅ 모든 문제를 풀었습니다!", &keyboard)
+		} else {
+			f.bot.SendMessageWithKeyboard(chatID, "✅ 모든 문제를 풀었습니다!", keyboard)
+		}
 		return
 	}
 
@@ -189,7 +196,7 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 	text := fmt.Sprintf("📝 <b>문제 %d/%d</b>%s\n\n%s",
 		questionIdx+1, len(sqs), reviewTag, question.Prompt)
 
-	var keyboard tgbotapi.InlineKeyboardMarkup
+	var keyboard *tgbotapi.InlineKeyboardMarkup
 
 	if string(question.Type) == "fill_blank" {
 		// Set active question in Redis for 1 hour
@@ -219,13 +226,21 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 			}
 			rows = append(rows, row)
 		}
-		keyboard = tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
+		keyboard = &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 	}
 
 	key := fmt.Sprintf("session:%d:question_start", sessionID)
 	f.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
 
-	f.bot.EditMessage(chatID, messageID, text, &keyboard)
+	if messageID > 0 {
+		f.bot.EditMessage(chatID, messageID, text, keyboard)
+	} else {
+		if keyboard != nil {
+			f.bot.SendMessageWithKeyboard(chatID, text, *keyboard)
+		} else {
+			f.bot.SendMessage(chatID, text)
+		}
+	}
 }
 
 func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, questionID int, optionIdx int) {
@@ -354,7 +369,7 @@ func (f *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQu
 				answer = *wa.UserAnswer
 			}
 			wrongSummary += fmt.Sprintf("❌ %s → %s (정답: %s)\n",
-				truncate(q.Prompt, 30), answer, q.CorrectAnswer)
+				truncate(stripHTML(q.Prompt), 30), answer, q.CorrectAnswer)
 		}
 	}
 
@@ -413,4 +428,24 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen]) + "..."
+}
+
+func stripHTML(s string) string {
+	// Simple tag stripping to avoid Telegram API errors on truncated HTML
+	var result strings.Builder
+	inTag := false
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
 }
