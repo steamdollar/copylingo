@@ -9,26 +9,30 @@ import (
 
 // AnalyzerService provides learning analytics and recommendations.
 type AnalyzerService struct {
-	repos *repository.Repositories
+	userRepo            *repository.UserRepository
+	sessionQuestionRepo *repository.SessionQuestionRepository
 }
 
-func NewAnalyzerService(repos *repository.Repositories) *AnalyzerService {
-	return &AnalyzerService{repos: repos}
+func NewAnalyzerService(userRepo *repository.UserRepository, sessionQuestionRepo *repository.SessionQuestionRepository) *AnalyzerService {
+	return &AnalyzerService{
+		userRepo:            userRepo,
+		sessionQuestionRepo: sessionQuestionRepo,
+	}
 }
 
 // GetUserStats returns comprehensive learning statistics.
 func (a *AnalyzerService) GetUserStats(ctx context.Context, userID int64) (*model.UserStats, error) {
-	user, err := a.repos.User.GetByID(ctx, userID)
+	user, err := a.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	todayTotal, todayCorrect, err := a.repos.SessionQuestion.GetTodayStats(ctx)
+	todayTotal, todayCorrect, err := a.sessionQuestionRepo.GetTodayStats(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	categoryAcc, err := a.repos.SessionQuestion.GetCategoryAccuracy(ctx)
+	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +59,7 @@ func (a *AnalyzerService) GetUserStats(ctx context.Context, userID int64) (*mode
 
 // GetWeakAreas returns the user's weakest categories for targeted practice.
 func (a *AnalyzerService) GetWeakAreas(ctx context.Context) ([]model.WeakArea, error) {
-	categoryAcc, err := a.repos.SessionQuestion.GetCategoryAccuracy(ctx)
+	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -10,13 +10,30 @@ import (
 
 // GraderService handles answer grading and result processing.
 type GraderService struct {
-	repos *repository.Repositories
-	srs   *SRSService
-	llm   external.LLMClient
+	userRepo            *repository.UserRepository
+	questionRepo        *repository.QuestionRepository
+	sessionRepo         *repository.SessionRepository
+	sessionQuestionRepo *repository.SessionQuestionRepository
+	srs                 *SRSService
+	llm                 external.LLMClient
 }
 
-func NewGraderService(repos *repository.Repositories, srs *SRSService, llm external.LLMClient) *GraderService {
-	return &GraderService{repos: repos, srs: srs, llm: llm}
+func NewGraderService(
+	userRepo *repository.UserRepository,
+	questionRepo *repository.QuestionRepository,
+	sessionRepo *repository.SessionRepository,
+	sessionQuestionRepo *repository.SessionQuestionRepository,
+	srs *SRSService,
+	llm external.LLMClient,
+) *GraderService {
+	return &GraderService{
+		userRepo:            userRepo,
+		questionRepo:        questionRepo,
+		sessionRepo:         sessionRepo,
+		sessionQuestionRepo: sessionQuestionRepo,
+		srs:                 srs,
+		llm:                 llm,
+	}
 }
 
 // SessionResult contains the summary of a completed session.
@@ -29,7 +46,7 @@ type SessionResult struct {
 // GradeAnswer grades a single answer and updates SRS accordingly.
 func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID int, userAnswer string) (bool, string, error) {
 	// Get the question to check correct answer
-	question, err := g.repos.Question.GetByID(ctx, questionID)
+	question, err := g.questionRepo.GetByID(ctx, questionID)
 	if err != nil {
 		return false, "", err
 	}
@@ -48,16 +65,16 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 	}
 
 	// Record the answer in session_questions
-	if err := g.repos.SessionQuestion.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
+	if err := g.sessionQuestionRepo.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
 		return false, "", err
 	}
 
 	// Update question statistics
-	if err := g.repos.Question.IncrementServed(ctx, questionID); err != nil {
+	if err := g.questionRepo.IncrementServed(ctx, questionID); err != nil {
 		return false, "", err
 	}
 	if isCorrect {
-		if err := g.repos.Question.IncrementCorrect(ctx, questionID); err != nil {
+		if err := g.questionRepo.IncrementCorrect(ctx, questionID); err != nil {
 			return false, "", err
 		}
 	}
@@ -72,7 +89,7 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 
 // CompleteSession finalizes a session with results.
 func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, userID int64) (*SessionResult, error) {
-	sqs, err := g.repos.SessionQuestion.GetBySession(ctx, sessionID)
+	sqs, err := g.sessionQuestionRepo.GetBySession(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,17 +102,17 @@ func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, user
 	}
 
 	// Update session
-	if err := g.repos.Session.Complete(ctx, sessionID, correctCount); err != nil {
+	if err := g.sessionRepo.Complete(ctx, sessionID, correctCount); err != nil {
 		return nil, err
 	}
 
 	// Update streak
-	if err := g.repos.User.UpdateStreak(ctx, userID); err != nil {
+	if err := g.userRepo.UpdateStreak(ctx, userID); err != nil {
 		return nil, err
 	}
 
 	// Get wrong answers for result display
-	wrongSQs, _ := g.repos.SessionQuestion.GetWrongAnswers(ctx, sessionID)
+	wrongSQs, _ := g.sessionQuestionRepo.GetWrongAnswers(ctx, sessionID)
 
 	return &SessionResult{
 		TotalQuestions: len(sqs),
@@ -104,11 +121,3 @@ func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, user
 	}, nil
 }
 
-func (g *GraderService) GetUser(ctx context.Context, telegramID int64, username string) (*model.User, error) {
-	return g.repos.User.GetOrCreate(ctx, telegramID, username)
-}
-
-// GetAllUsers returns all registered users (for scheduler).
-func (g *GraderService) GetAllUsers(ctx context.Context) ([]model.User, error) {
-	return g.repos.User.GetAllUsers(ctx)
-}

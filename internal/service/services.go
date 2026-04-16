@@ -10,6 +10,7 @@ import (
 
 // Services holds all service instances.
 type Services struct {
+	User           *UserService
 	SRS            *SRSService
 	SessionBuilder *SessionBuilderService
 	Grader         *GraderService
@@ -20,12 +21,14 @@ type Services struct {
 func NewServices(repos *repository.Repositories, rdb *redis.Client, cfg *config.Config) *Services {
 	llm := external.NewLLMClient(cfg)
 
+	userService := NewUserService(repos.User)
 	srsService := NewSRSService(repos.Question)
-	graderService := NewGraderService(repos, srsService, llm)
-	analyzerService := NewAnalyzerService(repos)
-	sessionBuilderService := NewSessionBuilderService(repos, srsService)
+	graderService := NewGraderService(repos.User, repos.Question, repos.Session, repos.SessionQuestion, srsService, llm)
+	analyzerService := NewAnalyzerService(repos.User, repos.SessionQuestion)
+	sessionBuilderService := NewSessionBuilderService(repos.Question, repos.Session, repos.SessionQuestion, srsService)
 
 	return &Services{
+		User:           userService,
 		SRS:            srsService,
 		SessionBuilder: sessionBuilderService,
 		Grader:         graderService,

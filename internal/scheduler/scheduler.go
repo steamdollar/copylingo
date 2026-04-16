@@ -95,7 +95,7 @@ func (s *Scheduler) Stop() {
 func (s *Scheduler) buildAndPushSessions(sessionType model.SessionType) {
 	ctx := context.Background()
 
-	users, err := s.services.Grader.GetAllUsers(ctx)
+	users, err := s.services.User.GetAllUsers(ctx)
 	if err != nil {
 		log.Printf("[Scheduler] Error getting users: %v", err)
 		return

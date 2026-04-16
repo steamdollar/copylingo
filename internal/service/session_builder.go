@@ -10,12 +10,24 @@ import (
 
 // SessionBuilderService creates learning sessions with appropriate question mix.
 type SessionBuilderService struct {
-	repos *repository.Repositories
-	srs   *SRSService
+	questionRepo        *repository.QuestionRepository
+	sessionRepo         *repository.SessionRepository
+	sessionQuestionRepo *repository.SessionQuestionRepository
+	srs                 *SRSService
 }
 
-func NewSessionBuilderService(repos *repository.Repositories, srs *SRSService) *SessionBuilderService {
-	return &SessionBuilderService{repos: repos, srs: srs}
+func NewSessionBuilderService(
+	questionRepo *repository.QuestionRepository,
+	sessionRepo *repository.SessionRepository,
+	sessionQuestionRepo *repository.SessionQuestionRepository,
+	srs *SRSService,
+) *SessionBuilderService {
+	return &SessionBuilderService{
+		questionRepo:        questionRepo,
+		sessionRepo:         sessionRepo,
+		sessionQuestionRepo: sessionQuestionRepo,
+		srs:                 srs,
+	}
 }
 
 // BuildMorningSession creates a morning session: 60% new + 40% review, total 15 questions.
@@ -74,7 +86,7 @@ func (s *SessionBuilderService) buildSession(
 		remainingNew = newCount
 	}
 	if remainingNew > 0 && language != "" && level != "" {
-		newQuestions, err := s.repos.Question.GetNewQuestions(ctx, language, level, "", remainingNew)
+		newQuestions, err := s.questionRepo.GetNewQuestions(ctx, language, level, "", remainingNew)
 		if err != nil {
 			log.Printf("Error getting new questions: %v", err)
 		} else {
@@ -101,7 +113,7 @@ func (s *SessionBuilderService) buildSession(
 		TotalQuestions: len(sessionQuestions),
 	}
 
-	if err := s.repos.Session.Create(ctx, session); err != nil {
+	if err := s.sessionRepo.Create(ctx, session); err != nil {
 		return nil, err
 	}
 
@@ -109,7 +121,7 @@ func (s *SessionBuilderService) buildSession(
 	for i := range sessionQuestions {
 		sessionQuestions[i].SessionID = session.ID
 	}
-	if err := s.repos.SessionQuestion.CreateBatch(ctx, sessionQuestions); err != nil {
+	if err := s.sessionQuestionRepo.CreateBatch(ctx, sessionQuestions); err != nil {
 		return nil, err
 	}
 
@@ -118,25 +130,25 @@ func (s *SessionBuilderService) buildSession(
 
 // GetPendingSessions returns pending sessions for a user.
 func (s *SessionBuilderService) GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error) {
-	return s.repos.Session.GetPendingSessions(ctx, userID)
+	return s.sessionRepo.GetPendingSessions(ctx, userID)
 }
 
 // GetSession returns a session by ID.
 func (s *SessionBuilderService) GetSession(ctx context.Context, sessionID int) (*model.Session, error) {
-	return s.repos.Session.GetByID(ctx, sessionID)
+	return s.sessionRepo.GetByID(ctx, sessionID)
 }
 
 // StartSession marks a session as in_progress.
 func (s *SessionBuilderService) StartSession(ctx context.Context, sessionID int) error {
-	return s.repos.Session.Start(ctx, sessionID)
+	return s.sessionRepo.Start(ctx, sessionID)
 }
 
 // GetQuestion returns a question by ID.
 func (s *SessionBuilderService) GetQuestion(ctx context.Context, questionID int) (*model.Question, error) {
-	return s.repos.Question.GetByID(ctx, questionID)
+	return s.questionRepo.GetByID(ctx, questionID)
 }
 
 // GetSessionQuestions returns all questions for a session.
 func (s *SessionBuilderService) GetSessionQuestions(ctx context.Context, sessionID int) ([]model.SessionQuestion, error) {
-	return s.repos.SessionQuestion.GetBySession(ctx, sessionID)
+	return s.sessionQuestionRepo.GetBySession(ctx, sessionID)
 }

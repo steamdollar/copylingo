@@ -190,7 +190,7 @@ func (b *Bot) handleMenu(ctx context.Context, msg *tgbotapi.Message) {
 }
 
 func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.User) {
-	user, err := b.services.Grader.GetUser(ctx, from.ID, from.UserName)
+	user, err := b.services.User.GetUser(ctx, from.ID, from.UserName)
 	if err != nil {
 		log.Printf("Error getting user: %v", err)
 	}
@@ -325,7 +325,7 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 
 func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {
 	// 1. Ensure user exists
-	user, err := b.services.Grader.GetUser(ctx, msg.From.ID, msg.From.UserName)
+	user, err := b.services.User.GetUser(ctx, msg.From.ID, msg.From.UserName)
 	if err != nil {
 		log.Printf("Error getting user for /test: %v", err)
 		b.SendMessage(msg.Chat.ID, "❌ 사용자 정보를 확인할 수 없습니다.")
