@@ -16,7 +16,7 @@
 
 ## ⏭️ 다음
 
-- Phase 2.3: AI 문제 생성 엔진 (Gemini 연동)
+- Phase 2.4: 아티클 요약 및 AI 대화 시나리오 구현
 
 ---
 
@@ -30,7 +30,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
-| 2026-04-16 | Phase 2.3 일부: AI 주관식 유사도 채점 기능 및 UX 인디케이터 추가 | `2604161909_phase_2_3_ai_subjective.md` |
+| 2026-04-16 | 서비스 계층 개별 의존성 주입(Individual DI) 적용 및 UserService 분리 | `2604162325_service_di_refactoring.md` |
+| 2026-04-16 | Phase 2.3: AI 주관식 유사도 채점 기능 및 UX 인디케이터 추가 | `2604161909_phase_2_3_ai_subjective.md` |
 | 2026-03-31 | 봇 세션 플로우 개선 및 결과 요약 에러 수정 | `2603310123_bot_fixes_and_dx_optimization.md` |
 | 2026-03-31 | 'air' 핫 리로드 및 Tmux 통합 대시보드 구축 | `2603310123_bot_fixes_and_dx_optimization.md` |
 | 2026-03-31 | config.go OPENAI_API_KEY 검증 완화 (선택적 사용) | `2603310041_remove_openai_key_validation.md` |
