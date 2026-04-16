@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/model"
 )
 
 // SessionFlow handles the question-answering interaction flow.
@@ -32,7 +35,7 @@ func (f *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuery
 			"📚 현재 대기 중인 학습 세션이 없습니다.\n다음 세션이 자동으로 전송될 예정입니다!",
 			&tgbotapi.InlineKeyboardMarkup{
 				InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
-					{tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", "menu:main")},
+					{tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain)},
 				},
 			},
 		)
@@ -43,10 +46,10 @@ func (f *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuery
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf("session:%d:start", session.ID)),
+			tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf(config.FormatSessionStart, session.ID)),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", "menu:main"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain),
 		),
 	)
 
@@ -67,7 +70,7 @@ func (f *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQuer
 			"✅ 복습할 문제가 없습니다! 훌륭합니다 🎉",
 			&tgbotapi.InlineKeyboardMarkup{
 				InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
-					{tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", "menu:main")},
+					{tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain)},
 				},
 			},
 		)
@@ -87,7 +90,7 @@ func (f *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQuer
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("▶️ 복습 시작", fmt.Sprintf("session:%d:start", session.ID)),
+			tgbotapi.NewInlineKeyboardButtonData("▶️ 복습 시작", fmt.Sprintf(config.FormatSessionStart, session.ID)),
 		),
 	)
 
@@ -159,7 +162,7 @@ func (f *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQue
 	}
 
 	// Store session start time in Redis for timing
-	key := fmt.Sprintf("session:%d:question_start", sessionID)
+	key := fmt.Sprintf(config.KeySessionQuestionStart, sessionID)
 	f.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
 
 	f.showQuestion(ctx, cb.Message.Chat.ID, cb.Message.MessageID, sessionID, 0)
@@ -171,7 +174,7 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 		// All questions answered, show finish button
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("📊 결과 보기", fmt.Sprintf("session:%d:finish", sessionID)),
+				tgbotapi.NewInlineKeyboardButtonData("📊 결과 보기", fmt.Sprintf(config.FormatSessionFinish, sessionID)),
 			),
 		)
 		if messageID > 0 {
@@ -198,13 +201,19 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 
 	var keyboard *tgbotapi.InlineKeyboardMarkup
 
-	if string(question.Type) == "fill_blank" {
+	switch question.Type {
+	case model.QuestionFillBlank, model.QuestionSubjective:
 		// Set active question in Redis for 1 hour
-		key := fmt.Sprintf("user:%d:active_question", chatID)
+		key := fmt.Sprintf(config.KeyUserActiveQuestion, chatID)
 		state := fmt.Sprintf("%d:%d", sessionID, questionIdx)
 		f.bot.rdb.Set(ctx, key, state, 1*time.Hour)
-		text += "\n\n⌨️ 채팅창에 답안을 영어로 입력해 주세요 (예: a, ka)"
-	} else {
+
+		if question.Type == model.QuestionSubjective {
+			text += "\n\n⌨️ 정답을 자유롭게 텍스트로 입력해 주세요"
+		} else {
+			text += "\n\n⌨️ 채팅창에 답안을 영어로 입력해 주세요 (예: a, ka)"
+		}
+	default:
 		options, err := question.GetOptions()
 		if err != nil || len(options) == 0 {
 			return
@@ -216,12 +225,12 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 			var row []tgbotapi.InlineKeyboardButton
 			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
 				options[i],
-				fmt.Sprintf("q:%d:%d:%d", sessionID, question.ID, i),
+				fmt.Sprintf(config.FormatQuestionAnswer, sessionID, question.ID, i),
 			))
 			if i+1 < len(options) {
 				row = append(row, tgbotapi.NewInlineKeyboardButtonData(
 					options[i+1],
-					fmt.Sprintf("q:%d:%d:%d", sessionID, question.ID, i+1),
+					fmt.Sprintf(config.FormatQuestionAnswer, sessionID, question.ID, i+1),
 				))
 			}
 			rows = append(rows, row)
@@ -229,7 +238,7 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 		keyboard = &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 	}
 
-	key := fmt.Sprintf("session:%d:question_start", sessionID)
+	key := fmt.Sprintf(config.KeySessionQuestionStart, sessionID)
 	f.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
 
 	if messageID > 0 {
@@ -260,7 +269,7 @@ func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQu
 
 // HandleTextInput intercepts text messages if there is an active text question.
 func (f *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Message) bool {
-	key := fmt.Sprintf("user:%d:active_question", msg.Chat.ID)
+	key := fmt.Sprintf(config.KeyUserActiveQuestion, msg.Chat.ID)
 	state, err := f.bot.rdb.Get(ctx, key).Result()
 	if err != nil {
 		return false
@@ -292,11 +301,23 @@ func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessi
 	}
 
 	// Grade the answer
-	selectedAnswer = strings.ToLower(selectedAnswer) // For Kana fill in the blank
-	isCorrect, err := f.bot.services.Grader.GradeAnswer(ctx, sessionID, questionID, selectedAnswer)
+	switch question.Type {
+	case model.QuestionFillBlank:
+		selectedAnswer = strings.ToLower(selectedAnswer) // For Kana fill in the blank
+	case model.QuestionSubjective:
+		// Show typing status for AI grading UX
+		f.bot.api.Request(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
+	}
+
+	isCorrect, feedback, err := f.bot.services.Grader.GradeAnswer(ctx, sessionID, questionID, selectedAnswer)
 	if err != nil {
-		log.Printf("Error grading answer: %v", err)
-		return
+		if errors.Is(err, config.ErrAIConfigMissing) {
+			errMsg := tgbotapi.NewMessage(chatID, "⚠️ 시스템 설정 문제로 현재 AI 주관식 채점이 불가능합니다. 임시로 오답 처리하고 넘어갑니다.")
+			f.bot.api.Send(errMsg)
+		} else {
+			log.Printf("Error grading answer: %v", err)
+			return
+		}
 	}
 
 	// Determine current question index for "next" button
@@ -317,6 +338,10 @@ func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessi
 			selectedAnswer, question.CorrectAnswer, question.Explanation)
 	}
 
+	if feedback != "" {
+		text += fmt.Sprintf("\n\n🤖 <b>AI 피드백:</b>\n%s", feedback)
+	}
+
 	nextLabel := "다음 문제 →"
 	if currentIdx+1 >= len(sqs) {
 		nextLabel = "📊 결과 보기"
@@ -324,9 +349,9 @@ func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessi
 
 	var nextData string
 	if currentIdx+1 >= len(sqs) {
-		nextData = fmt.Sprintf("session:%d:finish", sessionID)
+		nextData = fmt.Sprintf(config.FormatSessionFinish, sessionID)
 	} else {
-		nextData = fmt.Sprintf("q:%d:next:%d", sessionID, currentIdx)
+		nextData = fmt.Sprintf(config.FormatQuestionNext, sessionID, currentIdx)
 	}
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
@@ -380,14 +405,13 @@ func (f *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQu
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", "menu:main"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain),
 		),
 	)
 
 	f.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
 }
 
-// PushSession sends a session notification to a user.
 func (f *SessionFlow) PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error {
 	emoji := "📚"
 	label := "학습"
@@ -398,12 +422,16 @@ func (f *SessionFlow) PushSession(ctx context.Context, chatID int64, sessionID i
 
 	text := fmt.Sprintf("%s <b>%s 세션이 도착했습니다!</b>\n\n아래 버튼을 눌러 시작하세요.", emoji, label)
 
+	// 여러 row를 합쳐 줌
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		// 버튼을 가로로 배치할 row 생성
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf("session:%d:start", sessionID)),
+			// 버튼 1개 만들기
+			tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf(config.FormatSessionStart, sessionID)),
 		),
 	)
 
+	// 위해서 만든 keyboard를 send
 	return f.bot.SendMessageWithKeyboard(chatID, text, keyboard)
 }
 

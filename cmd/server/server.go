@@ -71,7 +71,7 @@ func initPipeline(repos *repository.Repositories) *pipeline.Orchestrator {
 }
 
 func initScheduler(cfg *config.Config, services *service.Services, botHandler *bot.Bot, orchestrator *pipeline.Orchestrator) (*scheduler.Scheduler, func()) {
-	cronScheduler := cron.New(cron.WithSeconds())
+	cronScheduler := cron.New()
 	sched := scheduler.New(cfg, services, botHandler, orchestrator, cronScheduler)
 	return sched, func() { sched.Stop() }
 }

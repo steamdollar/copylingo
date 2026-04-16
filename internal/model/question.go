@@ -9,12 +9,20 @@ import (
 type QuestionType string
 
 const (
+	// QuestionMultipleChoice - 객관식 (4지선다 등)
 	QuestionMultipleChoice QuestionType = "multiple_choice"
-	QuestionFillBlank      QuestionType = "fill_blank"
-	QuestionTranslation    QuestionType = "translation"
-	QuestionListening      QuestionType = "listening"
-	QuestionReadingComp    QuestionType = "reading_comp"
-	QuestionWordOrder      QuestionType = "word_order"
+	// QuestionFillBlank - 빈칸 채우기
+	QuestionFillBlank QuestionType = "fill_blank"
+	// QuestionSubjective - 주관식 (자유 입력 및 AI 채점)
+	QuestionSubjective QuestionType = "subjective"
+	// QuestionTranslation - 번역 문제
+	QuestionTranslation QuestionType = "translation"
+	// QuestionListening - 청해 문제
+	QuestionListening QuestionType = "listening"
+	// QuestionReadingComp - 독해 문제
+	QuestionReadingComp QuestionType = "reading_comp"
+	// QuestionWordOrder - 단어 배열 (어순 교정)
+	QuestionWordOrder QuestionType = "word_order"
 )
 
 // QuestionCategory defines the learning category.

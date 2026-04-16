@@ -14,7 +14,7 @@ type Config struct {
 	DB       DBConfig       `mapstructure:"db"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 	Telegram TelegramConfig `mapstructure:"telegram"`
-	OpenAI   OpenAIConfig   `mapstructure:"openai"`
+	LLM      LLMConfig      `mapstructure:"llm"`
 	TTS      TTSConfig      `mapstructure:"tts"`
 	Schedule ScheduleConfig `mapstructure:"schedule"`
 }
@@ -51,9 +51,15 @@ type TelegramConfig struct {
 	Debug bool   `mapstructure:"debug"`
 }
 
-type OpenAIConfig struct {
-	APIKey string `mapstructure:"api_key"`
-	Model  string `mapstructure:"model"` // gpt-4o-mini
+// LLMConfig는 시스템 전반의 LLM(거대 언어 모델) 설정을 담당
+// 구조체명은 LLMConfig이며 통신에 표준 go-openai 패키지를 사용할 수 있도록 호환 계층을 둠
+// 이는 Google API가 'OpenAI 호환 모드(Compatibility Layer)'를 지원하기 때문에 가능
+// BaseURL을 구글 측 엔드포인트로 덮어씌우게 되면, 향후 다른 LLM(Gemini, GPT-4o, Claude 등)으로
+// 마이그레이션이 필요할 때 로직 코드 수정 전혀 없이 환경변수(BaseURL, API Key)만으로 즉각 교체할 수 있어 유지보수성이 극대화
+type LLMConfig struct {
+	APIKey  string `mapstructure:"api_key"`
+	Model   string `mapstructure:"model"`    // gpt-4o-mini
+	BaseURL string `mapstructure:"base_url"` // https://generativelanguage.googleapis.com/v1beta/openai/
 }
 
 type TTSConfig struct {
@@ -101,16 +107,17 @@ func Load() (*Config, error) {
 	viper.SetDefault("redis.password", "")
 	viper.SetDefault("redis.db", 0)
 	viper.SetDefault("telegram.debug", false)
-	viper.SetDefault("openai.model", "gpt-4o-mini")
+	viper.SetDefault("llm.model", "gemini-3.1-flash")                                            // default to LLM model
+	viper.SetDefault("llm.base_url", "https://generativelanguage.googleapis.com/v1beta/openai/") // LLM compatibility layer
 	viper.SetDefault("tts.enabled", true)
 	viper.SetDefault("tts.audio_dir", "./data/audio")
 	viper.SetDefault("tts.language_code", "ja-JP")
 	viper.SetDefault("tts.voice_name", "ja-JP-Neural2-B")
-	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *")  // 매일 03:00
-	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")   // 매일 07:30
-	viper.SetDefault("schedule.morning_push_cron", "0 8 * * *")     // 매일 08:00
-	viper.SetDefault("schedule.evening_build_cron", "30 20 * * *")  // 매일 20:30
-	viper.SetDefault("schedule.evening_push_cron", "0 21 * * *")    // 매일 21:00
+	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *") // 매일 03:00
+	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")  // 매일 07:30
+	viper.SetDefault("schedule.morning_push_cron", "0 8 * * *")    // 매일 08:00
+	viper.SetDefault("schedule.evening_build_cron", "30 20 * * *") // 매일 20:30
+	viper.SetDefault("schedule.evening_push_cron", "0 21 * * *")   // 매일 21:00
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -135,8 +142,8 @@ func (c *Config) validate() error {
 	if c.Telegram.Token == "" {
 		return fmt.Errorf("telegram.token is required")
 	}
-	if c.OpenAI.APIKey == "" {
-		log.Println("[WARN] openai.api_key is not set. AI features may be disabled.")
+	if c.LLM.APIKey == "" {
+		log.Println("[WARN] llm.api_key is not set. AI features may be disabled.")
 	}
 	return nil
 }

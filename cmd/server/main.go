@@ -50,6 +50,7 @@ func run() error {
 	}
 
 	// Initialize content collection pipeline
+	// data fetcher
 	orchestrator := initPipeline(repos)
 
 	// Initialize and start scheduler
@@ -57,7 +58,6 @@ func run() error {
 	sched.Start()
 	defer stopSched()
 
-	// Start Telegram bot (non-blocking)
 	go botHandler.Start()
 
 	// Start HTTP server (health check + admin API)

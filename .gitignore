@@ -14,6 +14,7 @@ Thumbs.db
 
 # Config (secrets)
 config.local.yaml
+config.yaml
 
 # Build
 coverage.out

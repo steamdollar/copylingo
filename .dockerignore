@@ -1,0 +1,43 @@
+# Build
+bin/
+tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Data and Cache
+data/audio/*
+!data/audio/.gitkeep
+data/curriculum/*.json
+# (Only exclude some data if necessary, but curriculum is needed for app)
+# Let's keep data/curriculum as it might be needed for the app to run in container.
+
+# Logs
+logs/
+*.log
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Git
+.git
+.gitignore
+
+# OS
+.DS_Store
+
+# Tooling
+.air.toml
+Makefile
+.env
+.env.example
+docs/
+ROADMAP.md
+STATUS.md
+AGENTS.md
+CLAUDE.md
+schema.dbml

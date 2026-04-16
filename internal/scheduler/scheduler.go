@@ -38,7 +38,7 @@ func New(cfg *config.Config, services *service.Services, bot *bot.Bot, orchestra
 func (s *Scheduler) Start() {
 	// Content collection (daily at 03:00)
 	if s.orchestrator != nil && s.cfg.Schedule.ContentCollectCron != "" {
-		s.cron.AddFunc(s.cfg.Schedule.ContentCollectCron, func() {
+		_, err := s.cron.AddFunc(s.cfg.Schedule.ContentCollectCron, func() {
 			log.Println("[Scheduler] Starting content collection...")
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
@@ -53,22 +53,37 @@ func (s *Scheduler) Start() {
 				}
 			}
 		})
+		if err != nil {
+			log.Printf("[Scheduler] ERROR: failed to register content collection cron: %v", err)
+		} else {
+			log.Printf("[Scheduler] Registered cron job: content_collection (%s)", s.cfg.Schedule.ContentCollectCron)
+		}
 	}
 
 	// Morning session: build and push
-	s.cron.AddFunc(s.cfg.Schedule.MorningPushCron, func() {
+	_, err := s.cron.AddFunc(s.cfg.Schedule.MorningPushCron, func() {
 		log.Println("[Scheduler] Building and pushing morning sessions...")
 		s.buildAndPushSessions(model.SessionMorning)
 	})
+	if err != nil {
+		log.Printf("[Scheduler] ERROR: failed to register morning push cron: %v", err)
+	} else {
+		log.Printf("[Scheduler] Registered cron job: morning_push (%s)", s.cfg.Schedule.MorningPushCron)
+	}
 
 	// Evening session: build and push
-	s.cron.AddFunc(s.cfg.Schedule.EveningPushCron, func() {
+	_, err = s.cron.AddFunc(s.cfg.Schedule.EveningPushCron, func() {
 		log.Println("[Scheduler] Building and pushing evening sessions...")
 		s.buildAndPushSessions(model.SessionEvening)
 	})
+	if err != nil {
+		log.Printf("[Scheduler] ERROR: failed to register evening push cron: %v", err)
+	} else {
+		log.Printf("[Scheduler] Registered cron job: evening_push (%s)", s.cfg.Schedule.EveningPushCron)
+	}
 
 	s.cron.Start()
-	log.Println("[Scheduler] Started with cron jobs registered")
+	log.Println("[Scheduler] Started and running")
 }
 
 // Stop gracefully stops the scheduler.

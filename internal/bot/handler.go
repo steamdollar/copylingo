@@ -23,12 +23,12 @@ type Bot struct {
 	stopCh   chan struct{}
 }
 
-// New creates a new Telegram bot instance.
 func New(cfg *config.Config, services *service.Services, rdb *redis.Client) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Telegram bot: %w", err)
 	}
+
 	api.Debug = cfg.Telegram.Debug
 	log.Printf("Telegram bot authorized as @%s", api.Self.UserName)
 
@@ -46,14 +46,17 @@ func New(cfg *config.Config, services *service.Services, rdb *redis.Client) (*Bo
 
 // Start begins listening for Telegram updates.
 func (b *Bot) Start() {
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
+	// 사용자가 보낸 메시지, 버튼 클릭 이벤트 등을 poll
+	pollConfig := tgbotapi.NewUpdate(0)
+	pollConfig.Timeout = 60
 
-	updates := b.api.GetUpdatesChan(u)
+	// 업데이트 받는 go chan 생성
+	updates := b.api.GetUpdatesChan(pollConfig)
 
 	for {
 		select {
 		case update := <-updates:
+			// update listen
 			go b.handleUpdate(update)
 		case <-b.stopCh:
 			log.Println("Telegram bot stopped")
@@ -66,6 +69,11 @@ func (b *Bot) Start() {
 func (b *Bot) Stop() {
 	close(b.stopCh)
 	b.api.StopReceivingUpdates()
+}
+
+// PushSession: 시간마다 세션 시작 메시지 전송
+func (b *Bot) PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error {
+	return b.flow.PushSession(ctx, chatID, sessionID, sessionType)
 }
 
 // SendMessage sends a text message to a chat.
@@ -102,8 +110,10 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	ctx := context.Background()
 
 	if update.Message != nil {
+		// text input handle
 		b.handleMessage(ctx, update.Message)
 	} else if update.CallbackQuery != nil {
+		// button click handle
 		b.handleCallback(ctx, update.CallbackQuery)
 	}
 }
@@ -118,17 +128,17 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	}
 
 	switch msg.Command() {
-	case "start":
+	case config.CommandStart:
 		b.handleStart(ctx, msg)
-	case "menu":
+	case config.CommandMenu:
 		b.handleMenu(ctx, msg)
-	case "stats":
+	case config.CommandStats:
 		b.handleStats(ctx, msg)
-	case "streak":
+	case config.CommandStreak:
 		b.handleStreak(ctx, msg)
-	case "test":
+	case config.CommandTest:
 		b.handleTest(ctx, msg)
-	case "help":
+	case config.CommandHelp:
 		b.handleHelp(ctx, msg)
 	default:
 		b.SendMessage(msg.Chat.ID, "❓ 알 수 없는 명령어입니다. /help 를 입력해 보세요.")
@@ -143,17 +153,17 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	data := cb.Data
 
 	switch {
-	case data == "menu:main":
+	case data == config.ActionMenuMain:
 		b.showMainMenu(ctx, cb.Message.Chat.ID, cb.From)
-	case data == "menu:study":
+	case data == config.ActionMenuStudy:
 		b.flow.StartStudy(ctx, cb)
-	case data == "menu:review":
+	case data == config.ActionMenuReview:
 		b.flow.StartReview(ctx, cb)
-	case data == "menu:stats":
+	case data == config.ActionMenuStats:
 		b.handleStatsCallback(ctx, cb)
-	case strings.HasPrefix(data, "session:"):
+	case strings.HasPrefix(data, config.PrefixSession):
 		b.flow.HandleSessionCallback(ctx, cb)
-	case strings.HasPrefix(data, "q:"):
+	case strings.HasPrefix(data, config.PrefixQuestion):
 		b.flow.HandleAnswerCallback(ctx, cb)
 	}
 }
@@ -212,12 +222,12 @@ func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.Use
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📚 학습하기", "menu:study"),
-			tgbotapi.NewInlineKeyboardButtonData(reviewLabel, "menu:review"),
+			tgbotapi.NewInlineKeyboardButtonData("📚 학습하기", config.ActionMenuStudy),
+			tgbotapi.NewInlineKeyboardButtonData(reviewLabel, config.ActionMenuReview),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 내 통계", "menu:stats"),
-			tgbotapi.NewInlineKeyboardButtonData("⚙️ 설정", "menu:settings"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 내 통계", config.ActionMenuStats),
+			tgbotapi.NewInlineKeyboardButtonData("⚙️ 설정", config.ActionMenuSettings),
 		),
 	)
 
@@ -277,7 +287,7 @@ func (b *Bot) handleStatsCallback(ctx context.Context, cb *tgbotapi.CallbackQuer
 
 	backBtn := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", "menu:main"),
+			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain),
 		),
 	)
 

@@ -19,9 +19,9 @@ telegram:
   token: ""  # Set via env: COPYLINGO_TELEGRAM_TOKEN
   debug: true
 
-openai:
-  api_key: ""  # Set via env: COPYLINGO_OPENAI_API_KEY
-  model: gpt-4o-mini
+llm:
+  api_key: ""  # Set via env: COPYLINGO_LLM_API_KEY
+  model: gemini-3.1-flash
 
 tts:
   enabled: true
