@@ -41,7 +41,7 @@ func run() error {
 
 	// Initialize repositories and services
 	repos := repository.NewRepositories(db)
-	services := service.NewServices(repos, rdb, cfg)
+	services := service.NewServices(repos, cfg)
 
 	// Initialize Telegram bot
 	botHandler, err := bot.New(cfg, services, rdb)

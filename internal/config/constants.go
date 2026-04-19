@@ -47,6 +47,6 @@ const (
 
 // Redis Key Patterns
 const (
-	KeySessionQuestionStart = "session:%d:question_start"
-	KeyUserActiveQuestion   = "user:%d:active_question"
+	KeySessionQuestionStart string = "session:%d:question_start"
+	KeyUserActiveQuestion   string = "user:%d:active_question"
 )

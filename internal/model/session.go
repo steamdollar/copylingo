@@ -37,11 +37,11 @@ type Session struct {
 
 // SessionQuestion represents a question entry within a session, including the user's answer.
 type SessionQuestion struct {
-	ID            int    `db:"id" json:"id"`
-	SessionID     int    `db:"session_id" json:"session_id"`
-	QuestionID    int    `db:"question_id" json:"question_id"`
-	QuestionOrder int    `db:"question_order" json:"question_order"`
-	IsReview      bool   `db:"is_review" json:"is_review"`
+	ID            int     `db:"id" json:"id"`
+	SessionID     int     `db:"session_id" json:"session_id"`
+	QuestionID    int     `db:"question_id" json:"question_id"`
+	QuestionOrder int     `db:"question_order" json:"question_order"`
+	IsReview      bool    `db:"is_review" json:"is_review"`
 	UserAnswer    *string `db:"user_answer" json:"user_answer"` // NULL = not answered yet
 	IsCorrect     *bool   `db:"is_correct" json:"is_correct"`   // NULL = not answered yet
 }

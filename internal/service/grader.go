@@ -120,4 +120,3 @@ func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, user
 		WrongAnswers:   wrongSQs,
 	}, nil
 }
-

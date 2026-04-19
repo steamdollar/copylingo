@@ -30,6 +30,8 @@ func (f *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuery
 
 	// Check for pending sessions
 	sessions, err := f.bot.services.SessionBuilder.GetPendingSessions(ctx, userID)
+
+	// 진행중인 세션이 없으면 리턴
 	if err != nil || len(sessions) == 0 {
 		f.bot.EditMessage(chatID, cb.Message.MessageID,
 			"📚 현재 대기 중인 학습 세션이 없습니다.\n다음 세션이 자동으로 전송될 예정입니다!",
@@ -42,6 +44,7 @@ func (f *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuery
 		return
 	}
 
+	// 순차적으로 세션 시작
 	session := sessions[0]
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
@@ -102,6 +105,7 @@ func (f *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQuer
 
 // HandleSessionCallback handles session-level callbacks (start, finish).
 func (f *SessionFlow) HandleSessionCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+	// e.g. session:50:start
 	parts := strings.Split(cb.Data, ":")
 	if len(parts) < 3 {
 		return
@@ -156,12 +160,14 @@ func (f *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Cal
 }
 
 func (f *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
-	if err := f.bot.services.SessionBuilder.StartSession(ctx, sessionID); err != nil {
+	// 세션 상태 update at db
+	if err := f.bot.
+		services.SessionBuilder.StartSession(ctx, sessionID); err != nil {
 		log.Printf("Error starting session: %v", err)
 		return
 	}
 
-	// Store session start time in Redis for timing
+	// redis에 k-v로 시작 시간 기록
 	key := fmt.Sprintf(config.KeySessionQuestionStart, sessionID)
 	f.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
 

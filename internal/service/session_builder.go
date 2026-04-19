@@ -113,7 +113,7 @@ func (s *SessionBuilderService) buildSession(
 		TotalQuestions: len(sessionQuestions),
 	}
 
-	if err := s.sessionRepo.Create(ctx, session); err != nil {
+	if err := s.sessionRepo.CreateSession(ctx, session); err != nil {
 		return nil, err
 	}
 

@@ -6,10 +6,11 @@
 
 ## 🔨 진행 중
 
-**Phase 2.2: JLPT 학습 자료 수집기**
+**Phase 2.2: JLPT 학습 자료 수집기 (진행 중)**
 
 - 목표: JLPT 기출 문제 수집 → contents 테이블 저장
-- 기존 파이프라인 재사용: JLPTFetcher 구현 후 Orchestrator에 등록
+- 최근 작업: 세션 레이어 리팩토링 및 DI 최적화 (`Services`에서 불필요한 Redis 의존성 제거, `CreateSession` 명칭 통일), 가나 시더 오타 수정
+- 남은 작업: JLPTFetcher 구현 완료 및 Orchestrator 등록
 - source_type: `exam_prep`
 
 ---

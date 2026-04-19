@@ -104,11 +104,13 @@ func main() {
 	ctx := context.Background()
 
 	rand.Seed(time.Now().UnixNano())
-	
+
 	romajiList := make([]string, 0, len(kanaMap))
 	kanaList := make([]string, 0, len(kanaMap))
 	for k, v := range kanaMap {
-		if k == "리ョ" { continue } // skip typo key
+		if k == "리ョ" {
+			continue
+		} // skip typo key
 		kanaList = append(kanaList, k)
 		romajiList = append(romajiList, v)
 	}
@@ -116,7 +118,7 @@ func main() {
 	totalInserted := 0
 	for _, k := range kanaList {
 		romaji := kanaMap[k]
-		
+
 		isFillBlank := rand.Float32() < 0.7 // 70% fill blank, 30% multiple choice
 
 		qType := model.QuestionFillBlank

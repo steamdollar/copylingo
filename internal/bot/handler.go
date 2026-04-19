@@ -46,7 +46,7 @@ func New(cfg *config.Config, services *service.Services, rdb *redis.Client) (*Bo
 
 // Start begins listening for Telegram updates.
 func (b *Bot) Start() {
-	// 사용자가 보낸 메시지, 버튼 클릭 이벤트 등을 poll
+	// 사용자가 보낸 메시지, 버튼 클릭 이벤트 등을 poll하는 것 관련 config
 	pollConfig := tgbotapi.NewUpdate(0)
 	pollConfig.Timeout = 60
 
@@ -161,6 +161,8 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.flow.StartReview(ctx, cb)
 	case data == config.ActionMenuStats:
 		b.handleStatsCallback(ctx, cb)
+		// 학습 세션 시작
+		// e.g. session:50:start
 	case strings.HasPrefix(data, config.PrefixSession):
 		b.flow.HandleSessionCallback(ctx, cb)
 	case strings.HasPrefix(data, config.PrefixQuestion):

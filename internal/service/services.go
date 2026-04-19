@@ -1,8 +1,6 @@
 package service
 
 import (
-	"github.com/redis/go-redis/v9"
-
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/repository"
@@ -18,14 +16,16 @@ type Services struct {
 }
 
 // NewServices creates all services with the given dependencies.
-func NewServices(repos *repository.Repositories, rdb *redis.Client, cfg *config.Config) *Services {
+func NewServices(repos *repository.Repositories, cfg *config.Config) *Services {
 	llm := external.NewLLMClient(cfg)
 
 	userService := NewUserService(repos.User)
 	srsService := NewSRSService(repos.Question)
-	graderService := NewGraderService(repos.User, repos.Question, repos.Session, repos.SessionQuestion, srsService, llm)
+	graderService := NewGraderService(repos.User,
+		repos.Question, repos.Session, repos.SessionQuestion, srsService, llm)
 	analyzerService := NewAnalyzerService(repos.User, repos.SessionQuestion)
-	sessionBuilderService := NewSessionBuilderService(repos.Question, repos.Session, repos.SessionQuestion, srsService)
+	sessionBuilderService := NewSessionBuilderService(repos.Question,
+		repos.Session, repos.SessionQuestion, srsService)
 
 	return &Services{
 		User:           userService,

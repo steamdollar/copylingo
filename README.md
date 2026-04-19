@@ -74,6 +74,16 @@ make run
 
 ---
 
+## 🚀 다른 머신에서 이어서 작업하기
+
+1. **Repository Clone**: `git clone <repo_url>`
+2. **Environment**: `.env.example`을 복사하여 `.env` 생성 후 API 키 설정.
+3. **Infrastructure**: `make infra` (Docker Postgres/Redis 기동)
+4. **Migration**: `make migrate` (DB 스키마 생성)
+5. **Seeding**: `go run ./cmd/kana_seeder` (기초 가나 데이터 생성)
+
+---
+
 ## AI 설정 (Gemini 무료 티어)
 
 [Google AI Studio](https://aistudio.google.com)에서 API 키 발급 후 `config.yaml` 수정:

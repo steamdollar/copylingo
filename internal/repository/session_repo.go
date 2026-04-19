@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lsj/copylingo/internal/model"
@@ -15,7 +16,7 @@ func NewSessionRepository(db *sqlx.DB) *SessionRepository {
 	return &SessionRepository{db: db}
 }
 
-func (r *SessionRepository) Create(ctx context.Context, s *model.Session) error {
+func (r *SessionRepository) CreateSession(ctx context.Context, s *model.Session) error {
 	return r.db.QueryRowContext(ctx, `
 		INSERT INTO sessions (user_id, type, status, total_questions)
 		VALUES ($1, $2, $3, $4)
@@ -42,23 +43,27 @@ func (r *SessionRepository) GetPendingSessions(ctx context.Context, userID int64
 
 // Start marks a session as in_progress.
 func (r *SessionRepository) Start(ctx context.Context, id int) error {
-	_, err := r.db.ExecContext(ctx, `
+	if _, err := r.db.ExecContext(ctx, `
 		UPDATE sessions SET status = 'in_progress', started_at = NOW() WHERE id = $1
-	`, id)
-	return err
+	`, id); err != nil {
+		log.Printf("Error starting session: %v", err)
+		return err
+	}
+	return nil
 }
 
-// Complete marks a session as completed with results.
 func (r *SessionRepository) Complete(ctx context.Context, id int, correctCount int) error {
-	_, err := r.db.ExecContext(ctx, `
+	if _, err := r.db.ExecContext(ctx, `
 		UPDATE sessions SET
 			status = 'completed', correct_count = $2, completed_at = NOW()
 		WHERE id = $1
-	`, id, correctCount)
-	return err
+	`, id, correctCount); err != nil {
+		log.Printf("Error completing session: %v", err)
+		return err
+	}
+	return nil
 }
 
-// GetTodaySessions returns today's sessions for a user.
 func (r *SessionRepository) GetTodaySessions(ctx context.Context, userID int64) ([]model.Session, error) {
 	var sessions []model.Session
 	err := r.db.SelectContext(ctx, &sessions, `
