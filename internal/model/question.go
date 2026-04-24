@@ -15,6 +15,8 @@ const (
 	QuestionFillBlank QuestionType = "fill_blank"
 	// QuestionSubjective - 주관식 (자유 입력 및 AI 채점)
 	QuestionSubjective QuestionType = "subjective"
+	// QuestionKanaHandwriting - 가나 손글씨 입력 (Mini App + AI binary grading)
+	QuestionKanaHandwriting QuestionType = "kana_handwriting"
 	// QuestionTranslation - 번역 문제
 	QuestionTranslation QuestionType = "translation"
 	// QuestionListening - 청해 문제

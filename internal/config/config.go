@@ -20,8 +20,9 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port int    `mapstructure:"port"`
-	Mode string `mapstructure:"mode"` // debug, release
+	Port          int    `mapstructure:"port"`
+	Mode          string `mapstructure:"mode"`            // debug, release
+	PublicBaseURL string `mapstructure:"public_base_url"` // HTTPS URL used by Telegram Mini Apps
 }
 
 type DBConfig struct {
@@ -97,6 +98,7 @@ func Load() (*Config, error) {
 	// Defaults
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("server.mode", "debug")
+	viper.SetDefault("server.public_base_url", "")
 	viper.SetDefault("db.host", "localhost")
 	viper.SetDefault("db.port", 5432)
 	viper.SetDefault("db.user", "copylingo")

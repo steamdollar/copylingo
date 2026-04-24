@@ -64,27 +64,57 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 		isCorrect = userAnswer == question.CorrectAnswer
 	}
 
+	if err := g.recordGradingResult(ctx, sessionID, questionID, question, userAnswer, isCorrect); err != nil {
+		return false, "", err
+	}
+
+	return isCorrect, feedback, nil
+}
+
+func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questionID int, renderedImage []byte) (bool, string, error) {
+	question, err := g.questionRepo.GetByID(ctx, questionID)
+	if err != nil {
+		return false, "", err
+	}
+	if question.Type != model.QuestionKanaHandwriting {
+		return false, "", ErrHandwritingInvalidQuestion
+	}
+
+	isCorrect, feedback, err := g.llm.GradeHandwriting(ctx, question.Prompt, question.CorrectAnswer, renderedImage)
+	if err != nil {
+		return false, "", err
+	}
+
+	userAnswer := "handwriting:" + question.CorrectAnswer
+	if err := g.recordGradingResult(ctx, sessionID, questionID, question, userAnswer, isCorrect); err != nil {
+		return false, "", err
+	}
+
+	return isCorrect, feedback, nil
+}
+
+func (g *GraderService) recordGradingResult(ctx context.Context, sessionID, questionID int, question *model.Question, userAnswer string, isCorrect bool) error {
 	// Record the answer in session_questions
 	if err := g.sessionQuestionRepo.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
-		return false, "", err
+		return err
 	}
 
 	// Update question statistics
 	if err := g.questionRepo.IncrementServed(ctx, questionID); err != nil {
-		return false, "", err
+		return err
 	}
 	if isCorrect {
 		if err := g.questionRepo.IncrementCorrect(ctx, questionID); err != nil {
-			return false, "", err
+			return err
 		}
 	}
 
 	// Update SRS schedule on the question itself
 	if err := g.srs.ProcessAnswer(ctx, question, isCorrect); err != nil {
-		return false, "", err
+		return err
 	}
 
-	return isCorrect, feedback, nil
+	return nil
 }
 
 // CompleteSession finalizes a session with results.

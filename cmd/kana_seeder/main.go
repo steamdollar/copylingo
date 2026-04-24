@@ -69,13 +69,11 @@ var kanaMap = map[string]string{
 	"ニャ": "nya", "ニュ": "nyu", "ニョ": "nyo",
 	"ヒャ": "hya", "ヒュ": "hyu", "ヒョ": "hyo",
 	"ミャ": "mya", "ミュ": "myu", "ミョ": "myo",
-	"リャ": "rya", "リュ": "ryu", "리ョ": "ryo", // Typo fixed below
+	"リャ": "rya", "リュ": "ryu", "リョ": "ryo",
 	"ギャ": "gya", "ギュ": "gyu", "ギョ": "gyo",
 	"ジャ": "ja", "ジュ": "ju", "ジョ": "jo",
 	"ビャ": "bya", "ビュ": "byu", "ビョ": "byo",
 	"ピャ": "pya", "ピュ": "pyu", "ピョ": "pyo",
-	// Fix typo in katakana yoon ('리' is Korean)
-	"リョ": "ryo",
 }
 
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
@@ -105,73 +103,120 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	romajiList := make([]string, 0, len(kanaMap))
 	kanaList := make([]string, 0, len(kanaMap))
+	romajiList := make([]string, 0, len(kanaMap))
 	for k, v := range kanaMap {
-		if k == "리ョ" {
-			continue
-		} // skip typo key
 		kanaList = append(kanaList, k)
 		romajiList = append(romajiList, v)
 	}
 
-	totalInserted := 0
-	for _, k := range kanaList {
-		romaji := kanaMap[k]
+	questions := make([]*model.Question, 0, len(kanaList)*3)
 
-		isFillBlank := rand.Float32() < 0.7 // 70% fill blank, 30% multiple choice
+	// Type 1: Kana -> Romaji (Existing)
+	for _, kana := range kanaList {
+		romaji := kanaMap[kana]
+		questions = append(questions, buildQuestion(kana, romaji, romajiList, true))
+	}
 
-		qType := model.QuestionFillBlank
-		var options []string
-		if isFillBlank {
-			options = []string{}
-		} else {
-			qType = model.QuestionMultipleChoice
-			// Generate 3 random incorrect options
-			options = append(options, romaji)
-			for len(options) < 4 {
-				wrong := romajiList[rand.Intn(len(romajiList))]
-				// Ensure distinct
-				exists := false
-				for _, o := range options {
-					if o == wrong {
-						exists = true
-						break
-					}
-				}
-				if !exists {
-					options = append(options, wrong)
+	// Type 2: Romaji -> Kana (New)
+	for _, kana := range kanaList {
+		romaji := kanaMap[kana]
+		questions = append(questions, buildQuestion(romaji, kana, kanaList, false))
+	}
+
+	// Type 3: Romaji -> Kana handwriting (Mini App)
+	for _, kana := range kanaList {
+		romaji := kanaMap[kana]
+		questions = append(questions, buildHandwritingQuestion(romaji, kana))
+	}
+
+	if err := repos.Question.CreateBatch(ctx, questions); err != nil {
+		log.Printf("Failed to insert kana questions batch: %v", err)
+		return
+	}
+
+	log.Printf("Successfully inserted %d Kana questions.", len(questions))
+}
+
+// buildQuestion constructs a Kana question for batch insertion.
+// promptVal is the value shown in the prompt (e.g., 'あ' or 'a').
+// answerVal is the correct answer (e.g., 'a' or '아').
+// wrongPool is the list of values to pick incorrect options from.
+// isToRomaji indicates if the answer is in Romaji (true) or Kana (false).
+func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji bool) *model.Question {
+	isFillBlank := rand.Float32() < 0.7
+
+	qType := model.QuestionFillBlank
+	var options []string
+	if !isFillBlank {
+		qType = model.QuestionMultipleChoice
+		options = append(options, answerVal)
+		for len(options) < 4 {
+			wrong := wrongPool[rand.Intn(len(wrongPool))]
+			if wrong == answerVal {
+				continue
+			}
+			exists := false
+			for _, o := range options {
+				if o == wrong {
+					exists = true
+					break
 				}
 			}
-			// Shuffle options
-			rand.Shuffle(len(options), func(i, j int) { options[i], options[j] = options[j], options[i] })
+			if !exists {
+				options = append(options, wrong)
+			}
 		}
+		rand.Shuffle(len(options), func(i, j int) { options[i], options[j] = options[j], options[i] })
+	}
 
-		optBytes, _ := json.Marshal(options)
+	optBytes, _ := json.Marshal(options)
 
-		prompt := fmt.Sprintf("다음 문자의 올바른 발음을 입력하세요: <b>%s</b>", k)
-		if !isFillBlank {
-			prompt = fmt.Sprintf("다음 문자의 올바른 발음을 고르시오: <b>%s</b>", k)
-		}
-
-		q := &model.Question{
-			Type:             qType,
-			Language:         "ja",
-			ProficiencyLevel: "N5",
-			Category:         "kana",
-			Prompt:           prompt,
-			Options:          optBytes,
-			CorrectAnswer:    romaji,
-			Explanation:      fmt.Sprintf("%s 발음은 '%s' 입니다.", k, romaji),
-			Difficulty:       1,
-		}
-
-		if err := repos.Question.Create(ctx, q); err != nil {
-			log.Printf("Failed to insert question for %s: %v", k, err)
+	var prompt string
+	if isToRomaji {
+		if isFillBlank {
+			prompt = fmt.Sprintf("다음 문자의 올바른 발음을 입력하세요: <b>%s</b>", promptVal)
 		} else {
-			totalInserted++
+			prompt = fmt.Sprintf("다음 문자의 올바른 발음을 고르시오: <b>%s</b>", promptVal)
+		}
+	} else {
+		if isFillBlank {
+			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자를 입력하세요", promptVal)
+		} else {
+			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자를 고르시오", promptVal)
 		}
 	}
 
-	log.Printf("Successfully inserted %d Kana questions.", totalInserted)
+	var explanation string
+	if isToRomaji {
+		explanation = fmt.Sprintf("<b>%s</b>의 발음은 <b>'%s'</b>입니다.", promptVal, answerVal)
+	} else {
+		explanation = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자는 <b>%s</b>입니다.", promptVal, answerVal)
+	}
+
+	return &model.Question{
+		Type:             qType,
+		Language:         "ja",
+		ProficiencyLevel: "N5",
+		Category:         "kana",
+		Prompt:           prompt,
+		Options:          optBytes,
+		CorrectAnswer:    answerVal,
+		Explanation:      explanation,
+		Difficulty:       1,
+	}
+}
+
+func buildHandwritingQuestion(romaji, kana string) *model.Question {
+	return &model.Question{
+		Type:             model.QuestionKanaHandwriting,
+		Language:         "ja",
+		ProficiencyLevel: "N5",
+		Category:         "kana",
+		Prompt:           fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자를 손글씨로 쓰세요", romaji),
+		Options:          []byte("[]"),
+		CorrectAnswer:    kana,
+		Explanation:      fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자는 <b>%s</b>입니다.", romaji, kana),
+		Difficulty:       1,
+	}
 }

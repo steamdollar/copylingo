@@ -1,6 +1,7 @@
 server:
   port: 8080
   mode: debug
+  public_base_url: ""  # Set via env: COPYLINGO_SERVER_PUBLIC_BASE_URL
 
 db:
   host: localhost

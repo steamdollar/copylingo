@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -142,6 +143,10 @@ func (f *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Cal
 	if parts[2] == "next" {
 		currentIdx := 0
 		fmt.Sscanf(parts[3], "%d", &currentIdx)
+		if !f.isQuestionAnswered(ctx, sessionID, currentIdx) {
+			f.bot.SendMessage(cb.Message.Chat.ID, "✍️ 먼저 손글씨 답안을 제출해 주세요.")
+			return
+		}
 		// 1. Remove the "Next" button from current feedback to avoid confusion
 		f.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, cb.Message.Text, nil)
 		// 2. Show next question as a NEW message (0 messageID)
@@ -208,6 +213,27 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 	var keyboard *tgbotapi.InlineKeyboardMarkup
 
 	switch question.Type {
+	case model.QuestionKanaHandwriting:
+		nextData := fmt.Sprintf(config.FormatQuestionNext, sessionID, questionIdx)
+
+		miniAppURL, err := f.handwritingMiniAppURL(sessionID, question.ID)
+		if err != nil {
+			text += "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요."
+			break
+		}
+
+		text += "\n\n✍️ 아래 버튼을 눌러 화면에 글자를 써 주세요.\n제출 후 이 채팅으로 돌아와 다음 문제를 진행하면 됩니다."
+		replyMarkup := webAppKeyboardMarkup{
+			InlineKeyboard: [][]webAppButton{
+				{newWebAppButton("✍️ 손글씨로 답하기", miniAppURL)},
+				{newCallbackButton("제출 후 다음 문제 →", nextData)},
+			},
+		}
+		if messageID > 0 {
+			f.bot.EditMessage(chatID, messageID, "✍️ 손글씨 문항을 새 메시지로 보냈습니다.", nil)
+		}
+		f.bot.SendMessageWithReplyMarkup(chatID, text, replyMarkup)
+		return
 	case model.QuestionFillBlank, model.QuestionSubjective:
 		// Set active question in Redis for 1 hour
 		key := fmt.Sprintf(config.KeyUserActiveQuestion, chatID)
@@ -256,6 +282,30 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 			f.bot.SendMessage(chatID, text)
 		}
 	}
+}
+
+func (f *SessionFlow) isQuestionAnswered(ctx context.Context, sessionID, questionIdx int) bool {
+	sqs, err := f.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+	if err != nil || questionIdx < 0 || questionIdx >= len(sqs) {
+		return false
+	}
+	return sqs[questionIdx].IsCorrect != nil
+}
+
+func (f *SessionFlow) handwritingMiniAppURL(sessionID, questionID int) (string, error) {
+	baseURL := strings.TrimRight(f.bot.cfg.Server.PublicBaseURL, "/")
+	if baseURL == "" {
+		return "", fmt.Errorf("server public base url is empty")
+	}
+	u, err := url.Parse(baseURL + config.PathHandwritingMiniApp)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	q.Set("session_id", strconv.Itoa(sessionID))
+	q.Set("question_id", strconv.Itoa(questionID))
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, questionID int, optionIdx int) {

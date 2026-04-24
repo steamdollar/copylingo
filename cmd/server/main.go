@@ -61,7 +61,7 @@ func run() error {
 	go botHandler.Start()
 
 	// Start HTTP server (health check + admin API)
-	router := setupRouter(cfg, db, rdb)
+	router := setupRouter(cfg, db, rdb, services)
 	srv := startHTTPServer(cfg, router)
 
 	// Graceful shutdown

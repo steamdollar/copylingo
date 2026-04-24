@@ -2,6 +2,9 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"log"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lsj/copylingo/internal/model"
@@ -15,12 +18,19 @@ func NewQuestionRepository(db *sqlx.DB) *QuestionRepository {
 	return &QuestionRepository{db: db}
 }
 
-func (r *QuestionRepository) Create(ctx context.Context, q *model.Question) error {
-	return r.db.QueryRowContext(ctx, `
-		INSERT INTO questions (content_id, type, language, proficiency_level, category, prompt, options, correct_answer, explanation, audio_path, difficulty)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id
-	`, q.ContentID, q.Type, q.Language, q.ProficiencyLevel, q.Category, q.Prompt, q.Options, q.CorrectAnswer, q.Explanation, q.AudioPath, q.Difficulty).Scan(&q.ID)
+// CreateBatch inserts multiple questions in a single transaction and round-trip.
+func (r *QuestionRepository) CreateBatch(ctx context.Context, questions []*model.Question) error {
+	if len(questions) == 0 {
+		return nil
+	}
+
+	query, args := buildQuestionBatchInsertQuery(questions)
+	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
+		log.Println("QuestionBatch insert failed:", err)
+		return err
+	}
+
+	return nil
 }
 
 func (r *QuestionRepository) GetByID(ctx context.Context, id int) (*model.Question, error) {
@@ -86,4 +96,43 @@ func (r *QuestionRepository) IncrementServed(ctx context.Context, id int) error 
 func (r *QuestionRepository) IncrementCorrect(ctx context.Context, id int) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE questions SET times_correct = times_correct + 1 WHERE id = $1`, id)
 	return err
+}
+
+func buildQuestionBatchInsertQuery(questions []*model.Question) (string, []any) {
+	const columnCount = 11
+
+	var query strings.Builder
+	query.WriteString(`
+		INSERT INTO questions (content_id, type, language, proficiency_level, category, prompt, options, correct_answer, explanation, audio_path, difficulty)
+		VALUES
+	`)
+
+	args := make([]any, 0, len(questions)*columnCount)
+	for i, q := range questions {
+		if i > 0 {
+			query.WriteString(",")
+		}
+
+		base := i * columnCount
+		query.WriteString(fmt.Sprintf(
+			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9, base+10, base+11,
+		))
+
+		args = append(args,
+			q.ContentID,
+			q.Type,
+			q.Language,
+			q.ProficiencyLevel,
+			q.Category,
+			q.Prompt,
+			q.Options,
+			q.CorrectAnswer,
+			q.Explanation,
+			q.AudioPath,
+			q.Difficulty,
+		)
+	}
+
+	return query.String(), args
 }

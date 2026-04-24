@@ -50,3 +50,9 @@ const (
 	KeySessionQuestionStart string = "session:%d:question_start"
 	KeyUserActiveQuestion   string = "user:%d:active_question"
 )
+
+// Mini App routes
+const (
+	PathHandwritingMiniApp = "/miniapp/handwriting"
+	PathHandwritingSubmit  = "/api/miniapp/handwriting/submit"
+)

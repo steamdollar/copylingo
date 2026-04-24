@@ -2,6 +2,7 @@ package external
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -12,6 +13,7 @@ import (
 // LLMClient defines the interface for interacting with Language Models.
 type LLMClient interface {
 	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error)
+	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error)
 }
 
 // GradeResult represents the structured JSON output from the LLM.
@@ -94,6 +96,78 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 	var result GradeResult
 	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
 		return false, "", fmt.Errorf("failed to parse llm output (%s): %w", rawContent, err)
+	}
+
+	return result.IsCorrect, result.Feedback, nil
+}
+
+// GradeHandwriting verifies whether a rendered handwriting image matches the expected Kana.
+func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error) {
+	if c.client == nil || c.model == "" {
+		return false, "", config.ErrAIConfigMissing
+	}
+
+	systemPrompt := `You are an expert Japanese kana handwriting grader.
+You must return strict JSON only. Do not use markdown blocks.
+
+JSON schema:
+{
+  "is_correct": boolean,
+  "feedback": "string (Short Korean feedback explaining the result)"
+}
+
+Rules:
+1. This is binary verification, not open-ended OCR.
+2. Decide whether the handwritten image can reasonably be accepted as the expected kana.
+3. Accept minor wobble, uneven stroke width, and imperfect mobile handwriting.
+4. Reject if it looks like a different kana, has missing essential strokes, or is unreadable.
+5. Keep feedback concise and direct in Korean.`
+
+	userPrompt := fmt.Sprintf(`Question Context: %s
+Expected Kana: %s
+
+Evaluate whether the handwriting image matches the Expected Kana and output JSON.`, questionPrompt, correctAnswer)
+
+	imageURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngImage)
+	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: c.model,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: systemPrompt,
+			},
+			{
+				Role: openai.ChatMessageRoleUser,
+				MultiContent: []openai.ChatMessagePart{
+					{
+						Type: openai.ChatMessagePartTypeText,
+						Text: userPrompt,
+					},
+					{
+						Type: openai.ChatMessagePartTypeImageURL,
+						ImageURL: &openai.ChatMessageImageURL{
+							URL:    imageURL,
+							Detail: openai.ImageURLDetailLow,
+						},
+					},
+				},
+			},
+		},
+		ResponseFormat: &openai.ChatCompletionResponseFormat{
+			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		},
+	})
+	if err != nil {
+		return false, "", fmt.Errorf("llm handwriting grading request failed: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return false, "", fmt.Errorf("empty llm handwriting response")
+	}
+
+	rawContent := resp.Choices[0].Message.Content
+	var result GradeResult
+	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
+		return false, "", fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
 	}
 
 	return result.IsCorrect, result.Feedback, nil

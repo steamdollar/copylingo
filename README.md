@@ -77,25 +77,129 @@ make run
 ## 🚀 다른 머신에서 이어서 작업하기
 
 1. **Repository Clone**: `git clone <repo_url>`
-2. **Environment**: `.env.example`을 복사하여 `.env` 생성 후 API 키 설정.
+2. **Environment**: 필요한 환경변수 직접 설정
 3. **Infrastructure**: `make infra` (Docker Postgres/Redis 기동)
 4. **Migration**: `make migrate` (DB 스키마 생성)
-5. **Seeding**: `go run ./cmd/kana_seeder` (기초 가나 데이터 생성)
+5. **Seeding**: `go run ./cmd/kana_seeder` (기초 가나 + 손글씨 문항 생성)
+6. **Run**: `COPYLINGO_TELEGRAM_TOKEN=... COPYLINGO_LLM_API_KEY=... go run ./cmd/server`
+
+예시:
+
+```bash
+export COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>"
+export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
+
+make infra
+make migrate
+go run ./cmd/kana_seeder
+go run ./cmd/server
+```
+
+## Telegram Mini App + Cloudflare Tunnel 설정
+
+손글씨 가나 문항은 Telegram Mini App으로 열리므로, 로컬 서버를 단순 `localhost:8080`으로만 띄워서는 휴대폰 Telegram 앱에서 접근할 수 없습니다.
+다른 머신에서도 동일하게, **외부에서 접근 가능한 HTTPS URL**을 만든 뒤 그 URL을 `COPYLINGO_SERVER_PUBLIC_BASE_URL`로 주입해야 합니다.
+
+현재 손글씨 플로우는 아래 엔드포인트를 사용합니다.
+
+- `GET /miniapp/handwriting`
+- `POST /api/miniapp/handwriting/submit`
+
+### 1. 로컬 서버 실행
+
+```bash
+export COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>"
+export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
+
+make infra
+make migrate
+go run ./cmd/kana_seeder
+go run ./cmd/server
+```
+
+기본적으로 Go 서버는 `:8080`에서 실행됩니다.
+
+### 2. Cloudflare Tunnel로 HTTPS 공개 URL 발급
+
+가장 단순한 개발 방식은 Cloudflare Tunnel입니다.
+
+```bash
+cloudflared tunnel --url http://localhost:8080
+```
+
+실행 후 `https://xxxxx.trycloudflare.com` 같은 공개 HTTPS URL이 출력됩니다.
+
+### 3. public base URL 설정
+
+터널에서 받은 URL을 `COPYLINGO_SERVER_PUBLIC_BASE_URL`로 설정한 뒤 서버를 다시 실행합니다.
+
+```bash
+export COPYLINGO_SERVER_PUBLIC_BASE_URL="https://xxxxx.trycloudflare.com"
+go run ./cmd/server
+```
+
+또는 `config.yaml`에 직접 넣어도 됩니다.
+
+```yaml
+server:
+  port: 8080
+  mode: debug
+  public_base_url: "https://xxxxx.trycloudflare.com"
+```
+
+### 4. BotFather에서 Mini App 도메인 설정
+
+Telegram Mini App URL은 BotFather에 등록된 도메인과 일치해야 합니다.
+
+필수 확인:
+- BotFather에서 해당 봇의 Mini App/Web App 도메인 설정
+- `public_base_url`의 host가 등록된 도메인과 일치하는지 확인
+- tunnel URL이 바뀌면 `public_base_url`도 함께 갱신
+
+### 5. 동작 확인 순서
+
+1. Telegram에서 `/test`로 세션 생성
+2. 손글씨 문항이 나오면 `✍️ 손글씨로 답하기` 버튼 클릭
+3. Mini App이 열리면 canvas에 글자 입력 후 제출
+4. Mini App 내부에서 채점 결과 확인
+5. Telegram 채팅으로 돌아와 `제출 후 다음 문제 →` 버튼 클릭
+
+### 6. 다른 머신에서 옮길 때 바꿔야 하는 것
+
+- `COPYLINGO_TELEGRAM_TOKEN`
+- `COPYLINGO_LLM_API_KEY`
+- `COPYLINGO_SERVER_PUBLIC_BASE_URL`
+- PostgreSQL / Redis 접근 정보
+- Cloudflare Tunnel URL 또는 실제 운영 도메인
+
+### 7. 주의사항
+
+- `localhost`는 휴대폰 Telegram 앱에서 당신 PC를 가리키지 않습니다.
+- Mini App은 HTTPS 공개 URL이 필요합니다.
+- tunnel URL이 바뀌면 Bot이 생성하는 Mini App 링크도 즉시 바뀌므로, 서버 재시작 전 `public_base_url`을 맞춰야 합니다.
+- `COPYLINGO_SERVER_PUBLIC_BASE_URL`이 비어 있으면 손글씨 문항에서 Mini App 버튼 대신 설정 경고가 출력됩니다.
 
 ---
 
 ## AI 설정 (Gemini 무료 티어)
 
-[Google AI Studio](https://aistudio.google.com)에서 API 키 발급 후 `config.yaml` 수정:
+[Google AI Studio](https://aistudio.google.com)에서 API 키 발급 후 `config.yaml` 또는 환경변수 설정:
 
 ```yaml
-openai:
+llm:
   api_key: "AIza..."
-  model: "gemini-2.0-flash"
+  model: "gemini-3.1-flash"
   base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
 ```
 
-| Gemini 2.0 Flash 무료 한도 | 예상 사용량 |
+환경변수 예시:
+
+```bash
+export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
+export COPYLINGO_LLM_MODEL="gemini-3.1-flash"
+```
+
+| Gemini 3.1 Flash 무료 한도 | 예상 사용량 |
 |---|---|
 | 1,500 RPD | ~30회/일 (문제 생성 배치) |
 | 15 RPM | 새벽 3시 배치, 무관 |
@@ -107,7 +211,8 @@ openai:
 ```bash
 # .env 파일 생성
 echo "COPYLINGO_TELEGRAM_TOKEN=<토큰>" >> .env
-echo "COPYLINGO_OPENAI_API_KEY=<Gemini API 키>" >> .env
+echo "COPYLINGO_LLM_API_KEY=<Gemini API 키>" >> .env
+echo "COPYLINGO_SERVER_PUBLIC_BASE_URL=https://copylingo.example.com" >> .env
 
 # 전체 컨테이너 빌드 & 기동
 docker compose up -d

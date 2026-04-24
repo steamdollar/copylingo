@@ -12,6 +12,7 @@ type Services struct {
 	SRS            *SRSService
 	SessionBuilder *SessionBuilderService
 	Grader         *GraderService
+	Handwriting    *HandwritingService
 	Analyzer       *AnalyzerService
 }
 
@@ -26,12 +27,14 @@ func NewServices(repos *repository.Repositories, cfg *config.Config) *Services {
 	analyzerService := NewAnalyzerService(repos.User, repos.SessionQuestion)
 	sessionBuilderService := NewSessionBuilderService(repos.Question,
 		repos.Session, repos.SessionQuestion, srsService)
+	handwritingService := NewHandwritingService(repos.Session, repos.Question, repos.SessionQuestion, graderService, nil)
 
 	return &Services{
 		User:           userService,
 		SRS:            srsService,
 		SessionBuilder: sessionBuilderService,
 		Grader:         graderService,
+		Handwriting:    handwritingService,
 		Analyzer:       analyzerService,
 	}
 }

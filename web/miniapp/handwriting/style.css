@@ -1,0 +1,121 @@
+:root {
+  --ink: #162016;
+  --muted: #5f6f61;
+  --paper: #fbf4e2;
+  --field: #fffdf5;
+  --accent: #1f7a52;
+  --accent-dark: #13573a;
+  --border: rgba(22, 32, 22, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(249, 191, 79, 0.24), transparent 28%),
+    linear-gradient(145deg, #edf4df 0%, var(--paper) 52%, #e6f1ea 100%);
+}
+
+.shell {
+  width: min(100%, 460px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 28px 18px 24px;
+}
+
+.hero {
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent-dark);
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.05;
+}
+
+.hint {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: rgba(255, 253, 245, 0.82);
+  box-shadow: 0 18px 48px rgba(31, 58, 40, 0.14);
+}
+
+#pad {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid rgba(31, 122, 82, 0.24);
+  border-radius: 22px;
+  background:
+    linear-gradient(rgba(31, 122, 82, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 122, 82, 0.12) 1px, transparent 1px),
+    var(--field);
+  background-size: 50% 50%;
+  touch-action: none;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 999px;
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.primary {
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+
+.secondary {
+  color: var(--accent-dark);
+  background: rgba(31, 122, 82, 0.12);
+}
+
+button:disabled {
+  opacity: 0.58;
+}
+
+.status {
+  min-height: 24px;
+  margin: 12px 4px 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}

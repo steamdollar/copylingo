@@ -9,7 +9,7 @@
 **Phase 2.2: JLPT 학습 자료 수집기 (진행 중)**
 
 - 목표: JLPT 기출 문제 수집 → contents 테이블 저장
-- 최근 작업: 세션 레이어 리팩토링 및 DI 최적화 (`Services`에서 불필요한 Redis 의존성 제거, `CreateSession` 명칭 통일), 가나 시더 오타 수정
+- 최근 작업: 세션 레이어 리팩토링 및 가나 시더 문제 유형 확장 (영발음 -> 가나 추가)
 - 남은 작업: JLPTFetcher 구현 완료 및 Orchestrator 등록
 - source_type: `exam_prep`
 
@@ -31,6 +31,10 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-04-24 | README에 Mini App + Cloudflare Tunnel 설정 절차 추가 | `2604241732_readme_miniapp_tunnel_setup.md` |
+| 2026-04-24 | kana seeder batch insert + transaction 적용 | `2604241625_kana_seeder_batch_insert.md` |
+| 2026-04-23 | 손글씨 가나 Mini App MVP 구현 | `2604231736_handwriting_miniapp_mvp.md` |
+| 2026-04-23 | 손글씨 가나 문항 구현 방향 ADR 기록 (Mini App + Binary Grading) | `2604231712_handwriting_miniapp_adr.md` |
 | 2026-04-16 | 서비스 계층 개별 의존성 주입(Individual DI) 적용 및 UserService 분리 | `2604162325_service_di_refactoring.md` |
 | 2026-04-16 | Phase 2.3: AI 주관식 유사도 채점 기능 및 UX 인디케이터 추가 | `2604161909_phase_2_3_ai_subjective.md` |
 | 2026-03-31 | 봇 세션 플로우 개선 및 결과 요약 에러 수정 | `2603310123_bot_fixes_and_dx_optimization.md` |

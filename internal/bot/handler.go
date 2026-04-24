@@ -95,6 +95,15 @@ func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbota
 	return err
 }
 
+// SendMessageWithReplyMarkup sends a message with custom Telegram reply markup.
+func (b *Bot) SendMessageWithReplyMarkup(chatID int64, text string, replyMarkup interface{}) error {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ParseMode = "HTML"
+	msg.ReplyMarkup = replyMarkup
+	_, err := b.api.Send(msg)
+	return err
+}
+
 // EditMessage edits an existing message.
 func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *tgbotapi.InlineKeyboardMarkup) error {
 	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)

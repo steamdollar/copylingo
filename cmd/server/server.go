@@ -18,6 +18,7 @@ import (
 	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
+	"github.com/lsj/copylingo/internal/miniapp"
 	"github.com/lsj/copylingo/internal/pipeline"
 	"github.com/lsj/copylingo/internal/repository"
 	"github.com/lsj/copylingo/internal/scheduler"
@@ -111,7 +112,7 @@ func waitForShutdown(srv *http.Server, botHandler *bot.Bot) {
 	log.Println("Server stopped")
 }
 
-func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client) *gin.Engine {
+func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client, services *service.Services) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -144,6 +145,8 @@ func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client) *gin.Engine
 			"time":   time.Now().Format(time.RFC3339),
 		})
 	})
+
+	miniapp.RegisterRoutes(r, cfg, services)
 
 	return r
 }
