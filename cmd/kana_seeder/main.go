@@ -76,6 +76,19 @@ var kanaMap = map[string]string{
 	"ピャ": "pya", "ピュ": "pyu", "ピョ": "pyo",
 }
 
+func kanaScriptLabel(kana string) string {
+	for _, r := range kana {
+		switch {
+		case r >= 'ぁ' && r <= 'ゖ':
+			return "히라가나"
+		case r >= 'ァ' && r <= 'ヺ':
+			return "가타카나"
+		}
+	}
+
+	return "가나"
+}
+
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.DBName, cfg.DB.SSLMode)
@@ -173,6 +186,11 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 	optBytes, _ := json.Marshal(options)
 
 	var prompt string
+	scriptLabel := ""
+	if !isToRomaji {
+		scriptLabel = kanaScriptLabel(answerVal)
+	}
+
 	if isToRomaji {
 		if isFillBlank {
 			prompt = fmt.Sprintf("다음 문자의 올바른 발음을 입력하세요: <b>%s</b>", promptVal)
@@ -181,9 +199,9 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 		}
 	} else {
 		if isFillBlank {
-			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자를 입력하세요", promptVal)
+			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 입력하세요", promptVal, scriptLabel)
 		} else {
-			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자를 고르시오", promptVal)
+			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 고르시오", promptVal, scriptLabel)
 		}
 	}
 
@@ -191,7 +209,7 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 	if isToRomaji {
 		explanation = fmt.Sprintf("<b>%s</b>의 발음은 <b>'%s'</b>입니다.", promptVal, answerVal)
 	} else {
-		explanation = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자는 <b>%s</b>입니다.", promptVal, answerVal)
+		explanation = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자는 <b>%s</b>입니다.", promptVal, scriptLabel, answerVal)
 	}
 
 	return &model.Question{

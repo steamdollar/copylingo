@@ -9,7 +9,7 @@
 **Phase 2.2: JLPT 학습 자료 수집기 (진행 중)**
 
 - 목표: JLPT 기출 문제 수집 → contents 테이블 저장
-- 최근 작업: 세션 레이어 리팩토링 및 가나 시더 문제 유형 확장 (영발음 -> 가나 추가)
+- 최근 작업: 가나 시더 Type 2 문제 텍스트에 히라가나/가타카나 표시 추가
 - 남은 작업: JLPTFetcher 구현 완료 및 Orchestrator 등록
 - source_type: `exam_prep`
 
@@ -31,6 +31,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-04-25 | kana seeder Type 2 문항 script label 추가 | `2604250015_kana_seeder_type2_script_label.md` |
 | 2026-04-24 | README에 Mini App + Cloudflare Tunnel 설정 절차 추가 | `2604241732_readme_miniapp_tunnel_setup.md` |
 | 2026-04-24 | kana seeder batch insert + transaction 적용 | `2604241625_kana_seeder_batch_insert.md` |
 | 2026-04-23 | 손글씨 가나 Mini App MVP 구현 | `2604231736_handwriting_miniapp_mvp.md` |
