@@ -31,6 +31,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-07 | Cloudflare Quick Tunnel URL 자동 반영 스크립트 추가 | `2605072247_quick_tunnel_env_script.md` |
+| 2026-05-07 | 손글씨 Mini App ingress/Cloudflare Tunnel ADR 및 운영 문서화 | `2605072128_handwriting_miniapp_ingress_docs.md` |
 | 2026-04-25 | kana seeder Type 2 문항 script label 추가 | `2604250015_kana_seeder_type2_script_label.md` |
 | 2026-04-24 | README에 Mini App + Cloudflare Tunnel 설정 절차 추가 | `2604241732_readme_miniapp_tunnel_setup.md` |
 | 2026-04-24 | kana seeder batch insert + transaction 적용 | `2604241625_kana_seeder_batch_insert.md` |

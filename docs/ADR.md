@@ -140,3 +140,39 @@
   - 종이 또는 외부 앱에 쓴 뒤 사진 업로드: 구현은 단순하지만 UX가 좋지 않아 기각
   - 세션 전체를 Mini App으로 이전: UX 일관성은 좋지만 현재 구조 대비 변경 범위가 과도하여 기각
   - 원본 PNG를 매 시도마다 Gemini에 직접 전달: 초기 구현은 쉬우나 네트워크/비용 측면에서 비효율적이라 기각
+
+---
+
+## ADR-011: 손글씨 Mini App 제출은 HTTPS 공개 ingress + 서버 측 검증으로 처리
+
+- **날짜**: 2026-05-07
+- **상태**: 채택됨
+- **맥락**:
+  - 손글씨 문항은 Telegram Mini App 내부 canvas에서 입력된다.
+  - 휴대폰 Telegram 앱에서 열린 Mini App은 개발 머신의 `localhost:8080`에 접근할 수 없다.
+  - Telegram Mini App은 실사용 경로에서 HTTPS 공개 URL이 필요하며, Bot이 생성하는 `web_app` URL의 host는 BotFather에 등록된 Mini App/Web App 도메인과 일치해야 한다.
+  - 서버는 이미 Gin HTTP 서버를 `:8080`에서 실행하고, 손글씨 제출 API를 `POST /api/miniapp/handwriting/submit`으로 제공한다.
+- **결정**:
+  - 손글씨 제출은 Bot Callback Data가 아니라 Mini App의 HTTP `POST`로 받는다.
+  - Mini App은 원본 이미지 파일을 직접 업로드하지 않고, `init_data`, `session_id`, `question_id`, `strokes`를 JSON으로 전송한다.
+  - 서버는 Telegram `init_data`를 검증한 뒤, 세션 소유자와 제출 사용자가 일치하는지 확인한다.
+  - 서버는 제출된 `question_id`가 해당 세션에 포함되어 있고, 문항 타입이 `kana_handwriting`이며, 아직 답변되지 않았는지 확인한다.
+  - 서버는 stroke data를 PNG로 렌더링한 뒤, 정답이 이미 알려진 문항이라는 전제를 활용해 LLM multimodal 채점에 전달한다.
+  - 로컬/개발 환경의 공개 HTTPS ingress는 Cloudflare Tunnel(`cloudflared tunnel --url http://localhost:8080`)을 우선 사용한다.
+  - 운영 환경에서는 Cloudflare Tunnel 임시 URL보다 고정 도메인 + HTTPS reverse proxy 또는 named tunnel 구성을 사용한다.
+- **장점**:
+  - Telegram 채팅 UI의 입력 한계를 우회하면서도 Bot 세션 흐름을 유지한다.
+  - raw image upload보다 stroke-first payload가 작고, 서버에서 렌더링 크기를 통제할 수 있다.
+  - Telegram `init_data` 검증과 세션 소유권 검증을 서버에서 수행하므로, Mini App 클라이언트를 신뢰하지 않아도 된다.
+  - 개발 단계에서 OS firewall/NAT/router 포트를 직접 열지 않고 HTTPS 공개 URL을 만들 수 있다.
+  - HTTPS endpoint가 고정되면 BotFather 도메인 검증, Mini App URL 생성, submit API 호출 경로가 단순해진다.
+- **단점**:
+  - Mini App, public ingress, BotFather 도메인 설정이라는 운영 요소가 추가된다.
+  - Cloudflare Tunnel 임시 URL은 재실행 시 바뀔 수 있어 `COPYLINGO_SERVER_PUBLIC_BASE_URL`과 BotFather 설정을 다시 맞춰야 한다.
+  - tunnel을 켜 둔 동안에는 로컬 `:8080` HTTP surface가 인터넷에서 접근 가능해진다.
+  - 현재 Docker Compose는 PostgreSQL/Redis도 host port로 publish하고 있으므로, public 서버 배포 전 별도 hardening이 필요하다.
+- **대안**:
+  - OS/router에서 `8080`을 직접 공개: HTTPS, 인증서, NAT, firewall 관리 부담이 커서 개발용으로 기각
+  - Telegram 채팅에 사진 업로드: 구현은 단순하지만 반복 학습 UX가 나빠 기각
+  - 모든 학습 세션을 Web App으로 이전: 현재 Bot 중심 구조 대비 변경 범위가 커서 기각
+  - 서버 없이 클라이언트에서 채점: 정답/채점 기준 노출 및 조작 가능성이 커서 기각

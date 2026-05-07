@@ -85,6 +85,27 @@ internal/
   [결과 요약 (정답률, XP, 오답 목록)]
 ```
 
+### 손글씨 Mini App 제출 흐름
+
+손글씨 가나 문항은 Telegram Bot 채팅 UI만으로 입력을 받을 수 없으므로, 해당 문항에서만 Telegram Mini App을 연다.
+Bot은 세션 진행을 유지하고, Mini App은 canvas stroke data를 HTTP로 제출한다.
+
+```
+[Telegram Bot]
+  → web_app button: /miniapp/handwriting?session_id=...&question_id=...
+[Mini App]
+  → POST /api/miniapp/handwriting/submit
+     { init_data, session_id, question_id, strokes }
+[Go Server]
+  → Telegram init_data 검증
+  → session ownership / question membership / duplicate answer 검증
+  → stroke data PNG 렌더링
+  → LLM Binary Grading
+  → session_questions, question stats, SRS 업데이트
+```
+
+외부 HTTPS ingress와 Cloudflare Tunnel 운영 메모는 [`HANDWRITING_MINIAPP_INGRESS.md`](HANDWRITING_MINIAPP_INGRESS.md)를 기준으로 한다.
+
 ## Callback Data 규약
 
 ```

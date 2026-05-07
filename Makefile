@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker-up docker-down migrate dev app-up app-logs restart-db restart-redis infra tmux tmux-stop
+.PHONY: build run test clean docker-up docker-down migrate dev app-up app-logs restart-db restart-redis infra tunnel tmux tmux-stop
 
 # Build the application
 build:
@@ -79,6 +79,10 @@ migrate-down:
 # Development: start infra only (DB + Redis)
 infra:
 	docker compose up -d postgres redis
+
+# Development: start Cloudflare Quick Tunnel and update .env public base URL
+tunnel:
+	./scripts/start_quick_tunnel.sh
 
 # Lint
 lint:

@@ -100,6 +100,8 @@ go run ./cmd/server
 손글씨 가나 문항은 Telegram Mini App으로 열리므로, 로컬 서버를 단순 `localhost:8080`으로만 띄워서는 휴대폰 Telegram 앱에서 접근할 수 없습니다.
 다른 머신에서도 동일하게, **외부에서 접근 가능한 HTTPS URL**을 만든 뒤 그 URL을 `COPYLINGO_SERVER_PUBLIC_BASE_URL`로 주입해야 합니다.
 
+제출/채점 데이터 흐름, `cloudflared` 역할, 보안 주의사항은 [`docs/HANDWRITING_MINIAPP_INGRESS.md`](docs/HANDWRITING_MINIAPP_INGRESS.md)에 정리되어 있습니다.
+
 현재 손글씨 플로우는 아래 엔드포인트를 사용합니다.
 
 - `GET /miniapp/handwriting`
@@ -124,10 +126,11 @@ go run ./cmd/server
 가장 단순한 개발 방식은 Cloudflare Tunnel입니다.
 
 ```bash
-cloudflared tunnel --url http://localhost:8080
+make tunnel
 ```
 
-실행 후 `https://xxxxx.trycloudflare.com` 같은 공개 HTTPS URL이 출력됩니다.
+실행 후 `https://xxxxx.trycloudflare.com` 같은 공개 HTTPS URL이 출력되고, `.env`의 `COPYLINGO_SERVER_PUBLIC_BASE_URL`이 자동 갱신됩니다.
+서버는 시작 시점에 `.env`를 읽으므로 tunnel URL이 바뀌면 서버를 재시작해야 합니다.
 
 ### 3. public base URL 설정
 
