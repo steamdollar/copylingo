@@ -230,7 +230,7 @@ func buildHandwritingQuestion(romaji, kana string) *model.Question {
 		Type:             model.QuestionKanaHandwriting,
 		Language:         "ja",
 		ProficiencyLevel: "N5",
-		Category:         "kana",
+		Category:         "handwriting",
 		Prompt:           fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자를 손글씨로 쓰세요", romaji),
 		Options:          []byte("[]"),
 		CorrectAnswer:    kana,

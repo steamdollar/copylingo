@@ -85,7 +85,7 @@ func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questio
 		return false, "", err
 	}
 
-	userAnswer := "handwriting:" + question.CorrectAnswer
+	userAnswer := "handwriting:submitted"
 	if err := g.recordGradingResult(ctx, sessionID, questionID, question, userAnswer, isCorrect); err != nil {
 		return false, "", err
 	}
