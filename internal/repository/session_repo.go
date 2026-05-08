@@ -41,6 +41,17 @@ func (r *SessionRepository) GetPendingSessions(ctx context.Context, userID int64
 	return sessions, err
 }
 
+// GetInProgressSessions returns all in-progress sessions for a user.
+func (r *SessionRepository) GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error) {
+	var sessions []model.Session
+	err := r.db.SelectContext(ctx, &sessions, `
+		SELECT * FROM sessions
+		WHERE user_id = $1 AND status = 'in_progress'
+		ORDER BY started_at DESC NULLS LAST, created_at DESC
+	`, userID)
+	return sessions, err
+}
+
 // Start marks a session as in_progress.
 func (r *SessionRepository) Start(ctx context.Context, id int) error {
 	if _, err := r.db.ExecContext(ctx, `

@@ -25,6 +25,32 @@
 
 ---
 
+---
+
+## 📋 TODO 문서 프로토콜 (`docs/todos/`)
+
+상세한 작업 지시가 필요한 TODO는 `docs/todos/<task_name>.md` 형태로 detail 문서를 별도 작성하고, `STATUS.md`에는 한 줄 요약 + 문서 링크만 둡니다. 단순 TODO는 `STATUS.md`에 직접 적어도 됩니다.
+
+### 테크 리드 (Claude Code)가 detail 문서를 작성할 때
+- `STATUS.md`의 TODO 항목 형식: `- [ ] <한 줄 요약> — see [docs/todos/<file>.md](docs/todos/<file>.md)`
+- detail 문서는 **자기완결적**으로 작성. 다른 문서를 안 봐도 실행 가능해야 함:
+  - 배경/목적
+  - 변경할 파일 목록 + Before/After 코드 스니펫
+  - 검증 방법 (`go build ./...`, `make test` 등)
+  - 건드리면 안 되는 영역, 결정된 사항 명시
+- 모호한 결정 포인트는 작성 단계에서 사용자와 합의해 문서에 박아둠 (담당 에이전트가 다시 묻지 않게)
+
+### 담당 에이전트(Gemini 등)가 TODO를 실행할 때
+1. `STATUS.md`에서 TODO 항목의 detail 문서 경로 확인 → 해당 문서를 처음부터 끝까지 읽기
+2. 문서 따라 구현. **문서에 명시되지 않은 결정 사항만** 사용자에게 질문
+3. `make test` 통과 확인 (필수)
+4. **완료 후 처리** (모든 TODO 공통, 절대 빠뜨리지 말 것):
+   - `docs/workthrough/YYMMDDhhmm_<job>.md` 생성 — 변경 파일 목록, 검증 결과, 결정 사항 기록
+   - `STATUS.md` 업데이트 — TODO 항목 제거 + "📝 최근 완료" 테이블 맨 위에 한 줄 추가
+   - `docs/todos/<task_name>.md` 삭제 (git history에 보존됨)
+
+---
+
 ## 프로젝트 개요
 
 - **이름**: CopyLingo
@@ -43,7 +69,7 @@
 | 캐시 | **Redis 7** | 세션 캐시, 응답 시간 측정 |
 | 설정 | **Viper** | YAML + 환경변수 오버라이드 |
 | 스케줄러 | **robfig/cron/v3** | |
-| AI | **Gemini 3.0 Flash** | OpenAI 호환 엔드포인트 사용 |
+| AI | **Gemini 3.1 Flash Lite** | OpenAI 호환 엔드포인트 사용 |
 | TTS | **Google Cloud TTS** | 사전 생성 + 파일 캐싱 |
 | 컨테이너 | **Docker + Docker Compose** | PostgreSQL, Redis, App |
 
@@ -83,10 +109,17 @@ copylingo/
 
 1. **패키지 구조**: `internal/` 하위에 레이어별 분리 (`model`, `repository`, `service`, `bot`, `pipeline`, `external`)
 2. **DB 접근**: `sqlx`로 raw SQL 작성. ORM 사용 금지.
-3. **에러 처리**: `fmt.Errorf("context: %w", err)` 패턴으로 에러 래핑
+3. **에러 처리**:
+   - 에러 발생 지점에서는 로그를 찍지 말고 `fmt.Errorf("context: %w", err)` 패턴으로 맥락을 붙여 반환
+   - Repository 계층은 함수명/주요 식별자 기반으로 검색 가능한 에러 컨텍스트 포함 (예: `SessionQuestionRepository.GetBySession session_id=%d: %w`)
+   - Service 계층은 새로운 비즈니스 의미를 추가할 때만 래핑. 단순 repository pass-through 함수는 그대로 반환
+   - `err`를 이후에 재사용하지 않으면 `if err := ...; err != nil` 또는 `if _, err := ...; err != nil` 형태로 스코프를 좁히기
 4. **ID**: DB PK는 SERIAL (auto-increment). users 테이블만 Telegram ID (BIGINT)
 5. **Context**: 모든 repository/service 메서드는 첫 번째 인자로 `context.Context` 받기
-6. **로깅**: 현재 `log` 표준 라이브러리 사용 (추후 structured logging 전환 가능)
+6. **로깅**:
+   - 현재 `log` 표준 라이브러리 사용 (추후 structured logging 전환 가능)
+   - Repository 같은 하위 계층에서는 직접 로그를 찍지 않음
+   - Bot handler, HTTP handler, scheduler job 같은 경계 계층에서 사용자/작업 맥락과 함께 한 번만 로그 출력
 7. **테스트**: `*_test.go` 파일, 같은 패키지 내 위치
 
 ### 텔레그램 봇

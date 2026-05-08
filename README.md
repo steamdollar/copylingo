@@ -191,7 +191,7 @@ Telegram Mini App URL은 BotFather에 등록된 도메인과 일치해야 합니
 ```yaml
 llm:
   api_key: "AIza..."
-  model: "gemini-3.1-flash"
+  model: "gemini-3.1-flash-lite"
   base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
 ```
 
@@ -199,7 +199,7 @@ llm:
 
 ```bash
 export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
-export COPYLINGO_LLM_MODEL="gemini-3.1-flash"
+export COPYLINGO_LLM_MODEL="gemini-3.1-flash-lite"
 ```
 
 | Gemini 3.1 Flash 무료 한도 | 예상 사용량 |

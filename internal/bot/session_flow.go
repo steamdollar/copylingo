@@ -25,16 +25,30 @@ func NewSessionFlow(bot *Bot) *SessionFlow {
 }
 
 // StartStudy begins a new study session or resumes a pending one.
-func (f *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (sf *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
 
+	// Resume in-progress session first.
+	inProgressSessions, err := sf.bot.services.SessionBuilder.GetInProgressSessions(ctx, userID)
+	if err == nil && len(inProgressSessions) > 0 {
+		session := inProgressSessions[0]
+		nextIdx, err := sf.nextUnansweredQuestionIndex(ctx, session.ID)
+		if err != nil {
+			log.Printf("Error finding next unanswered question for session %d: %v", session.ID, err)
+			nextIdx = 0
+		}
+		editMessageID := cb.Message.MessageID
+		sf.showQuestion(ctx, chatID, &editMessageID, session.ID, nextIdx)
+		return
+	}
+
 	// Check for pending sessions
-	sessions, err := f.bot.services.SessionBuilder.GetPendingSessions(ctx, userID)
+	sessions, err := sf.bot.services.SessionBuilder.GetPendingSessions(ctx, userID)
 
 	// 진행중인 세션이 없으면 리턴
 	if err != nil || len(sessions) == 0 {
-		f.bot.EditMessage(chatID, cb.Message.MessageID,
+		sf.bot.EditMessage(chatID, cb.Message.MessageID,
 			"📚 현재 대기 중인 학습 세션이 없습니다.\n다음 세션이 자동으로 전송될 예정입니다!",
 			&tgbotapi.InlineKeyboardMarkup{
 				InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
@@ -60,17 +74,17 @@ func (f *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuery
 	text := fmt.Sprintf("📚 <b>학습 세션 준비됨</b>\n\n총 %d문제\n유형: %s\n\n준비되면 시작 버튼을 누르세요!",
 		session.TotalQuestions, sessionTypeLabel(string(session.Type)))
 
-	f.bot.EditMessage(chatID, cb.Message.MessageID, text, &keyboard)
+	sf.bot.EditMessage(chatID, cb.Message.MessageID, text, &keyboard)
 }
 
 // StartReview starts an on-demand review session.
-func (f *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (sf *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
 
-	count, _ := f.bot.services.SRS.GetDueCount(ctx)
+	count, _ := sf.bot.services.SRS.GetDueCount(ctx)
 	if count == 0 {
-		f.bot.EditMessage(chatID, cb.Message.MessageID,
+		sf.bot.EditMessage(chatID, cb.Message.MessageID,
 			"✅ 복습할 문제가 없습니다! 훌륭합니다 🎉",
 			&tgbotapi.InlineKeyboardMarkup{
 				InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
@@ -86,9 +100,9 @@ func (f *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQuer
 		limit = 15
 	}
 
-	session, err := f.bot.services.SessionBuilder.BuildReviewSession(ctx, userID, limit)
+	session, err := sf.bot.services.SessionBuilder.BuildReviewSession(ctx, userID, limit)
 	if err != nil || session == nil {
-		f.bot.SendMessage(chatID, "❌ 복습 세션 생성에 실패했습니다.")
+		sf.bot.SendMessage(chatID, "❌ 복습 세션 생성에 실패했습니다.")
 		return
 	}
 
@@ -101,11 +115,11 @@ func (f *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQuer
 	text := fmt.Sprintf("🔄 <b>복습 세션</b>\n\n복습 대상: %d문제\n\n준비되면 시작!",
 		session.TotalQuestions)
 
-	f.bot.EditMessage(chatID, cb.Message.MessageID, text, &keyboard)
+	sf.bot.EditMessage(chatID, cb.Message.MessageID, text, &keyboard)
 }
 
 // HandleSessionCallback handles session-level callbacks (start, finish).
-func (f *SessionFlow) HandleSessionCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (sf *SessionFlow) HandleSessionCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	// e.g. session:50:start
 	parts := strings.Split(cb.Data, ":")
 	if len(parts) < 3 {
@@ -121,14 +135,14 @@ func (f *SessionFlow) HandleSessionCallback(ctx context.Context, cb *tgbotapi.Ca
 
 	switch action {
 	case "start":
-		f.startSession(ctx, cb, sessionID)
+		sf.startSession(ctx, cb, sessionID)
 	case "finish":
-		f.finishSession(ctx, cb, sessionID)
+		sf.finishSession(ctx, cb, sessionID)
 	}
 }
 
 // HandleAnswerCallback handles question answer callbacks.
-func (f *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (sf *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	// Format: q:{sessionID}:{questionID}:{optionIndex} or q:{sessionID}:next:{currentIndex}
 	parts := strings.Split(cb.Data, ":")
 	if len(parts) < 4 {
@@ -143,14 +157,15 @@ func (f *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Cal
 	if parts[2] == "next" {
 		currentIdx := 0
 		fmt.Sscanf(parts[3], "%d", &currentIdx)
-		if !f.isQuestionAnswered(ctx, sessionID, currentIdx) {
-			f.bot.SendMessage(cb.Message.Chat.ID, "✍️ 먼저 손글씨 답안을 제출해 주세요.")
+		if !sf.isQuestionAnswered(ctx, sessionID, currentIdx) {
+			sf.bot.SendMessage(cb.Message.Chat.ID, "✍️ 먼저 손글씨 답안을 제출해 주세요.")
 			return
 		}
-		// 1. Remove the "Next" button from current feedback to avoid confusion
-		f.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, cb.Message.Text, nil)
-		// 2. Show next question as a NEW message (0 messageID)
-		f.showQuestion(ctx, cb.Message.Chat.ID, 0, sessionID, currentIdx+1)
+		// 같은 손글씨 제출 결과로 다음 문제를 중복 진행하지 못하게 먼저 버튼을 제거한다.
+		sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, cb.Message.Text, nil)
+		// 손글씨 문항은 Mini App HTTP로 제출되므로 원래 메시지 맥락을 남기고,
+		// 다음 문제는 새 Telegram 메시지로 렌더링한다.
+		sf.showQuestion(ctx, cb.Message.Chat.ID, nil, sessionID, currentIdx+1)
 		return
 	}
 
@@ -161,12 +176,12 @@ func (f *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Cal
 	optionIdx := 0
 	fmt.Sscanf(parts[3], "%d", &optionIdx)
 
-	f.processAnswer(ctx, cb, sessionID, questionID, optionIdx)
+	sf.processAnswer(ctx, cb, sessionID, questionID, optionIdx)
 }
 
-func (f *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
+func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
 	// 세션 상태 update at db
-	if err := f.bot.
+	if err := sf.bot.
 		services.SessionBuilder.StartSession(ctx, sessionID); err != nil {
 		log.Printf("Error starting session: %v", err)
 		return
@@ -174,31 +189,51 @@ func (f *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQue
 
 	// redis에 k-v로 시작 시간 기록
 	key := fmt.Sprintf(config.KeySessionQuestionStart, sessionID)
-	f.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
+	sf.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
 
-	f.showQuestion(ctx, cb.Message.Chat.ID, cb.Message.MessageID, sessionID, 0)
+	editMessageID := cb.Message.MessageID
+	sf.showQuestion(ctx, cb.Message.Chat.ID, &editMessageID, sessionID, 0)
 }
 
-func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID int, sessionID int, questionIdx int) {
-	sqs, err := f.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
-	if err != nil || questionIdx >= len(sqs) {
+func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
+	editMessageID *int, sessionID, questionIdx int) {
+	sqs, err := sf.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+	if err != nil {
+		log.Printf("Error getting session questions for session %d: %v", sessionID, err)
+		if editMessageID != nil {
+			sf.bot.EditMessage(chatID, *editMessageID, "❌ 문제를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", nil)
+		} else {
+			sf.bot.SendMessage(chatID, "❌ 문제를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
+		}
+		return
+	}
+
+	if questionIdx >= len(sqs) {
 		// All questions answered, show finish button
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData("📊 결과 보기", fmt.Sprintf(config.FormatSessionFinish, sessionID)),
 			),
 		)
-		if messageID > 0 {
-			f.bot.EditMessage(chatID, messageID, "✅ 모든 문제를 풀었습니다!", &keyboard)
+		if editMessageID != nil {
+			sf.bot.EditMessage(chatID, *editMessageID, "✅ 모든 문제를 풀었습니다!", &keyboard)
 		} else {
-			f.bot.SendMessageWithKeyboard(chatID, "✅ 모든 문제를 풀었습니다!", keyboard)
+			sf.bot.SendMessageWithKeyboard(chatID, "✅ 모든 문제를 풀었습니다!", keyboard)
 		}
 		return
 	}
 
 	sq := sqs[questionIdx]
-	question, err := f.bot.services.SessionBuilder.GetQuestion(ctx, sq.QuestionID)
+	// TODO: 매 showQuestion 함수 호출마다 db hit > cache 도입
+	question, err := sf.bot.services.SessionBuilder.GetQuestion(ctx, sq.QuestionID)
 	if err != nil {
+		log.Printf("Error getting question for session %d question_idx=%d question_id=%d: %v",
+			sessionID, questionIdx, sq.QuestionID, err)
+		if editMessageID != nil {
+			sf.bot.EditMessage(chatID, *editMessageID, "❌ 문제를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", nil)
+		} else {
+			sf.bot.SendMessage(chatID, "❌ 문제를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.")
+		}
 		return
 	}
 
@@ -216,7 +251,7 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 	case model.QuestionKanaHandwriting:
 		nextData := fmt.Sprintf(config.FormatQuestionNext, sessionID, questionIdx)
 
-		miniAppURL, err := f.handwritingMiniAppURL(sessionID, question.ID)
+		miniAppURL, err := sf.handwritingMiniAppURL(sessionID, question.ID)
 		if err != nil {
 			text += "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요."
 			break
@@ -229,16 +264,18 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 				{newCallbackButton("제출 후 다음 문제 →", nextData)},
 			},
 		}
-		if messageID > 0 {
-			f.bot.EditMessage(chatID, messageID, "✍️ 손글씨 문항을 새 메시지로 보냈습니다.", nil)
+		if editMessageID != nil {
+			// Web App 버튼은 별도 메시지로 두는 편이 Mini App 왕복 흐름을 추적하기 쉽다.
+			// 이전 메시지는 재사용하지 않고 짧은 안내 문구로 축약한다.
+			sf.bot.EditMessage(chatID, *editMessageID, "✍️ 손글씨 문항을 새 메시지로 보냈습니다.", nil)
 		}
-		f.bot.SendMessageWithReplyMarkup(chatID, text, replyMarkup)
+		sf.bot.SendMessageWithReplyMarkup(chatID, text, replyMarkup)
 		return
 	case model.QuestionFillBlank, model.QuestionSubjective:
 		// Set active question in Redis for 1 hour
 		key := fmt.Sprintf(config.KeyUserActiveQuestion, chatID)
 		state := fmt.Sprintf("%d:%d", sessionID, questionIdx)
-		f.bot.rdb.Set(ctx, key, state, 1*time.Hour)
+		sf.bot.rdb.Set(ctx, key, state, 1*time.Hour)
 
 		if question.Type == model.QuestionSubjective {
 			text += "\n\n⌨️ 정답을 자유롭게 텍스트로 입력해 주세요"
@@ -271,29 +308,45 @@ func (f *SessionFlow) showQuestion(ctx context.Context, chatID int64, messageID 
 	}
 
 	key := fmt.Sprintf(config.KeySessionQuestionStart, sessionID)
-	f.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
+	sf.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
 
-	if messageID > 0 {
-		f.bot.EditMessage(chatID, messageID, text, keyboard)
+	if editMessageID != nil {
+		sf.bot.EditMessage(chatID, *editMessageID, text, keyboard)
 	} else {
 		if keyboard != nil {
-			f.bot.SendMessageWithKeyboard(chatID, text, *keyboard)
+			sf.bot.SendMessageWithKeyboard(chatID, text, *keyboard)
 		} else {
-			f.bot.SendMessage(chatID, text)
+			sf.bot.SendMessage(chatID, text)
 		}
 	}
 }
 
-func (f *SessionFlow) isQuestionAnswered(ctx context.Context, sessionID, questionIdx int) bool {
-	sqs, err := f.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+func (sf *SessionFlow) isQuestionAnswered(ctx context.Context, sessionID, questionIdx int) bool {
+	sqs, err := sf.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
 	if err != nil || questionIdx < 0 || questionIdx >= len(sqs) {
 		return false
 	}
 	return sqs[questionIdx].IsCorrect != nil
 }
 
-func (f *SessionFlow) handwritingMiniAppURL(sessionID, questionID int) (string, error) {
-	baseURL := strings.TrimRight(f.bot.cfg.Server.PublicBaseURL, "/")
+func (sf *SessionFlow) nextUnansweredQuestionIndex(ctx context.Context, sessionID int) (int, error) {
+	sqs, err := sf.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+	if err != nil {
+		return 0, err
+	}
+
+	for idx, sq := range sqs {
+		if sq.IsCorrect == nil {
+			return idx, nil
+		}
+	}
+
+	return len(sqs), nil
+}
+
+// TODO: 이 함수 굳이 이렇게 복잡하게 짜야 함?
+func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int) (string, error) {
+	baseURL := strings.TrimRight(sf.bot.cfg.Server.PublicBaseURL, "/")
 	if baseURL == "" {
 		return "", fmt.Errorf("server public base url is empty")
 	}
@@ -308,8 +361,8 @@ func (f *SessionFlow) handwritingMiniAppURL(sessionID, questionID int) (string, 
 	return u.String(), nil
 }
 
-func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, questionID int, optionIdx int) {
-	question, err := f.bot.services.SessionBuilder.GetQuestion(ctx, questionID)
+func (sf *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, questionID int, optionIdx int) {
+	question, err := sf.bot.services.SessionBuilder.GetQuestion(ctx, questionID)
 	if err != nil {
 		return
 	}
@@ -320,13 +373,14 @@ func (f *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQu
 	}
 
 	selectedAnswer := options[optionIdx]
-	f.processAnswerText(ctx, cb.Message.Chat.ID, sessionID, questionID, selectedAnswer, cb.Message.MessageID)
+	editMessageID := cb.Message.MessageID
+	sf.processAnswerText(ctx, cb.Message.Chat.ID, sessionID, questionID, selectedAnswer, &editMessageID)
 }
 
 // HandleTextInput intercepts text messages if there is an active text question.
-func (f *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Message) bool {
+func (sf *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Message) bool {
 	key := fmt.Sprintf(config.KeyUserActiveQuestion, msg.Chat.ID)
-	state, err := f.bot.rdb.Get(ctx, key).Result()
+	state, err := sf.bot.rdb.Get(ctx, key).Result()
 	if err != nil {
 		return false
 	}
@@ -338,20 +392,20 @@ func (f *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Message
 	sessionID, _ := strconv.Atoi(parts[0])
 	questionIdx, _ := strconv.Atoi(parts[1])
 
-	f.bot.rdb.Del(ctx, key)
+	sf.bot.rdb.Del(ctx, key)
 
-	sqs, err := f.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+	sqs, err := sf.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
 	if err != nil || questionIdx >= len(sqs) {
 		return false
 	}
 	questionID := sqs[questionIdx].QuestionID
 
-	f.processAnswerText(ctx, msg.Chat.ID, sessionID, questionID, strings.TrimSpace(msg.Text), 0)
+	sf.processAnswerText(ctx, msg.Chat.ID, sessionID, questionID, strings.TrimSpace(msg.Text), nil)
 	return true
 }
 
-func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessionID, questionID int, selectedAnswer string, messageID int) {
-	question, err := f.bot.services.SessionBuilder.GetQuestion(ctx, questionID)
+func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessionID, questionID int, selectedAnswer string, editMessageID *int) {
+	question, err := sf.bot.services.SessionBuilder.GetQuestion(ctx, questionID)
 	if err != nil {
 		return
 	}
@@ -362,14 +416,14 @@ func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessi
 		selectedAnswer = strings.ToLower(selectedAnswer) // For Kana fill in the blank
 	case model.QuestionSubjective:
 		// Show typing status for AI grading UX
-		f.bot.api.Request(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
+		sf.bot.api.Request(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
 	}
 
-	isCorrect, feedback, err := f.bot.services.Grader.GradeAnswer(ctx, sessionID, questionID, selectedAnswer)
+	isCorrect, feedback, err := sf.bot.services.Grader.GradeAnswer(ctx, sessionID, questionID, selectedAnswer)
 	if err != nil {
 		if errors.Is(err, config.ErrAIConfigMissing) {
 			errMsg := tgbotapi.NewMessage(chatID, "⚠️ 시스템 설정 문제로 현재 AI 주관식 채점이 불가능합니다. 임시로 오답 처리하고 넘어갑니다.")
-			f.bot.api.Send(errMsg)
+			sf.bot.api.Send(errMsg)
 		} else {
 			log.Printf("Error grading answer: %v", err)
 			return
@@ -377,7 +431,7 @@ func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessi
 	}
 
 	// Determine current question index for "next" button
-	sqs, _ := f.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+	sqs, _ := sf.bot.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
 	currentIdx := 0
 	for i, sq := range sqs {
 		if sq.QuestionID == questionID {
@@ -416,16 +470,16 @@ func (f *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessi
 		),
 	)
 
-	if messageID > 0 {
-		f.bot.EditMessage(chatID, messageID, text, &keyboard)
+	if editMessageID != nil {
+		sf.bot.EditMessage(chatID, *editMessageID, text, &keyboard)
 	} else {
-		// Normal message replacement
-		f.bot.SendMessageWithKeyboard(chatID, text, keyboard)
+		// 텍스트 답변은 사용자 메시지로 들어오므로 편집할 봇 문제 메시지가 없다.
+		sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
 	}
 }
 
-func (f *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
-	result, err := f.bot.services.Grader.CompleteSession(ctx, sessionID, cb.From.ID)
+func (sf *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
+	result, err := sf.bot.services.Grader.CompleteSession(ctx, sessionID, cb.From.ID)
 	if err != nil {
 		log.Printf("Error completing session: %v", err)
 		return
@@ -441,14 +495,19 @@ func (f *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQu
 	if len(result.WrongAnswers) > 0 {
 		wrongSummary = "\n\n<b>틀린 문제:</b>\n"
 		for _, wa := range result.WrongAnswers {
-			q, err := f.bot.services.SessionBuilder.GetQuestion(ctx, wa.QuestionID)
+			if wa.IsCorrect == nil || *wa.IsCorrect {
+				continue
+			}
+			q, err := sf.bot.services.SessionBuilder.GetQuestion(ctx, wa.QuestionID)
 			if err != nil {
 				continue
 			}
-			answer := ""
-			if wa.UserAnswer != nil {
-				answer = *wa.UserAnswer
+			if q.Type == model.QuestionKanaHandwriting {
+				wrongSummary += fmt.Sprintf("❌ %s (정답: %s)\n",
+					truncate(stripHTML(q.Prompt), 30), q.CorrectAnswer)
+				continue
 			}
+			answer := formatSessionAnswer(wa.UserAnswer)
 			wrongSummary += fmt.Sprintf("❌ %s → %s (정답: %s)\n",
 				truncate(stripHTML(q.Prompt), 30), answer, q.CorrectAnswer)
 		}
@@ -465,10 +524,17 @@ func (f *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQu
 		),
 	)
 
-	f.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
+	sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
 }
 
-func (f *SessionFlow) PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error {
+func formatSessionAnswer(userAnswer *string) string {
+	if userAnswer == nil || *userAnswer == "" {
+		return "미응답"
+	}
+	return *userAnswer
+}
+
+func (sf *SessionFlow) PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error {
 	emoji := "📚"
 	label := "학습"
 	if sessionType == "evening" {
@@ -488,7 +554,7 @@ func (f *SessionFlow) PushSession(ctx context.Context, chatID int64, sessionID i
 	)
 
 	// 위해서 만든 keyboard를 send
-	return f.bot.SendMessageWithKeyboard(chatID, text, keyboard)
+	return sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
 }
 
 func sessionTypeLabel(t string) string {

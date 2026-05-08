@@ -121,7 +121,7 @@ func (s *SessionBuilderService) buildSession(
 	for i := range sessionQuestions {
 		sessionQuestions[i].SessionID = session.ID
 	}
-	if err := s.sessionQuestionRepo.CreateBatch(ctx, sessionQuestions); err != nil {
+	if err := s.sessionQuestionRepo.CreateSessionQuestions(ctx, sessionQuestions); err != nil {
 		return nil, err
 	}
 
@@ -131,6 +131,11 @@ func (s *SessionBuilderService) buildSession(
 // GetPendingSessions returns pending sessions for a user.
 func (s *SessionBuilderService) GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error) {
 	return s.sessionRepo.GetPendingSessions(ctx, userID)
+}
+
+// GetInProgressSessions returns in-progress sessions for a user.
+func (s *SessionBuilderService) GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error) {
+	return s.sessionRepo.GetInProgressSessions(ctx, userID)
 }
 
 // GetSession returns a session by ID.

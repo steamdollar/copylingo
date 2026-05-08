@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/sashabaranov/go-openai"
@@ -103,6 +105,8 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 
 // GradeHandwriting verifies whether a rendered handwriting image matches the expected Kana.
 func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error) {
+	startedAt := time.Now()
+
 	if c.client == nil || c.model == "" {
 		return false, "", config.ErrAIConfigMissing
 	}
@@ -118,10 +122,13 @@ JSON schema:
 
 Rules:
 1. This is binary verification, not open-ended OCR.
-2. Decide whether the handwritten image can reasonably be accepted as the expected kana.
-3. Accept minor wobble, uneven stroke width, and imperfect mobile handwriting.
-4. Reject if it looks like a different kana, has missing essential strokes, or is unreadable.
-5. Keep feedback concise and direct in Korean.`
+2. The image contains one centered handwritten kana in black on white.
+3. Decide whether the handwritten image can reasonably be accepted as the expected kana.
+4. Accept minor wobble, uneven stroke width, rounded corners, and imperfect mobile handwriting.
+5. Do not reject only because the drawing is large, small, slightly tilted, or not aesthetically neat.
+6. Reject if it clearly looks like a different kana, has missing essential strokes, or is unreadable.
+7. Keep feedback concise and direct in Korean.
+8. When the shape is close enough for a human teacher to accept in beginner practice, return true.`
 
 	userPrompt := fmt.Sprintf(`Question Context: %s
 Expected Kana: %s
@@ -147,7 +154,7 @@ Evaluate whether the handwriting image matches the Expected Kana and output JSON
 						Type: openai.ChatMessagePartTypeImageURL,
 						ImageURL: &openai.ChatMessageImageURL{
 							URL:    imageURL,
-							Detail: openai.ImageURLDetailLow,
+							Detail: openai.ImageURLDetailAuto,
 						},
 					},
 				},
@@ -169,6 +176,7 @@ Evaluate whether the handwriting image matches the Expected Kana and output JSON
 	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
 		return false, "", fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
 	}
+	log.Printf("[Handwriting] llm model=%s elapsed=%s image_bytes=%d is_correct=%t", c.model, time.Since(startedAt), len(pngImage), result.IsCorrect)
 
 	return result.IsCorrect, result.Feedback, nil
 }

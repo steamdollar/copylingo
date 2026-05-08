@@ -105,6 +105,7 @@ async function submitAnswer() {
       }),
     });
 
+    // TODO: 이거 타입 도입 가능한지 체크
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(payload.error || "채점 요청에 실패했습니다.");

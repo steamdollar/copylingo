@@ -176,3 +176,32 @@
   - Telegram 채팅에 사진 업로드: 구현은 단순하지만 반복 학습 UX가 나빠 기각
   - 모든 학습 세션을 Web App으로 이전: 현재 Bot 중심 구조 대비 변경 범위가 커서 기각
   - 서버 없이 클라이언트에서 채점: 정답/채점 기준 노출 및 조작 가능성이 커서 기각
+
+---
+
+## ADR-012: Bot 세션 메시지 렌더링은 nullable editMessageID로 분기
+
+- **날짜**: 2026-05-08
+- **상태**: 채택됨
+- **맥락**:
+  - `SessionFlow.showQuestion`은 기존 Telegram 메시지를 수정할지, 새 메시지를 보낼지 결정해야 한다.
+  - 기존 구현은 `messageID int`에 실제 Telegram 메시지 ID와 `0` sentinel을 함께 담았다.
+  - `messageID > 0`은 기존 메시지 edit, `messageID == 0`은 새 메시지 send라는 암묵 규약이었으나, `0`이 실제 엔티티 ID처럼 읽혀 흐름 이해가 어려웠다.
+  - 손글씨 Mini App 문항은 Web App 버튼이 붙은 메시지를 별도로 남기고, 제출 후 다음 문제는 새 Telegram 메시지로 보내야 한다.
+- **결정**:
+  - 세션 플로우에서 메시지 렌더링 분기는 `editMessageID *int`로 표현한다.
+  - `editMessageID != nil`이면 해당 Telegram 메시지를 수정한다.
+  - `editMessageID == nil`이면 편집할 봇 메시지가 없거나 새 메시지 UX가 필요한 것으로 보고 새 Telegram 메시지를 보낸다.
+  - 손글씨 Mini App의 "제출 후 다음 문제" 흐름은 기존 메시지의 버튼만 제거하고, 다음 문제를 새 메시지로 렌더링한다.
+  - 객관식 callback처럼 버튼이 붙은 봇 메시지가 명확한 경우에는 `editMessageID`를 전달해 기존 메시지를 피드백으로 수정한다.
+- **장점**:
+  - `0` sentinel의 이중 의미를 제거해 코드 독해성이 좋아진다.
+  - Telegram 메시지 ID와 렌더링 모드가 더 명확히 구분된다.
+  - 손글씨 Mini App 왕복 흐름에서 메시지 히스토리를 보존하는 의도가 코드에 드러난다.
+- **단점**:
+  - 호출부에서 로컬 변수 주소를 넘기는 작은 보일러플레이트가 생긴다.
+  - `nil` 의미를 이해해야 하므로 함수 시그니처와 주석을 함께 유지해야 한다.
+- **대안**:
+  - `messageID int` + `0` sentinel 유지: 구현은 단순하지만 의미가 불명확해 기각
+  - `QuestionRenderMode` enum 추가: 가장 명시적이지만 현재 분기 규모에는 과한 구조라 보류
+  - `sendNew bool` 인자 추가: bool과 message ID 조합이 불일치할 수 있어 기각

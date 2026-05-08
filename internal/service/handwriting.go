@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/repository"
@@ -62,7 +64,7 @@ func NewHandwritingService(
 	renderer StrokeRenderer,
 ) *HandwritingService {
 	if renderer == nil {
-		renderer = NewPNGStrokeRenderer(160, 18)
+		renderer = NewPNGStrokeRenderer(256, 24)
 	}
 	return &HandwritingService{
 		sessionRepo:         sessionRepo,
@@ -74,6 +76,8 @@ func NewHandwritingService(
 }
 
 func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSubmitRequest) (*HandwritingSubmitResult, error) {
+	startedAt := time.Now()
+
 	session, err := s.sessionRepo.GetByID(ctx, req.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("get session for handwriting submission: %w", err)
@@ -113,11 +117,14 @@ func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSu
 	if err != nil {
 		return nil, fmt.Errorf("render handwriting strokes: %w", err)
 	}
+	renderedAt := time.Now()
 
 	isCorrect, feedback, err := s.grader.GradeHandwriting(ctx, req.SessionID, req.QuestionID, renderedImage)
 	if err != nil {
 		return nil, fmt.Errorf("grade handwriting answer: %w", err)
 	}
+	log.Printf("[Handwriting] service total=%s render=%s grade=%s session_id=%d question_id=%d image_bytes=%d",
+		time.Since(startedAt), renderedAt.Sub(startedAt), time.Since(renderedAt), req.SessionID, req.QuestionID, len(renderedImage))
 
 	return &HandwritingSubmitResult{
 		IsCorrect:     isCorrect,

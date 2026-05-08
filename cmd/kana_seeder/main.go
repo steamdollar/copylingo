@@ -226,15 +226,17 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 }
 
 func buildHandwritingQuestion(romaji, kana string) *model.Question {
+	scriptLabel := kanaScriptLabel(kana)
+
 	return &model.Question{
 		Type:             model.QuestionKanaHandwriting,
 		Language:         "ja",
 		ProficiencyLevel: "N5",
 		Category:         "handwriting",
-		Prompt:           fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자를 손글씨로 쓰세요", romaji),
+		Prompt:           fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 손글씨로 쓰세요", romaji, scriptLabel),
 		Options:          []byte("[]"),
 		CorrectAnswer:    kana,
-		Explanation:      fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 문자는 <b>%s</b>입니다.", romaji, kana),
+		Explanation:      fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자는 <b>%s</b>입니다.", romaji, scriptLabel, kana),
 		Difficulty:       1,
 	}
 }

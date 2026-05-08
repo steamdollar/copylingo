@@ -27,6 +27,7 @@
 - **작업 로그**: 작업 완료 후 `docs/workthrough/YYMMDDhhmm_<job_done>.md` 파일 생성 필수
 - **역할 분담**: Claude Code는 테크 리드 (아키텍처, 설계). 단순 구현은 Gemini에게 프롬프트와 함께 위임 제안
 - **협업 방식**: Claude가 프롬프트 작성 → 사용자가 Gemini에 복붙하여 실행
+- **TODO 위임 프로토콜**: 디테일이 필요한 TODO는 `docs/todos/<task>.md`에 자기완결적 문서로 분리하고 `STATUS.md`에는 한 줄 요약 + 문서 링크만 둠. 작성/실행/완료 처리 규칙은 `AGENTS.md`의 "TODO 문서 프로토콜" 섹션 참조.
 
 ### 5. 필수 규칙
 1. **작업 시작 전**: `AGENTS.md` (규칙 확인) → `STATUS.md` (현재 작업)
@@ -38,6 +39,13 @@
    - 마일스톤 완료 시에만 `ROADMAP.md` 업데이트
 3. **코딩 규칙**: `AGENTS.md` 참조 (DB, 에러 처리, 텔레그램 콜백 규약 등)
 4. **주의**: `config.yaml`에 API 키/토큰 하드코딩 금지 → 환경변수로 주입
+
+### 5.1. 에러 처리/로깅 정책
+- 에러 발생 지점에서는 로그를 찍지 말고 `fmt.Errorf("context: %w", err)` 패턴으로 맥락을 붙여 반환합니다.
+- Repository 계층은 함수명/주요 식별자 기반으로 검색 가능한 에러 컨텍스트를 포함합니다. 예: `SessionQuestionRepository.GetBySession session_id=%d: %w`
+- Service 계층은 새로운 비즈니스 의미를 추가할 때만 래핑합니다. 단순 repository pass-through 함수는 그대로 반환합니다.
+- `err`를 이후에 재사용하지 않으면 `if err := ...; err != nil` 또는 `if _, err := ...; err != nil` 형태로 스코프를 좁힙니다.
+- Repository 같은 하위 계층에서는 직접 로그를 찍지 않고, Bot handler/HTTP handler/scheduler job 같은 경계 계층에서 사용자/작업 맥락과 함께 한 번만 로그를 출력합니다.
 
 ### 6. 개발 명령어
 ```bash

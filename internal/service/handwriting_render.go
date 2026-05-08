@@ -19,10 +19,15 @@ type StrokeRenderer interface {
 type PNGStrokeRenderer struct {
 	size    int
 	padding int
+	brush   int
 }
 
 func NewPNGStrokeRenderer(size, padding int) *PNGStrokeRenderer {
-	return &PNGStrokeRenderer{size: size, padding: padding}
+	brush := 5
+	if size <= 160 {
+		brush = 3
+	}
+	return &PNGStrokeRenderer{size: size, padding: padding, brush: brush}
 }
 
 func (r *PNGStrokeRenderer) RenderPNG(strokes []Stroke) ([]byte, error) {
@@ -63,13 +68,13 @@ func (r *PNGStrokeRenderer) RenderPNG(strokes []Stroke) ([]byte, error) {
 			x := int(math.Round((p.X-minX)*scale + offsetX))
 			y := int(math.Round((p.Y-minY)*scale + offsetY))
 			if i == 0 {
-				drawBrush(img, x, y, 3, black)
+				drawBrush(img, x, y, r.brush, black)
 				continue
 			}
 			prev := stroke.Points[i-1]
 			px := int(math.Round((prev.X-minX)*scale + offsetX))
 			py := int(math.Round((prev.Y-minY)*scale + offsetY))
-			drawLine(img, px, py, x, y, black)
+			drawLine(img, px, py, x, y, r.brush, black)
 		}
 	}
 
@@ -88,7 +93,7 @@ func fill(img *image.RGBA, c color.RGBA) {
 	}
 }
 
-func drawLine(img *image.RGBA, x0, y0, x1, y1 int, c color.RGBA) {
+func drawLine(img *image.RGBA, x0, y0, x1, y1, brush int, c color.RGBA) {
 	dx := int(math.Abs(float64(x1 - x0)))
 	dy := -int(math.Abs(float64(y1 - y0)))
 	sx := -1
@@ -102,7 +107,7 @@ func drawLine(img *image.RGBA, x0, y0, x1, y1 int, c color.RGBA) {
 	err := dx + dy
 
 	for {
-		drawBrush(img, x0, y0, 3, c)
+		drawBrush(img, x0, y0, brush, c)
 		if x0 == x1 && y0 == y1 {
 			break
 		}

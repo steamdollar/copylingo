@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"log"
+	"time"
 
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
@@ -72,6 +74,8 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 }
 
 func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questionID int, renderedImage []byte) (bool, string, error) {
+	startedAt := time.Now()
+
 	question, err := g.questionRepo.GetByID(ctx, questionID)
 	if err != nil {
 		return false, "", err
@@ -84,11 +88,14 @@ func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questio
 	if err != nil {
 		return false, "", err
 	}
+	gradedAt := time.Now()
 
 	userAnswer := "handwriting:submitted"
 	if err := g.recordGradingResult(ctx, sessionID, questionID, question, userAnswer, isCorrect); err != nil {
 		return false, "", err
 	}
+	log.Printf("[Handwriting] grader total=%s llm=%s record=%s session_id=%d question_id=%d is_correct=%t",
+		time.Since(startedAt), gradedAt.Sub(startedAt), time.Since(gradedAt), sessionID, questionID, isCorrect)
 
 	return isCorrect, feedback, nil
 }

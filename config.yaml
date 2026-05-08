@@ -22,7 +22,7 @@ telegram:
 
 llm:
   api_key: ""  # Set via env: COPYLINGO_LLM_API_KEY
-  model: gemini-3.1-flash
+  model: gemini-3.1-flash-lite
 
 tts:
   enabled: true

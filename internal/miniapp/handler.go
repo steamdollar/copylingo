@@ -2,6 +2,7 @@ package miniapp
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -39,6 +40,8 @@ func (h *Handler) ShowHandwriting(c *gin.Context) {
 }
 
 func (h *Handler) SubmitHandwriting(c *gin.Context) {
+	startedAt := time.Now()
+
 	var req handwritingSubmitRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -75,5 +78,6 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[Handwriting] submit total=%s session_id=%d question_id=%d is_correct=%t", time.Since(startedAt), req.SessionID, req.QuestionID, result.IsCorrect)
 	c.JSON(http.StatusOK, result)
 }

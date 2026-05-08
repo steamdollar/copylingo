@@ -109,7 +109,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("redis.password", "")
 	viper.SetDefault("redis.db", 0)
 	viper.SetDefault("telegram.debug", false)
-	viper.SetDefault("llm.model", "gemini-3.1-flash")                                            // default to LLM model
+	viper.SetDefault("llm.model", "gemini-3.1-flash-lite")                                       // default to LLM model
 	viper.SetDefault("llm.base_url", "https://generativelanguage.googleapis.com/v1beta/openai/") // LLM compatibility layer
 	viper.SetDefault("tts.enabled", true)
 	viper.SetDefault("tts.audio_dir", "./data/audio")
