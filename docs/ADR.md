@@ -205,3 +205,45 @@
   - `messageID int` + `0` sentinel 유지: 구현은 단순하지만 의미가 불명확해 기각
   - `QuestionRenderMode` enum 추가: 가장 명시적이지만 현재 분기 규모에는 과한 구조라 보류
   - `sendNew bool` 인자 추가: bool과 message ID 조합이 불일치할 수 있어 기각
+
+---
+
+## ADR-013: 활성 세션 상태는 Redis 작업영역 + 세션 종료 시 DB 일괄 flush
+
+- **날짜**: 2026-05-09
+- **상태**: 채택됨 (구현 미진행 — Phase 분리 예정)
+- **맥락**:
+  - 현재 답안 처리 hot path는 문제 1개당 DB UPDATE 4개를 동기적으로 실행한다:
+    1. `session_questions.user_answer, is_correct`
+    2. `questions.times_served +1` (`IncrementTimesServed`)
+    3. `questions.times_correct +1` (`IncrementTimesCorrect`)
+    4. `questions.{ease_factor, interval_days, repetitions, next_review_at, ...}` (`UpdateSRS`)
+  - 2~4번은 동일 row(`questions` PK)를 같은 트랜잭션 시점에 3번 때리는 구조로, 규모와 무관하게 잘못 짜인 부분이다.
+  - 또한 세션 진행 중 `GetBySession()`이 매 답안 처리마다 DB를 read하여 mid-session 상태를 재조회하고 있다.
+  - 본 프로젝트의 설계 평가 기준은 "수만~수십만 사용자 가정"이며 (CLAUDE.md/AGENTS.md의 "프로젝트 성격 및 설계 기준" 참조), 그 규모에서 위 플로우는 hot path latency, row-level 락 경합, 통계/도메인 데이터의 일관성 요구 분리 부재 등 명확한 약점이 있다.
+- **결정**:
+  - **활성 세션 상태(current question idx, 누적 답안, mid-session 진행 정보)는 Redis에 working state로 유지**한다.
+  - 답안 hot path에서는 **DB write를 발생시키지 않는다.** Redis만 갱신하고 사용자에게 즉시 응답한다.
+  - mid-session read(`GetBySession` 등)도 Redis hit으로 흡수한다.
+  - **세션 종료 시점(`finishSession`)에 단일 DB 트랜잭션으로 일괄 flush**한다:
+    - `sessions` UPDATE (status, completed_at, correct_count)
+    - `session_questions` bulk UPDATE (1세션 분량, 오전 15 / 오후 10)
+    - `questions` bulk UPDATE (SRS 필드 + times_served/times_correct 카운터를 **하나의 UPDATE로 합쳐서**)
+  - flush 트랜잭션은 retry. 영구 실패 시 해당 세션은 손실 처리하고, 사용자가 다시 풀게 한다.
+  - 봇 재시작 시 Redis가 살아있으면 세션 이어 진행, Redis도 날아갔으면 DB의 `in_progress` 세션을 abandoned 처리하고 사용자에게 재시작 옵션 제공.
+- **prerequisite (선행 정리)**:
+  - `IncrementTimesServed` / `IncrementTimesCorrect` / `UpdateSRS` 3개 메서드를 **단일 `RecordAnswer(questionID, isCorrect, srs SRSResult)` 메서드로 합쳐 1 UPDATE**로 줄인다. 이건 본 ADR과 독립적으로 즉시 정당화되는 cleanup이며, Redis 도입 작업의 1차 단계로 둔다.
+- **장점**:
+  - 답안 hot path에서 DB write 0회 → latency 감소, row-level 락 경합 해소.
+  - "잃어도 되는 데이터(mid-session state)"와 "잃으면 안 되는 데이터(완료 세션 결과)"를 명시적으로 분리하여 각자에 맞는 durability 비용을 지불.
+  - 세션당 DB 트랜잭션 1회로 카운터 hot row 경합이 사라짐.
+  - 통계/SRS write가 본질적으로 eventual consistency 허용 가능한 데이터라는 사실이 코드 구조에 드러남.
+- **단점**:
+  - Redis가 활성 세션의 working state를 들고 있으므로, Redis 장애/eviction 시 진행 중 세션은 손실됨. 단, 이는 의도된 트레이드오프(아래 "검토 후 기각" 참조).
+  - 세션 종료 flush 트랜잭션 실패 시 해당 세션 결과가 사라질 수 있어, retry 로직과 idempotent flush 설계가 필요함.
+  - 기존 mid-session DB read 경로(`GetBySession`, `isQuestionAnswered`, `nextUnansweredQuestionIndex`, 손글씨 submit 검증 등)를 모두 Redis 기반으로 옮겨야 함.
+- **검토 후 기각된 대안**:
+  - **(A) 현재 구조 유지 + UPDATE 합치기만**: prerequisite 단계 한정으론 정당하지만, hot path 동기 4 write → 2 write로 줄어들 뿐 mid-session DB read와 카운터 hot row 경합은 그대로. 가정한 규모에서 부족한 개선폭이라 최종 대안으로는 기각.
+  - **(B) "Redis SSOT"로 활성 세션 전체를 Redis가 소유**: 용어 자체가 부정확하다. 표준 아키텍처에서 Redis가 SSOT 역할을 하는 케이스는 HTTP session, rate limiter, 실시간 leaderboard 등 본질적으로 ephemeral한 데이터에 한정된다. 본 도메인은 DB가 SSOT를 유지해야 한다.
+  - **(C) Outbox / event sourcing 패턴 (answer_events append-only log + async worker)**: 표준적으로 검증된 패턴이고 durability/scale 모두 보호하지만, **본 도메인에서 보호하려는 데이터의 가치가 outbox 도입 비용보다 작다.** 구체적으로 — mid-session state(현재 question idx, 부분 답안)는 잃어도 사용자가 세션을 다시 풀면 그만이고, SRS 업데이트 손실은 다음 출제 때 자연 복구되며, 카운터 손실은 통계 미세 어긋남에 그친다. 잃으면 안 되는 건 "완료된 세션의 최종 상태"뿐이고, 이는 종료 시점의 트랜잭션 1회로 보장 가능. 따라서 outbox 추가 복잡도(event log 테이블, async worker, 재처리/idempotency 로직)는 정당화되지 않음.
+- **포트폴리오 관점 메모**: 본 ADR의 진짜 가치는 "Redis 도입했다"가 아니라 **각 데이터의 durability 요구를 명시적으로 분석하여 outbox 같은 표준 패턴을 의식적으로 기각한 사고 과정**이다. 채택 패턴 카탈로그보다 트레이드오프 추적이 평가 가능한 1급 산출물이라는 전제에서 작성됨.
