@@ -5,22 +5,39 @@ import (
 	"log"
 
 	"github.com/lsj/copylingo/internal/model"
-	"github.com/lsj/copylingo/internal/repository"
 )
+
+type questionFetcher interface {
+	GetNewQuestions(ctx context.Context, language, level, category string, limit int) ([]model.Question, error)
+	GetByID(ctx context.Context, id int) (*model.Question, error)
+}
+
+type sessionStore interface {
+	CreateSession(ctx context.Context, s *model.Session) error
+	GetByID(ctx context.Context, id int) (*model.Session, error)
+	GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error)
+	GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error)
+	Start(ctx context.Context, id int) error
+}
+
+type sessionQuestionStore interface {
+	CreateSessionQuestions(ctx context.Context, sqs []model.SessionQuestion) error
+	GetBySession(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+}
 
 // SessionBuilderService creates learning sessions with appropriate question mix.
 type SessionBuilderService struct {
-	questionRepo        *repository.QuestionRepository
-	sessionRepo         *repository.SessionRepository
-	sessionQuestionRepo *repository.SessionQuestionRepository
-	srs                 *SRSService
+	questionRepo        questionFetcher
+	sessionRepo         sessionStore
+	sessionQuestionRepo sessionQuestionStore
+	srs                 srsScheduler
 }
 
 func NewSessionBuilderService(
-	questionRepo *repository.QuestionRepository,
-	sessionRepo *repository.SessionRepository,
-	sessionQuestionRepo *repository.SessionQuestionRepository,
-	srs *SRSService,
+	questionRepo questionFetcher,
+	sessionRepo sessionStore,
+	sessionQuestionRepo sessionQuestionStore,
+	srs srsScheduler,
 ) *SessionBuilderService {
 	return &SessionBuilderService{
 		questionRepo:        questionRepo,

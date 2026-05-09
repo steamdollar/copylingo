@@ -5,16 +5,29 @@ import (
 	"time"
 
 	"github.com/lsj/copylingo/internal/model"
-	"github.com/lsj/copylingo/internal/repository"
 )
+
+type questionQuerier interface {
+	GetDueReviews(ctx context.Context, limit int) ([]model.Question, error)
+	GetDueReviewCount(ctx context.Context) (int, error)
+	UpdateSRS(ctx context.Context, q *model.Question) error
+}
+
+// srsScheduler는 GraderService와 SessionBuilderService가 SRSService에 의존할 때 쓰는 계약.
+// *SRSService가 암묵적으로 만족한다.
+type srsScheduler interface {
+	GetDueReviews(ctx context.Context, limit int) ([]model.Question, error)
+	GetDueCount(ctx context.Context) (int, error)
+	ProcessAnswer(ctx context.Context, q *model.Question, isCorrect bool) error
+}
 
 // SRSService implements the SM-2 Spaced Repetition algorithm.
 // SRS state is stored directly on the questions table.
 type SRSService struct {
-	questionRepo *repository.QuestionRepository
+	questionRepo questionQuerier
 }
 
-func NewSRSService(questionRepo *repository.QuestionRepository) *SRSService {
+func NewSRSService(questionRepo questionQuerier) *SRSService {
 	return &SRSService{questionRepo: questionRepo}
 }
 

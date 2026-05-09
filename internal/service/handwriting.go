@@ -8,8 +8,23 @@ import (
 	"time"
 
 	"github.com/lsj/copylingo/internal/model"
-	"github.com/lsj/copylingo/internal/repository"
 )
+
+type handwritingSessionRepo interface {
+	GetByID(ctx context.Context, id int) (*model.Session, error)
+}
+
+type handwritingQuestionRepo interface {
+	GetByID(ctx context.Context, id int) (*model.Question, error)
+}
+
+type handwritingSessionQuestionRepo interface {
+	GetBySession(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+}
+
+type graderClient interface {
+	GradeHandwriting(ctx context.Context, sessionID, questionID int, renderedImage []byte) (bool, string, error)
+}
 
 var (
 	ErrHandwritingUnauthorized     = errors.New("handwriting submission is not owned by user")
@@ -49,18 +64,18 @@ type HandwritingSubmitResult struct {
 
 // HandwritingService coordinates Mini App submissions without coupling HTTP and Bot flows.
 type HandwritingService struct {
-	sessionRepo         *repository.SessionRepository
-	questionRepo        *repository.QuestionRepository
-	sessionQuestionRepo *repository.SessionQuestionRepository
-	grader              *GraderService
+	sessionRepo         handwritingSessionRepo
+	questionRepo        handwritingQuestionRepo
+	sessionQuestionRepo handwritingSessionQuestionRepo
+	grader              graderClient
 	renderer            StrokeRenderer
 }
 
 func NewHandwritingService(
-	sessionRepo *repository.SessionRepository,
-	questionRepo *repository.QuestionRepository,
-	sessionQuestionRepo *repository.SessionQuestionRepository,
-	grader *GraderService,
+	sessionRepo handwritingSessionRepo,
+	questionRepo handwritingQuestionRepo,
+	sessionQuestionRepo handwritingSessionQuestionRepo,
+	grader graderClient,
 	renderer StrokeRenderer,
 ) *HandwritingService {
 	if renderer == nil {

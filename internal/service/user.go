@@ -4,15 +4,19 @@ import (
 	"context"
 
 	"github.com/lsj/copylingo/internal/model"
-	"github.com/lsj/copylingo/internal/repository"
 )
+
+type userRepo interface {
+	GetOrCreate(ctx context.Context, telegramID int64, username string) (*model.User, error)
+	GetAllUsers(ctx context.Context) ([]model.User, error)
+}
 
 // UserService handles user-related business logic.
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo userRepo
 }
 
-func NewUserService(userRepo *repository.UserRepository) *UserService {
+func NewUserService(userRepo userRepo) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 

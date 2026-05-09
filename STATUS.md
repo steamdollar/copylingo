@@ -6,18 +6,13 @@
 
 ## 🔨 진행 중
 
-**Phase 2.2: JLPT 학습 자료 수집기 (진행 중)**
-
-- 목표: JLPT 기출 문제 수집 → contents 테이블 저장
-- 최근 작업: SessionFlow 메시지 렌더링의 `messageID=0` sentinel 제거
-- 남은 작업: JLPTFetcher 구현 완료 및 Orchestrator 등록
-- source_type: `exam_prep`
+- Phase 2.4: 아티클 요약 및 AI 대화 시나리오 구현
 
 ---
 
 ## ⏭️ 다음
 
-- Phase 2.4: 아티클 요약 및 AI 대화 시나리오 구현
+- (없음)
 
 ---
 
@@ -32,12 +27,13 @@
 > 각 항목은 `docs/todos/<file>.md`에 자기완결적 문서로 분리되어 있다. 작성/실행/완료 처리 규칙은 `AGENTS.md`의 "TODO 문서 프로토콜" 참조.
 
 - [ ] `showQuestion` 반복 DB hit 개선 — 문제 이동마다 2회 read 발생, JOIN 또는 cache로 축소. see [docs/todos/show_question_db_hit_reduction.md](docs/todos/show_question_db_hit_reduction.md)
-- [ ] Service 레이어 인터페이스 도입 + 단위 테스트 — repo concrete 의존을 unexported 인터페이스로 교체하고 SRS/Grader/SessionBuilder/Analyzer 테스트 작성. see [docs/todos/service_layer_interfaces_and_tests.md](docs/todos/service_layer_interfaces_and_tests.md)
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-09 | Service 레이어 error path 단위 테스트 보강 | `2605091506_service_error_path_tests.md` |
+| 2026-05-09 | Service 레이어 인터페이스 도입 및 단위 테스트 작성 (Phase 2.5) | `2605091440_service_layer_refactoring.md` |
 | 2026-05-09 | 손글씨 Mini App tunnel 안정화 및 stale URL 복구 | `2605091337_tmux_tunnel_dashboard.md` |
 | 2026-05-08 | showQuestion silent error 처리 (로그 + 사용자 안내) | `2605081617_show_question_silent_error_handling.md` |
 | 2026-05-08 | showQuestion TODO 이슈 분리 | `2605081544_status_showquestion_todo_split.md` |

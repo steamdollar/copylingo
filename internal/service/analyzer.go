@@ -4,16 +4,24 @@ import (
 	"context"
 
 	"github.com/lsj/copylingo/internal/model"
-	"github.com/lsj/copylingo/internal/repository"
 )
+
+type analyzerUserRepo interface {
+	GetByID(ctx context.Context, id int64) (*model.User, error)
+}
+
+type sessionStatRepo interface {
+	GetTodayStats(ctx context.Context) (int, int, error)
+	GetCategoryAccuracy(ctx context.Context) (map[string]float64, error)
+}
 
 // AnalyzerService provides learning analytics and recommendations.
 type AnalyzerService struct {
-	userRepo            *repository.UserRepository
-	sessionQuestionRepo *repository.SessionQuestionRepository
+	userRepo            analyzerUserRepo
+	sessionQuestionRepo sessionStatRepo
 }
 
-func NewAnalyzerService(userRepo *repository.UserRepository, sessionQuestionRepo *repository.SessionQuestionRepository) *AnalyzerService {
+func NewAnalyzerService(userRepo analyzerUserRepo, sessionQuestionRepo sessionStatRepo) *AnalyzerService {
 	return &AnalyzerService{
 		userRepo:            userRepo,
 		sessionQuestionRepo: sessionQuestionRepo,

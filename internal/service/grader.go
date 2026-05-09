@@ -7,25 +7,44 @@ import (
 
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
-	"github.com/lsj/copylingo/internal/repository"
 )
+
+type graderUserRepo interface {
+	UpdateStreak(ctx context.Context, userID int64) error
+}
+
+type graderQuestionRepo interface {
+	GetByID(ctx context.Context, id int) (*model.Question, error)
+	IncrementServed(ctx context.Context, id int) error
+	IncrementCorrect(ctx context.Context, id int) error
+}
+
+type graderSessionRepo interface {
+	Complete(ctx context.Context, id int, correctCount int) error
+}
+
+type graderSessionQuestionRepo interface {
+	RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
+	GetBySession(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+	GetWrongAnswers(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+}
 
 // GraderService handles answer grading and result processing.
 type GraderService struct {
-	userRepo            *repository.UserRepository
-	questionRepo        *repository.QuestionRepository
-	sessionRepo         *repository.SessionRepository
-	sessionQuestionRepo *repository.SessionQuestionRepository
-	srs                 *SRSService
+	userRepo            graderUserRepo
+	questionRepo        graderQuestionRepo
+	sessionRepo         graderSessionRepo
+	sessionQuestionRepo graderSessionQuestionRepo
+	srs                 srsScheduler
 	llm                 external.LLMClient
 }
 
 func NewGraderService(
-	userRepo *repository.UserRepository,
-	questionRepo *repository.QuestionRepository,
-	sessionRepo *repository.SessionRepository,
-	sessionQuestionRepo *repository.SessionQuestionRepository,
-	srs *SRSService,
+	userRepo graderUserRepo,
+	questionRepo graderQuestionRepo,
+	sessionRepo graderSessionRepo,
+	sessionQuestionRepo graderSessionQuestionRepo,
+	srs srsScheduler,
 	llm external.LLMClient,
 ) *GraderService {
 	return &GraderService{
