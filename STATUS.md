@@ -38,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-09 | 손글씨 Mini App tunnel 안정화 및 stale URL 복구 | `2605091337_tmux_tunnel_dashboard.md` |
 | 2026-05-08 | showQuestion silent error 처리 (로그 + 사용자 안내) | `2605081617_show_question_silent_error_handling.md` |
 | 2026-05-08 | showQuestion TODO 이슈 분리 | `2605081544_status_showquestion_todo_split.md` |
 | 2026-05-08 | showQuestion 안정화 TODO 구체화 | `2605081538_status_showquestion_todo.md` |

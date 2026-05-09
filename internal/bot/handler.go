@@ -115,6 +115,13 @@ func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *tg
 	return err
 }
 
+// ClearInlineKeyboard removes inline buttons from an existing bot message.
+func (b *Bot) ClearInlineKeyboard(chatID int64, messageID int) error {
+	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, tgbotapi.InlineKeyboardMarkup{})
+	_, err := b.api.Send(edit)
+	return err
+}
+
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	ctx := context.Background()
 

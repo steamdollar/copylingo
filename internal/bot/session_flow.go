@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"net/url"
 	"strconv"
@@ -155,14 +156,23 @@ func (sf *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Ca
 	}
 
 	if parts[2] == "next" {
+		if cb.Message == nil {
+			return
+		}
 		currentIdx := 0
 		fmt.Sscanf(parts[3], "%d", &currentIdx)
 		if !sf.isQuestionAnswered(ctx, sessionID, currentIdx) {
+			if isStaleMiniAppCallback(parts, sf.bot.cfg.Server.PublicBaseURL) {
+				sf.bot.ClearInlineKeyboard(cb.Message.Chat.ID, cb.Message.MessageID)
+				sf.bot.SendMessage(cb.Message.Chat.ID, "🔄 손글씨 링크가 만료되어 같은 문제를 새 링크로 다시 보냅니다.")
+				sf.showQuestion(ctx, cb.Message.Chat.ID, nil, sessionID, currentIdx)
+				return
+			}
 			sf.bot.SendMessage(cb.Message.Chat.ID, "✍️ 먼저 손글씨 답안을 제출해 주세요.")
 			return
 		}
 		// 같은 손글씨 제출 결과로 다음 문제를 중복 진행하지 못하게 먼저 버튼을 제거한다.
-		sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, cb.Message.Text, nil)
+		sf.bot.ClearInlineKeyboard(cb.Message.Chat.ID, cb.Message.MessageID)
 		// 손글씨 문항은 Mini App HTTP로 제출되므로 원래 메시지 맥락을 남기고,
 		// 다음 문제는 새 Telegram 메시지로 렌더링한다.
 		sf.showQuestion(ctx, cb.Message.Chat.ID, nil, sessionID, currentIdx+1)
@@ -249,13 +259,12 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 
 	switch question.Type {
 	case model.QuestionKanaHandwriting:
-		nextData := fmt.Sprintf(config.FormatQuestionNext, sessionID, questionIdx)
-
 		miniAppURL, err := sf.handwritingMiniAppURL(sessionID, question.ID)
 		if err != nil {
 			text += "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요."
 			break
 		}
+		nextData := formatHandwritingNextCallback(sessionID, questionIdx, sf.bot.cfg.Server.PublicBaseURL)
 
 		text += "\n\n✍️ 아래 버튼을 눌러 화면에 글자를 써 주세요.\n제출 후 이 채팅으로 돌아와 다음 문제를 진행하면 됩니다."
 		replyMarkup := webAppKeyboardMarkup{
@@ -359,6 +368,43 @@ func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int) (string,
 	q.Set("question_id", strconv.Itoa(questionID))
 	u.RawQuery = q.Encode()
 	return u.String(), nil
+}
+
+func formatHandwritingNextCallback(sessionID, questionIdx int, publicBaseURL string) string {
+	token := miniAppURLFingerprint(publicBaseURL)
+	if token == "" {
+		return fmt.Sprintf(config.FormatQuestionNext, sessionID, questionIdx)
+	}
+	return fmt.Sprintf("%s:u:%s", fmt.Sprintf(config.FormatQuestionNext, sessionID, questionIdx), token)
+}
+
+func isStaleMiniAppCallback(parts []string, currentPublicBaseURL string) bool {
+	messageToken, ok := miniAppFingerprintFromCallbackParts(parts)
+	if !ok {
+		// Older messages did not carry a URL fingerprint, so regenerate once.
+		return true
+	}
+	currentToken := miniAppURLFingerprint(currentPublicBaseURL)
+	return currentToken == "" || messageToken != currentToken
+}
+
+func miniAppFingerprintFromCallbackParts(parts []string) (string, bool) {
+	for i := 4; i+1 < len(parts); i++ {
+		if parts[i] == "u" && parts[i+1] != "" {
+			return parts[i+1], true
+		}
+	}
+	return "", false
+}
+
+func miniAppURLFingerprint(rawURL string) string {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(strings.ToLower(u.Host)))
+	return fmt.Sprintf("%08x", h.Sum32())
 }
 
 func (sf *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, questionID int, optionIdx int) {
