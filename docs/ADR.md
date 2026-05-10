@@ -247,3 +247,27 @@
   - **(B) "Redis SSOT"로 활성 세션 전체를 Redis가 소유**: 용어 자체가 부정확하다. 표준 아키텍처에서 Redis가 SSOT 역할을 하는 케이스는 HTTP session, rate limiter, 실시간 leaderboard 등 본질적으로 ephemeral한 데이터에 한정된다. 본 도메인은 DB가 SSOT를 유지해야 한다.
   - **(C) Outbox / event sourcing 패턴 (answer_events append-only log + async worker)**: 표준적으로 검증된 패턴이고 durability/scale 모두 보호하지만, **본 도메인에서 보호하려는 데이터의 가치가 outbox 도입 비용보다 작다.** 구체적으로 — mid-session state(현재 question idx, 부분 답안)는 잃어도 사용자가 세션을 다시 풀면 그만이고, SRS 업데이트 손실은 다음 출제 때 자연 복구되며, 카운터 손실은 통계 미세 어긋남에 그친다. 잃으면 안 되는 건 "완료된 세션의 최종 상태"뿐이고, 이는 종료 시점의 트랜잭션 1회로 보장 가능. 따라서 outbox 추가 복잡도(event log 테이블, async worker, 재처리/idempotency 로직)는 정당화되지 않음.
 - **포트폴리오 관점 메모**: 본 ADR의 진짜 가치는 "Redis 도입했다"가 아니라 **각 데이터의 durability 요구를 명시적으로 분석하여 outbox 같은 표준 패턴을 의식적으로 기각한 사고 과정**이다. 채택 패턴 카탈로그보다 트레이드오프 추적이 평가 가능한 1급 산출물이라는 전제에서 작성됨.
+
+---
+
+## ADR-014: 세션 구성 비율 및 문제 유형 분포
+
+- **날짜**: 2026-05-11
+- **상태**: **검토 중 (Open)** — 사용자가 인지과학 관점에서 재설계 예정. 결정 시점에 "채택됨"으로 갱신.
+- **맥락**:
+  - 현재 `internal/service/session_builder.go`의 세션 구성 비율은 다음과 같음:
+    - 오전 세션: 15문제 = 새 9 (60%) + 복습 6 (40%)
+    - 오후 세션: 10문제 = 새 2 (20%) + 복습 8 (80%)
+    - 카테고리(뉴스/시험대비) 비율: `GetNewQuestions(..., category="", ...)` 형태로 호출되어 세션 단계에서 미적용. ADR-008은 *수집 단계*의 4:6 비율을 정의했지만 세션 빌드에는 강제 메커니즘이 없음.
+  - 위 비율은 초기 구현 시의 직관값이며, **인지과학적 근거(망각 곡선, spaced repetition, interleaving, desirable difficulty 등)를 반영한 설계는 미수행**.
+  - 본 ADR은 작업 중 세션 빌드 규칙이 문서(이전 AGENTS.md §7)와 코드 사이에서 드리프트되어 있던 것을 발견하면서 분리됨. 잘못된 문서를 그대로 유지하는 것보다, 결정되지 않은 영역임을 ADR로 명시하는 편이 안전.
+- **결정해야 할 사항**:
+  - 세션 유형별 새/복습 비율 (오전 / 오후 / on-demand `BuildReviewSession`)
+  - 한 세션 내 문제 유형(객관식 · 빈칸채우기 · 번역 · 듣기 · 독해 · 어순배열) 분포
+  - 카테고리 비율(뉴스/시험대비)을 세션 단계에서도 강제할지, 수집 단계의 ADR-008만으로 충분한지
+  - 비율의 인지과학적 근거 reference 정리
+- **다음 단계 (사용자 본인 작업, 에이전트 위임 대상 아님)**:
+  - 망각 곡선, spaced repetition, interleaving vs blocking, desirable difficulty 관련 reference 수집·정리
+  - 위 결과를 바탕으로 비율 재산정
+  - 결정 후 본 ADR을 "채택됨"으로 갱신 + `session_builder.go`의 const 갱신
+- **운영 원칙**: 결정 후에도 비율은 **코드의 const + 본 ADR로만 관리**한다. 별도 문서 사본을 두지 않음 (드리프트 재발 방지).

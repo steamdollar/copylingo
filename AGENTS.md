@@ -1,126 +1,153 @@
-# CopyLingo — Agent System Prompt
+# CopyLingo — Agent Contract (SSOT)
 
-> 이 문서는 AI 에이전트가 CopyLingo 프로젝트 작업 시 반드시 참고해야 하는 컨텍스트와 규칙을 정의합니다.
-
----
-
-## 🚨 작업 시작 프로토콜 (필수)
-
-새 대화에서 작업을 시작할 때 **반드시 아래 순서를 따르세요**:
-
-```
-1. AGENTS.md 읽기         ← 프로젝트 컨텍스트, 코딩 규칙 (첫 세션 또는 규칙 확인 시)
-2. STATUS.md 읽기         ← 현재 작업 + 다음 작업 + 블로커
-3. 작업 수행
-4. STATUS.md 업데이트     ← 진행 중 → 완료, 다음 작업 설정
-5. docs/workthrough/ 생성 ← YYMMDDhhmm_<job>.md 형식으로 상세 기록
-```
-
-> [!IMPORTANT]
-> - `STATUS.md`의 "🔨 진행 중" 섹션이 에이전트의 작업 지시서입니다.
-> - 작업 완료 시 반드시 `STATUS.md`를 업데이트하여 다음 에이전트가 이어갈 수 있게 하세요.
-> - 작업 중 새 의사결정이 있으면 `docs/ADR.md`에 ADR 항목을 추가하세요.
-> - 마일스톤 완료 시에만 `ROADMAP.md` 상태를 업데이트하세요.
-> - implementation plan, workthrough는 반드시 한글로 작성해주세요.
+> AI agent가 CopyLingo 작업 시 따라야 할 공통 규칙입니다. **Codex는 이 파일을 직접 자동 로드**하고, **Claude / Gemini는 각자의 파일(`CLAUDE.md`, `GEMINI.md`)에서 이 문서를 가리킵니다.** 즉 이 문서는 모든 agent의 SSOT입니다.
 
 ---
 
----
+## 1. agent 진입 규칙
 
-## 📋 TODO 문서 프로토콜 (`docs/todos/`)
+각 CLI는 자기 컨벤션 파일을 자동 로드합니다. 이 매핑은 도구 측 동작이라 변경할 수 없습니다.
 
-상세한 작업 지시가 필요한 TODO는 `docs/todos/<task_name>.md` 형태로 detail 문서를 별도 작성하고, `STATUS.md`에는 한 줄 요약 + 문서 링크만 둡니다. 단순 TODO는 `STATUS.md`에 직접 적어도 됩니다.
+| agent | 자동 로드 파일 | AGENTS.md 접근 방법 |
+|---|---|---|
+| Claude Code | `CLAUDE.md` | `CLAUDE.md` 첫 줄에서 본 문서 위임 |
+| Codex | `AGENTS.md` | 본 문서를 직접 로드 |
+| Gemini CLI | `GEMINI.md` | `GEMINI.md` 첫 줄에서 본 문서 위임 |
 
-### 테크 리드 (Claude Code)가 detail 문서를 작성할 때
-- `STATUS.md`의 TODO 항목 형식: `- [ ] <한 줄 요약> — see [docs/todos/<file>.md](docs/todos/<file>.md)`
-- detail 문서는 **자기완결적**으로 작성. 다른 문서를 안 봐도 실행 가능해야 함:
-  - 배경/목적
-  - 변경할 파일 목록 + Before/After 코드 스니펫
-  - 검증 방법 (`go build ./...`, `make test` 등)
-  - 건드리면 안 되는 영역, 결정된 사항 명시
-- 모호한 결정 포인트는 작성 단계에서 사용자와 합의해 문서에 박아둠 (담당 에이전트가 다시 묻지 않게)
-
-### 담당 에이전트(Gemini 등)가 TODO를 실행할 때
-1. `STATUS.md`에서 TODO 항목의 detail 문서 경로 확인 → 해당 문서를 처음부터 끝까지 읽기
-2. 문서 따라 구현. **문서에 명시되지 않은 결정 사항만** 사용자에게 질문
-3. `make test` 통과 확인 (필수)
-4. **완료 후 처리** (모든 TODO 공통, 절대 빠뜨리지 말 것):
-   - `docs/workthrough/YYMMDDhhmm_<job>.md` 생성 — 변경 파일 목록, 검증 결과, 결정 사항 기록
-   - `STATUS.md` 업데이트 — TODO 항목 제거 + "📝 최근 완료" 테이블 맨 위에 한 줄 추가
-   - `docs/todos/<task_name>.md` 삭제 (git history에 보존됨)
+각 agent별 파일은 **이 문서 위에 얹는 얇은 overlay**입니다. 공통 규칙은 모두 이 문서에 있습니다.
 
 ---
 
-## 프로젝트 개요
+## 2. agent 역할 matrix
 
-- **이름**: CopyLingo
-- **목적**: (a) 외국어 학습 + (b) 포트폴리오 — 우선순위는 **(b) 포트폴리오** ("프로젝트 성격 및 설계 기준" 섹션 참조)
-- **핵심 플로우**: 콘텐츠 수집(뉴스/시험대비) → AI 문제 생성 → 텔레그램 푸시 → 풀이 → 채점 → SRS 복습
-- **사용자**: 실제 1명, 단 설계 평가는 큰 규모 가정
+| 주체 | 진입 방식 | 책임 범위 |
+|---|---|---|
+| **사용자** | 모든 session의 출발점 | **최종 결정권자.** 모든 의사결정(설계, 구현 방향, ADR 채택, TODO 위임 여부 등)에 대한 최종 승인. agent는 제안·실행·review까지 하지만, **비자명한 결정은 반드시 사용자 confirmation을 받음** |
+| **Claude Code / Codex** | 사용자가 직접 session 시작 | 한 작업을 **설계 · 구현 · 검증 · review**까지 끝까지 진행. 두 agent는 **현재 대등하며 사용자 선호로 선택** (의미 있는 능력 차이가 생기면 본 문서에 명시). 비자명한 판단은 사용자에게 올림 |
+| **Gemini CLI** | main session에서 만든 TODO 문서를 받음 | **자기완결 명세를 명세 그대로 실행**. 판단이 필요한 지점이 나오면 즉시 중단하고 사용자에게 질문 |
 
-## 프로젝트 성격 및 설계 기준 (중요)
+> Gemini는 능력 등급이 낮은 일반 실행자가 아니라, **main 작업 흐름에서 떨어져 나온 자명한 부산물 처리 전담**입니다. 자기완결적이지 않은 작업은 Gemini로 보내지 않습니다 (필요하면 Codex가 받아 Case B로 격상).
 
-- Copylingo는 **(a) 실제 외국어 학습용 + (b) 포트폴리오**의 dual-purpose 프로젝트이며, 우선순위는 **(b)** 입니다.
+### 역할 대체 / fallback
+
+**위 matrix는 평상시의 기본값(default)이며, 권한 rule이 아닙니다.** 다음 상황에서는 다른 agent가 임시로 다른 역할을 수행할 수 있습니다:
+
+- 사용자가 명시적으로 다른 배정을 지정한 경우
+- 특정 작업 성격상 일반적인 분담을 따르지 않는 게 더 효율적인 경우 (사용자 판단)
+
+**다만 누가 수행하든 §3 작업 protocol(3-case 절차, 산출물, case 전이 규칙)은 그대로 적용됩니다.** 본 문서는 "누구만 할 수 있다"가 아니라 **"어떤 일을 어떻게 한다"**를 정의합니다. fallback 상황에서도 절차는 동일.
+
+---
+
+## 3. 작업 protocol — 3 cases
+
+사용자의 요청은 다음 셋 중 하나로 분류되며, 분류에 따라 산출물과 절차가 다릅니다.
+
+> **사전 분기 — 매우 작은 변경은 사용자가 직접 처리**
+>
+> 글자 하나, 변수명 하나, 단일 오타 같은 **매우 작은 변경**(코드/MD 모두)처럼 agent의 토큰 소모가 비효율적인 요청을 받으면 처리에 들어가지 말고 **"이건 직접 수정하시는 게 토큰 효율적입니다"** 라고 안내하세요. 사용자가 "그래도 진행해"라고 지시하면 그때 처리.
+
+### Case A. 의사결정 (ADR)
+
+> 시스템 아키텍처, 구현 방식, tradeoff 등 **코드 베이스 구성에 관한 결정**을 논의하는 경우.
+
+- **담당**: Claude / Codex
+- **절차**:
+  1. 사용자와 충분히 논의. 가정한 규모(§4 참조)에서의 tradeoff 명시
+  2. **결정이 굳어지면 사용자가 별도로 요청하지 않아도 agent가 즉시 `docs/ADR.md`에 항목 추가** (배경 / 결정 / 결과). 사용자가 ADR 갱신을 잊는 일이 잦으므로 agent가 능동적으로 처리할 것
+  3. 코드 변경이 동반되면 Case B로 이어서 진행
+- **주의**: "현재 1인 부하라 괜찮다", "YAGNI" 같은 답변을 default로 깔지 말 것 (§4 참조)
+
+### Case B. 코드 작성
+
+> 작업 범위가 정해진 후 **plan 작성 → 구현 → 검증 → 종료** 까지 한 흐름에서 처리하는 경우.
+
+- **담당**: Claude / Codex (사용자 선택)
+- **절차**:
+  1. **시작**: `STATUS.md`에서 "🔨 진행 중" 항목 확인 — 현재 요청과 관련된지 판단
+  2. **plan**: 비자명한 작업이면 plan을 사용자와 합의한 뒤 구현 시작
+  3. **구현**: `internal/` 레이어 구조와 코딩 규칙(§5) 준수
+  4. **검증**: 코드/마이그레이션/설정 변경 시 `make test` **필수**. 문서-only 작업이면 미실행 사유를 workthrough에 기록
+  5. **종료**:
+     - `STATUS.md` 갱신 — **현재 요청이 "진행 중" 항목 자체를 완료하는 경우에만** "진행 중" → "📝 최근 완료"로 이동. 진행 중 항목과 무관한 side task(예: 문서 정리, 우발적 발견 처리)는 STATUS.md를 건드리지 않거나 "📝 최근 완료"에 한 줄만 추가
+     - `docs/workthrough/YYMMDDhhmm_<job>.md` 생성 — 변경 파일, 결정 사항, 검증 결과
+     - 의사결정이 발생했다면 `docs/ADR.md` 갱신
+     - 마일스톤 완료 시에만 `ROADMAP.md` 갱신
+- **언어**: implementation plan과 workthrough는 **한글**로 작성
+
+### Case C. TODO 분리 및 위임
+
+> 작업 중 **현재 범위 밖의 이상치/개선 포인트를 발견**했고, 즉시 처리하지 않고 기록만 남기는 경우.
+
+- **트리거**: 코드 review/구현 중 "이건 지금 건드리면 스코프가 부풀어진다" 싶은 항목 발견
+- **담당**:
+  - **분리**: 발견자 (Claude/Codex)
+  - **실행**: 별도 session의 담당 agent — **주로 Gemini**, 사안에 따라 Codex/Claude도 가능 (Gemini 전용이 아님)
+
+#### 분리 (main agent)
+
+1. **`docs/todos/<task>.md`를 자기완결적 plan 문서로 반드시 작성**한다 (한 줄 요약만 남기는 escape hatch는 없음). 다음 항목을 포함:
+   - 배경/목적
+   - 변경할 파일 목록 + Before/After 스니펫
+   - 검증 방법 (`make test` 등)
+   - 건드리면 안 되는 영역, 결정된 사항
+2. plan 작성 중 모호한 결정 포인트가 있으면 **이 단계에서 사용자와 합의해 문서에 박아둘 것** (실행자가 다시 묻지 않도록)
+3. `STATUS.md`에 한 줄 요약 + 문서 링크 등록:
+   `- [ ] <한 줄 요약> — see [docs/todos/<file>.md](docs/todos/<file>.md)`
+
+#### 실행 (담당 agent, 주로 Gemini)
+
+1. `STATUS.md`에서 plan 문서 경로 확인 → `docs/todos/<task>.md`를 **처음부터 끝까지 정독**
+2. 분기:
+   - 명확하지 않은 사항이 있으면 → **사용자에게 질문** (plan에 박힌 결정 외 추가 판단이 필요한 경우)
+   - 명확하면 → **즉시 작업 시작**. 이후는 **Case B의 절차 3(구현) → 4(검증) → 5(종료)를 그대로 따른다.**
+3. **Case C 종료 시 추가 처리** (Case B 종료에 더해서):
+   - `STATUS.md`에서 해당 TODO 체크박스 항목 제거 (Case B의 "진행 중 → 최근 완료 이동" 규칙과는 별개)
+   - `docs/todos/<task>.md` 삭제 (git history에 보존됨)
+
+### Case 간 전이
+
+작업 도중 case가 바뀌는 경우는 흔하다. 다음 전이는 모두 명시적으로 처리한다 (암묵적 case 변경 금지):
+
+| 전이 | 트리거 | 처리 |
+|---|---|---|
+| **A → B** | ADR 결정 후 코드 변경이 동반됨 | ADR 항목 기록 후 곧바로 Case B 절차로 진입 |
+| **B → A** | 구현 중 가정한 규모/아키텍처에 영향을 주는 **비자명한 결정**이 새로 등장 | **구현을 일시 중단** → 사용자와 Case A 절차로 합의 → ADR 즉시 기록 → Case B 복귀 |
+| **B → C** | 작업 범위 밖의 이상치/개선 포인트 발견 | 현재 구현은 멈추지 않고 Case C로 TODO 분리만 수행 → 분리 후 원래 Case B 계속 |
+| **C → B** | 실행 단계에서 plan에 명시되지 않은 비자명한 결정이 필요하거나, 작업 범위가 plan보다 훨씬 큼이 드러남 | 실행 agent는 즉시 중단·사용자에게 보고 → 사용자 판단으로 plan 보강 후 재개하거나, main session의 Case B로 격상해 정상 처리 |
+
+---
+
+## 4. 프로젝트 성격 및 설계 기준 ⚠️
+
+> 본 프로젝트의 **모든 아키텍처/리팩터 결정은 이 섹션을 기준**으로 평가됩니다.
+
+- CopyLingo는 **(a) 실제 외국어 학습용 + (b) 포트폴리오**의 dual-purpose 프로젝트이며, **개발 작업시 우선순위는 (b)** 입니다.
 - 실제 사용자는 1명이지만, 아키텍처/리팩터 결정은 **"이 시스템이 수만~수십만 사용자를 다룬다"는 가정** 하에 평가합니다.
 - 이유: 더 큰 규모 시스템을 다뤄본 경험을 쌓는 것이 이 프로젝트의 핵심 목적 중 하나입니다.
-- 적용 방법:
-  - "현재 1인 부하라 괜찮다", "YAGNI" 같은 답변을 default로 깔지 말 것. 그 결론을 사용자가 명시적으로 원할 때만 그쪽으로 갑니다.
-  - 가정한 규모에서 실제 의미가 있는 패턴(캐시 SSOT, 이벤트 스트림/outbox, CQRS, 비동기 워커 등)을 의식적으로 고르고 트레이드오프를 명시.
-  - 단, "스케일을 가정한다"는 것이 모든 곳에 분산 시스템을 박는다는 뜻은 아님. 의도된 선택이어야 함.
-  - 코드만큼 **`docs/ADR.md` 등 설계 문서가 1급 산출물**. 비자명한 설계 변경 시 ADR 갱신을 함께 수행.
-- 아래 "의사결정 원칙"의 **"개인 사용 최적화"는 기능 범위(scope) 결정에만 적용**되고, 아키텍처/성능 결정에는 적용하지 않습니다.
 
-## 기술 스택
+### 적용 방법
 
-| 구분 | 기술 | 비고 |
-|---|---|---|
-| 언어 | **Go 1.25** | |
-| HTTP 프레임워크 | **Gin** | 헬스체크/관리 API 용도 |
-| 텔레그램 | **go-telegram-bot-api/v5** | Inline Keyboard 기반 인터랙션 |
-| DB | **PostgreSQL 16** | sqlx (raw SQL, ORM 미사용) |
-| 캐시 | **Redis 7** | 세션 캐시, 응답 시간 측정 |
-| 설정 | **Viper** | YAML + 환경변수 오버라이드 |
-| 스케줄러 | **robfig/cron/v3** | |
-| AI | **Gemini 3.1 Flash Lite** | OpenAI 호환 엔드포인트 사용 |
-| TTS | **Google Cloud TTS** | 사전 생성 + 파일 캐싱 |
-| 컨테이너 | **Docker + Docker Compose** | PostgreSQL, Redis, App |
+- **"현재 1인 부하라 괜찮다", "YAGNI" 같은 답변을 default로 깔지 말 것.** 그 결론을 사용자가 명시적으로 원할 때만 그쪽으로 갑니다.
+- 가정한 규모에서 실제 의미가 있는 패턴(캐시 SSOT, 이벤트 스트림/outbox, CQRS, 비동기 워커 등)을 의식적으로 고르고 tradeoff를 명시.
+- 단, "스케일을 가정한다"는 것이 모든 곳에 분산 시스템을 박는다는 뜻은 아님. **의도된 선택**이어야 함.
+- 코드만큼 **`docs/ADR.md` 등 설계 문서가 1급 산출물**. 비자명한 설계 변경 시 ADR 갱신을 함께 수행.
 
-## 프로젝트 구조
+### 의사결정 원칙
 
-```
-copylingo/
-├── cmd/server/main.go              ← 엔트리포인트 (DI, graceful shutdown)
-├── internal/
-│   ├── config/                      ← Viper 기반 설정
-│   ├── model/                       ← 도메인 모델 (DB 매핑)
-│   ├── repository/                  ← 데이터 접근 (PostgreSQL, raw SQL)
-│   ├── service/                     ← 비즈니스 로직
-│   ├── bot/                         ← 텔레그램 봇 핸들러
-│   ├── scheduler/                   ← 크론 스케줄러
-│   ├── pipeline/                    ← 콘텐츠 수집/문제 생성/TTS
-│   └── external/                    ← 외부 API 클라이언트
-├── migrations/                      ← SQL 마이그레이션
-├── data/
-│   ├── curriculum/                  ← N5~N1 커리큘럼 JSON
-│   └── audio/                       ← TTS 캐시
-├── docs/                            ← 프로젝트 문서
-│   ├── workthrough/                 ← 작업 완료 기록 (YYMMDDhhmm_*.md)
-│   ├── ARCHITECTURE.md              ← 시스템 아키텍처
-│   └── ADR.md                       ← Architecture Decision Records
-├── config.yaml                      ← 기본 설정 (민감 정보 제외)
-├── docker-compose.yml
-├── Dockerfile
-├── Makefile
-├── ROADMAP.md                       ← 전체 Phase/Subphase 진행 상황
-└── STATUS.md                        ← 현재 작업 상태 (🚨 작업 전 필독)
-```
+1. **개인 사용 최적화는 기능 scope 결정에만 적용** — 소셜 기능, 과금 유도 장치(하트 등) 불필요. **아키텍처/성능 결정에는 적용 금지.**
+2. **Push 기반 학습** — 사용자가 찾아오는 게 아니라, 봇이 먼저 session을 보냄
+3. **AI 적극 활용** — 문제 생성, 아티클 대화, 피드백 모두 AI 기반
+4. **AI 모델 운용** — Gemini를 OpenAI 호환 모드로 사용 (월 무료 1,500 RPD 내 운용)
 
-## 코딩 규칙
+---
+
+## 5. 코딩 규칙
 
 ### Go 코드
 
 1. **패키지 구조**: `internal/` 하위에 레이어별 분리 (`model`, `repository`, `service`, `bot`, `pipeline`, `external`)
-2. **DB 접근**: `sqlx`로 raw SQL 작성. ORM 사용 금지.
+2. **DB 접근**: `sqlx`로 raw SQL 작성. 
 3. **에러 처리**:
    - 에러 발생 지점에서는 로그를 찍지 말고 `fmt.Errorf("context: %w", err)` 패턴으로 맥락을 붙여 반환
    - Repository 계층은 함수명/주요 식별자 기반으로 검색 가능한 에러 컨텍스트 포함 (예: `SessionQuestionRepository.GetBySession session_id=%d: %w`)
@@ -137,7 +164,7 @@ copylingo/
 ### 텔레그램 봇
 
 1. **Callback Data 규약**:
-   - `session:{session_id}:start` — 세션 시작
+   - `session:{session_id}:start` — session 시작
    - `q:{session_id}:{question_id}:{option_idx}` — 답변 선택
    - `q:{session_id}:next:{current_idx}` — 다음 문제
    - `session:{session_id}:finish` — 결과 보기
@@ -155,66 +182,17 @@ copylingo/
 
 ### 설정
 
-1. **민감 정보**: 환경변수로 주입 (`COPYLINGO_TELEGRAM_TOKEN`, `COPYLINGO_OPENAI_API_KEY`)
-2. **기본값**: `config.yaml`에 비민감 기본값 정의
-3. **환경변수 prefix**: `COPYLINGO_` (예: `COPYLINGO_DB_HOST`)
-4. **AI 엔드포인트**: Gemini를 OpenAI 호환 모드로 사용
-   ```yaml
-   openai:
-     api_key: "AIza..."
-     model: "gemini-2.0-flash"
-     base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
-   ```
+- **민감 정보는 환경변수로 주입** (`COPYLINGO_TELEGRAM_TOKEN`, `COPYLINGO_LLM_API_KEY` 등). `config.yaml`에 API 키/토큰 하드코딩 금지.
 
-## 핵심 비즈니스 로직
+---
 
-### SM-2 간격 반복 (SRS)
+## 6. 참고 문서
 
-- 위치: `internal/service/srs.go`
-- 정답 시: interval 점진 증가 (1일 → 6일 → ×ease_factor)
-- 오답 시: interval 리셋 → 1일
-- ease_factor: 최소 1.3
-
-### 세션 빌드 규칙
-
-- 위치: `internal/service/session_builder.go`
-- **오전 세션**: 15문제 = 새 문제 9개 (60%) + 복습 6개 (40%)
-- **오후 세션**: 10문제 = 새 문제 6개 (60%) + 복습 4개 (40%)
-- **콘텐츠 비율**: 뉴스 40% + 시험 대비 60%
-
-### XP 계산 (채점)
-
-- 위치: `internal/service/grader.go`
-- 기본: 문제당 1 XP + 정답당 0.5 XP 보너스
-- 퍼펙트 보너스: 전문 정답 시 +5 XP
-
-## 의사결정 원칙
-
-1. **개인 사용 최적화** (기능 scope 한정): 소셜 기능, 과금 유도 장치(하트 등) 불필요. 단, 아키텍처/성능 결정에는 이 원칙 적용 금지 — "프로젝트 성격 및 설계 기준" 참조.
-2. **Push 기반 학습**: 사용자가 찾아오는 게 아니라, 봇이 먼저 세션을 보냄
-3. **AI 적극 활용**: 문제 생성, 아티클 대화, 피드백 모두 AI 기반
-4. **AI**: Gemini 3.0 Flash (월 무료 1,500 RPD 내 운용)
-
-## 작업 시 주의사항
-
-> [!CAUTION]
-> `config.yaml`에 API 키나 토큰을 절대 하드코딩하지 마세요. 환경변수로 주입합니다.
-
-## 개발 명령어
-
-```bash
-make infra      # PostgreSQL + Redis 시작
-make migrate    # DB 마이그레이션 실행
-make run        # 앱 실행 (go run)
-make build      # 바이너리 빌드
-make test       # 전체 테스트
-make docker-up  # Docker 전체 시작 (앱 포함)
-```
-
-## 참고 문서
-
+- [README.md](README.md) — 프로젝트 개요, 기술 스택, 로컬 개발/배포 방법
 - [STATUS.md](STATUS.md) — 현재 작업 상태 (🚨 작업 전 필독)
 - [ROADMAP.md](ROADMAP.md) — 전체 Phase/Subphase 진행 상황
-- [아키텍처](docs/ARCHITECTURE.md) — 시스템 구조, 데이터 흐름, 콜백 규약
-- [ADR](docs/ADR.md) — 기술 의사결정 기록
-- [작업 기록](docs/workthrough/) — 완료된 작업 상세 기록
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 시스템 구조, 데이터 흐름, 콜백 규약
+- [docs/ADR.md](docs/ADR.md) — 기술 의사결정 기록
+- [docs/workthrough/](docs/workthrough/) — 완료된 작업 상세 기록
+- [docs/todos/](docs/todos/) — 별도 session에서 실행될 TODO의 자기완결 plan 문서
+- [Makefile](Makefile) — 개발 명령어 (`make test`, `make infra`, `make migrate`, `make build` 등). README.md "Makefile" 섹션에도 표로 정리됨
