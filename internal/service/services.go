@@ -14,6 +14,7 @@ type Services struct {
 	Grader         *GraderService
 	Handwriting    *HandwritingService
 	Analyzer       *AnalyzerService
+	Tip            *TipService
 }
 
 // NewServices creates all services with the given dependencies.
@@ -28,6 +29,7 @@ func NewServices(repos *repository.Repositories, cfg *config.Config) *Services {
 	sessionBuilderService := NewSessionBuilderService(repos.Question,
 		repos.Session, repos.SessionQuestion, srsService)
 	handwritingService := NewHandwritingService(repos.Session, repos.Question, repos.SessionQuestion, graderService, nil)
+	tipService := NewTipService(repos.Tip)
 
 	return &Services{
 		User:           userService,
@@ -36,5 +38,6 @@ func NewServices(repos *repository.Repositories, cfg *config.Config) *Services {
 		Grader:         graderService,
 		Handwriting:    handwritingService,
 		Analyzer:       analyzerService,
+		Tip:            tipService,
 	}
 }

@@ -13,6 +13,7 @@ type Repositories struct {
 	Question        *QuestionRepository
 	Session         *SessionRepository
 	SessionQuestion *SessionQuestionRepository
+	Tip             *TipRepository
 }
 
 // NewRepositories creates all repositories with the given DB connection.
@@ -23,6 +24,7 @@ func NewRepositories(db *sqlx.DB) *Repositories {
 		Question:        NewQuestionRepository(db),
 		Session:         NewSessionRepository(db),
 		SessionQuestion: NewSessionQuestionRepository(db),
+		Tip:             NewTipRepository(db),
 	}
 }
 
