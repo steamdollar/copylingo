@@ -81,3 +81,19 @@ Table session_questions {
     session_id
   }
 }
+
+Table tips {
+  id serial [pk]
+  language varchar(10) [not null, note: 'ISO 639-1: ja, el, en']
+  proficiency_level varchar(10) [not null, note: 'JLPT: N5-N1, CEFR: A1-C2']
+  category varchar(64) [not null, note: 'model.TipCategory whitelist']
+  body varchar(500) [not null, note: '1-2 short sentences']
+  source_model varchar(64) [note: 'e.g. gemini-2.5-flash']
+  source_prompt_ver varchar(32) [note: 'prompt template version tag']
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `NOW()`]
+
+  indexes {
+    (language, proficiency_level) [note: 'partial: WHERE is_active']
+  }
+}

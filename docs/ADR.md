@@ -271,3 +271,32 @@
   - 위 결과를 바탕으로 비율 재산정
   - 결정 후 본 ADR을 "채택됨"으로 갱신 + `session_builder.go`의 const 갱신
 - **운영 원칙**: 결정 후에도 비율은 **코드의 const + 본 ADR로만 관리**한다. 별도 문서 사본을 두지 않음 (드리프트 재발 방지).
+
+---
+
+## ADR-015: 학습 팁(Tips) 시스템 도입 — LLM 채점 대기 시간 활용
+
+- **날짜**: 2026-05-11
+- **상태**: 채택됨 (스키마/모델/repository/API/Mini App 연동 완료, scheduler 생성은 TODO로 분리)
+- **맥락**:
+  - 손글씨 Mini App 의 LLM 채점은 수 초 단위 latency. 사용자가 채점 결과만 기다리는 dead time 이 발생.
+  - 단순 spinner 보다, 대기 시간을 짧은 학습 팁(요음 규칙, 비슷한 가나 구분, 획순 등)으로 채우면 UX 개선 + 학습량 누적이 동시에 달성됨.
+  - 정적 JSON 으로 둘 수도 있으나, 본 프로젝트가 다국어(ADR-009) + JLPT/CEFR 레벨 분기를 이미 갖고 있어 (language, proficiency_level) 별 컨텐츠 자산화가 자연스러움.
+- **결정**:
+  - `tips` 테이블을 초기 스키마에 포함한다 (`migrations/001_init.sql`, 단일 파일 컨벤션). 컬럼: `language`, `proficiency_level`, `category`, `body (VARCHAR 500)`, `source_model`, `source_prompt_ver`, `is_active`, `created_at`. label 컬럼은 두지 않음 — 카드 eyebrow 는 `TipCategory.DisplayName()` 매핑으로 표시해 시각 일관성 + LLM 프롬프트 단순화.
+  - `category` 는 DB 측은 VARCHAR, Go 측 `model.TipCategory` 화이트리스트로 검증 (`DisplayName()` 으로 한국어 eyebrow 매핑). 초기 7개 (가나 손글씨 전용): `kana_youon`, `kana_sokuon`, `kana_dakuten`, `kana_chouon`, `kana_shape`, `kana_stroke`, `kana_hira_vs_kata`. 다른 언어/스킬 추가 시 enum 확장.
+  - 컨텐츠는 **AI 생성** — 별도 seeder CLI 가 아니라 **scheduler 세션 빌드 사이클에 통합**한다. (lang, level) 잔고가 50 미만일 때만 한 세션 빌드당 2-3개씩 LLM 으로 생성. 50 도달 후 자동 정지.
+  - **dedup 메커니즘은 도입하지 않는다** (현 시점). UNIQUE 제약 / 의미적 dedup 모두 없이 누적, 사용자가 누적 결과를 보고 추후 결정.
+  - 런타임 노출은 손글씨 Mini App 한정. `GET /api/miniapp/tips?language=..&level=..` → 클라이언트가 로딩 시 fetch → shuffle/회전.
+- **장점**:
+  - LLM 비용을 점진 분할 — 한 번에 500개 시드 부담 없음.
+  - 잔고 임계치 기반이라 자동 정지, 무한 LLM 호출 위험 없음.
+  - 손글씨 외 다른 wait point 가 생겨도 같은 테이블 재활용 가능.
+- **단점 / 트레이드오프**:
+  - dedup 없이 누적 시 (lang, level) 안에 의미적으로 유사한 tip 이 쌓일 수 있음 — 의도된 절충, 데이터 본 후 결정.
+  - 매 세션 빌드 시 `COUNT(*)` 1회 추가 hit — `idx_tips_lang_level_active` 부분 인덱스로 비용 최소화.
+- **대안**:
+  - 정적 JSON: 다국어/레벨 확장 어려움, 컨텐츠 큐레이션 수동.
+  - on-demand 생성 (Mini App 열 때마다 LLM 호출): 비용·지연 폭증, 동일 사용자에게 같은 tip 보이지 않게 하기 어려움.
+  - 별도 seeder CLI 일회성 실행: scheduler 통합 대비 운영 포인트 증가, "점진 누적" 특성 살리기 어려움.
+- **후속 TODO**: `docs/todos/tip_scheduler_generation.md` — (language, proficiency_level) 잔고가 임계치 미만일 때 scheduler 가 LLM 으로 tip 을 보충하는 생성 경로.

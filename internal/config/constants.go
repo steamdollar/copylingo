@@ -49,10 +49,12 @@ const (
 const (
 	KeySessionQuestionStart string = "session:%d:question_start"
 	KeyUserActiveQuestion   string = "user:%d:active_question"
+	KeyHandwritingMessage   string = "handwriting:msg:%d:%d" // session_id, question_id
 )
 
 // Mini App routes
 const (
 	PathHandwritingMiniApp = "/miniapp/handwriting"
 	PathHandwritingSubmit  = "/api/miniapp/handwriting/submit"
+	PathMiniAppTips        = "/api/miniapp/tips"
 )

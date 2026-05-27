@@ -112,7 +112,7 @@ func waitForShutdown(srv *http.Server, botHandler *bot.Bot) {
 	log.Println("Server stopped")
 }
 
-func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client, services *service.Services) *gin.Engine {
+func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client, services *service.Services, botHandler *bot.Bot) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -146,7 +146,7 @@ func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client, services *s
 		})
 	})
 
-	miniapp.RegisterRoutes(r, cfg, services)
+	miniapp.RegisterRoutes(r, cfg, services, rdb, botHandler)
 
 	return r
 }

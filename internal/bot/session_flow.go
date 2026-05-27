@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"log"
 	"net/url"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
@@ -259,12 +259,12 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 
 	switch question.Type {
 	case model.QuestionKanaHandwriting:
-		miniAppURL, err := sf.handwritingMiniAppURL(sessionID, question.ID)
+		miniAppURL, err := sf.handwritingMiniAppURL(sessionID, question.ID, question.Language, question.ProficiencyLevel)
 		if err != nil {
 			text += "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요."
 			break
 		}
-		nextData := formatHandwritingNextCallback(sessionID, questionIdx, sf.bot.cfg.Server.PublicBaseURL)
+		nextData := callback.FormatHandwritingNext(sessionID, questionIdx, sf.bot.cfg.Server.PublicBaseURL)
 
 		text += "\n\n✍️ 아래 버튼을 눌러 화면에 글자를 써 주세요.\n제출 후 이 채팅으로 돌아와 다음 문제를 진행하면 됩니다."
 		replyMarkup := webAppKeyboardMarkup{
@@ -278,7 +278,18 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 			// 이전 메시지는 재사용하지 않고 짧은 안내 문구로 축약한다.
 			sf.bot.EditMessage(chatID, *editMessageID, "✍️ 손글씨 문항을 새 메시지로 보냈습니다.", nil)
 		}
-		sf.bot.SendMessageWithReplyMarkup(chatID, text, replyMarkup)
+		msgID, err := sf.bot.SendMessageWithReplyMarkup(chatID, text, replyMarkup)
+		if err != nil {
+			log.Printf("Error sending handwriting message chat=%d session=%d question=%d: %v", chatID, sessionID, question.ID, err)
+			return
+		}
+
+		// Store message ID to clean up buttons after Mini App submission
+		key := fmt.Sprintf(config.KeyHandwritingMessage, sessionID, question.ID)
+		val := fmt.Sprintf("%d:%d", chatID, msgID)
+		if err := sf.bot.rdb.Set(ctx, key, val, time.Hour).Err(); err != nil {
+			log.Printf("Error caching handwriting message id session=%d question=%d: %v", sessionID, question.ID, err)
+		}
 		return
 	case model.QuestionFillBlank, model.QuestionSubjective:
 		// Set active question in Redis for 1 hour
@@ -354,7 +365,7 @@ func (sf *SessionFlow) nextUnansweredQuestionIndex(ctx context.Context, sessionI
 }
 
 // TODO: 이 함수 굳이 이렇게 복잡하게 짜야 함?
-func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int) (string, error) {
+func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int, language, level string) (string, error) {
 	baseURL := strings.TrimRight(sf.bot.cfg.Server.PublicBaseURL, "/")
 	if baseURL == "" {
 		return "", fmt.Errorf("server public base url is empty")
@@ -366,45 +377,14 @@ func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int) (string,
 	q := u.Query()
 	q.Set("session_id", strconv.Itoa(sessionID))
 	q.Set("question_id", strconv.Itoa(questionID))
+	q.Set("language", language)
+	q.Set("level", level)
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
 
-func formatHandwritingNextCallback(sessionID, questionIdx int, publicBaseURL string) string {
-	token := miniAppURLFingerprint(publicBaseURL)
-	if token == "" {
-		return fmt.Sprintf(config.FormatQuestionNext, sessionID, questionIdx)
-	}
-	return fmt.Sprintf("%s:u:%s", fmt.Sprintf(config.FormatQuestionNext, sessionID, questionIdx), token)
-}
-
 func isStaleMiniAppCallback(parts []string, currentPublicBaseURL string) bool {
-	messageToken, ok := miniAppFingerprintFromCallbackParts(parts)
-	if !ok {
-		// Older messages did not carry a URL fingerprint, so regenerate once.
-		return true
-	}
-	currentToken := miniAppURLFingerprint(currentPublicBaseURL)
-	return currentToken == "" || messageToken != currentToken
-}
-
-func miniAppFingerprintFromCallbackParts(parts []string) (string, bool) {
-	for i := 4; i+1 < len(parts); i++ {
-		if parts[i] == "u" && parts[i+1] != "" {
-			return parts[i+1], true
-		}
-	}
-	return "", false
-}
-
-func miniAppURLFingerprint(rawURL string) string {
-	u, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || u.Host == "" {
-		return ""
-	}
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(strings.ToLower(u.Host)))
-	return fmt.Sprintf("%08x", h.Sum32())
+	return callback.IsStaleMiniAppCallback(parts, currentPublicBaseURL)
 }
 
 func (sf *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, questionID int, optionIdx int) {

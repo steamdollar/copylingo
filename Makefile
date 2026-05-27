@@ -99,11 +99,12 @@ tmux-stop:
 	@if command -v fuser >/dev/null 2>&1; then fuser -k 8080/tcp 2>/dev/null || true; fi
 
 # Run database migration (requires psql)
+# Applies every migrations/NNN_*.sql in filename order.
 migrate:
-	psql -h localhost -U copylingo -d copylingo -f migrations/001_init.up.sql
-
-migrate-down:
-	psql -h localhost -U copylingo -d copylingo -f migrations/001_init.down.sql
+	@for f in $(sort $(wildcard migrations/[0-9]*.sql)); do \
+		echo "==> Applying $$f"; \
+		psql -h localhost -U copylingo -d copylingo -v ON_ERROR_STOP=1 -f $$f || exit 1; \
+	done
 
 # Development: start infra only (DB + Redis)
 infra:

@@ -28,12 +28,15 @@
 
 - [ ] `showQuestion` 반복 DB hit 개선 — 문제 이동마다 2회 read 발생, JOIN 또는 cache로 축소. see [docs/todos/show_question_db_hit_reduction.md](docs/todos/show_question_db_hit_reduction.md)
 
+- [ ] 학습 팁 AI 생성 (scheduler 통합) — (lang, level) 잔고 < 50 일 때 세션 빌드마다 2-3개 LLM 으로 생성. see [docs/todos/tip_scheduler_generation.md](docs/todos/tip_scheduler_generation.md)
+
 - 손글씨 쓰기 채점 - 너무 오래 걸림. 대안 필요. (속도를 줄이던가, 그 사이에 뭘 하게끔 하던가)
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-20 | 손글씨 Mini App 학습 팁 통합 | `2605200103_handwriting_tips_integration.md` |
 | 2026-05-11 | 에이전트 가이드라인 문서 재구성 (AGENTS SSOT + CLAUDE/GEMINI thin overlay, ADR-014 Open 분리) | `2605110132_agent_docs_restructure.md` |
 | 2026-05-09 | Service 레이어 error path 단위 테스트 보강 | `2605091506_service_error_path_tests.md` |
 | 2026-05-09 | Service 레이어 인터페이스 도입 및 단위 테스트 작성 (Phase 2.5) | `2605091440_service_layer_refactoring.md` |

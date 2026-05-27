@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>CopyLingo 손글씨 답안</title>
-    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css">
+    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css?v=2605200114">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
@@ -21,10 +21,20 @@
           <button id="clear" class="secondary" type="button">지우기</button>
           <button id="submit" class="primary" type="button">제출하기</button>
         </div>
+        <div id="loadingPanel" class="loading-panel" hidden>
+          <div class="loading-header">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="loading-title">채점 중입니다</span>
+          </div>
+          <div id="tipCard" class="tip-card" aria-live="polite" hidden>
+            <span class="tip-eyebrow" id="tipEyebrow"></span>
+            <p class="tip-body" id="tipBody"></p>
+          </div>
+        </div>
         <p id="status" class="status">준비됨</p>
       </section>
     </main>
 
-    <script src="/miniapp/handwriting/assets/app.js"></script>
+    <script src="/miniapp/handwriting/assets/app.js?v=2605200114"></script>
   </body>
 </html>

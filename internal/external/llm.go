@@ -154,7 +154,7 @@ Evaluate whether the handwriting image matches the Expected Kana and output JSON
 						Type: openai.ChatMessagePartTypeImageURL,
 						ImageURL: &openai.ChatMessageImageURL{
 							URL:    imageURL,
-							Detail: openai.ImageURLDetailAuto,
+							Detail: openai.ImageURLDetailLow,
 						},
 					},
 				},

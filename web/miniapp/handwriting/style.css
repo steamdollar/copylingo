@@ -119,3 +119,66 @@ button:disabled {
   font-size: 14px;
   line-height: 1.45;
 }
+
+.loading-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.loading-panel[hidden],
+.tip-card[hidden] {
+  display: none;
+}
+
+.loading-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(31, 122, 82, 0.18);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-title {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tip-card {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(31, 122, 82, 0.08);
+  transition: opacity 0.22s;
+}
+
+.tip-eyebrow {
+  display: block;
+  color: var(--accent-dark);
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tip-body {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}

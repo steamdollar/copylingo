@@ -1,10 +1,10 @@
 -- CopyLingo Initial Schema (Multi-language Support)
--- 5 tables: users, contents, questions (with SRS), sessions, session_questions
+-- 6 tables: users, contents, questions (with SRS), sessions, session_questions, tips
 
 -----------------------------------------------------------
 -- users
 -----------------------------------------------------------
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id                  BIGINT PRIMARY KEY,                     -- Telegram user ID
     username            VARCHAR(255) NOT NULL DEFAULT '',
     language            VARCHAR(10) NOT NULL DEFAULT 'ja',      -- ISO 639-1: 'ja', 'el', 'en', etc.
@@ -19,7 +19,7 @@ CREATE TABLE users (
 -----------------------------------------------------------
 -- contents (collected learning materials)
 -----------------------------------------------------------
-CREATE TABLE contents (
+CREATE TABLE IF NOT EXISTS contents (
     id              SERIAL PRIMARY KEY,
     source_type     VARCHAR(20) NOT NULL,                       -- 'news' | 'exam_prep'
     source_url      TEXT NOT NULL DEFAULT '',
@@ -37,7 +37,7 @@ CREATE TABLE contents (
 -----------------------------------------------------------
 -- questions (generated learning questions + SRS state)
 -----------------------------------------------------------
-CREATE TABLE questions (
+CREATE TABLE IF NOT EXISTS questions (
     id              SERIAL PRIMARY KEY,
     content_id      INT REFERENCES contents(id) ON DELETE SET NULL,
     type            VARCHAR(30) NOT NULL,                       -- multiple_choice, fill_blank, etc.
@@ -61,14 +61,14 @@ CREATE TABLE questions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_questions_next_review ON questions(next_review_at)
+CREATE INDEX IF NOT EXISTS idx_questions_next_review ON questions(next_review_at)
     WHERE next_review_at IS NOT NULL;
-CREATE INDEX idx_questions_language_level ON questions(language, proficiency_level);
+CREATE INDEX IF NOT EXISTS idx_questions_language_level ON questions(language, proficiency_level);
 
 -----------------------------------------------------------
 -- sessions (learning sessions)
 -----------------------------------------------------------
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
     id              SERIAL PRIMARY KEY,
     user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type            VARCHAR(20) NOT NULL,                       -- morning, evening, review, article
@@ -80,12 +80,12 @@ CREATE TABLE sessions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_sessions_created_at ON sessions(created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
 
 -----------------------------------------------------------
 -- session_questions (join: session <-> question + user answer)
 -----------------------------------------------------------
-CREATE TABLE session_questions (
+CREATE TABLE IF NOT EXISTS session_questions (
     id              SERIAL PRIMARY KEY,
     session_id      INT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     question_id     INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
@@ -95,4 +95,23 @@ CREATE TABLE session_questions (
     is_correct      BOOLEAN                                     -- NULL = not answered yet
 );
 
-CREATE INDEX idx_session_questions_session_id ON session_questions(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_questions_session_id ON session_questions(session_id);
+
+-----------------------------------------------------------
+-- tips (short learning notes shown while waiting for grading)
+-----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tips (
+    id                SERIAL PRIMARY KEY,
+    language          VARCHAR(10)  NOT NULL,                       -- ISO 639-1: 'ja', 'el', 'en'
+    proficiency_level VARCHAR(10)  NOT NULL,                       -- JLPT: N5-N1, CEFR: A1-C2
+    category          VARCHAR(64)  NOT NULL,                       -- model.TipCategory whitelist
+    body              VARCHAR(500) NOT NULL,                       -- 1-2 short sentences
+
+    source_model      VARCHAR(64),                                 -- e.g. 'gemini-2.5-flash'
+    source_prompt_ver VARCHAR(32),                                 -- prompt template version tag
+    is_active         BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tips_lang_level_active
+    ON tips(language, proficiency_level) WHERE is_active;
