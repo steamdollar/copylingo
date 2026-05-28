@@ -92,7 +92,7 @@ make run
 2. **Environment**: 필요한 환경변수 직접 설정
 3. **Infrastructure**: `make infra` (Docker Postgres/Redis 기동)
 4. **Migration**: `make migrate` (DB 스키마 생성)
-5. **Seeding**: `go run ./cmd/kana_seeder` (기초 가나 + 손글씨 문항 생성)
+5. **Seeding**: `go run ./cmd/ja/kana_seeder` (기초 가나 + 손글씨 문항 생성), `go run ./cmd/ja/vocab_seeder` (N5 단어 문항 생성)
 6. **Run**: `COPYLINGO_TELEGRAM_TOKEN=... COPYLINGO_LLM_API_KEY=... go run ./cmd/server`
 
 예시:
@@ -103,7 +103,8 @@ export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
 
 make infra
 make migrate
-go run ./cmd/kana_seeder
+go run ./cmd/ja/kana_seeder
+go run ./cmd/ja/vocab_seeder
 go run ./cmd/server
 ```
 
@@ -127,7 +128,7 @@ export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
 
 make infra
 make migrate
-go run ./cmd/kana_seeder
+go run ./cmd/ja/kana_seeder
 go run ./cmd/server
 ```
 

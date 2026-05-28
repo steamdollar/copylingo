@@ -300,7 +300,7 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 		if question.Type == model.QuestionSubjective {
 			text += "\n\n⌨️ 정답을 자유롭게 텍스트로 입력해 주세요"
 		} else {
-			text += "\n\n⌨️ 채팅창에 답안을 영어로 입력해 주세요 (예: a, ka)"
+			text += "\n\n⌨️ 채팅창에 답안을 입력해 주세요"
 		}
 	default:
 		options, err := question.GetOptions()

@@ -103,7 +103,7 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 	return result.IsCorrect, result.Feedback, nil
 }
 
-// GradeHandwriting verifies whether a rendered handwriting image matches the expected Kana.
+// GradeHandwriting verifies whether a rendered handwriting image matches the expected Japanese text.
 func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error) {
 	startedAt := time.Now()
 
@@ -111,29 +111,8 @@ func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt,
 		return false, "", config.ErrAIConfigMissing
 	}
 
-	systemPrompt := `You are an expert Japanese kana handwriting grader.
-You must return strict JSON only. Do not use markdown blocks.
-
-JSON schema:
-{
-  "is_correct": boolean,
-  "feedback": "string (Short Korean feedback explaining the result)"
-}
-
-Rules:
-1. This is binary verification, not open-ended OCR.
-2. The image contains one centered handwritten kana in black on white.
-3. Decide whether the handwritten image can reasonably be accepted as the expected kana.
-4. Accept minor wobble, uneven stroke width, rounded corners, and imperfect mobile handwriting.
-5. Do not reject only because the drawing is large, small, slightly tilted, or not aesthetically neat.
-6. Reject if it clearly looks like a different kana, has missing essential strokes, or is unreadable.
-7. Keep feedback concise and direct in Korean.
-8. When the shape is close enough for a human teacher to accept in beginner practice, return true.`
-
-	userPrompt := fmt.Sprintf(`Question Context: %s
-Expected Kana: %s
-
-Evaluate whether the handwriting image matches the Expected Kana and output JSON.`, questionPrompt, correctAnswer)
+	systemPrompt := buildHandwritingSystemPrompt()
+	userPrompt := buildHandwritingUserPrompt(questionPrompt, correctAnswer)
 
 	imageURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngImage)
 	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
@@ -179,4 +158,32 @@ Evaluate whether the handwriting image matches the Expected Kana and output JSON
 	log.Printf("[Handwriting] llm model=%s elapsed=%s image_bytes=%d is_correct=%t", c.model, time.Since(startedAt), len(pngImage), result.IsCorrect)
 
 	return result.IsCorrect, result.Feedback, nil
+}
+
+func buildHandwritingSystemPrompt() string {
+	return `You are an expert Japanese handwriting grader.
+You must return strict JSON only. Do not use markdown blocks.
+
+JSON schema:
+{
+  "is_correct": boolean,
+  "feedback": "string (Short Korean feedback explaining the result)"
+}
+
+Rules:
+1. This is binary verification, not open-ended OCR.
+2. The image contains one centered handwritten Japanese kana character or short kana word in black on white.
+3. Decide whether the handwritten image can reasonably be accepted as the expected text.
+4. Accept minor wobble, uneven stroke width, rounded corners, and imperfect mobile handwriting.
+5. Do not reject only because the drawing is large, small, slightly tilted, or not aesthetically neat.
+6. For short words, compare the full expected string in order; reject missing, extra, swapped, or clearly different characters.
+7. Keep feedback concise and direct in Korean.
+8. When the shape is close enough for a human teacher to accept in beginner practice, return true.`
+}
+
+func buildHandwritingUserPrompt(questionPrompt, correctAnswer string) string {
+	return fmt.Sprintf(`Question Context: %s
+Expected Text: %s
+
+Evaluate whether the handwriting image matches the Expected Text and output JSON.`, questionPrompt, correctAnswer)
 }
