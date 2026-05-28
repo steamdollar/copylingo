@@ -12,7 +12,7 @@ cmd = "go build -o ./tmp/main ./cmd/server"
 # Watch these directories
 include_dir = ["cmd", "internal"]
 # Watch these extensions
-include_ext = ["go", "yaml"]
+include_ext = ["go", "yaml", "env"]
 # Ignore these directories
 exclude_dir = ["bin", "data", "migrations", ".git", "tmp"]
 # Delay after file change

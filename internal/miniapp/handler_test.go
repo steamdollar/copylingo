@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -163,7 +164,7 @@ func TestParseHandwritingMessageRef(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			gotChatID, gotMsgID, err := parseHandwritingMessageRef(tt.raw)
+			gotChatID, gotMsgID, err := bot.ParseHandwritingMessageRef(tt.raw)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error")
@@ -174,7 +175,7 @@ func TestParseHandwritingMessageRef(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if gotChatID != tt.wantChatID || gotMsgID != tt.wantMsgID {
-				t.Fatalf("parseHandwritingMessageRef()=(%d,%d), want (%d,%d)",
+				t.Fatalf("bot.ParseHandwritingMessageRef()=(%d,%d), want (%d,%d)",
 					gotChatID, gotMsgID, tt.wantChatID, tt.wantMsgID)
 			}
 		})

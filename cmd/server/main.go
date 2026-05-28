@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -59,6 +60,7 @@ func run() error {
 	defer stopSched()
 
 	go botHandler.Start()
+	go botHandler.RefreshStaleMiniAppMessages(context.Background())
 
 	// Start HTTP server (health check + admin API)
 	router := setupRouter(cfg, db, rdb, services, botHandler)

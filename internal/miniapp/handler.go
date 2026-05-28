@@ -14,6 +14,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
@@ -159,7 +160,7 @@ func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
 		return
 	}
 
-	chatID, msgID, err := parseHandwritingMessageRef(val)
+	chatID, msgID, err := bot.ParseHandwritingMessageRef(val)
 	if err != nil {
 		log.Printf("[Handwriting] invalid message id format in redis value=%q: %v", val, err)
 		return
@@ -196,29 +197,4 @@ func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
 	if err := h.messenger.EditMessageReplyMarkup(chatID, msgID, markup); err != nil {
 		log.Printf("[Handwriting] failed to edit message reply markup chat=%d msg=%d: %v", chatID, msgID, err)
 	}
-}
-
-func parseHandwritingMessageRef(raw string) (int64, int, error) {
-	parts := strings.Split(raw, ":")
-	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("expected chat_id:message_id")
-	}
-
-	chatID, err := strconv.ParseInt(parts[0], 10, 64)
-	if err != nil {
-		return 0, 0, fmt.Errorf("parse chat_id: %w", err)
-	}
-	if chatID == 0 {
-		return 0, 0, fmt.Errorf("chat_id is zero")
-	}
-
-	msgID, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return 0, 0, fmt.Errorf("parse message_id: %w", err)
-	}
-	if msgID <= 0 {
-		return 0, 0, fmt.Errorf("message_id must be positive")
-	}
-
-	return chatID, msgID, nil
 }

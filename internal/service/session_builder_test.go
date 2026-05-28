@@ -25,6 +25,7 @@ type mockSessionStore struct {
 	getByIDFn               func(ctx context.Context, id int) (*model.Session, error)
 	getPendingSessionsFn    func(ctx context.Context, userID int64) ([]model.Session, error)
 	getInProgressSessionsFn func(ctx context.Context, userID int64) ([]model.Session, error)
+	listInProgressFn        func(ctx context.Context) ([]model.Session, error)
 	startFn                 func(ctx context.Context, id int) error
 }
 
@@ -39,6 +40,12 @@ func (m *mockSessionStore) GetPendingSessions(ctx context.Context, userID int64)
 }
 func (m *mockSessionStore) GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error) {
 	return m.getInProgressSessionsFn(ctx, userID)
+}
+func (m *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
+	if m.listInProgressFn != nil {
+		return m.listInProgressFn(ctx)
+	}
+	return nil, nil
 }
 func (m *mockSessionStore) Start(ctx context.Context, id int) error {
 	return m.startFn(ctx, id)

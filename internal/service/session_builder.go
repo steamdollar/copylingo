@@ -27,6 +27,7 @@ type sessionStore interface {
 	GetByID(ctx context.Context, id int) (*model.Session, error)
 	GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error)
 	GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error)
+	ListInProgress(ctx context.Context) ([]model.Session, error)
 	Start(ctx context.Context, id int) error
 }
 
@@ -196,6 +197,11 @@ func (s *SessionBuilderService) GetPendingSessions(ctx context.Context, userID i
 // GetInProgressSessions returns in-progress sessions for a user.
 func (s *SessionBuilderService) GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error) {
 	return s.sessionRepo.GetInProgressSessions(ctx, userID)
+}
+
+// GetAllInProgressSessions returns all in-progress sessions for all users.
+func (s *SessionBuilderService) GetAllInProgressSessions(ctx context.Context) ([]model.Session, error) {
+	return s.sessionRepo.ListInProgress(ctx)
 }
 
 // GetSession returns a session by ID.

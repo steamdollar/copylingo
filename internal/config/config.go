@@ -81,6 +81,8 @@ type ScheduleConfig struct {
 
 // Load reads config from file and environment variables.
 func Load() (*Config, error) {
+	viper.Reset()
+
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -88,12 +90,16 @@ func Load() (*Config, error) {
 	viper.AddConfigPath("/etc/copylingo")
 
 	// Load .env file if it exists
+	dotEnv, _ := godotenv.Read()
 	_ = godotenv.Load()
 
 	// Environment variable overrides: COPYLINGO_DB_HOST, COPYLINGO_TELEGRAM_TOKEN, etc.
 	viper.SetEnvPrefix("COPYLINGO")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
+	if err := bindEnv(); err != nil {
+		return nil, err
+	}
 
 	// Defaults
 	viper.SetDefault("server.port", 8080)
@@ -128,6 +134,10 @@ func Load() (*Config, error) {
 		// Config file not found is OK — use defaults + env vars
 	}
 
+	if publicBaseURL := strings.TrimSpace(dotEnv["COPYLINGO_SERVER_PUBLIC_BASE_URL"]); publicBaseURL != "" {
+		viper.Set("server.public_base_url", publicBaseURL)
+	}
+
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
@@ -138,6 +148,44 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func bindEnv() error {
+	keys := []string{
+		"server.port",
+		"server.mode",
+		"server.public_base_url",
+		"db.host",
+		"db.port",
+		"db.user",
+		"db.password",
+		"db.dbname",
+		"db.sslmode",
+		"redis.addr",
+		"redis.password",
+		"redis.db",
+		"telegram.token",
+		"telegram.debug",
+		"llm.api_key",
+		"llm.model",
+		"llm.base_url",
+		"tts.enabled",
+		"tts.cred_path",
+		"tts.audio_dir",
+		"tts.language_code",
+		"tts.voice_name",
+		"schedule.content_collect_cron",
+		"schedule.morning_build_cron",
+		"schedule.morning_push_cron",
+		"schedule.evening_build_cron",
+		"schedule.evening_push_cron",
+	}
+	for _, key := range keys {
+		if err := viper.BindEnv(key); err != nil {
+			return fmt.Errorf("bind env %s: %w", key, err)
+		}
+	}
+	return nil
 }
 
 func (c *Config) validate() error {
