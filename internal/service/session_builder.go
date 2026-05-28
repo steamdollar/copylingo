@@ -3,9 +3,19 @@ package service
 import (
 	"context"
 	"log"
+	"math/rand"
 
 	"github.com/lsj/copylingo/internal/model"
 )
+
+const maxPerCategory = 6
+
+var defaultCategoryOrder = []model.QuestionCategory{
+	model.CategoryKana,
+	model.CategoryHandwriting,
+	model.CategoryVocabulary,
+	model.CategoryGrammar,
+}
 
 type questionFetcher interface {
 	GetNewQuestions(ctx context.Context, language, level, category string, limit int) ([]model.Question, error)
@@ -97,23 +107,56 @@ func (s *SessionBuilderService) buildSession(
 		}
 	}
 
-	// 2. Fill remaining with new questions
+	// 2. Fill remaining with new questions (Random Slot Relay)
 	remainingNew := totalQuestions - len(sessionQuestions)
 	if remainingNew < newCount {
 		remainingNew = newCount
 	}
+
 	if remainingNew > 0 && language != "" && level != "" {
-		newQuestions, err := s.questionRepo.GetNewQuestions(ctx, language, level, "", remainingNew)
-		if err != nil {
-			log.Printf("Error getting new questions: %v", err)
-		} else {
-			for _, q := range newQuestions {
-				sessionQuestions = append(sessionQuestions, model.SessionQuestion{
-					QuestionID:    q.ID,
-					QuestionOrder: order,
-					IsReview:      false,
-				})
-				order++
+		// Prepare categories for relay. The last empty category acts as a general fallback.
+		categories := make([]string, 0, len(defaultCategoryOrder)+1)
+		for _, cat := range defaultCategoryOrder {
+			categories = append(categories, string(cat))
+		}
+		categories = append(categories, "") // Final fallback
+
+		for i, cat := range categories {
+			if remainingNew <= 0 {
+				break
+			}
+
+			var alloc int
+			if i == len(categories)-1 {
+				// Final category gets all remaining slots
+				alloc = remainingNew
+			} else {
+				// Random allocation with a per-category cap
+				max := maxPerCategory
+				if remainingNew < max {
+					max = remainingNew
+				}
+				// rand.Intn(max+1) returns a value in [0, max]
+				alloc = rand.Intn(max + 1)
+			}
+
+			if alloc > 0 {
+				newQs, err := s.questionRepo.GetNewQuestions(ctx, language, level, cat, alloc)
+				if err != nil {
+					log.Printf("Error getting new questions for category %s: %v", cat, err)
+					continue
+				}
+
+				for _, q := range newQs {
+					sessionQuestions = append(sessionQuestions, model.SessionQuestion{
+						QuestionID:    q.ID,
+						QuestionOrder: order,
+						IsReview:      false,
+					})
+					order++
+				}
+				// Deduct the number of questions actually fetched
+				remainingNew -= len(newQs)
 			}
 		}
 	}

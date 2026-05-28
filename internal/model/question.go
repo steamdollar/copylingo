@@ -31,11 +31,13 @@ const (
 type QuestionCategory string
 
 const (
-	CategoryVocabulary QuestionCategory = "vocabulary"
-	CategoryGrammar    QuestionCategory = "grammar"
-	CategoryKanji      QuestionCategory = "kanji"
-	CategoryReading    QuestionCategory = "reading"
-	CategoryListening  QuestionCategory = "listening"
+	CategoryKana        QuestionCategory = "kana"
+	CategoryHandwriting QuestionCategory = "handwriting"
+	CategoryVocabulary  QuestionCategory = "vocabulary"
+	CategoryGrammar     QuestionCategory = "grammar"
+	CategoryKanji       QuestionCategory = "kanji"
+	CategoryReading     QuestionCategory = "reading"
+	CategoryListening   QuestionCategory = "listening"
 )
 
 // Question represents a single learning question with embedded SRS state.

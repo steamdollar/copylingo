@@ -69,18 +69,36 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 		},
 	}
 
+	collectedNewCount := 0
 	qFetcher := &mockQuestionFetcher{
 		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, limit int) ([]model.Question, error) {
-			// total 15, reviews 4, so need 11 new
-			if limit != 11 {
-				t.Errorf("expected new limit 11, got %d", limit)
+			// Random Slot Relay will call this multiple times for different categories.
+			// Each call should have a reasonable limit.
+			if limit < 0 {
+				t.Errorf("unexpected negative limit %d", limit)
 			}
-			return []model.Question{{ID: 101}, {ID: 102}, {ID: 103}, {ID: 104}, {ID: 105}, {ID: 106}, {ID: 107}, {ID: 108}, {ID: 109}}, nil // only 9 available
+
+			// We simulate returning a few questions for some categories to test relay.
+			// If cat is empty (final fallback), we return some to fill the gap.
+			var qs []model.Question
+			if cat == "" {
+				// Fill up to 9 new questions (since we already have 4 reviews, total goal 15, need 11 new)
+				// But we'll return 9 to match the original test's 13 total.
+				need := 9 - collectedNewCount
+				if need > 0 {
+					for i := 0; i < need; i++ {
+						qs = append(qs, model.Question{ID: 1000 + collectedNewCount + i})
+					}
+				}
+			}
+			collectedNewCount += len(qs)
+			return qs, nil
 		},
 	}
 
 	sStore := &mockSessionStore{
 		createSessionFn: func(ctx context.Context, s *model.Session) error {
+			// 4 reviews + 9 new = 13 total
 			if s.TotalQuestions != 13 {
 				t.Errorf("expected total 13, got %d", s.TotalQuestions)
 			}
