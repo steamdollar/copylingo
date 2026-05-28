@@ -12,9 +12,11 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-// LLMClient defines the interface for interacting with Language Models.
+// LLMClient defines AI-backed grading paths that cannot be handled by exact string matching.
 type LLMClient interface {
+	// GradeAnswer is for QuestionSubjective only: free-text semantic grading such as translated meaning or paraphrased answers.
 	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error)
+	// GradeHandwriting is for QuestionKanaHandwriting only: binary visual verification of a rendered handwriting PNG.
 	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error)
 }
 
@@ -42,7 +44,8 @@ func NewLLMClient(cfg *config.Config) LLMClient {
 	}
 }
 
-// GradeAnswer evaluates a subjective similarity question using the LLM.
+// GradeAnswer evaluates a QuestionSubjective free-text answer by semantic similarity.
+// Fill-blank and multiple-choice answers are graded by exact string matching in GraderService.
 func (c *DefaultLLMClient) GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error) {
 	if c.client == nil || c.model == "" {
 		return false, "", config.ErrAIConfigMissing
@@ -139,9 +142,7 @@ func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt,
 				},
 			},
 		},
-		ResponseFormat: &openai.ChatCompletionResponseFormat{
-			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
-		},
+		ResponseFormat: buildHandwritingResponseFormat(),
 	})
 	if err != nil {
 		return false, "", fmt.Errorf("llm handwriting grading request failed: %w", err)
@@ -167,7 +168,7 @@ You must return strict JSON only. Do not use markdown blocks.
 JSON schema:
 {
   "is_correct": boolean,
-  "feedback": "string (Short Korean feedback explaining the result)"
+  "feedback": "string (empty when correct; optional short Korean correction note when incorrect)"
 }
 
 Rules:
@@ -177,8 +178,35 @@ Rules:
 4. Accept minor wobble, uneven stroke width, rounded corners, and imperfect mobile handwriting.
 5. Do not reject only because the drawing is large, small, slightly tilted, or not aesthetically neat.
 6. For short words, compare the full expected string in order; reject missing, extra, swapped, or clearly different characters.
-7. Keep feedback concise and direct in Korean.
-8. When the shape is close enough for a human teacher to accept in beginner practice, return true.`
+7. When the shape is close enough for a human teacher to accept in beginner practice, return true.
+8. Feedback policy:
+   - If is_correct is true, feedback must be an empty string.
+   - If is_correct is false, do not repeat the expected text; the client already shows the correct answer.
+   - For incorrect answers, feedback may be an empty string, or one short Korean sentence only when there is a useful correction note.
+   - Do not praise, encourage, or add filler such as "잘 썼어요" or "아주 좋아요".`
+}
+
+func buildHandwritingResponseFormat() *openai.ChatCompletionResponseFormat {
+	return &openai.ChatCompletionResponseFormat{
+		Type: openai.ChatCompletionResponseFormatTypeJSONSchema,
+		JSONSchema: &openai.ChatCompletionResponseFormatJSONSchema{
+			Name:        "handwriting_grade_result",
+			Description: "Binary Japanese kana handwriting grading result.",
+			Strict:      true,
+			Schema: json.RawMessage(`{
+				"type": "object",
+				"properties": {
+					"is_correct": { "type": "boolean" },
+					"feedback": {
+						"type": "string",
+						"description": "Empty when correct. When incorrect, optional short Korean correction note without repeating the expected text."
+					}
+				},
+				"required": ["is_correct", "feedback"],
+				"additionalProperties": false
+			}`),
+		},
+	}
 }
 
 func buildHandwritingUserPrompt(questionPrompt, correctAnswer string) string {

@@ -240,8 +240,12 @@ async function submitAnswer() {
       throw new Error(payload.error || "채점 요청에 실패했습니다.");
     }
 
-    const prefix = payload.is_correct ? "정답입니다." : `오답입니다. 정답은 ${payload.correct_answer} 입니다.`;
-    setStatus(`${prefix} ${payload.feedback || payload.explanation || ""}`.trim());
+    if (payload.is_correct) {
+      setStatus("정답입니다.");
+    } else {
+      const prefix = `오답입니다. 정답은 ${payload.correct_answer} 입니다.`;
+      setStatus(`${prefix} ${payload.feedback || ""}`.trim());
+    }
     tg?.HapticFeedback?.notificationOccurred(payload.is_correct ? "success" : "error");
   } catch (error) {
     setStatus(error.message);

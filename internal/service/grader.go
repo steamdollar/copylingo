@@ -75,7 +75,8 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 	var isCorrect bool
 	var feedback string
 
-	// 쓰기 문제인 경우 llm이 유사도를 확인해 채점
+	// QuestionSubjective is the only text-answer path that uses LLM semantic grading.
+	// FillBlank and MultipleChoice remain exact-match to avoid unnecessary latency and nondeterminism.
 	if question.Type == model.QuestionSubjective {
 		isCorrect, feedback, err = g.llm.GradeAnswer(ctx, question.Prompt, question.CorrectAnswer, userAnswer)
 		if err != nil {

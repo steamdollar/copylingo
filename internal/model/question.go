@@ -13,7 +13,7 @@ const (
 	QuestionMultipleChoice QuestionType = "multiple_choice"
 	// QuestionFillBlank - 빈칸 채우기
 	QuestionFillBlank QuestionType = "fill_blank"
-	// QuestionSubjective - 주관식 (자유 입력 및 AI 채점)
+	// QuestionSubjective - 자유 입력 의미 채점 (LLM semantic grading; exact match 불가한 번역/의미 답변용)
 	QuestionSubjective QuestionType = "subjective"
 	// QuestionKanaHandwriting - 가나 손글씨 입력 (Mini App + AI binary grading)
 	QuestionKanaHandwriting QuestionType = "kana_handwriting"
