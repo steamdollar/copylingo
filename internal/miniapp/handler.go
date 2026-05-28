@@ -25,12 +25,40 @@ type TelegramMessenger interface {
 	EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotapi.InlineKeyboardMarkup) error
 }
 
+type handwritingService interface {
+	SubmitAnswer(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error)
+}
+
+type tipService interface {
+	ListActive(ctx context.Context, language, level string, limit int) ([]model.Tip, error)
+}
+
+type sessionBuilderService interface {
+	GetSessionQuestions(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+}
+
+type verifier interface {
+	Verify(initData string) (*TelegramUser, error)
+}
+
 type Handler struct {
-	services  *service.Services
-	verifier  *InitDataVerifier
-	rdb       *redis.Client
-	messenger TelegramMessenger
-	cfg       *config.Config
+	handwriting    handwritingService
+	tip            tipService
+	sessionBuilder sessionBuilderService
+	verifier       verifier
+	rdb            *redis.Client
+	messenger      TelegramMessenger
+	cfg            *config.Config
+}
+
+type HandlerDeps struct {
+	Handwriting    handwritingService
+	Tip            tipService
+	SessionBuilder sessionBuilderService
+	Verifier       verifier
+	Redis          *redis.Client
+	Messenger      TelegramMessenger
+	Config         *config.Config
 }
 
 type handwritingSubmitRequest struct {
@@ -40,18 +68,28 @@ type handwritingSubmitRequest struct {
 	Strokes    []service.Stroke `json:"strokes" binding:"required"`
 }
 
-func NewHandler(services *service.Services, verifier *InitDataVerifier, rdb *redis.Client, messenger TelegramMessenger, cfg *config.Config) *Handler {
+func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
-		services:  services,
-		verifier:  verifier,
-		rdb:       rdb,
-		messenger: messenger,
-		cfg:       cfg,
+		handwriting:    deps.Handwriting,
+		tip:            deps.Tip,
+		sessionBuilder: deps.SessionBuilder,
+		verifier:       deps.Verifier,
+		rdb:            deps.Redis,
+		messenger:      deps.Messenger,
+		cfg:            deps.Config,
 	}
 }
 
 func RegisterRoutes(r *gin.Engine, cfg *config.Config, services *service.Services, rdb *redis.Client, messenger TelegramMessenger) {
-	handler := NewHandler(services, NewInitDataVerifier(cfg.Telegram.Token, 24*time.Hour), rdb, messenger, cfg)
+	handler := NewHandler(HandlerDeps{
+		Handwriting:    services.Handwriting,
+		Tip:            services.Tip,
+		SessionBuilder: services.SessionBuilder,
+		Verifier:       NewInitDataVerifier(cfg.Telegram.Token, 24*time.Hour),
+		Redis:          rdb,
+		Messenger:      messenger,
+		Config:         cfg,
+	})
 
 	r.Static("/miniapp/handwriting/assets", "./web/miniapp/handwriting")
 	r.GET(config.PathHandwritingMiniApp, handler.ShowHandwriting)
@@ -81,7 +119,7 @@ func (h *Handler) ListTips(c *gin.Context) {
 		}
 	}
 
-	tips, err := h.services.Tip.ListActive(c.Request.Context(), language, level, limit)
+	tips, err := h.tip.ListActive(c.Request.Context(), language, level, limit)
 	if err != nil {
 		log.Printf("[Tips] list failed language=%s level=%s: %v", language, level, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load tips"})
@@ -110,27 +148,16 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 		return
 	}
 
-	result, err := h.services.Handwriting.SubmitAnswer(c.Request.Context(), service.HandwritingSubmitRequest{
+	result, err := h.handwriting.SubmitAnswer(c.Request.Context(), service.HandwritingSubmitRequest{
 		UserID:     user.ID,
 		SessionID:  req.SessionID,
 		QuestionID: req.QuestionID,
 		Strokes:    req.Strokes,
 	})
 	if err != nil {
-		status := http.StatusInternalServerError
-		switch {
-		case errors.Is(err, service.ErrHandwritingUnauthorized):
-			status = http.StatusForbidden
-		case errors.Is(err, service.ErrHandwritingQuestionMismatch),
-			errors.Is(err, service.ErrHandwritingInvalidQuestion),
-			errors.Is(err, service.ErrEmptyStrokes):
-			status = http.StatusBadRequest
-		case errors.Is(err, service.ErrHandwritingAlreadyAnswered):
-			status = http.StatusConflict
-		case errors.Is(err, config.ErrAIConfigMissing):
-			status = http.StatusServiceUnavailable
-		}
-		c.JSON(status, gin.H{"error": err.Error()})
+		publicErr := handwritingPublicError(err)
+		log.Printf("[Handwriting] submit failed status=%d session_id=%d question_id=%d: %v", publicErr.status, req.SessionID, req.QuestionID, err)
+		c.JSON(publicErr.status, gin.H{"error": publicErr.message})
 		return
 	}
 
@@ -140,6 +167,28 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 	go h.refreshHandwritingMessage(req.SessionID, req.QuestionID)
 
 	c.JSON(http.StatusOK, result)
+}
+
+type publicError struct {
+	status  int
+	message string
+}
+
+func handwritingPublicError(err error) publicError {
+	switch {
+	case errors.Is(err, service.ErrHandwritingUnauthorized):
+		return publicError{status: http.StatusForbidden, message: "권한이 없습니다."}
+	case errors.Is(err, service.ErrHandwritingQuestionMismatch),
+		errors.Is(err, service.ErrHandwritingInvalidQuestion),
+		errors.Is(err, service.ErrEmptyStrokes):
+		return publicError{status: http.StatusBadRequest, message: "손글씨 제출 정보를 확인할 수 없습니다."}
+	case errors.Is(err, service.ErrHandwritingAlreadyAnswered):
+		return publicError{status: http.StatusConflict, message: "이미 채점된 문항입니다."}
+	case errors.Is(err, config.ErrAIConfigMissing):
+		return publicError{status: http.StatusServiceUnavailable, message: "현재 AI 채점 설정을 사용할 수 없습니다."}
+	default:
+		return publicError{status: http.StatusServiceUnavailable, message: "현재 AI 채점이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."}
+	}
 }
 
 func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
@@ -167,7 +216,7 @@ func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
 	}
 
 	// We need to know the question index to format the "Next" button.
-	sqs, err := h.services.SessionBuilder.GetSessionQuestions(ctx, sessionID)
+	sqs, err := h.sessionBuilder.GetSessionQuestions(ctx, sessionID)
 	if err != nil {
 		log.Printf("[Handwriting] failed to get session questions for cleanup session=%d: %v", sessionID, err)
 		return

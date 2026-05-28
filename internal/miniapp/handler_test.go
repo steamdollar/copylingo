@@ -6,10 +6,12 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lsj/copylingo/internal/bot"
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -34,8 +36,7 @@ func TestListTips(t *testing.T) {
 			},
 		}
 		tipSvc := service.NewTipService(repo)
-		services := &service.Services{Tip: tipSvc}
-		handler := NewHandler(services, nil, nil, nil, nil)
+		handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -58,7 +59,7 @@ func TestListTips(t *testing.T) {
 	})
 
 	t.Run("missing parameters", func(t *testing.T) {
-		handler := NewHandler(&service.Services{}, nil, nil, nil, nil)
+		handler := NewHandler(HandlerDeps{})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/miniapp/tips?language=ja", nil)
@@ -77,8 +78,7 @@ func TestListTips(t *testing.T) {
 			},
 		}
 		tipSvc := service.NewTipService(repo)
-		services := &service.Services{Tip: tipSvc}
-		handler := NewHandler(services, nil, nil, nil, nil)
+		handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -101,8 +101,7 @@ func TestListTips(t *testing.T) {
 			},
 		}
 		tipSvc := service.NewTipService(repo)
-		services := &service.Services{Tip: tipSvc}
-		handler := NewHandler(services, nil, nil, nil, nil)
+		handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -124,8 +123,7 @@ func TestListTips(t *testing.T) {
 			},
 		}
 		tipSvc := service.NewTipService(repo)
-		services := &service.Services{Tip: tipSvc}
-		handler := NewHandler(services, nil, nil, nil, nil)
+		handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -177,6 +175,110 @@ func TestParseHandwritingMessageRef(t *testing.T) {
 			if gotChatID != tt.wantChatID || gotMsgID != tt.wantMsgID {
 				t.Fatalf("bot.ParseHandwritingMessageRef()=(%d,%d), want (%d,%d)",
 					gotChatID, gotMsgID, tt.wantChatID, tt.wantMsgID)
+			}
+		})
+	}
+}
+
+type mockHandwritingService struct {
+	submitAnswerFn func(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error)
+}
+
+func (m *mockHandwritingService) SubmitAnswer(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error) {
+	return m.submitAnswerFn(ctx, req)
+}
+
+type mockVerifier struct {
+	verifyFn func(initData string) (*TelegramUser, error)
+}
+
+func (m *mockVerifier) Verify(initData string) (*TelegramUser, error) {
+	return m.verifyFn(initData)
+}
+
+func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name          string
+		serviceErr    error
+		wantStatus    int
+		wantBody      string
+		notWantInBody string
+	}{
+		{
+			name:          "unknown llm error sanitized",
+			serviceErr:    errors.New(`grade handwriting answer: llm handwriting grading request failed: error, status code: 500, body: {"error":"provider internal stack"}`),
+			wantStatus:    http.StatusServiceUnavailable,
+			wantBody:      "현재 AI 채점이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.",
+			notWantInBody: "provider internal stack",
+		},
+		{
+			name:       "unauthorized error mapping",
+			serviceErr: service.ErrHandwritingUnauthorized,
+			wantStatus: http.StatusForbidden,
+			wantBody:   "권한이 없습니다.",
+		},
+		{
+			name:       "already answered mapping",
+			serviceErr: service.ErrHandwritingAlreadyAnswered,
+			wantStatus: http.StatusConflict,
+			wantBody:   "이미 채점된 문항입니다.",
+		},
+		{
+			name:       "invalid question mapping",
+			serviceErr: service.ErrHandwritingInvalidQuestion,
+			wantStatus: http.StatusBadRequest,
+			wantBody:   "손글씨 제출 정보를 확인할 수 없습니다.",
+		},
+		{
+			name:       "ai config missing mapping",
+			serviceErr: config.ErrAIConfigMissing,
+			wantStatus: http.StatusServiceUnavailable,
+			wantBody:   "현재 AI 채점 설정을 사용할 수 없습니다.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handwriting := &mockHandwritingService{
+				submitAnswerFn: func(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error) {
+					return nil, tt.serviceErr
+				},
+			}
+			verifier := &mockVerifier{
+				verifyFn: func(initData string) (*TelegramUser, error) {
+					return &TelegramUser{ID: 123}, nil
+				},
+			}
+			handler := NewHandler(HandlerDeps{
+				Handwriting: handwriting,
+				Verifier:    verifier,
+			})
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			reqBody := `{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`
+			c.Request, _ = http.NewRequest("POST", "/api/miniapp/handwriting/submit", strings.NewReader(reqBody))
+			c.Request.Header.Set("Content-Type", "application/json")
+
+			handler.SubmitHandwriting(c)
+
+			if w.Code != tt.wantStatus {
+				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
+			}
+
+			var resp map[string]string
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
+
+			if got := resp["error"]; got != tt.wantBody {
+				t.Errorf("expected error message %q, got %q", tt.wantBody, got)
+			}
+
+			if tt.notWantInBody != "" && strings.Contains(w.Body.String(), tt.notWantInBody) {
+				t.Errorf("response leaked sensitive information: %s", w.Body.String())
 			}
 		})
 	}
