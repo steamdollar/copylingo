@@ -35,6 +35,8 @@ const (
 	CommandTest = "test"
 	// 도움말 및 명령어 안내
 	CommandHelp = "help"
+	// 현재 입력 취소 및 대기 상태 종료
+	CommandExit = "exit"
 )
 
 // Callback Data Formats (for Sprintf)

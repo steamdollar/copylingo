@@ -13,17 +13,25 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
+// BotAPI defines the interface for Telegram bot interactions to allow mocking.
+type BotAPI interface {
+	Send(c tgbotapi.Chattable) (tgbotapi.Message, error)
+	Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error)
+	GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel
+	StopReceivingUpdates()
+}
+
 // Bot wraps the Telegram bot API with CopyLingo business logic.
 type Bot struct {
-	api      *tgbotapi.BotAPI
+	api      BotAPI
 	cfg      *config.Config
 	services *service.Services
-	rdb      *redis.Client
+	rdb      redis.Cmdable
 	flow     *SessionFlow
 	stopCh   chan struct{}
 }
 
-func New(cfg *config.Config, services *service.Services, rdb *redis.Client) (*Bot, error) {
+func New(cfg *config.Config, services *service.Services, rdb redis.Cmdable) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Telegram bot: %w", err)
@@ -166,6 +174,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		b.handleTest(ctx, msg)
 	case config.CommandHelp:
 		b.handleHelp(ctx, msg)
+	case config.CommandExit:
+		b.handleExit(ctx, msg)
 	default:
 		b.SendMessage(msg.Chat.ID, "❓ 알 수 없는 명령어입니다. /help 를 입력해 보세요.")
 	}
@@ -340,6 +350,7 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 /menu - 메인 메뉴
 /stats - 학습 통계
 /streak - 스트릭 확인
+/exit - 현재 입력 취소 (세션은 보존, /menu 에서 재개)
 /help - 도움말
 
 <b>학습 흐름:</b>
@@ -349,6 +360,12 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 4. /menu → 복습하기로 수동 복습도 가능합니다`
 
 	b.SendMessage(msg.Chat.ID, help)
+}
+
+func (b *Bot) handleExit(ctx context.Context, msg *tgbotapi.Message) {
+	key := fmt.Sprintf(config.KeyUserActiveQuestion, msg.Chat.ID)
+	b.rdb.Del(ctx, key)
+	b.SendMessage(msg.Chat.ID, "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요.")
 }
 
 func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {
