@@ -36,6 +36,10 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-27 | 서버 재시작 후 Mini App public URL stale 복구 안정화 | `2605271519_public_url_recovery.md` |
+| 2026-05-27 | `/exit` 명령어 구현 및 `/help` 텍스트 정비 | `2605271445_help_exit_commands.md` |
+| 2026-05-27 | SessionBuilder 카테고리 랜덤 배분 로직 구현 (Random Slot Relay) | `2605271400_session_category_random_relay.md` |
+| 2026-05-27 | Kana 이후 N5 단어 vocabulary seed 구현 | `2605271247_n5_vocab_seed.md` |
 | 2026-05-20 | 손글씨 Mini App 학습 팁 통합 | `2605200103_handwriting_tips_integration.md` |
 | 2026-05-11 | 에이전트 가이드라인 문서 재구성 (AGENTS SSOT + CLAUDE/GEMINI thin overlay, ADR-014 Open 분리) | `2605110132_agent_docs_restructure.md` |
 | 2026-05-09 | Service 레이어 error path 단위 테스트 보강 | `2605091506_service_error_path_tests.md` |
