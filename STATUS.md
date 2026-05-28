@@ -30,12 +30,20 @@
 
 - [ ] 학습 팁 AI 생성 (scheduler 통합) — (lang, level) 잔고 < 50 일 때 세션 빌드마다 2-3개 LLM 으로 생성. see [docs/todos/tip_scheduler_generation.md](docs/todos/tip_scheduler_generation.md)
 
+- [ ] 손글씨 채점 결과 후 Tip Card 유지 — 응답 후 spinner 는 닫되 마지막 tip 은 계속 표시. see [docs/todos/handwriting_tip_persist_after_result.md](docs/todos/handwriting_tip_persist_after_result.md)
+
+- [ ] LLM 채점 반환값 구조체화 — `bool, string, error` tuple 대신 `(GradeResult, error)`로 의미 명확화. see [docs/todos/llm_grade_result_return_refactor.md](docs/todos/llm_grade_result_return_refactor.md)
+
 - 손글씨 쓰기 채점 - 너무 오래 걸림. 대안 필요. (속도를 줄이던가, 그 사이에 뭘 하게끔 하던가)
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-28 | Mini App HandlerDeps 생성자 정리 | `2605281528_miniapp_handler_deps.md` |
+| 2026-05-28 | 손글씨 LLM 오류 사용자 노출 차단 | `2605281535_handwriting_error_sanitization.md` |
+| 2026-05-28 | 손글씨 채점 Feedback 정책 정리 | `2605281450_handwriting_feedback_policy.md` |
+| 2026-05-28 | 손글씨 채점 응답 포맷 Strict JSON Schema 적용 | `2605281417_handwriting_json_schema.md` |
 | 2026-05-27 | 서버 재시작 후 Mini App public URL stale 복구 안정화 | `2605271519_public_url_recovery.md` |
 | 2026-05-27 | `/exit` 명령어 구현 및 `/help` 텍스트 정비 | `2605271445_help_exit_commands.md` |
 | 2026-05-27 | SessionBuilder 카테고리 랜덤 배분 로직 구현 (Random Slot Relay) | `2605271400_session_category_random_relay.md` |
