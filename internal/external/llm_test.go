@@ -22,6 +22,9 @@ func TestBuildHandwritingSystemPromptSupportsShortWords(t *testing.T) {
 	if !strings.Contains(prompt, "full expected string") {
 		t.Fatalf("system prompt does not require full string comparison: %q", prompt)
 	}
+	if !strings.Contains(prompt, "not open-ended OCR") {
+		t.Fatalf("system prompt does not state binary verification boundary: %q", prompt)
+	}
 }
 
 func TestBuildHandwritingSystemPromptDefinesFeedbackPolicy(t *testing.T) {
@@ -37,6 +40,28 @@ func TestBuildHandwritingSystemPromptDefinesFeedbackPolicy(t *testing.T) {
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("system prompt does not contain feedback policy %q: %q", want, prompt)
+		}
+	}
+}
+
+func TestBuildHandwritingSystemPromptDefinesDecisionRubric(t *testing.T) {
+	t.Parallel()
+
+	prompt := buildHandwritingSystemPrompt()
+
+	for _, want := range []string{
+		"Accept when:",
+		"Reject when:",
+		"Every expected kana character is recognizable in order",
+		"Make a quick beginner-practice judgment",
+		"Prefer accepting a plausible Expected Text",
+		"ambiguous between visually similar kana",
+		"A character is clearly missing, extra, swapped, or different",
+		"clearly absent or clearly wrong",
+		"cannot plausibly be read as the Expected Text",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("system prompt does not contain decision rubric %q: %q", want, prompt)
 		}
 	}
 }
@@ -108,5 +133,42 @@ func TestBuildHandwritingResponseFormatUsesStrictJSONSchema(t *testing.T) {
 	}
 	if len(schema.Required) != 2 || schema.Required[0] != "is_correct" || schema.Required[1] != "feedback" {
 		t.Fatalf("schema required = %v, want [is_correct feedback]", schema.Required)
+	}
+}
+
+func TestBuildHandwritingChatCompletionRequestConstrainsGeneration(t *testing.T) {
+	t.Parallel()
+
+	req := buildHandwritingChatCompletionRequest(
+		"gemini-3.1-flash-lite",
+		"system prompt",
+		"user prompt",
+		"data:image/png;base64,abc",
+	)
+
+	if req.MaxCompletionTokens != handwritingMaxCompletionTokens {
+		t.Fatalf("MaxCompletionTokens = %d, want %d", req.MaxCompletionTokens, handwritingMaxCompletionTokens)
+	}
+	if req.ReasoningEffort != "" {
+		t.Fatalf("ReasoningEffort = %q, want empty", req.ReasoningEffort)
+	}
+	if req.Temperature != handwritingTemperature {
+		t.Fatalf("Temperature = %v, want %v", req.Temperature, handwritingTemperature)
+	}
+	if req.ResponseFormat == nil || req.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONSchema {
+		t.Fatalf("ResponseFormat = %#v, want JSON schema", req.ResponseFormat)
+	}
+	if len(req.Messages) != 2 {
+		t.Fatalf("messages length = %d, want 2", len(req.Messages))
+	}
+	if len(req.Messages[1].MultiContent) != 2 {
+		t.Fatalf("user multi content length = %d, want 2", len(req.Messages[1].MultiContent))
+	}
+	imagePart := req.Messages[1].MultiContent[1]
+	if imagePart.ImageURL == nil {
+		t.Fatal("image part ImageURL is nil")
+	}
+	if imagePart.ImageURL.Detail != openai.ImageURLDetailLow {
+		t.Fatalf("image detail = %q, want %q", imagePart.ImageURL.Detail, openai.ImageURLDetailLow)
 	}
 }

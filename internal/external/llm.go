@@ -26,6 +26,12 @@ type GradeResult struct {
 	Feedback  string `json:"feedback"`
 }
 
+const (
+	handwritingMaxCompletionTokens = 80
+	// go-openai omits zero-valued temperature, so use a near-zero value to force low-variance decoding.
+	handwritingTemperature = 0.01
+)
+
 type DefaultLLMClient struct {
 	client *openai.Client
 	model  string
@@ -118,8 +124,30 @@ func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt,
 	userPrompt := buildHandwritingUserPrompt(questionPrompt, correctAnswer)
 
 	imageURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngImage)
-	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: c.model,
+	req := buildHandwritingChatCompletionRequest(c.model, systemPrompt, userPrompt, imageURL)
+	resp, err := c.client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return false, "", fmt.Errorf("llm handwriting grading request failed: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return false, "", fmt.Errorf("empty llm handwriting response")
+	}
+
+	rawContent := resp.Choices[0].Message.Content
+	var result GradeResult
+	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
+		return false, "", fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
+	}
+	log.Printf("[Handwriting] llm model=%s elapsed=%s image_bytes=%d is_correct=%t", c.model, time.Since(startedAt), len(pngImage), result.IsCorrect)
+
+	return result.IsCorrect, result.Feedback, nil
+}
+
+func buildHandwritingChatCompletionRequest(model, systemPrompt, userPrompt, imageURL string) openai.ChatCompletionRequest {
+	return openai.ChatCompletionRequest{
+		Model:               model,
+		MaxCompletionTokens: handwritingMaxCompletionTokens,
+		Temperature:         handwritingTemperature,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
@@ -143,27 +171,12 @@ func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt,
 			},
 		},
 		ResponseFormat: buildHandwritingResponseFormat(),
-	})
-	if err != nil {
-		return false, "", fmt.Errorf("llm handwriting grading request failed: %w", err)
 	}
-	if len(resp.Choices) == 0 {
-		return false, "", fmt.Errorf("empty llm handwriting response")
-	}
-
-	rawContent := resp.Choices[0].Message.Content
-	var result GradeResult
-	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
-		return false, "", fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
-	}
-	log.Printf("[Handwriting] llm model=%s elapsed=%s image_bytes=%d is_correct=%t", c.model, time.Since(startedAt), len(pngImage), result.IsCorrect)
-
-	return result.IsCorrect, result.Feedback, nil
 }
 
 func buildHandwritingSystemPrompt() string {
-	return `You are an expert Japanese handwriting grader.
-You must return strict JSON only. Do not use markdown blocks.
+	return `You are a Japanese kana handwriting verifier.
+Return strict JSON only. Do not use markdown blocks.
 
 JSON schema:
 {
@@ -171,15 +184,26 @@ JSON schema:
   "feedback": "string (empty when correct; optional short Korean correction note when incorrect)"
 }
 
-Rules:
-1. This is binary verification, not open-ended OCR.
-2. The image contains one centered handwritten Japanese kana character or short kana word in black on white.
-3. Decide whether the handwritten image can reasonably be accepted as the expected text.
-4. Accept minor wobble, uneven stroke width, rounded corners, and imperfect mobile handwriting.
-5. Do not reject only because the drawing is large, small, slightly tilted, or not aesthetically neat.
-6. For short words, compare the full expected string in order; reject missing, extra, swapped, or clearly different characters.
-7. When the shape is close enough for a human teacher to accept in beginner practice, return true.
-8. Feedback policy:
+Task:
+- This is binary verification against the provided Expected Text, not open-ended OCR.
+- The image contains one centered handwritten Japanese kana character or short kana word in black on white.
+- For a short kana word, compare the full expected string in order.
+- Make a quick beginner-practice judgment. Do not perform stroke-by-stroke forensic analysis.
+- Prefer accepting a plausible Expected Text over rejecting a small-screen handwriting attempt.
+
+Accept when:
+- Every expected kana character is recognizable in order.
+- Beginner handwriting imperfections are present but identity is still clear: wobble, uneven stroke width, rounded corners, size, spacing, tilt, or imperfect mobile drawing.
+- Stroke order or calligraphic neatness is imperfect but the character identity is clear.
+- The handwriting is ambiguous between visually similar kana, but the Expected Text is a plausible reading.
+- Dakuten, handakuten, small kana, sokuon, or chouon marks are rough or faint but plausibly present.
+
+Reject when:
+- A character is clearly missing, extra, swapped, or different.
+- Dakuten, handakuten, small kana, sokuon, chouon, or other identity-changing marks are clearly absent or clearly wrong.
+- The image cannot plausibly be read as the Expected Text.
+
+Feedback policy:
    - If is_correct is true, feedback must be an empty string.
    - If is_correct is false, do not repeat the expected text; the client already shows the correct answer.
    - For incorrect answers, feedback may be an empty string, or one short Korean sentence only when there is a useful correction note.

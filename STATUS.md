@@ -40,6 +40,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-28 | 손글씨 LLM 채점 튜닝 (generation bound + prompt rubric) | `2605281551_handwriting_llm_generation_bounds.md` |
 | 2026-05-28 | Mini App HandlerDeps 생성자 정리 | `2605281528_miniapp_handler_deps.md` |
 | 2026-05-28 | 손글씨 LLM 오류 사용자 노출 차단 | `2605281535_handwriting_error_sanitization.md` |
 | 2026-05-28 | 손글씨 채점 Feedback 정책 정리 | `2605281450_handwriting_feedback_policy.md` |

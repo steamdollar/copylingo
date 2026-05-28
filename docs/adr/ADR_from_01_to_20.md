@@ -300,3 +300,39 @@
   - on-demand 생성 (Mini App 열 때마다 LLM 호출): 비용·지연 폭증, 동일 사용자에게 같은 tip 보이지 않게 하기 어려움.
   - 별도 seeder CLI 일회성 실행: scheduler 통합 대비 운영 포인트 증가, "점진 누적" 특성 살리기 어려움.
 - **후속 TODO**: `docs/todos/tip_scheduler_generation.md` — (language, proficiency_level) 잔고가 임계치 미만일 때 scheduler 가 LLM 으로 tip 을 보충하는 생성 경로.
+
+---
+
+## ADR-016: 손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선
+
+- **날짜**: 2026-05-28
+- **상태**: 채택됨
+- **맥락**:
+  - 손글씨 Mini App 채점은 작은 모바일 화면에서 손가락으로 입력한 stroke를 소형 PNG로 렌더링한 뒤 LLM multimodal verification으로 처리한다.
+  - 사용자는 정답을 알고 쓰는 연습 중이며, 이 기능의 목적은 시험식 엄격 채점보다 반복 학습 흐름과 손글씨 시도 자체를 유지하는 것이다.
+  - 실제 테스트에서 사용자가 맞게 썼다고 느낀 답안이 비슷한 kana 간 형태 차이 때문에 오답 처리되는 false negative가 발생했다.
+  - LLM 호출 latency는 대부분 provider-side image understanding/queue 구간에서 발생한다. prompt/parameter tuning만으로 latency를 크게 줄이기는 어렵지만, prompt가 획 단위 분석을 유도하면 판단이 보수적이고 느려질 수 있다.
+- **결정**:
+  - 손글씨 채점 prompt는 `Expected Text` 기준 **Binary Verification**을 유지하되, 학습 UX상 false negative를 줄이는 방향으로 설계한다.
+  - 모델에게 stroke-by-stroke forensic analysis를 하지 말고 **quick beginner-practice judgment**를 수행하도록 지시한다.
+  - 작은 화면 입력 특성을 고려해 wobble, uneven stroke width, size, spacing, tilt, rough/faint marks는 reject 사유로 보지 않는다.
+  - 비슷한 kana 사이에서 애매하지만 `Expected Text`로 plausible 하게 읽히면 accept한다.
+  - reject는 명확한 mismatch에 한정한다: character missing/extra/swapped/different, dakuten/handakuten/small kana/sokuon/chouon 등이 **clearly absent or clearly wrong**인 경우.
+  - 정답인 경우 feedback은 empty string으로 유지하고, 오답인 경우에도 client가 정답을 이미 보여주므로 필요할 때만 짧은 한국어 correction note를 반환한다.
+  - `ReasoningEffort`는 사용하지 않는다. `reasoning_effort=low`와 `MaxCompletionTokens=80` 조합에서 Gemini OpenAI-compatible 응답이 JSON이 아닌 `Here`로 깨진 사례가 있어 안정성을 우선한다.
+- **장점**:
+  - 사용자가 맞게 썼다고 느낀 답안을 오답 처리하는 좌절감을 줄인다.
+  - 작은 화면 손글씨 입력의 물리적 한계를 채점 기준에 반영한다.
+  - LLM이 불필요한 획 분석을 덜 하도록 유도해, 가능한 범위에서 판단 경로를 단순화한다.
+  - feedback format을 짧게 유지해 Mini App 결과 UI가 흔들리지 않는다.
+- **단점 / 트레이드오프**:
+  - false negative를 줄이는 대신 false positive가 일부 증가할 수 있다.
+  - 비슷한 kana를 엄격하게 구분하는 시험식 채점에는 덜 적합하다.
+  - latency 개선은 보장하지 않는다. provider-side multimodal 처리 시간이 dominant하면 체감 속도는 크게 변하지 않을 수 있다.
+- **대안**:
+  - 엄격 채점 유지: 학습 정확도는 높아질 수 있으나 모바일 손글씨 UX에서 좌절감과 재시도 비용이 커져 기각.
+  - local OCR/heuristic 선채점: LLM 호출 감소 가능성이 있으나 kana stroke/shape 판정 구현 비용과 정확도 검증 부담이 커서 후속 최적화 후보로 보류.
+  - 모델 교체(`gemini-2.0-flash-lite`, `gemini-2.5-flash-lite`) 실험: latency/cost 개선 가능성이 있으나 채점 품질 A/B가 필요하므로 별도 실험으로 분리.
+
+---
+
