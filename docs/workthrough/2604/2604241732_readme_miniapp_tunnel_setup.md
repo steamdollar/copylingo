@@ -7,7 +7,7 @@
 ## 반영 내용
 
 - `다른 머신에서 이어서 작업하기` 섹션을 현재 코드 기준 환경변수 이름으로 정리했습니다.
-- `go run ./cmd/kana_seeder`가 손글씨 문항까지 생성한다는 점을 명시했습니다.
+- `go run ./cmd/ja/kana_seeder`가 손글씨 문항까지 생성한다는 점을 명시했습니다.
 - `Telegram Mini App + Cloudflare Tunnel 설정` 섹션을 추가했습니다.
 - `COPYLINGO_SERVER_PUBLIC_BASE_URL` 설정 이유와 사용 방법을 설명했습니다.
 - `cloudflared tunnel --url http://localhost:8080` 기준 로컬 개발 절차를 예시로 추가했습니다.

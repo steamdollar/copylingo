@@ -31,7 +31,7 @@
 | Subphase | 상태 | 설명 |
 |---|---|---|
 | 2.1 NHK News Easy 크롤러 | ✅ 완료 | `internal/pipeline/collector.go`, `internal/external/nhk.go` |
-| 2.1.5 히라가나/카타카나 학습 | ✅ 완료 | `cmd/kana_seeder`, 주관식 봇 핸들링 추가 |
+| 2.1.5 히라가나/카타카나 학습 | ✅ 완료 | `cmd/ja/kana_seeder`, 주관식 봇 핸들링 추가 |
 | 2.2 JLPT 학습 자료 수집기 | ⬜ 대기 | `internal/external/` 추가 소스 |
 | 2.3 AI 문제 생성 엔진 | ⬜ 대기 | `internal/pipeline/generator.go`, `internal/external/openai.go` |
 | 2.4 TTS 음성 생성 & 캐싱 | ⬜ 대기 | `internal/pipeline/tts.go`, `internal/external/tts_client.go` |

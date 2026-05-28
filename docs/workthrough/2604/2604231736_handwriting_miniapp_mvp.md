@@ -18,7 +18,7 @@ Telegram Mini App을 사용해 히라가나/가타카나 손글씨 문항을 풀
 - stroke data를 서버에서 소형 PNG로 렌더링하는 `PNGStrokeRenderer`를 추가했습니다.
 - `LLMClient.GradeHandwriting`을 추가해 Gemini에게 binary verification 방식으로 채점하게 했습니다.
 - `GraderService.GradeHandwriting`을 추가해 기존 `session_questions`, question stats, SRS 업데이트 흐름을 재사용했습니다.
-- `cmd/kana_seeder`에 손글씨 가나 문항 생성 로직을 추가하고, 기존 가나 맵의 한국어 문자 혼입 오타를 수정했습니다.
+- `cmd/ja/kana_seeder`에 손글씨 가나 문항 생성 로직을 추가하고, 기존 가나 맵의 한국어 문자 혼입 오타를 수정했습니다.
 
 ## 주요 플로우
 

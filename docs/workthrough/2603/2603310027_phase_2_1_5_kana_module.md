@@ -4,7 +4,7 @@
 
 ## 🚀 구현된 주요 기능
 
-### 1. Kana Data Seeder (`cmd/kana_seeder`)
+### 1. Kana Data Seeder (`cmd/ja/kana_seeder`)
 일본어 히라가나 및 가타카나 문자(약 208자)의 기초 지식을 검증하기 위해 질문 데이터를 일괄 생성하는 도구를 만들었습니다.
 - **주관식 (70%)**: 문자를 보고 발음(Romaji)을 직접 타이핑하여 맞추는 형태 (`QuestionFillBlank` 타입)
 - **객관식 (30%)**: 문자를 보고 4지 선다로 매칭하는 형태 (`QuestionMultipleChoice` 타입)
