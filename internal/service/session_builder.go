@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -25,8 +26,7 @@ type questionFetcher interface {
 type sessionStore interface {
 	CreateSession(ctx context.Context, s *model.Session) error
 	GetByID(ctx context.Context, id int) (*model.Session, error)
-	GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error)
-	GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error)
+	GetSessionsByStatus(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error)
 	ListInProgress(ctx context.Context) ([]model.Session, error)
 	Start(ctx context.Context, id int) error
 }
@@ -92,6 +92,7 @@ func (s *SessionBuilderService) buildSession(
 	order := 0
 
 	// 1. Get review questions from SRS (due reviews)
+	// TODO: language 별로 가져와야 하는거 아닌가?
 	if reviewCount > 0 {
 		reviews, err := s.srs.GetDueReviews(ctx, reviewCount)
 		if err != nil {
@@ -189,14 +190,8 @@ func (s *SessionBuilderService) buildSession(
 	return session, nil
 }
 
-// GetPendingSessions returns pending sessions for a user.
-func (s *SessionBuilderService) GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error) {
-	return s.sessionRepo.GetPendingSessions(ctx, userID)
-}
-
-// GetInProgressSessions returns in-progress sessions for a user.
-func (s *SessionBuilderService) GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error) {
-	return s.sessionRepo.GetInProgressSessions(ctx, userID)
+func (s *SessionBuilderService) GetSessionsByStatus(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+	return s.sessionRepo.GetSessionsByStatus(ctx, userID, status)
 }
 
 // GetAllInProgressSessions returns all in-progress sessions for all users.

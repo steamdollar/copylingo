@@ -13,6 +13,7 @@ type Repositories struct {
 	Question        *QuestionRepository
 	Session         *SessionRepository
 	SessionQuestion *SessionQuestionRepository
+	ActiveSession   *ActiveSessionRepository
 	Tip             *TipRepository
 }
 
@@ -24,6 +25,7 @@ func NewRepositories(db *sqlx.DB) *Repositories {
 		Question:        NewQuestionRepository(db),
 		Session:         NewSessionRepository(db),
 		SessionQuestion: NewSessionQuestionRepository(db),
+		ActiveSession:   NewActiveSessionRepository(db),
 		Tip:             NewTipRepository(db),
 	}
 }

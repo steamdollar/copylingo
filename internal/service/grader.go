@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -13,67 +14,48 @@ type graderUserRepo interface {
 	UpdateStreak(ctx context.Context, userID int64) error
 }
 
-type graderQuestionRepo interface {
-	GetByID(ctx context.Context, id int) (*model.Question, error)
-	IncrementServed(ctx context.Context, id int) error
-	IncrementCorrect(ctx context.Context, id int) error
-}
-
-type graderSessionRepo interface {
-	Complete(ctx context.Context, id int, correctCount int) error
-}
-
-type graderSessionQuestionRepo interface {
+type graderActiveSession interface {
+	Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
 	RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
-	GetBySession(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
-	GetWrongAnswers(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+	Flush(ctx context.Context, sessionID int, userID int64) (*SessionResult, error)
+	Delete(ctx context.Context, sessionID int) error
 }
 
 // GraderService handles answer grading and result processing.
 type GraderService struct {
-	userRepo            graderUserRepo
-	questionRepo        graderQuestionRepo
-	sessionRepo         graderSessionRepo
-	sessionQuestionRepo graderSessionQuestionRepo
-	srs                 srsScheduler
-	llm                 external.LLMClient
+	userRepo      graderUserRepo
+	activeSession graderActiveSession
+	llm           external.LLMClient
 }
 
 func NewGraderService(
 	userRepo graderUserRepo,
-	questionRepo graderQuestionRepo,
-	sessionRepo graderSessionRepo,
-	sessionQuestionRepo graderSessionQuestionRepo,
-	srs srsScheduler,
+	activeSession graderActiveSession,
 	llm external.LLMClient,
 ) *GraderService {
 	return &GraderService{
-		userRepo:            userRepo,
-		questionRepo:        questionRepo,
-		sessionRepo:         sessionRepo,
-		sessionQuestionRepo: sessionQuestionRepo,
-		srs:                 srs,
-		llm:                 llm,
+		userRepo:      userRepo,
+		activeSession: activeSession,
+		llm:           llm,
 	}
-}
-
-// SessionResult contains the summary of a completed session.
-type SessionResult struct {
-	TotalQuestions int
-	CorrectCount   int
-	WrongAnswers   []model.SessionQuestion
 }
 
 // GradeAnswer grades a single answer and updates SRS accordingly.
 func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID int, userAnswer string) (bool, string, error) {
-	// Get the question to check correct answer
-	question, err := g.questionRepo.GetByID(ctx, questionID)
+	question, err := g.questionFromActiveSession(ctx, sessionID, questionID)
 	if err != nil {
 		return false, "", err
 	}
+	return g.GradeAnswerWithQuestion(ctx, sessionID, questionID, question, userAnswer)
+}
 
+func (g *GraderService) GradeAnswerWithQuestion(ctx context.Context, sessionID, questionID int, question *model.Question, userAnswer string) (bool, string, error) {
+	if question == nil || question.ID != questionID {
+		return false, "", fmt.Errorf("grade answer question mismatch session_id=%d question_id=%d", sessionID, questionID)
+	}
 	var isCorrect bool
 	var feedback string
+	var err error
 
 	// QuestionSubjective is the only text-answer path that uses LLM semantic grading.
 	// FillBlank and MultipleChoice remain exact-match to avoid unnecessary latency and nondeterminism.
@@ -86,7 +68,7 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 		isCorrect = userAnswer == question.CorrectAnswer
 	}
 
-	if err := g.recordGradingResult(ctx, sessionID, questionID, question, userAnswer, isCorrect); err != nil {
+	if err := g.recordGradingResult(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
 		return false, "", err
 	}
 
@@ -94,11 +76,18 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 }
 
 func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questionID int, renderedImage []byte) (bool, string, error) {
-	startedAt := time.Now()
-
-	question, err := g.questionRepo.GetByID(ctx, questionID)
+	question, err := g.questionFromActiveSession(ctx, sessionID, questionID)
 	if err != nil {
 		return false, "", err
+	}
+	return g.GradeHandwritingWithQuestion(ctx, sessionID, questionID, question, renderedImage)
+}
+
+func (g *GraderService) GradeHandwritingWithQuestion(ctx context.Context, sessionID, questionID int, question *model.Question, renderedImage []byte) (bool, string, error) {
+	startedAt := time.Now()
+
+	if question == nil || question.ID != questionID {
+		return false, "", fmt.Errorf("grade handwriting question mismatch session_id=%d question_id=%d", sessionID, questionID)
 	}
 	if question.Type != model.QuestionKanaHandwriting {
 		return false, "", ErrHandwritingInvalidQuestion
@@ -111,7 +100,7 @@ func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questio
 	gradedAt := time.Now()
 
 	userAnswer := "handwriting:submitted"
-	if err := g.recordGradingResult(ctx, sessionID, questionID, question, userAnswer, isCorrect); err != nil {
+	if err := g.recordGradingResult(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
 		return false, "", err
 	}
 	log.Printf("[Handwriting] grader total=%s llm=%s record=%s session_id=%d question_id=%d is_correct=%t",
@@ -120,46 +109,20 @@ func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questio
 	return isCorrect, feedback, nil
 }
 
-func (g *GraderService) recordGradingResult(ctx context.Context, sessionID, questionID int, question *model.Question, userAnswer string, isCorrect bool) error {
-	// Record the answer in session_questions
-	if err := g.sessionQuestionRepo.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
-		return err
+func (g *GraderService) recordGradingResult(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {
+	if g.activeSession == nil {
+		return ErrActiveSessionDependencyMissing
 	}
-
-	// Update question statistics
-	if err := g.questionRepo.IncrementServed(ctx, questionID); err != nil {
-		return err
-	}
-	if isCorrect {
-		if err := g.questionRepo.IncrementCorrect(ctx, questionID); err != nil {
-			return err
-		}
-	}
-
-	// Update SRS schedule on the question itself
-	if err := g.srs.ProcessAnswer(ctx, question, isCorrect); err != nil {
-		return err
-	}
-
-	return nil
+	return g.activeSession.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect)
 }
 
 // CompleteSession finalizes a session with results.
 func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, userID int64) (*SessionResult, error) {
-	sqs, err := g.sessionQuestionRepo.GetBySession(ctx, sessionID)
+	if g.activeSession == nil {
+		return nil, ErrActiveSessionDependencyMissing
+	}
+	result, err := g.activeSession.Flush(ctx, sessionID, userID)
 	if err != nil {
-		return nil, err
-	}
-
-	correctCount := 0
-	for _, sq := range sqs {
-		if sq.IsCorrect != nil && *sq.IsCorrect {
-			correctCount++
-		}
-	}
-
-	// Update session
-	if err := g.sessionRepo.Complete(ctx, sessionID, correctCount); err != nil {
 		return nil, err
 	}
 
@@ -168,12 +131,27 @@ func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, user
 		return nil, err
 	}
 
-	// Get wrong answers for result display
-	wrongSQs, _ := g.sessionQuestionRepo.GetWrongAnswers(ctx, sessionID)
+	if err := g.activeSession.Delete(ctx, sessionID); err != nil {
+		return nil, err
+	}
 
-	return &SessionResult{
-		TotalQuestions: len(sqs),
-		CorrectCount:   correctCount,
-		WrongAnswers:   wrongSQs,
-	}, nil
+	return result, nil
+}
+
+func (g *GraderService) questionFromActiveSession(ctx context.Context, sessionID, questionID int) (*model.Question, error) {
+	if g.activeSession == nil {
+		return nil, ErrActiveSessionDependencyMissing
+	}
+	state, err := g.activeSession.Get(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	item, _, ok := state.FindItemByQuestionID(questionID)
+	if !ok {
+		return nil, fmt.Errorf("%w session_id=%d question_id=%d", ErrActiveSessionQuestionNotFound, sessionID, questionID)
+	}
+	if item.SessionQuestion.IsCorrect != nil {
+		return nil, fmt.Errorf("%w session_id=%d question_id=%d", ErrActiveSessionAlreadyAnswered, sessionID, questionID)
+	}
+	return &item.Question, nil
 }

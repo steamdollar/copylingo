@@ -25,6 +25,38 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
+func initInfra(cfg *config.Config) (*sqlx.DB, *redis.Client, func(), error) {
+	db, err := initDB(cfg)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	rdb, err := initRedis(cfg)
+	if err != nil {
+		db.Close()
+		return nil, nil, nil, err
+	}
+	return db, rdb, func() { db.Close(); rdb.Close() }, nil
+}
+
+func initApp(cfg *config.Config, db *sqlx.DB, rdb *redis.Client) (*repository.Repositories, *service.Services, *bot.Bot, error) {
+	repos := repository.NewRepositories(db)
+	services := service.NewServices(repos, cfg, rdb)
+	botHandler, err := bot.New(cfg, services, rdb)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to initialize Telegram bot: %w", err)
+	}
+	return repos, services, botHandler, nil
+}
+
+func startWorkers(cfg *config.Config, services *service.Services, botHandler *bot.Bot, repos *repository.Repositories) func() {
+	orchestrator := initPipeline(repos)
+	sched, stopSched := initScheduler(cfg, services, botHandler, orchestrator)
+	sched.Start()
+	go botHandler.Start()
+	go botHandler.RefreshStaleMiniAppMessages(context.Background())
+	return stopSched
+}
+
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
 	db, err := sqlx.Connect("postgres", cfg.DB.DSN())
 	if err != nil {

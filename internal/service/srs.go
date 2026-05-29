@@ -13,6 +13,7 @@ type questionQuerier interface {
 	UpdateSRS(ctx context.Context, q *model.Question) error
 }
 
+// srs: Spaced Repetition System
 // srsScheduler는 GraderService와 SessionBuilderService가 SRSService에 의존할 때 쓰는 계약.
 // *SRSService가 암묵적으로 만족한다.
 type srsScheduler interface {
@@ -33,14 +34,19 @@ func NewSRSService(questionRepo questionQuerier) *SRSService {
 
 // ProcessAnswer updates the SRS schedule on the question based on correctness.
 func (s *SRSService) ProcessAnswer(ctx context.Context, question *model.Question, isCorrect bool) error {
+	s.ScheduleAnswer(question, isCorrect)
+
+	return s.questionRepo.UpdateSRS(ctx, question)
+}
+
+// ScheduleAnswer applies SRS changes in memory without writing to the DB.
+func (s *SRSService) ScheduleAnswer(question *model.Question, isCorrect bool) {
 	quality := 1 // wrong
 	if isCorrect {
 		quality = 4 // correct with some hesitation
 	}
 
 	s.updateSchedule(question, quality)
-
-	return s.questionRepo.UpdateSRS(ctx, question)
 }
 
 // updateSchedule applies the SM-2 algorithm to update the question's SRS state.

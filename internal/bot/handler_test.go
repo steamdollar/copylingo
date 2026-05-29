@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -57,7 +56,7 @@ func TestHandleExit(t *testing.T) {
 	b.handleExit(ctx, msg)
 
 	// Verify Redis key deletion
-	expectedKey := fmt.Sprintf(config.KeyUserActiveQuestion, chatID)
+	expectedKey := config.UserActiveQuestionRedisKey.Format(chatID)
 	found := false
 	for _, k := range mRdb.deletedKeys {
 		if k == expectedKey {

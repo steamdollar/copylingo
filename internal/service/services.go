@@ -1,6 +1,8 @@
 package service
 
 import (
+	"github.com/redis/go-redis/v9"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/repository"
@@ -11,6 +13,7 @@ type Services struct {
 	User           *UserService
 	SRS            *SRSService
 	SessionBuilder *SessionBuilderService
+	ActiveSession  *ActiveSessionService
 	Grader         *GraderService
 	Handwriting    *HandwritingService
 	Analyzer       *AnalyzerService
@@ -18,26 +21,22 @@ type Services struct {
 }
 
 // NewServices creates all services with the given dependencies.
-func NewServices(repos *repository.Repositories, cfg *config.Config) *Services {
+func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.Cmdable) *Services {
 	llm := external.NewLLMClient(cfg)
 
-	userService := NewUserService(repos.User)
 	srsService := NewSRSService(repos.Question)
-	graderService := NewGraderService(repos.User,
-		repos.Question, repos.Session, repos.SessionQuestion, srsService, llm)
-	analyzerService := NewAnalyzerService(repos.User, repos.SessionQuestion)
-	sessionBuilderService := NewSessionBuilderService(repos.Question,
-		repos.Session, repos.SessionQuestion, srsService)
-	handwritingService := NewHandwritingService(repos.Session, repos.Question, repos.SessionQuestion, graderService, nil)
-	tipService := NewTipService(repos.Tip)
+	activeSessionService := NewActiveSessionService(repos.ActiveSession, rdb, srsService)
+	graderService := NewGraderService(repos.User, activeSessionService, llm)
 
 	return &Services{
-		User:           userService,
-		SRS:            srsService,
-		SessionBuilder: sessionBuilderService,
-		Grader:         graderService,
-		Handwriting:    handwritingService,
-		Analyzer:       analyzerService,
-		Tip:            tipService,
+		User: NewUserService(repos.User),
+		SRS:  srsService,
+		SessionBuilder: NewSessionBuilderService(repos.Question,
+			repos.Session, repos.SessionQuestion, srsService),
+		ActiveSession: activeSessionService,
+		Grader:        graderService,
+		Handwriting:   NewHandwritingService(activeSessionService, graderService, nil),
+		Analyzer:      NewAnalyzerService(repos.User, repos.SessionQuestion),
+		Tip:           NewTipService(repos.Tip),
 	}
 }

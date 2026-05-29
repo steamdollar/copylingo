@@ -26,8 +26,6 @@
 
 > 각 항목은 `docs/todos/<file>.md`에 자기완결적 문서로 분리되어 있다. 작성/실행/완료 처리 규칙은 `AGENTS.md`의 "TODO 문서 프로토콜" 참조.
 
-- [ ] `showQuestion` 반복 DB hit 개선 — 문제 이동마다 2회 read 발생, JOIN 또는 cache로 축소. see [docs/todos/show_question_db_hit_reduction.md](docs/todos/show_question_db_hit_reduction.md)
-
 - [ ] 학습 팁 AI 생성 (scheduler 통합) — (lang, level) 잔고 < 50 일 때 세션 빌드마다 2-3개 LLM 으로 생성. see [docs/todos/tip_scheduler_generation.md](docs/todos/tip_scheduler_generation.md)
 
 - [ ] 손글씨 채점 결과 후 Tip Card 유지 — 응답 후 spinner 는 닫되 마지막 tip 은 계속 표시. see [docs/todos/handwriting_tip_persist_after_result.md](docs/todos/handwriting_tip_persist_after_result.md)
@@ -40,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-28 | Redis Active Session State 구현 | `2605281946_redis_active_session_state.md` |
 | 2026-05-28 | 손글씨 LLM 채점 튜닝 (generation bound + prompt rubric) | `2605281551_handwriting_llm_generation_bounds.md` |
 | 2026-05-28 | Mini App HandlerDeps 생성자 정리 | `2605281528_miniapp_handler_deps.md` |
 | 2026-05-28 | 손글씨 LLM 오류 사용자 노출 차단 | `2605281535_handwriting_error_sanitization.md` |

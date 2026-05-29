@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -21,12 +22,11 @@ func (m *mockQuestionFetcher) GetByID(ctx context.Context, id int) (*model.Quest
 }
 
 type mockSessionStore struct {
-	createSessionFn         func(ctx context.Context, s *model.Session) error
-	getByIDFn               func(ctx context.Context, id int) (*model.Session, error)
-	getPendingSessionsFn    func(ctx context.Context, userID int64) ([]model.Session, error)
-	getInProgressSessionsFn func(ctx context.Context, userID int64) ([]model.Session, error)
-	listInProgressFn        func(ctx context.Context) ([]model.Session, error)
-	startFn                 func(ctx context.Context, id int) error
+	createSessionFn       func(ctx context.Context, s *model.Session) error
+	getByIDFn             func(ctx context.Context, id int) (*model.Session, error)
+	getSessionsByStatusFn func(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error)
+	listInProgressFn      func(ctx context.Context) ([]model.Session, error)
+	startFn               func(ctx context.Context, id int) error
 }
 
 func (m *mockSessionStore) CreateSession(ctx context.Context, s *model.Session) error {
@@ -35,11 +35,8 @@ func (m *mockSessionStore) CreateSession(ctx context.Context, s *model.Session) 
 func (m *mockSessionStore) GetByID(ctx context.Context, id int) (*model.Session, error) {
 	return m.getByIDFn(ctx, id)
 }
-func (m *mockSessionStore) GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error) {
-	return m.getPendingSessionsFn(ctx, userID)
-}
-func (m *mockSessionStore) GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error) {
-	return m.getInProgressSessionsFn(ctx, userID)
+func (m *mockSessionStore) GetSessionsByStatus(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+	return m.getSessionsByStatusFn(ctx, userID, status)
 }
 func (m *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
 	if m.listInProgressFn != nil {

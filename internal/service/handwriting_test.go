@@ -2,41 +2,26 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type mockHandwritingSessionRepo struct {
-	getByIDFn func(ctx context.Context, id int) (*model.Session, error)
+type mockHandwritingActiveSession struct {
+	getFn func(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
 }
 
-func (m *mockHandwritingSessionRepo) GetByID(ctx context.Context, id int) (*model.Session, error) {
-	return m.getByIDFn(ctx, id)
-}
-
-type mockHandwritingQuestionRepo struct {
-	getByIDFn func(ctx context.Context, id int) (*model.Question, error)
-}
-
-func (m *mockHandwritingQuestionRepo) GetByID(ctx context.Context, id int) (*model.Question, error) {
-	return m.getByIDFn(ctx, id)
-}
-
-type mockHandwritingSessionQuestionRepo struct {
-	getBySessionFn func(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
-}
-
-func (m *mockHandwritingSessionQuestionRepo) GetBySession(ctx context.Context, sid int) ([]model.SessionQuestion, error) {
-	return m.getBySessionFn(ctx, sid)
+func (m *mockHandwritingActiveSession) Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
+	return m.getFn(ctx, sessionID)
 }
 
 type mockGraderClient struct {
-	gradeHandwritingFn func(ctx context.Context, sid, qid int, img []byte) (bool, string, error)
+	gradeHandwritingFn func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error)
 }
 
-func (m *mockGraderClient) GradeHandwriting(ctx context.Context, sid, qid int, img []byte) (bool, string, error) {
-	return m.gradeHandwritingFn(ctx, sid, qid, img)
+func (m *mockGraderClient) GradeHandwritingWithQuestion(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+	return m.gradeHandwritingFn(ctx, sid, qid, q, img)
 }
 
 type mockRenderer struct {
@@ -53,23 +38,21 @@ func TestSubmitAnswer_Success(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	sRepo := &mockHandwritingSessionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Session, error) {
-			return &model.Session{ID: id, UserID: userID}, nil
-		},
-	}
-	qRepo := &mockHandwritingQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{ID: id, Type: model.QuestionKanaHandwriting, CorrectAnswer: "あ"}, nil
-		},
-	}
-	sqRepo := &mockHandwritingSessionQuestionRepo{
-		getBySessionFn: func(ctx context.Context, sid int) ([]model.SessionQuestion, error) {
-			return []model.SessionQuestion{{QuestionID: questionID, SessionID: sid}}, nil
+	active := &mockHandwritingActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+			return handwritingState(userID, sessionID, model.Question{
+				ID:            questionID,
+				Type:          model.QuestionKanaHandwriting,
+				CorrectAnswer: "あ",
+				Explanation:   "hiragana a",
+			}, false), nil
 		},
 	}
 	grader := &mockGraderClient{
-		gradeHandwritingFn: func(ctx context.Context, sid, qid int, img []byte) (bool, string, error) {
+		gradeHandwritingFn: func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+			if sid != sessionID || qid != questionID || q.CorrectAnswer != "あ" || string(img) != "fake-image" {
+				t.Fatalf("unexpected grade args sid=%d qid=%d q=%+v img=%q", sid, qid, q, string(img))
+			}
 			return true, "Correct!", nil
 		},
 	}
@@ -79,7 +62,7 @@ func TestSubmitAnswer_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewHandwritingService(sRepo, qRepo, sqRepo, grader, renderer)
+	svc := NewHandwritingService(active, grader, renderer)
 	res, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{
 		UserID:     userID,
 		SessionID:  sessionID,
@@ -96,20 +79,22 @@ func TestSubmitAnswer_Success(t *testing.T) {
 	if res.Feedback != "Correct!" {
 		t.Errorf("expected feedback Correct!, got %s", res.Feedback)
 	}
+	if res.CorrectAnswer != "あ" || res.Explanation != "hiragana a" {
+		t.Fatalf("unexpected public result: %+v", res)
+	}
 }
 
 func TestSubmitAnswer_Unauthorized(t *testing.T) {
 	ctx := context.Background()
-	sRepo := &mockHandwritingSessionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Session, error) {
-			return &model.Session{ID: id, UserID: 456}, nil // Different user
+	active := &mockHandwritingActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+			return handwritingState(456, 10, model.Question{ID: 1, Type: model.QuestionKanaHandwriting}, false), nil
 		},
 	}
 
-	svc := NewHandwritingService(sRepo, nil, nil, nil, nil)
-	_, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{UserID: 123, SessionID: 10})
-
-	if err != ErrHandwritingUnauthorized {
+	svc := NewHandwritingService(active, nil, nil)
+	_, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{UserID: 123, SessionID: 10, QuestionID: 1})
+	if !errors.Is(err, ErrHandwritingUnauthorized) {
 		t.Errorf("expected ErrHandwritingUnauthorized, got %v", err)
 	}
 }
@@ -117,21 +102,37 @@ func TestSubmitAnswer_Unauthorized(t *testing.T) {
 func TestSubmitAnswer_InvalidQuestionType(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
-	sRepo := &mockHandwritingSessionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Session, error) {
-			return &model.Session{ID: id, UserID: userID}, nil
-		},
-	}
-	qRepo := &mockHandwritingQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{ID: id, Type: model.QuestionMultipleChoice}, nil // Wrong type
+	active := &mockHandwritingActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+			return handwritingState(userID, 10, model.Question{ID: 1, Type: model.QuestionMultipleChoice}, false), nil
 		},
 	}
 
-	svc := NewHandwritingService(sRepo, qRepo, nil, nil, nil)
+	svc := NewHandwritingService(active, nil, nil)
 	_, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{UserID: userID, SessionID: 10, QuestionID: 1})
-
-	if err != ErrHandwritingInvalidQuestion {
+	if !errors.Is(err, ErrHandwritingInvalidQuestion) {
 		t.Errorf("expected ErrHandwritingInvalidQuestion, got %v", err)
 	}
+}
+
+func TestSubmitAnswer_AlreadyAnswered(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+	active := &mockHandwritingActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+			return handwritingState(userID, 10, model.Question{ID: 1, Type: model.QuestionKanaHandwriting}, true), nil
+		},
+	}
+
+	svc := NewHandwritingService(active, nil, nil)
+	_, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{UserID: userID, SessionID: 10, QuestionID: 1})
+	if !errors.Is(err, ErrHandwritingAlreadyAnswered) {
+		t.Errorf("expected ErrHandwritingAlreadyAnswered, got %v", err)
+	}
+}
+
+func handwritingState(userID int64, sessionID int, question model.Question, answered bool) *model.ActiveSessionState {
+	state := activeStateForQuestion(sessionID, question, answered)
+	state.Session.UserID = userID
+	return state
 }

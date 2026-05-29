@@ -336,3 +336,36 @@
 
 ---
 
+## ADR-017: 진행 중 세션은 Redis Active Session State로 처리
+
+- **날짜**: 2026-05-28
+- **상태**: 채택됨
+- **맥락**:
+  - `showQuestion`, text answer, handwriting submit, restart recovery가 같은 session/session_questions/questions 데이터를 반복 조회했다.
+  - 손글씨 제출은 `session_id`, `question_id`를 이미 알고 있는데도 session ownership, question type, membership, grader lookup 단계에서 DB read가 중복됐다.
+  - ADR-013은 활성 세션 상태를 Redis 작업영역으로 유지하고 종료 시 DB에 일괄 flush하는 방향을 이미 채택했으나 구현은 미진행이었다.
+- **결정**:
+  - 진행 중 세션은 Redis `session:{session_id}:working_set`를 authoritative working set으로 사용한다.
+  - working set에는 session metadata, ordered session_questions, question copy, progress(`user_answer`, `is_correct`), `current_index`, `answered_count`, `updated_at`, `version`을 함께 저장한다.
+  - 세션 시작 시 DB에서 session + session_questions + questions를 한 번에 JOIN load하여 Redis state를 생성한다.
+  - 세션 진행 중 문제 표시, 답변 여부 확인, 다음 문제 계산, 손글씨 제출 검증, grader question lookup은 Redis state만 본다.
+  - 답변 hot path는 DB write를 하지 않는다. Redis state 안의 progress, question stats, SRS working copy를 갱신한다.
+  - 세션 종료 시 Redis state를 DB transaction으로 flush한다:
+    - `sessions` completed 처리
+    - `session_questions` answer/is_correct 일괄 반영
+    - `questions` stats delta와 SRS field 반영
+  - flush 성공 후 user streak를 갱신하고 Redis state를 삭제한다.
+  - Redis state missing/corrupt 시 DB fallback은 하지 않는다. 진행 중 progress의 신뢰 가능한 SoT가 Redis이므로, stale DB로 복구하면 사용자가 이미 푼 답안이 사라질 수 있다.
+- **장점**:
+  - 세션 중 반복 DB read와 answer별 DB write를 제거한다.
+  - 손글씨 submit에서 session/question/session_questions/grader lookup 중복을 Redis state 조회로 통합한다.
+  - 완료 시점 DB transaction으로 flush 경계를 명확히 만들어 batch flush 구조를 코드에 반영한다.
+  - Redis state loss를 DB fallback으로 감추지 않아 progress 일관성 정책이 명확하다.
+- **단점 / 트레이드오프**:
+  - Redis 장애/eviction 시 진행 중 세션은 복구하지 않고 사용자에게 재시작을 안내해야 한다.
+  - answer path에서 Redis read-modify-write가 추가되므로, 다중 app instance에서 같은 question에 동시 submit이 들어오는 경우 atomic CAS/Lua 보강 여지가 있다.
+  - `questions` SRS field가 전역 row에 있어 동시 세션이 같은 question을 flush하면 SRS는 last-write-wins 성격을 유지한다. 기존 구조의 한계를 이번 작업에서 별도 사용자별 SRS로 확장하지는 않는다.
+- **대안**:
+  - read-through cache만 도입: DB write hot path가 남고 ADR-013의 batch flush 목표를 달성하지 못해 기각.
+  - JOIN query만 추가: 구현은 단순하지만 progress write와 손글씨 중복 lookup 문제가 유지되어 기각.
+  - DB fallback 허용: Redis state 손실 시 미flush progress를 잃은 DB 상태로 사용자를 계속 진행시킬 수 있어 기각.

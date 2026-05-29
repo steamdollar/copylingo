@@ -3,7 +3,6 @@ package miniapp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -33,8 +32,8 @@ type tipService interface {
 	ListActive(ctx context.Context, language, level string, limit int) ([]model.Tip, error)
 }
 
-type sessionBuilderService interface {
-	GetSessionQuestions(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+type activeSessionService interface {
+	Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
 }
 
 type verifier interface {
@@ -42,23 +41,23 @@ type verifier interface {
 }
 
 type Handler struct {
-	handwriting    handwritingService
-	tip            tipService
-	sessionBuilder sessionBuilderService
-	verifier       verifier
-	rdb            *redis.Client
-	messenger      TelegramMessenger
-	cfg            *config.Config
+	handwriting   handwritingService
+	tip           tipService
+	activeSession activeSessionService
+	verifier      verifier
+	rdb           *redis.Client
+	messenger     TelegramMessenger
+	cfg           *config.Config
 }
 
 type HandlerDeps struct {
-	Handwriting    handwritingService
-	Tip            tipService
-	SessionBuilder sessionBuilderService
-	Verifier       verifier
-	Redis          *redis.Client
-	Messenger      TelegramMessenger
-	Config         *config.Config
+	Handwriting   handwritingService
+	Tip           tipService
+	ActiveSession activeSessionService
+	Verifier      verifier
+	Redis         *redis.Client
+	Messenger     TelegramMessenger
+	Config        *config.Config
 }
 
 type handwritingSubmitRequest struct {
@@ -70,35 +69,33 @@ type handwritingSubmitRequest struct {
 
 func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
-		handwriting:    deps.Handwriting,
-		tip:            deps.Tip,
-		sessionBuilder: deps.SessionBuilder,
-		verifier:       deps.Verifier,
-		rdb:            deps.Redis,
-		messenger:      deps.Messenger,
-		cfg:            deps.Config,
+		handwriting:   deps.Handwriting,
+		tip:           deps.Tip,
+		activeSession: deps.ActiveSession,
+		verifier:      deps.Verifier,
+		rdb:           deps.Redis,
+		messenger:     deps.Messenger,
+		cfg:           deps.Config,
 	}
 }
 
 func RegisterRoutes(r *gin.Engine, cfg *config.Config, services *service.Services, rdb *redis.Client, messenger TelegramMessenger) {
 	handler := NewHandler(HandlerDeps{
-		Handwriting:    services.Handwriting,
-		Tip:            services.Tip,
-		SessionBuilder: services.SessionBuilder,
-		Verifier:       NewInitDataVerifier(cfg.Telegram.Token, 24*time.Hour),
-		Redis:          rdb,
-		Messenger:      messenger,
-		Config:         cfg,
+		Handwriting:   services.Handwriting,
+		Tip:           services.Tip,
+		ActiveSession: services.ActiveSession,
+		Verifier:      NewInitDataVerifier(cfg.Telegram.Token, 24*time.Hour),
+		Redis:         rdb,
+		Messenger:     messenger,
+		Config:        cfg,
 	})
 
 	r.Static("/miniapp/handwriting/assets", "./web/miniapp/handwriting")
-	r.GET(config.PathHandwritingMiniApp, handler.ShowHandwriting)
+	r.GET(config.PathHandwritingMiniApp, func(c *gin.Context) {
+		c.File("./web/miniapp/handwriting/index.html")
+	})
 	r.POST(config.PathHandwritingSubmit, handler.SubmitHandwriting)
 	r.GET(config.PathMiniAppTips, handler.ListTips)
-}
-
-func (h *Handler) ShowHandwriting(c *gin.Context) {
-	c.File("./web/miniapp/handwriting/index.html")
 }
 
 func (h *Handler) ListTips(c *gin.Context) {
@@ -200,7 +197,7 @@ func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	key := fmt.Sprintf(config.KeyHandwritingMessage, sessionID, questionID)
+	key := config.HandwritingMessageRedisKey.Format(sessionID, questionID)
 	val, err := h.rdb.Get(ctx, key).Result()
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
@@ -216,15 +213,15 @@ func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
 	}
 
 	// We need to know the question index to format the "Next" button.
-	sqs, err := h.sessionBuilder.GetSessionQuestions(ctx, sessionID)
+	state, err := h.activeSession.Get(ctx, sessionID)
 	if err != nil {
-		log.Printf("[Handwriting] failed to get session questions for cleanup session=%d: %v", sessionID, err)
+		log.Printf("[Handwriting] failed to get active session state for cleanup session=%d: %v", sessionID, err)
 		return
 	}
 
 	questionIdx := -1
-	for i, sq := range sqs {
-		if sq.QuestionID == questionID {
+	for i, item := range state.Items {
+		if item.SessionQuestion.QuestionID == questionID {
 			questionIdx = i
 			break
 		}

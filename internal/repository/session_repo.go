@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -30,25 +31,13 @@ func (r *SessionRepository) GetByID(ctx context.Context, id int) (*model.Session
 	return s, err
 }
 
-// GetPendingSessions returns all pending sessions for a user.
-func (r *SessionRepository) GetPendingSessions(ctx context.Context, userID int64) ([]model.Session, error) {
+func (r *SessionRepository) GetSessionsByStatus(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
 	var sessions []model.Session
 	err := r.db.SelectContext(ctx, &sessions, `
 		SELECT * FROM sessions
-		WHERE user_id = $1 AND status = 'pending'
-		ORDER BY created_at DESC
-	`, userID)
-	return sessions, err
-}
-
-// GetInProgressSessions returns all in-progress sessions for a user.
-func (r *SessionRepository) GetInProgressSessions(ctx context.Context, userID int64) ([]model.Session, error) {
-	var sessions []model.Session
-	err := r.db.SelectContext(ctx, &sessions, `
-		SELECT * FROM sessions
-		WHERE user_id = $1 AND status = 'in_progress'
+		WHERE user_id = $1 AND status = $2
 		ORDER BY started_at DESC NULLS LAST, created_at DESC
-	`, userID)
+	`, userID, status)
 	return sessions, err
 }
 

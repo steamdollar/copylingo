@@ -8,7 +8,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// Mocks for GraderService
 type mockGraderUserRepo struct {
 	updateStreakFn func(ctx context.Context, userID int64) error
 }
@@ -17,44 +16,27 @@ func (m *mockGraderUserRepo) UpdateStreak(ctx context.Context, userID int64) err
 	return m.updateStreakFn(ctx, userID)
 }
 
-type mockGraderQuestionRepo struct {
-	getByIDFn          func(ctx context.Context, id int) (*model.Question, error)
-	incrementServedFn  func(ctx context.Context, id int) error
-	incrementCorrectFn func(ctx context.Context, id int) error
+type mockGraderActiveSession struct {
+	getFn          func(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
+	recordAnswerFn func(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
+	flushFn        func(ctx context.Context, sessionID int, userID int64) (*SessionResult, error)
+	deleteFn       func(ctx context.Context, sessionID int) error
 }
 
-func (m *mockGraderQuestionRepo) GetByID(ctx context.Context, id int) (*model.Question, error) {
-	return m.getByIDFn(ctx, id)
-}
-func (m *mockGraderQuestionRepo) IncrementServed(ctx context.Context, id int) error {
-	return m.incrementServedFn(ctx, id)
-}
-func (m *mockGraderQuestionRepo) IncrementCorrect(ctx context.Context, id int) error {
-	return m.incrementCorrectFn(ctx, id)
+func (m *mockGraderActiveSession) Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
+	return m.getFn(ctx, sessionID)
 }
 
-type mockGraderSessionRepo struct {
-	completeFn func(ctx context.Context, id int, correctCount int) error
-}
-
-func (m *mockGraderSessionRepo) Complete(ctx context.Context, id int, correctCount int) error {
-	return m.completeFn(ctx, id, correctCount)
-}
-
-type mockGraderSessionQuestionRepo struct {
-	recordAnswerFn    func(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
-	getBySessionFn    func(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
-	getWrongAnswersFn func(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
-}
-
-func (m *mockGraderSessionQuestionRepo) RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {
+func (m *mockGraderActiveSession) RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {
 	return m.recordAnswerFn(ctx, sessionID, questionID, userAnswer, isCorrect)
 }
-func (m *mockGraderSessionQuestionRepo) GetBySession(ctx context.Context, sessionID int) ([]model.SessionQuestion, error) {
-	return m.getBySessionFn(ctx, sessionID)
+
+func (m *mockGraderActiveSession) Flush(ctx context.Context, sessionID int, userID int64) (*SessionResult, error) {
+	return m.flushFn(ctx, sessionID, userID)
 }
-func (m *mockGraderSessionQuestionRepo) GetWrongAnswers(ctx context.Context, sessionID int) ([]model.SessionQuestion, error) {
-	return m.getWrongAnswersFn(ctx, sessionID)
+
+func (m *mockGraderActiveSession) Delete(ctx context.Context, sessionID int) error {
+	return m.deleteFn(ctx, sessionID)
 }
 
 type mockSRS struct {
@@ -69,8 +51,8 @@ func (m *mockSRS) GetDueReviews(ctx context.Context, limit int) ([]model.Questio
 func (m *mockSRS) GetDueCount(ctx context.Context) (int, error) {
 	return m.getDueCountFn(ctx)
 }
-func (m *mockSRS) ProcessAnswer(ctx context.Context, q *model.Question, isCorrect bool) error {
-	return m.processAnswerFn(ctx, q, isCorrect)
+func (m *mockSRS) ProcessAnswer(ctx context.Context, q *model.Question, correct bool) error {
+	return m.processAnswerFn(ctx, q, correct)
 }
 
 type mockLLM struct {
@@ -91,37 +73,27 @@ func (m *mockLLM) Translate(ctx context.Context, text, targetLang string) (strin
 
 func TestGradeAnswer_Correct(t *testing.T) {
 	ctx := context.Background()
-	questionID := 1
 	sessionID := 10
-	userAnswer := "apple"
+	questionID := 1
 
-	qRepo := &mockGraderQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{ID: id, CorrectAnswer: "apple", Type: model.QuestionMultipleChoice}, nil
+	active := &mockGraderActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			return activeStateForQuestion(sessionID, model.Question{
+				ID:            questionID,
+				CorrectAnswer: "apple",
+				Type:          model.QuestionMultipleChoice,
+			}, false), nil
 		},
-		incrementServedFn:  func(ctx context.Context, id int) error { return nil },
-		incrementCorrectFn: func(ctx context.Context, id int) error { return nil },
-	}
-	sqRepo := &mockGraderSessionQuestionRepo{
 		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
-			if !correct {
-				t.Errorf("expected isCorrect true")
-			}
-			return nil
-		},
-	}
-	srsMock := &mockSRS{
-		processAnswerFn: func(ctx context.Context, q *model.Question, correct bool) error {
-			if !correct {
-				t.Errorf("expected srs processAnswer isCorrect true")
+			if sid != sessionID || qid != questionID || ans != "apple" || !correct {
+				t.Fatalf("unexpected record args sid=%d qid=%d ans=%q correct=%t", sid, qid, ans, correct)
 			}
 			return nil
 		},
 	}
 
-	grader := NewGraderService(nil, qRepo, nil, sqRepo, srsMock, nil)
-	isCorrect, feedback, err := grader.GradeAnswer(ctx, sessionID, questionID, userAnswer)
-
+	grader := NewGraderService(nil, active, nil)
+	isCorrect, feedback, err := grader.GradeAnswer(ctx, sessionID, questionID, "apple")
 	if err != nil {
 		t.Fatalf("GradeAnswer failed: %v", err)
 	}
@@ -129,42 +101,33 @@ func TestGradeAnswer_Correct(t *testing.T) {
 		t.Error("expected isCorrect true")
 	}
 	if feedback != "" {
-		t.Errorf("expected empty feedback for multiple choice, got %s", feedback)
+		t.Errorf("expected empty feedback, got %q", feedback)
 	}
 }
 
 func TestGradeAnswer_Wrong(t *testing.T) {
 	ctx := context.Background()
-	questionID := 1
 	sessionID := 10
-	userAnswer := "banana"
+	questionID := 1
 
-	qRepo := &mockGraderQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{ID: id, CorrectAnswer: "apple", Type: model.QuestionMultipleChoice}, nil
+	active := &mockGraderActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			return activeStateForQuestion(sessionID, model.Question{
+				ID:            questionID,
+				CorrectAnswer: "apple",
+				Type:          model.QuestionMultipleChoice,
+			}, false), nil
 		},
-		incrementServedFn: func(ctx context.Context, id int) error { return nil },
-	}
-	sqRepo := &mockGraderSessionQuestionRepo{
 		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
 			if correct {
-				t.Error("expected isCorrect false")
-			}
-			return nil
-		},
-	}
-	srsMock := &mockSRS{
-		processAnswerFn: func(ctx context.Context, q *model.Question, correct bool) error {
-			if correct {
-				t.Error("expected srs processAnswer isCorrect false")
+				t.Fatal("expected wrong answer to be recorded")
 			}
 			return nil
 		},
 	}
 
-	grader := NewGraderService(nil, qRepo, nil, sqRepo, srsMock, nil)
-	isCorrect, _, err := grader.GradeAnswer(ctx, sessionID, questionID, userAnswer)
-
+	grader := NewGraderService(nil, active, nil)
+	isCorrect, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "banana")
 	if err != nil {
 		t.Fatalf("GradeAnswer failed: %v", err)
 	}
@@ -175,37 +138,33 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 
 func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 	ctx := context.Background()
-	questionID := 1
 	sessionID := 10
-	userAnswer := "I am a student"
+	questionID := 1
 
-	qRepo := &mockGraderQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{
-				ID:            id,
+	active := &mockGraderActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			return activeStateForQuestion(sessionID, model.Question{
+				ID:            questionID,
 				CorrectAnswer: "I'm a student",
 				Type:          model.QuestionSubjective,
 				Prompt:        "Translate: 私は学生です",
-			}, nil
+			}, false), nil
 		},
-		incrementServedFn:  func(ctx context.Context, id int) error { return nil },
-		incrementCorrectFn: func(ctx context.Context, id int) error { return nil },
+		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
+			if !correct {
+				t.Fatal("expected subjective answer to be recorded as correct")
+			}
+			return nil
+		},
 	}
-	sqRepo := &mockGraderSessionQuestionRepo{
-		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error { return nil },
-	}
-	srsMock := &mockSRS{
-		processAnswerFn: func(ctx context.Context, q *model.Question, correct bool) error { return nil },
-	}
-	llmMock := &mockLLM{
+	llm := &mockLLM{
 		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (bool, string, error) {
 			return true, "Good job", nil
 		},
 	}
 
-	grader := NewGraderService(nil, qRepo, nil, sqRepo, srsMock, llmMock)
-	isCorrect, feedback, err := grader.GradeAnswer(ctx, sessionID, questionID, userAnswer)
-
+	grader := NewGraderService(nil, active, llm)
+	isCorrect, feedback, err := grader.GradeAnswer(ctx, sessionID, questionID, "I am a student")
 	if err != nil {
 		t.Fatalf("GradeAnswer failed: %v", err)
 	}
@@ -213,189 +172,127 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 		t.Error("expected isCorrect true from LLM")
 	}
 	if feedback != "Good job" {
-		t.Errorf("expected feedback 'Good job', got %s", feedback)
+		t.Errorf("expected feedback 'Good job', got %q", feedback)
 	}
 }
 
-func TestCompleteSession_CorrectCountCalculation(t *testing.T) {
+func TestGradeAnswer_AlreadyAnswered(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
-	userID := int64(12345)
+	questionID := 1
 
-	trueVal := true
-	falseVal := false
-	sqRepo := &mockGraderSessionQuestionRepo{
-		getBySessionFn: func(ctx context.Context, sid int) ([]model.SessionQuestion, error) {
-			return []model.SessionQuestion{
-				{QuestionID: 1, IsCorrect: &trueVal},
-				{QuestionID: 2, IsCorrect: &falseVal},
-				{QuestionID: 3, IsCorrect: &trueVal},
-			}, nil
-		},
-		getWrongAnswersFn: func(ctx context.Context, sid int) ([]model.SessionQuestion, error) {
-			return []model.SessionQuestion{{QuestionID: 2, IsCorrect: &falseVal}}, nil
+	active := &mockGraderActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			return activeStateForQuestion(sessionID, model.Question{
+				ID:            questionID,
+				CorrectAnswer: "apple",
+				Type:          model.QuestionMultipleChoice,
+			}, true), nil
 		},
 	}
 
-	sRepo := &mockGraderSessionRepo{
-		completeFn: func(ctx context.Context, id int, count int) error {
-			if count != 2 {
-				t.Errorf("expected correctCount 2, got %d", count)
-			}
-			return nil
-		},
-	}
-
-	uRepo := &mockGraderUserRepo{
-		updateStreakFn: func(ctx context.Context, uid int64) error {
-			if uid != userID {
-				t.Errorf("expected userID %d, got %d", userID, uid)
-			}
-			return nil
-		},
-	}
-
-	grader := NewGraderService(uRepo, nil, sRepo, sqRepo, nil, nil)
-	result, err := grader.CompleteSession(ctx, sessionID, userID)
-
-	if err != nil {
-		t.Fatalf("CompleteSession failed: %v", err)
-	}
-	if result.CorrectCount != 2 {
-		t.Errorf("expected result.CorrectCount 2, got %d", result.CorrectCount)
-	}
-	if len(result.WrongAnswers) != 1 {
-		t.Errorf("expected 1 wrong answer, got %d", len(result.WrongAnswers))
-	}
-}
-
-func TestGradeAnswer_QuestionNotFound(t *testing.T) {
-	ctx := context.Background()
-	qRepo := &mockGraderQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return nil, errors.New("not found")
-		},
-	}
-
-	grader := NewGraderService(nil, qRepo, nil, nil, nil, nil)
-	_, _, err := grader.GradeAnswer(ctx, 10, 1, "ans")
-
-	if err == nil {
-		t.Error("expected error when question not found")
+	grader := NewGraderService(nil, active, nil)
+	_, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "apple")
+	if !errors.Is(err, ErrActiveSessionAlreadyAnswered) {
+		t.Fatalf("expected ErrActiveSessionAlreadyAnswered, got %v", err)
 	}
 }
 
 func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 	ctx := context.Background()
+	sessionID := 10
+	questionID := 1
 	expectedErr := errors.New("record answer failed")
-	incrementServedCalled := false
-	processAnswerCalled := false
 
-	qRepo := &mockGraderQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{ID: id, CorrectAnswer: "apple", Type: model.QuestionMultipleChoice}, nil
+	active := &mockGraderActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			return activeStateForQuestion(sessionID, model.Question{
+				ID:            questionID,
+				CorrectAnswer: "apple",
+				Type:          model.QuestionMultipleChoice,
+			}, false), nil
 		},
-		incrementServedFn: func(ctx context.Context, id int) error {
-			incrementServedCalled = true
-			return nil
-		},
-	}
-	sqRepo := &mockGraderSessionQuestionRepo{
 		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
 			return expectedErr
 		},
 	}
-	srsMock := &mockSRS{
-		processAnswerFn: func(ctx context.Context, q *model.Question, correct bool) error {
-			processAnswerCalled = true
-			return nil
-		},
-	}
 
-	grader := NewGraderService(nil, qRepo, nil, sqRepo, srsMock, nil)
-	_, _, err := grader.GradeAnswer(ctx, 10, 1, "apple")
-
+	grader := NewGraderService(nil, active, nil)
+	_, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "apple")
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected RecordAnswer error %v, got %v", expectedErr, err)
 	}
-	if incrementServedCalled {
-		t.Error("IncrementServed should not be called after RecordAnswer failure")
+}
+
+func TestCompleteSession_FlushStreakAndDelete(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	userID := int64(12345)
+	deleteCalled := false
+
+	active := &mockGraderActiveSession{
+		flushFn: func(ctx context.Context, sid int, uid int64) (*SessionResult, error) {
+			if sid != sessionID || uid != userID {
+				t.Fatalf("unexpected flush args sid=%d uid=%d", sid, uid)
+			}
+			return &SessionResult{TotalQuestions: 3, CorrectCount: 2}, nil
+		},
+		deleteFn: func(ctx context.Context, sid int) error {
+			if sid != sessionID {
+				t.Fatalf("unexpected delete session id %d", sid)
+			}
+			deleteCalled = true
+			return nil
+		},
 	}
-	if processAnswerCalled {
-		t.Error("ProcessAnswer should not be called after RecordAnswer failure")
+	userRepo := &mockGraderUserRepo{
+		updateStreakFn: func(ctx context.Context, uid int64) error {
+			if uid != userID {
+				t.Fatalf("expected userID %d, got %d", userID, uid)
+			}
+			return nil
+		},
+	}
+
+	grader := NewGraderService(userRepo, active, nil)
+	result, err := grader.CompleteSession(ctx, sessionID, userID)
+	if err != nil {
+		t.Fatalf("CompleteSession failed: %v", err)
+	}
+	if result.CorrectCount != 2 || result.TotalQuestions != 3 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if !deleteCalled {
+		t.Fatal("expected active session state to be deleted")
 	}
 }
 
-func TestGradeAnswer_IncrementServedFails(t *testing.T) {
-	ctx := context.Background()
-	expectedErr := errors.New("increment served failed")
-	incrementCorrectCalled := false
-	processAnswerCalled := false
-
-	qRepo := &mockGraderQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{ID: id, CorrectAnswer: "apple", Type: model.QuestionMultipleChoice}, nil
+func activeStateForQuestion(sessionID int, question model.Question, answered bool) *model.ActiveSessionState {
+	var userAnswer *string
+	var isCorrect *bool
+	if answered {
+		answer := "answered"
+		correct := true
+		userAnswer = &answer
+		isCorrect = &correct
+	}
+	return &model.ActiveSessionState{
+		Version: model.ActiveSessionStateVersion,
+		Session: model.Session{
+			ID:     sessionID,
+			UserID: 1,
 		},
-		incrementServedFn: func(ctx context.Context, id int) error {
-			return expectedErr
+		Items: []model.ActiveSessionQuestion{
+			{
+				SessionQuestion: model.SessionQuestion{
+					ID:         100,
+					SessionID:  sessionID,
+					QuestionID: question.ID,
+					UserAnswer: userAnswer,
+					IsCorrect:  isCorrect,
+				},
+				Question: question,
+			},
 		},
-		incrementCorrectFn: func(ctx context.Context, id int) error {
-			incrementCorrectCalled = true
-			return nil
-		},
-	}
-	sqRepo := &mockGraderSessionQuestionRepo{
-		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
-			return nil
-		},
-	}
-	srsMock := &mockSRS{
-		processAnswerFn: func(ctx context.Context, q *model.Question, correct bool) error {
-			processAnswerCalled = true
-			return nil
-		},
-	}
-
-	grader := NewGraderService(nil, qRepo, nil, sqRepo, srsMock, nil)
-	_, _, err := grader.GradeAnswer(ctx, 10, 1, "apple")
-
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("expected IncrementServed error %v, got %v", expectedErr, err)
-	}
-	if incrementCorrectCalled {
-		t.Error("IncrementCorrect should not be called after IncrementServed failure")
-	}
-	if processAnswerCalled {
-		t.Error("ProcessAnswer should not be called after IncrementServed failure")
-	}
-}
-
-func TestGradeAnswer_ProcessAnswerFails(t *testing.T) {
-	ctx := context.Background()
-	expectedErr := errors.New("process answer failed")
-
-	qRepo := &mockGraderQuestionRepo{
-		getByIDFn: func(ctx context.Context, id int) (*model.Question, error) {
-			return &model.Question{ID: id, CorrectAnswer: "apple", Type: model.QuestionMultipleChoice}, nil
-		},
-		incrementServedFn:  func(ctx context.Context, id int) error { return nil },
-		incrementCorrectFn: func(ctx context.Context, id int) error { return nil },
-	}
-	sqRepo := &mockGraderSessionQuestionRepo{
-		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
-			return nil
-		},
-	}
-	srsMock := &mockSRS{
-		processAnswerFn: func(ctx context.Context, q *model.Question, correct bool) error {
-			return expectedErr
-		},
-	}
-
-	grader := NewGraderService(nil, qRepo, nil, sqRepo, srsMock, nil)
-	_, _, err := grader.GradeAnswer(ctx, 10, 1, "apple")
-
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("expected ProcessAnswer error %v, got %v", expectedErr, err)
 	}
 }

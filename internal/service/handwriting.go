@@ -10,20 +10,12 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type handwritingSessionRepo interface {
-	GetByID(ctx context.Context, id int) (*model.Session, error)
-}
-
-type handwritingQuestionRepo interface {
-	GetByID(ctx context.Context, id int) (*model.Question, error)
-}
-
-type handwritingSessionQuestionRepo interface {
-	GetBySession(ctx context.Context, sessionID int) ([]model.SessionQuestion, error)
+type handwritingActiveSession interface {
+	Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
 }
 
 type graderClient interface {
-	GradeHandwriting(ctx context.Context, sessionID, questionID int, renderedImage []byte) (bool, string, error)
+	GradeHandwritingWithQuestion(ctx context.Context, sessionID, questionID int, question *model.Question, renderedImage []byte) (bool, string, error)
 }
 
 var (
@@ -64,17 +56,13 @@ type HandwritingSubmitResult struct {
 
 // HandwritingService coordinates Mini App submissions without coupling HTTP and Bot flows.
 type HandwritingService struct {
-	sessionRepo         handwritingSessionRepo
-	questionRepo        handwritingQuestionRepo
-	sessionQuestionRepo handwritingSessionQuestionRepo
-	grader              graderClient
-	renderer            StrokeRenderer
+	activeSession handwritingActiveSession
+	grader        graderClient
+	renderer      StrokeRenderer
 }
 
 func NewHandwritingService(
-	sessionRepo handwritingSessionRepo,
-	questionRepo handwritingQuestionRepo,
-	sessionQuestionRepo handwritingSessionQuestionRepo,
+	activeSession handwritingActiveSession,
 	grader graderClient,
 	renderer StrokeRenderer,
 ) *HandwritingService {
@@ -82,49 +70,32 @@ func NewHandwritingService(
 		renderer = NewPNGStrokeRenderer(256, 24)
 	}
 	return &HandwritingService{
-		sessionRepo:         sessionRepo,
-		questionRepo:        questionRepo,
-		sessionQuestionRepo: sessionQuestionRepo,
-		grader:              grader,
-		renderer:            renderer,
+		activeSession: activeSession,
+		grader:        grader,
+		renderer:      renderer,
 	}
 }
 
 func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSubmitRequest) (*HandwritingSubmitResult, error) {
 	startedAt := time.Now()
 
-	session, err := s.sessionRepo.GetByID(ctx, req.SessionID)
+	state, err := s.activeSession.Get(ctx, req.SessionID)
 	if err != nil {
-		return nil, fmt.Errorf("get session for handwriting submission: %w", err)
+		return nil, fmt.Errorf("get active session for handwriting submission: %w", err)
 	}
-	if session.UserID != req.UserID {
+	if state.Session.UserID != req.UserID {
 		return nil, ErrHandwritingUnauthorized
 	}
 
-	question, err := s.questionRepo.GetByID(ctx, req.QuestionID)
-	if err != nil {
-		return nil, fmt.Errorf("get question for handwriting submission: %w", err)
+	item, _, ok := state.FindItemByQuestionID(req.QuestionID)
+	if !ok {
+		return nil, ErrHandwritingQuestionMismatch
 	}
+	question := &item.Question
 	if question.Type != model.QuestionKanaHandwriting {
 		return nil, ErrHandwritingInvalidQuestion
 	}
-
-	sessionQuestions, err := s.sessionQuestionRepo.GetBySession(ctx, req.SessionID)
-	if err != nil {
-		return nil, fmt.Errorf("get session questions for handwriting submission: %w", err)
-	}
-
-	var matched *model.SessionQuestion
-	for i := range sessionQuestions {
-		if sessionQuestions[i].QuestionID == req.QuestionID {
-			matched = &sessionQuestions[i]
-			break
-		}
-	}
-	if matched == nil {
-		return nil, ErrHandwritingQuestionMismatch
-	}
-	if matched.IsCorrect != nil {
+	if item.SessionQuestion.IsCorrect != nil {
 		return nil, ErrHandwritingAlreadyAnswered
 	}
 
@@ -134,8 +105,11 @@ func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSu
 	}
 	renderedAt := time.Now()
 
-	isCorrect, feedback, err := s.grader.GradeHandwriting(ctx, req.SessionID, req.QuestionID, renderedImage)
+	isCorrect, feedback, err := s.grader.GradeHandwritingWithQuestion(ctx, req.SessionID, req.QuestionID, question, renderedImage)
 	if err != nil {
+		if errors.Is(err, ErrActiveSessionAlreadyAnswered) {
+			return nil, ErrHandwritingAlreadyAnswered
+		}
 		return nil, fmt.Errorf("grade handwriting answer: %w", err)
 	}
 	log.Printf("[Handwriting] service total=%s render=%s grade=%s session_id=%d question_id=%d image_bytes=%d",

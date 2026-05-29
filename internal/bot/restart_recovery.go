@@ -35,23 +35,24 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			continue
 		}
 
-		idx, err := b.flow.nextUnansweredQuestionIndex(ctx, s.ID)
+		state, err := b.services.ActiveSession.Get(ctx, s.ID)
 		if err != nil {
+			log.Printf("[restart-recovery] active session state unavailable session=%d: %v", s.ID, err)
 			continue
 		}
 
-		sqs, err := b.services.SessionBuilder.GetSessionQuestions(ctx, s.ID)
-		if err != nil || idx >= len(sqs) {
+		idx := state.NextUnansweredIndex()
+		if idx >= len(state.Items) {
 			continue
 		}
 
-		q, err := b.services.SessionBuilder.GetQuestion(ctx, sqs[idx].QuestionID)
-		if err != nil || q.Type != model.QuestionKanaHandwriting {
+		q := state.Items[idx].Question
+		if q.Type != model.QuestionKanaHandwriting {
 			continue
 		}
 
-		// (a) best-effort: edit old message to strip buttons via KeyHandwritingMessage
-		oldKey := fmt.Sprintf(config.KeyHandwritingMessage, s.ID, q.ID)
+		// (a) best-effort: edit old message to strip buttons via HandwritingMessageRedisKey
+		oldKey := config.HandwritingMessageRedisKey.Format(s.ID, q.ID)
 		if val, err := b.rdb.Get(ctx, oldKey).Result(); err == nil {
 			if chatID, msgID, perr := ParseHandwritingMessageRef(val); perr == nil {
 				_ = b.ClearInlineKeyboard(chatID, msgID)

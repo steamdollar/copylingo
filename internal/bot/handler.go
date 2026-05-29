@@ -47,6 +47,7 @@ func New(cfg *config.Config, services *service.Services, rdb redis.Cmdable) (*Bo
 		rdb:      rdb,
 		stopCh:   make(chan struct{}),
 	}
+
 	bot.flow = NewSessionFlow(bot)
 
 	return bot, nil
@@ -166,7 +167,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	switch msg.Command() {
+	switch config.BotCommand(msg.Command()) {
 	case config.CommandStart:
 		b.handleStart(ctx, msg)
 	case config.CommandMenu:
@@ -368,7 +369,7 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 }
 
 func (b *Bot) handleExit(ctx context.Context, msg *tgbotapi.Message) {
-	key := fmt.Sprintf(config.KeyUserActiveQuestion, msg.Chat.ID)
+	key := config.UserActiveQuestionRedisKey.Format(msg.Chat.ID)
 	b.rdb.Del(ctx, key)
 	b.SendMessage(msg.Chat.ID, "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요.")
 }

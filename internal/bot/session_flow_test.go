@@ -1,10 +1,19 @@
 package bot
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/callback"
+	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/service"
 )
 
 func TestMiniAppURLFingerprint(t *testing.T) {
@@ -83,4 +92,84 @@ func TestIsStaleMiniAppCallback(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSessionFlowUsesActiveSessionProgress(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	trueVal := true
+	state := &model.ActiveSessionState{
+		Version: model.ActiveSessionStateVersion,
+		Session: model.Session{
+			ID: sessionID,
+		},
+		Items: []model.ActiveSessionQuestion{
+			{
+				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &trueVal},
+				Question:        model.Question{ID: 1},
+			},
+			{
+				SessionQuestion: model.SessionQuestion{QuestionID: 2},
+				Question:        model.Question{ID: 2},
+			},
+		},
+	}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal state: %v", err)
+	}
+	rdb := &sessionFlowRedis{values: map[string]string{
+		config.ActiveSessionWorkingSetRedisKey.Format(sessionID): string(raw),
+	}}
+	active := service.NewActiveSessionService(nil, rdb, nil)
+	sf := NewSessionFlow(&Bot{services: &service.Services{ActiveSession: active}})
+
+	idx, err := sf.nextUnansweredQuestionIndex(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("nextUnansweredQuestionIndex failed: %v", err)
+	}
+	if idx != 1 {
+		t.Fatalf("expected next unanswered index 1, got %d", idx)
+	}
+	if !sf.isQuestionAnswered(ctx, sessionID, 0) {
+		t.Fatal("expected first question to be answered")
+	}
+	if sf.isQuestionAnswered(ctx, sessionID, 1) {
+		t.Fatal("expected second question to be unanswered")
+	}
+}
+
+type sessionFlowRedis struct {
+	values map[string]string
+}
+
+func (f *sessionFlowRedis) Get(ctx context.Context, key string) *redis.StringCmd {
+	val, ok := f.values[key]
+	if !ok {
+		return redis.NewStringResult("", redis.Nil)
+	}
+	return redis.NewStringResult(val, nil)
+}
+
+func (f *sessionFlowRedis) Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd {
+	switch v := value.(type) {
+	case []byte:
+		f.values[key] = string(v)
+	case string:
+		f.values[key] = v
+	default:
+		f.values[key] = fmt.Sprint(v)
+	}
+	return redis.NewStatusResult("OK", nil)
+}
+
+func (f *sessionFlowRedis) Del(ctx context.Context, keys ...string) *redis.IntCmd {
+	var deleted int64
+	for _, key := range keys {
+		if _, ok := f.values[key]; ok {
+			delete(f.values, key)
+			deleted++
+		}
+	}
+	return redis.NewIntResult(deleted, nil)
 }
