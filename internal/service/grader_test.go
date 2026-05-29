@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -173,6 +174,68 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 	}
 	if feedback != "Good job" {
 		t.Errorf("expected feedback 'Good job', got %q", feedback)
+	}
+}
+
+func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	questionID := 1
+
+	active := &mockGraderActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			return activeStateForQuestion(sessionID, model.Question{
+				ID:            questionID,
+				CorrectAnswer: "I'm a student",
+				Type:          model.QuestionSubjective,
+				Prompt:        "Translate: 私は学生です",
+			}, false), nil
+		},
+	}
+	llm := &mockLLM{
+		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (bool, string, error) {
+			return false, "", external.ErrAIConfigMissing
+		},
+	}
+
+	grader := NewGraderService(nil, active, llm)
+	_, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "I am a student")
+	if !errors.Is(err, ErrAIUnavailable) {
+		t.Fatalf("expected ErrAIUnavailable, got %v", err)
+	}
+	if !errors.Is(err, external.ErrAIConfigMissing) {
+		t.Fatalf("expected wrapped external.ErrAIConfigMissing, got %v", err)
+	}
+}
+
+func TestGradeHandwriting_AIUnavailable(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	questionID := 1
+
+	active := &mockGraderActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			return activeStateForQuestion(sessionID, model.Question{
+				ID:            questionID,
+				CorrectAnswer: "あ",
+				Type:          model.QuestionKanaHandwriting,
+				Prompt:        "Write あ",
+			}, false), nil
+		},
+	}
+	llm := &mockLLM{
+		gradeHandwritingFn: func(ctx context.Context, prompt, correctAnswer string, image []byte) (bool, string, error) {
+			return false, "", external.ErrAIConfigMissing
+		},
+	}
+
+	grader := NewGraderService(nil, active, llm)
+	_, _, err := grader.GradeHandwriting(ctx, sessionID, questionID, []byte("png"))
+	if !errors.Is(err, ErrAIUnavailable) {
+		t.Fatalf("expected ErrAIUnavailable, got %v", err)
+	}
+	if !errors.Is(err, external.ErrAIConfigMissing) {
+		t.Fatalf("expected wrapped external.ErrAIConfigMissing, got %v", err)
 	}
 }
 

@@ -91,7 +91,7 @@ func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sess
 
 	isCorrect, feedback, err := sf.bot.services.Grader.GradeAnswerWithQuestion(ctx, sessionID, questionID, &question, selectedAnswer)
 	if err != nil {
-		if errors.Is(err, config.ErrAIConfigMissing) {
+		if errors.Is(err, service.ErrAIUnavailable) {
 			errMsg := tgbotapi.NewMessage(chatID, "⚠️ 시스템 설정 문제로 현재 AI 주관식 채점이 불가능합니다. 임시로 오답 처리하고 넘어갑니다.")
 			sf.bot.api.Send(errMsg)
 			isCorrect = false

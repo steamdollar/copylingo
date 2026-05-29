@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -62,7 +63,7 @@ func (g *GraderService) GradeAnswerWithQuestion(ctx context.Context, sessionID, 
 	if question.Type == model.QuestionSubjective {
 		isCorrect, feedback, err = g.llm.GradeAnswer(ctx, question.Prompt, question.CorrectAnswer, userAnswer)
 		if err != nil {
-			return false, "", err
+			return false, "", mapAIUnavailableError(err)
 		}
 	} else {
 		isCorrect = userAnswer == question.CorrectAnswer
@@ -95,7 +96,7 @@ func (g *GraderService) GradeHandwritingWithQuestion(ctx context.Context, sessio
 
 	isCorrect, feedback, err := g.llm.GradeHandwriting(ctx, question.Prompt, question.CorrectAnswer, renderedImage)
 	if err != nil {
-		return false, "", err
+		return false, "", mapAIUnavailableError(err)
 	}
 	gradedAt := time.Now()
 
@@ -107,6 +108,13 @@ func (g *GraderService) GradeHandwritingWithQuestion(ctx context.Context, sessio
 		time.Since(startedAt), gradedAt.Sub(startedAt), time.Since(gradedAt), sessionID, questionID, isCorrect)
 
 	return isCorrect, feedback, nil
+}
+
+func mapAIUnavailableError(err error) error {
+	if errors.Is(err, external.ErrAIConfigMissing) {
+		return fmt.Errorf("%w: %w", ErrAIUnavailable, err)
+	}
+	return err
 }
 
 func (g *GraderService) recordGradingResult(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {

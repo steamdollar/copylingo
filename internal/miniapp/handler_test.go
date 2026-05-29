@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lsj/copylingo/internal/bot"
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -232,8 +231,8 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 			wantBody:   "손글씨 제출 정보를 확인할 수 없습니다.",
 		},
 		{
-			name:       "ai config missing mapping",
-			serviceErr: config.ErrAIConfigMissing,
+			name:       "ai unavailable mapping",
+			serviceErr: service.ErrAIUnavailable,
 			wantStatus: http.StatusServiceUnavailable,
 			wantBody:   "현재 AI 채점 설정을 사용할 수 없습니다.",
 		},

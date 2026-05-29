@@ -181,7 +181,7 @@ type LLMClient interface {
 Error path 예시:
 
 ```go
-return GradeResult{}, config.ErrAIConfigMissing
+return GradeResult{}, ErrAIConfigMissing
 ```
 
 Success path:
@@ -197,7 +197,7 @@ return result, nil
 ```go
 result, err := g.llm.GradeAnswer(ctx, question.Prompt, question.CorrectAnswer, userAnswer)
 if err != nil {
-	return false, "", err
+	return false, "", mapAIUnavailableError(err)
 }
 isCorrect = result.IsCorrect
 feedback = result.Feedback
@@ -208,7 +208,7 @@ feedback = result.Feedback
 ```go
 result, err := g.llm.GradeHandwriting(ctx, question.Prompt, question.CorrectAnswer, renderedImage)
 if err != nil {
-	return false, "", err
+	return false, "", mapAIUnavailableError(err)
 }
 ```
 

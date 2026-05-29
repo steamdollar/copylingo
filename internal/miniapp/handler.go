@@ -181,7 +181,7 @@ func handwritingPublicError(err error) publicError {
 		return publicError{status: http.StatusBadRequest, message: "손글씨 제출 정보를 확인할 수 없습니다."}
 	case errors.Is(err, service.ErrHandwritingAlreadyAnswered):
 		return publicError{status: http.StatusConflict, message: "이미 채점된 문항입니다."}
-	case errors.Is(err, config.ErrAIConfigMissing):
+	case errors.Is(err, service.ErrAIUnavailable):
 		return publicError{status: http.StatusServiceUnavailable, message: "현재 AI 채점 설정을 사용할 수 없습니다."}
 	default:
 		return publicError{status: http.StatusServiceUnavailable, message: "현재 AI 채점이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."}

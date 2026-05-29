@@ -8,8 +8,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/sashabaranov/go-openai"
+
+	"github.com/lsj/copylingo/internal/config"
 )
 
 // LLMClient defines AI-backed grading paths that cannot be handled by exact string matching.
@@ -54,7 +55,7 @@ func NewLLMClient(cfg *config.Config) LLMClient {
 // Fill-blank and multiple-choice answers are graded by exact string matching in GraderService.
 func (c *DefaultLLMClient) GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error) {
 	if c.client == nil || c.model == "" {
-		return false, "", config.ErrAIConfigMissing
+		return false, "", ErrAIConfigMissing
 	}
 
 	systemPrompt := `You are an expert language teacher grading a student's answer.
@@ -117,7 +118,7 @@ func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt,
 	startedAt := time.Now()
 
 	if c.client == nil || c.model == "" {
-		return false, "", config.ErrAIConfigMissing
+		return false, "", ErrAIConfigMissing
 	}
 
 	systemPrompt := buildHandwritingSystemPrompt()
