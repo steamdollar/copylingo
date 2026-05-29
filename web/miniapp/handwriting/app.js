@@ -10,7 +10,8 @@ const tipEyebrow = document.getElementById("tipEyebrow");
 const tipBody = document.getElementById("tipBody");
 const params = new URLSearchParams(window.location.search);
 
-const TIP_INTERVAL_MS = 3500;
+const TIP_INTERVAL_MS = 15000;
+const TIP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const TIP_CACHE_PREFIX = "copylingo:handwriting:tips:";
 const TIP_CATEGORY_DISPLAY = {
 	kana_youon: "요음",
@@ -67,10 +68,14 @@ async function loadTips() {
 
 function readTipCache(cacheKey) {
 	try {
-		const raw = window.sessionStorage?.getItem(cacheKey);
+		const raw = window.localStorage?.getItem(cacheKey);
 		if (!raw) return null;
-		const tips = JSON.parse(raw);
-		return Array.isArray(tips) ? tips : null;
+		const cached = JSON.parse(raw);
+		if (!cached || Date.now() > cached.expires_at || !Array.isArray(cached.tips)) {
+			window.localStorage?.removeItem(cacheKey);
+			return null;
+		}
+		return cached.tips;
 	} catch (_) {
 		return null;
 	}
@@ -78,7 +83,10 @@ function readTipCache(cacheKey) {
 
 function writeTipCache(cacheKey, tips) {
 	try {
-		window.sessionStorage?.setItem(cacheKey, JSON.stringify(tips));
+		window.localStorage?.setItem(cacheKey, JSON.stringify({
+			expires_at: Date.now() + TIP_CACHE_TTL_MS,
+			tips,
+		}));
 	} catch (_) {
 		// cache best-effort
 	}

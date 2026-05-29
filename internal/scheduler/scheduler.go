@@ -101,6 +101,9 @@ func (s *Scheduler) buildAndPushSessions(sessionType model.SessionType) {
 		return
 	}
 
+	// TODO: user가 많다고 가정했을때, 뭐 한 10만명 ~ 100만명 된다고 가정했을때, 이걸 빨리 할 방법이 있을까?
+	// 예를 들어서, 세션 빌드 자체를 비동기로 하고, 세션이 준비되는대로 푸시를 한다거나? 아니면 세션 빌드와 푸시를 완전히 분리해서,
+	// 세션 빌드는 큐에 넣고, 푸시는 큐에서 빼서 하는 식으로? 일단은 간단하게 동기적으로 처리하지만, 나중에 확장성을 고려해서 개선할 수 있을듯.
 	for _, user := range users {
 		var session *model.Session
 		var err error

@@ -6,6 +6,7 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
+// 왜 repo interface를 service 패키지에 두는가?
 type userRepo interface {
 	GetOrCreate(ctx context.Context, telegramID int64, username string) (*model.User, error)
 	GetAllUsers(ctx context.Context) ([]model.User, error)
