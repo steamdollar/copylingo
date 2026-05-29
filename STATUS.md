@@ -32,6 +32,8 @@
 
 - [ ] LLM 채점 반환값 구조체화 — `bool, string, error` tuple 대신 `(GradeResult, error)`로 의미 명확화. see [docs/todos/llm_grade_result_return_refactor.md](docs/todos/llm_grade_result_return_refactor.md)
 
+- [ ] 손글씨 채점 관측 로깅 보강 — stroke/point count와 image_bytes/render/llm 시간을 함께 기록해 튜닝 근거 확보. see [docs/todos/handwriting_scoring_observability.md](docs/todos/handwriting_scoring_observability.md)
+
 - 손글씨 쓰기 채점 - 너무 오래 걸림. 대안 필요. (속도를 줄이던가, 그 사이에 뭘 하게끔 하던가)
 
 ## 📝 최근 완료
