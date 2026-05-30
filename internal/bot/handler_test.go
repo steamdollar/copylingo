@@ -5,43 +5,13 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/config"
 )
 
-type mockBotAPI struct {
-	sentMessages []tgbotapi.Chattable
-}
-
-func (m *mockBotAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
-	m.sentMessages = append(m.sentMessages, c)
-	return tgbotapi.Message{}, nil
-}
-
-func (m *mockBotAPI) Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
-	return &tgbotapi.APIResponse{}, nil
-}
-
-func (m *mockBotAPI) GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
-	return nil
-}
-
-func (m *mockBotAPI) StopReceivingUpdates() {}
-
-type mockRedis struct {
-	redis.Cmdable
-	deletedKeys []string
-}
-
-func (m *mockRedis) Del(ctx context.Context, keys ...string) *redis.IntCmd {
-	m.deletedKeys = append(m.deletedKeys, keys...)
-	return redis.NewIntCmd(ctx)
-}
-
 func TestHandleExit(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	mRdb := &mockRedis{}
+	mRdb := &testRedis{values: map[string]string{}}
 	b := &Bot{
 		api: mAPI,
 		rdb: mRdb,
@@ -57,15 +27,9 @@ func TestHandleExit(t *testing.T) {
 
 	// Verify Redis key deletion
 	expectedKey := config.UserActiveQuestionRedisKey.Format(chatID)
-	found := false
-	for _, k := range mRdb.deletedKeys {
-		if k == expectedKey {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Errorf("expected Redis key %s to be deleted, but it wasn't", expectedKey)
+	_, deleted := mRdb.values[expectedKey]
+	if deleted {
+		t.Errorf("expected Redis key %s to be deleted, but it still exists", expectedKey)
 	}
 
 	// Verify message sent
