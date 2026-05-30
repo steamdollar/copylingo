@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 
 	t.Run("empty base url", func(t *testing.T) {
 		b.cfg.Server.PublicBaseURL = ""
-		_, err := sf.handwritingMiniAppURL(1, 1, "jp", "n5")
+		_, err := sf.handwritingMiniAppURL(1, 1, "jp", "n5", "prompt")
 		if err == nil {
 			t.Error("expected error for empty base URL")
 		}
@@ -35,7 +36,8 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 
 	t.Run("valid url", func(t *testing.T) {
 		b.cfg.Server.PublicBaseURL = "https://api.example.com/"
-		got, err := sf.handwritingMiniAppURL(123, 456, "jp", "n5")
+		prompt := "뜻 <b>'학교'</b>에 해당하는 일본어 단어를 손글씨로 쓰세요"
+		got, err := sf.handwritingMiniAppURL(123, 456, "jp", "n5", prompt)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -44,6 +46,13 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 		}
 		if !strings.Contains(got, "question_id=456") {
 			t.Errorf("missing question_id in %s", got)
+		}
+		u, err := url.Parse(got)
+		if err != nil {
+			t.Fatalf("parse url: %v", err)
+		}
+		if gotPrompt := u.Query().Get("prompt"); gotPrompt != prompt {
+			t.Errorf("prompt = %q, want %q", gotPrompt, prompt)
 		}
 	})
 }

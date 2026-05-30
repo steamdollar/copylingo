@@ -10,12 +10,12 @@ import (
 )
 
 type mockQuestionFetcher struct {
-	getNewQuestionsFn func(ctx context.Context, language, level, category string, limit int) ([]model.Question, error)
+	getNewQuestionsFn func(ctx context.Context, language, level, category string, excludeIDs []int, limit int) ([]model.Question, error)
 	getByIDFn         func(ctx context.Context, id int) (*model.Question, error)
 }
 
-func (m *mockQuestionFetcher) GetNewQuestions(ctx context.Context, lang, level, cat string, limit int) ([]model.Question, error) {
-	return m.getNewQuestionsFn(ctx, lang, level, cat, limit)
+func (m *mockQuestionFetcher) GetNewQuestions(ctx context.Context, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+	return m.getNewQuestionsFn(ctx, lang, level, cat, excludeIDs, limit)
 }
 func (m *mockQuestionFetcher) GetByID(ctx context.Context, id int) (*model.Question, error) {
 	return m.getByIDFn(ctx, id)
@@ -75,7 +75,7 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 
 	collectedNewCount := 0
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, limit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
 			// Random Slot Relay will call this multiple times for different categories.
 			// Each call should have a reasonable limit.
 			if limit < 0 {
@@ -175,7 +175,7 @@ func TestBuildSession_NoQuestions(t *testing.T) {
 	}
 
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, limit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
 			return nil, nil
 		},
 	}
@@ -250,5 +250,50 @@ func TestBuildSession_CreateSessionQuestionsFails(t *testing.T) {
 
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected CreateSessionQuestions error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestBuildSession_DeduplicatesQuestionIDs(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+
+	srsMock := &mockSRS{
+		getDueReviewsFn: func(ctx context.Context, limit int) ([]model.Question, error) {
+			return []model.Question{{ID: 1}, {ID: 1}}, nil
+		},
+	}
+	qFetcher := &mockQuestionFetcher{
+		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+			return []model.Question{{ID: 1}, {ID: 2}, {ID: 2}}, nil
+		},
+	}
+	sStore := &mockSessionStore{
+		createSessionFn: func(ctx context.Context, s *model.Session) error {
+			if s.TotalQuestions != 2 {
+				t.Fatalf("expected 2 unique questions, got %d", s.TotalQuestions)
+			}
+			s.ID = 10
+			return nil
+		},
+	}
+	sqStore := &mockSessionQuestionStore{
+		createSessionQuestionsFn: func(ctx context.Context, sqs []model.SessionQuestion) error {
+			if len(sqs) != 2 {
+				t.Fatalf("expected 2 unique session questions, got %d", len(sqs))
+			}
+			if sqs[0].QuestionID != 1 || sqs[1].QuestionID != 2 {
+				t.Fatalf("unexpected question ids: %+v", sqs)
+			}
+			return nil
+		},
+	}
+
+	builder := NewSessionBuilderService(qFetcher, sStore, sqStore, srsMock)
+	session, err := builder.BuildMorningSession(ctx, userID, "ja", "N5")
+	if err != nil {
+		t.Fatalf("BuildMorningSession failed: %v", err)
+	}
+	if session == nil {
+		t.Fatal("expected session")
 	}
 }

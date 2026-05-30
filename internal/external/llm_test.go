@@ -1,7 +1,10 @@
 package external
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -33,10 +36,11 @@ func TestBuildHandwritingSystemPromptDefinesFeedbackPolicy(t *testing.T) {
 	prompt := buildHandwritingSystemPrompt()
 
 	for _, want := range []string{
-		"feedback must be an empty string",
-		"do not repeat the expected text",
-		"one short Korean sentence",
-		"Do not praise",
+		"If is_correct is true, feedback must be an empty string",
+		"one short Korean correction note only when a reliable note exists",
+		"Explain only which expected feature is clearly missing or wrong",
+		"Do not propose, transcribe, or mention an alternative character",
+		"If no reliable correction note exists, return an empty string",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("system prompt does not contain feedback policy %q: %q", want, prompt)
@@ -44,24 +48,26 @@ func TestBuildHandwritingSystemPromptDefinesFeedbackPolicy(t *testing.T) {
 	}
 }
 
-func TestBuildHandwritingSystemPromptDefinesDecisionRubric(t *testing.T) {
+func TestBuildHandwritingSystemPromptDefinesConditionalVerificationPolicy(t *testing.T) {
 	t.Parallel()
 
 	prompt := buildHandwritingSystemPrompt()
 
 	for _, want := range []string{
-		"Accept when:",
-		"Reject when:",
-		"Every expected kana character is recognizable in order",
-		"Make a quick beginner-practice judgment",
-		"Prefer accepting a plausible Expected Text",
-		"ambiguous between visually similar kana",
-		"A character is clearly missing, extra, swapped, or different",
-		"clearly absent or clearly wrong",
+		"conditional verification against the provided Expected Text, not open-ended OCR",
+		"Default to true when the Expected Text is a plausible reading",
+		"Do not search for or prefer an alternative transcription",
+		"another kana or kanji",
+		"ambiguous small kana or diacritic marks when plausibly present",
+		"full expected string in order",
 		"cannot plausibly be read as the Expected Text",
+		"Apply this principle generally, not only to this example",
+		"Expected Text: オ",
+		"visually similar kanji 才",
+		"Since オ remains a plausible reading, return true",
 	} {
 		if !strings.Contains(prompt, want) {
-			t.Fatalf("system prompt does not contain decision rubric %q: %q", want, prompt)
+			t.Fatalf("system prompt does not contain conditional verification policy %q: %q", want, prompt)
 		}
 	}
 }
@@ -170,5 +176,42 @@ func TestBuildHandwritingChatCompletionRequestConstrainsGeneration(t *testing.T)
 	}
 	if imagePart.ImageURL.Detail != openai.ImageURLDetailLow {
 		t.Fatalf("image detail = %q, want %q", imagePart.ImageURL.Detail, openai.ImageURLDetailLow)
+	}
+}
+
+func TestGradeHandwritingReturnsProviderFeedback(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("request path = %q, want /v1/chat/completions", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices": [{
+				"message": {
+					"content": "{\"is_correct\":false,\"feedback\":\"탁점이 빠졌습니다.\"}"
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("test-api-key")
+	cfg.BaseURL = server.URL + "/v1"
+	client := &DefaultLLMClient{
+		client: openai.NewClientWithConfig(cfg),
+		model:  "test-model",
+	}
+
+	isCorrect, feedback, err := client.GradeHandwriting(context.Background(), "prompt", "オ", []byte("png"))
+	if err != nil {
+		t.Fatalf("GradeHandwriting() error = %v", err)
+	}
+	if isCorrect {
+		t.Fatal("GradeHandwriting() isCorrect = true, want false")
+	}
+	if feedback != "탁점이 빠졌습니다." {
+		t.Fatalf("GradeHandwriting() feedback = %q, want correction note", feedback)
 	}
 }

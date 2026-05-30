@@ -131,6 +131,53 @@ func TestSubmitAnswer_AlreadyAnswered(t *testing.T) {
 	}
 }
 
+func TestSubmitAnswer_UsesCurrentDuplicateOccurrence(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+	sessionID := 10
+	questionID := 1
+
+	state := handwritingState(userID, sessionID, model.Question{
+		ID:            questionID,
+		Type:          model.QuestionKanaHandwriting,
+		CorrectAnswer: "あ",
+	}, true)
+	state.Items = append(state.Items, model.ActiveSessionQuestion{
+		SessionQuestion: model.SessionQuestion{ID: 101, SessionID: sessionID, QuestionID: questionID},
+		Question: model.Question{
+			ID:            questionID,
+			Type:          model.QuestionKanaHandwriting,
+			CorrectAnswer: "あ",
+		},
+	})
+	state.CurrentIndex = 1
+
+	active := &mockHandwritingActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+			return state, nil
+		},
+	}
+	grader := &mockGraderClient{
+		gradeHandwritingFn: func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+			return true, "", nil
+		},
+	}
+	renderer := &mockRenderer{
+		renderPNGFn: func(strokes []Stroke) ([]byte, error) {
+			return []byte("fake-image"), nil
+		},
+	}
+
+	svc := NewHandwritingService(active, grader, renderer)
+	if _, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{
+		UserID:     userID,
+		SessionID:  sessionID,
+		QuestionID: questionID,
+	}); err != nil {
+		t.Fatalf("SubmitAnswer failed: %v", err)
+	}
+}
+
 func handwritingState(userID int64, sessionID int, question model.Question, answered bool) *model.ActiveSessionState {
 	state := activeStateForQuestion(sessionID, question, answered)
 	state.Session.UserID = userID

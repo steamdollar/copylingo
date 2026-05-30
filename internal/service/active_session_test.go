@@ -218,6 +218,74 @@ func TestActiveSessionRecordAnswerRejectsDuplicate(t *testing.T) {
 	}
 }
 
+func TestActiveSessionRecordAnswerUsesCurrentDuplicateOccurrence(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	rdb := newFakeActiveSessionRedis()
+	svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+
+	state := activeSessionTestState(sessionID, 123, true)
+	state.Items = append(state.Items, model.ActiveSessionQuestion{
+		SessionQuestion: model.SessionQuestion{ID: 101, SessionID: sessionID, QuestionID: 1},
+		Question: model.Question{
+			ID:            1,
+			Type:          model.QuestionMultipleChoice,
+			CorrectAnswer: "apple",
+			EaseFactor:    2.5,
+		},
+	})
+	state.CurrentIndex = 1
+	if err := svc.save(ctx, state); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	if err := svc.RecordAnswer(ctx, sessionID, 1, "apple", true); err != nil {
+		t.Fatalf("RecordAnswer failed: %v", err)
+	}
+
+	got, err := svc.Get(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if got.Items[1].SessionQuestion.IsCorrect == nil || !*got.Items[1].SessionQuestion.IsCorrect {
+		t.Fatalf("expected current duplicate occurrence to be answered: %+v", got.Items[1].SessionQuestion)
+	}
+}
+
+func TestActiveSessionRecordAnswerRejectsStaleDuplicateCallback(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	rdb := newFakeActiveSessionRedis()
+	svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+
+	state := activeSessionTestState(sessionID, 123, true)
+	state.Items = append(state.Items, model.ActiveSessionQuestion{
+		SessionQuestion: model.SessionQuestion{ID: 101, SessionID: sessionID, QuestionID: 1},
+		Question: model.Question{
+			ID:            1,
+			Type:          model.QuestionMultipleChoice,
+			CorrectAnswer: "apple",
+			EaseFactor:    2.5,
+		},
+	})
+	if err := svc.save(ctx, state); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	err := svc.RecordAnswer(ctx, sessionID, 1, "apple", true)
+	if !errors.Is(err, ErrActiveSessionAlreadyAnswered) {
+		t.Fatalf("expected ErrActiveSessionAlreadyAnswered, got %v", err)
+	}
+
+	got, getErr := svc.Get(ctx, sessionID)
+	if getErr != nil {
+		t.Fatalf("Get failed: %v", getErr)
+	}
+	if got.Items[1].SessionQuestion.IsCorrect != nil {
+		t.Fatalf("expected later duplicate occurrence to remain unanswered: %+v", got.Items[1].SessionQuestion)
+	}
+}
+
 func TestActiveSessionFlushSuccess(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
