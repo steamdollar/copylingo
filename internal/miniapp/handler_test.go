@@ -282,3 +282,68 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 		})
 	}
 }
+
+func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("invalid json", func(t *testing.T) {
+		handler := NewHandler(HandlerDeps{})
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/submit", strings.NewReader(`{invalid`))
+		handler.SubmitHandwriting(c)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("auth failure", func(t *testing.T) {
+		verifier := &mockVerifier{
+			verifyFn: func(initData string) (*TelegramUser, error) {
+				return nil, errors.New("auth failed")
+			},
+		}
+		handler := NewHandler(HandlerDeps{Verifier: verifier})
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		reqBody := `{"init_data":"bad","session_id":1,"question_id":1,"strokes":[]}`
+		c.Request, _ = http.NewRequest("POST", "/submit", strings.NewReader(reqBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+		handler.SubmitHandwriting(c)
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected 401, got %d", w.Code)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		handwriting := &mockHandwritingService{
+			submitAnswerFn: func(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error) {
+				return &service.HandwritingSubmitResult{IsCorrect: true}, nil
+			},
+		}
+		verifier := &mockVerifier{
+			verifyFn: func(initData string) (*TelegramUser, error) {
+				return &TelegramUser{ID: 123}, nil
+			},
+		}
+		handler := NewHandler(HandlerDeps{
+			Handwriting: handwriting,
+			Verifier:    verifier,
+		})
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		reqBody := `{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`
+		c.Request, _ = http.NewRequest("POST", "/submit", strings.NewReader(reqBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		handler.SubmitHandwriting(c)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), `"is_correct":true`) {
+			t.Errorf("unexpected body: %s", w.Body.String())
+		}
+	})
+}

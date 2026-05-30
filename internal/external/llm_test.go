@@ -215,3 +215,94 @@ func TestGradeHandwritingReturnsProviderFeedback(t *testing.T) {
 		t.Fatalf("GradeHandwriting() feedback = %q, want correction note", feedback)
 	}
 }
+
+func TestGradeAnswer_Success(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices": [{
+				"message": {
+					"content": "{\"is_correct\":true,\"feedback\":\"잘 하셨습니다.\"}"
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("test-api-key")
+	cfg.BaseURL = server.URL + "/v1"
+	client := &DefaultLLMClient{
+		client: openai.NewClientWithConfig(cfg),
+		model:  "test-model",
+	}
+
+	isCorrect, feedback, err := client.GradeAnswer(context.Background(), "prompt", "apple", "apple")
+	if err != nil {
+		t.Fatalf("GradeAnswer() error = %v", err)
+	}
+	if !isCorrect {
+		t.Fatal("GradeAnswer() isCorrect = false, want true")
+	}
+	if !strings.Contains(feedback, "잘 하셨습니다") {
+		t.Fatalf("GradeAnswer() feedback = %q", feedback)
+	}
+}
+
+func TestDefaultLLMClient_Errors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Missing config", func(t *testing.T) {
+		client := &DefaultLLMClient{}
+		_, _, err := client.GradeAnswer(context.Background(), "p", "a", "u")
+		if !strings.Contains(err.Error(), "ai system is not configured") {
+			t.Errorf("expected ErrAIConfigMissing, got %v", err)
+		}
+	})
+
+	t.Run("HTTP 500", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		cfg := openai.DefaultConfig("test-api-key")
+		cfg.BaseURL = server.URL + "/v1"
+		client := &DefaultLLMClient{
+			client: openai.NewClientWithConfig(cfg),
+			model:  "test-model",
+		}
+
+		_, _, err := client.GradeAnswer(context.Background(), "p", "a", "u")
+		if err == nil || !strings.Contains(err.Error(), "llm grading request failed") {
+			t.Errorf("expected HTTP error, got %v", err)
+		}
+	})
+
+	t.Run("Invalid JSON response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"choices": [{
+					"message": {
+						"content": "invalid json"
+					}
+				}]
+			}`))
+		}))
+		defer server.Close()
+
+		cfg := openai.DefaultConfig("test-api-key")
+		cfg.BaseURL = server.URL + "/v1"
+		client := &DefaultLLMClient{
+			client: openai.NewClientWithConfig(cfg),
+			model:  "test-model",
+		}
+
+		_, _, err := client.GradeAnswer(context.Background(), "p", "a", "u")
+		if err == nil || !strings.Contains(err.Error(), "failed to parse llm output") {
+			t.Errorf("expected parsing error, got %v", err)
+		}
+	})
+}
