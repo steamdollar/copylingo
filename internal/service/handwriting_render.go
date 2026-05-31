@@ -23,8 +23,10 @@ type PNGStrokeRenderer struct {
 }
 
 func NewPNGStrokeRenderer(size, padding int) *PNGStrokeRenderer {
-	brush := 5
-	if size <= 160 {
+	// 획 두께를 캔버스 크기에 비례시켜, 해상도를 올려도 stroke가 상대적으로 얇아지지 않게 한다.
+	// (256→5, 512→10) 탁점/반탁점 같은 미세 마크가 다운스케일 후에도 살아남도록.
+	brush := size / 51
+	if brush < 3 {
 		brush = 3
 	}
 	return &PNGStrokeRenderer{size: size, padding: padding, brush: brush}

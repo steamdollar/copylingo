@@ -165,7 +165,7 @@ func buildHandwritingChatCompletionRequest(model, systemPrompt, userPrompt, imag
 						Type: openai.ChatMessagePartTypeImageURL,
 						ImageURL: &openai.ChatMessageImageURL{
 							URL:    imageURL,
-							Detail: openai.ImageURLDetailLow,
+							Detail: openai.ImageURLDetailHigh,
 						},
 					},
 				},
