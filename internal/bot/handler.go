@@ -67,7 +67,8 @@ func New(cfg *config.Config, services *service.Services, rdb redis.Cmdable) (*Bo
 
 // Start begins listening for Telegram updates.
 func (b *Bot) Start() {
-	// 사용자가 보낸 메시지, 버튼 클릭 이벤트 등을 poll하는 것 관련 config
+	// when bot starts, it fetches messges from user that was stored in telegram while bot was offline,
+	// and handle them with handleUpdate function.
 	pollConfig := tgbotapi.NewUpdate(0)
 	pollConfig.Timeout = 60
 
@@ -170,6 +171,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 }
 
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
+	// if it is nor bot command, check if it is active question answer, if not, ignore or route to chat.
 	if !msg.IsCommand() {
 		// Route plain text to session flow for FillBlank questions
 		if handled := b.flow.HandleTextInput(ctx, msg); !handled {
@@ -180,7 +182,7 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 
 	switch config.BotCommand(msg.Command()) {
 	case config.CommandStart:
-		b.handleStart(ctx, msg)
+		b.handleStart(msg)
 	case config.CommandMenu:
 		b.handleMenu(ctx, msg)
 	case config.CommandStats:
@@ -223,7 +225,7 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	}
 }
 
-func (b *Bot) handleStart(ctx context.Context, msg *tgbotapi.Message) {
+func (b *Bot) handleStart(msg *tgbotapi.Message) {
 	welcome := `🎌 <b>CopyLingo에 오신 것을 환영합니다!</b>
 
 일본어를 마스터하기 위한 여정을 시작합니다.
@@ -257,9 +259,9 @@ func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.Use
 		streakEmoji = "💤"
 	}
 
+	var lang, level string
+
 	streakDays := 0
-	lang := "ja"
-	level := "N5"
 	if user != nil {
 		streakDays = user.StreakDays
 		lang = user.Language

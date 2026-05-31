@@ -32,3 +32,4 @@ data/audio/*.ogg
 /server
 /kana_seeder
 tmp/
+cs
