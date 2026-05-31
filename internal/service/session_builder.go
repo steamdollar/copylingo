@@ -19,7 +19,7 @@ var defaultCategoryOrder = []model.QuestionCategory{
 }
 
 type questionFetcher interface {
-	GetNewQuestions(ctx context.Context, language, level, category string, limit int) ([]model.Question, error)
+	GetNewQuestions(ctx context.Context, language, level, category string, excludeIDs []int, limit int) ([]model.Question, error)
 	GetByID(ctx context.Context, id int) (*model.Question, error)
 }
 
@@ -89,7 +89,24 @@ func (s *SessionBuilderService) buildSession(
 	totalQuestions, newCount, reviewCount int,
 ) (*model.Session, error) {
 	var sessionQuestions []model.SessionQuestion
+	selectedQuestionIDs := make(map[int]struct{}, totalQuestions)
+	excludeIDs := make([]int, 0, totalQuestions)
 	order := 0
+
+	appendQuestion := func(questionID int, isReview bool) bool {
+		if _, exists := selectedQuestionIDs[questionID]; exists {
+			return false
+		}
+		selectedQuestionIDs[questionID] = struct{}{}
+		excludeIDs = append(excludeIDs, questionID)
+		sessionQuestions = append(sessionQuestions, model.SessionQuestion{
+			QuestionID:    questionID,
+			QuestionOrder: order,
+			IsReview:      isReview,
+		})
+		order++
+		return true
+	}
 
 	// 1. Get review questions from SRS (due reviews)
 	// TODO: language 별로 가져와야 하는거 아닌가?
@@ -99,12 +116,7 @@ func (s *SessionBuilderService) buildSession(
 			log.Printf("Error getting due reviews: %v", err)
 		} else {
 			for _, q := range reviews {
-				sessionQuestions = append(sessionQuestions, model.SessionQuestion{
-					QuestionID:    q.ID,
-					QuestionOrder: order,
-					IsReview:      true,
-				})
-				order++
+				appendQuestion(q.ID, true)
 			}
 		}
 	}
@@ -143,22 +155,20 @@ func (s *SessionBuilderService) buildSession(
 			}
 
 			if alloc > 0 {
-				newQs, err := s.questionRepo.GetNewQuestions(ctx, language, level, cat, alloc)
+				newQs, err := s.questionRepo.GetNewQuestions(ctx, language, level, cat, excludeIDs, alloc)
 				if err != nil {
 					log.Printf("Error getting new questions for category %s: %v", cat, err)
 					continue
 				}
 
+				added := 0
 				for _, q := range newQs {
-					sessionQuestions = append(sessionQuestions, model.SessionQuestion{
-						QuestionID:    q.ID,
-						QuestionOrder: order,
-						IsReview:      false,
-					})
-					order++
+					if appendQuestion(q.ID, false) {
+						added++
+					}
 				}
 				// Deduct the number of questions actually fetched
-				remainingNew -= len(newQs)
+				remainingNew -= added
 			}
 		}
 	}

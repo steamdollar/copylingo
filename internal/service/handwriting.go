@@ -87,7 +87,7 @@ func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSu
 		return nil, ErrHandwritingUnauthorized
 	}
 
-	item, _, ok := state.FindItemByQuestionID(req.QuestionID)
+	item, _, ok := state.CurrentItemByQuestionID(req.QuestionID)
 	if !ok {
 		return nil, ErrHandwritingQuestionMismatch
 	}

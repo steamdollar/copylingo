@@ -219,15 +219,8 @@ func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
 		return
 	}
 
-	questionIdx := -1
-	for i, item := range state.Items {
-		if item.SessionQuestion.QuestionID == questionID {
-			questionIdx = i
-			break
-		}
-	}
-
-	if questionIdx == -1 {
+	_, questionIdx, ok := state.CurrentItemByQuestionID(questionID)
+	if !ok {
 		log.Printf("[Handwriting] question not found in session for cleanup session=%d question=%d", sessionID, questionID)
 		return
 	}

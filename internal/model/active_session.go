@@ -31,13 +31,12 @@ func (s *ActiveSessionState) RecountAnswered() int {
 	return count
 }
 
-func (s *ActiveSessionState) FindItemByQuestionID(questionID int) (*ActiveSessionQuestion, int, bool) {
-	for i := range s.Items {
-		if s.Items[i].Question.ID == questionID {
-			return &s.Items[i], i, true
-		}
+func (s *ActiveSessionState) CurrentItemByQuestionID(questionID int) (*ActiveSessionQuestion, int, bool) {
+	item, ok := s.ItemAt(s.CurrentIndex)
+	if !ok || item.SessionQuestion.QuestionID != questionID {
+		return nil, -1, false
 	}
-	return nil, -1, false
+	return item, s.CurrentIndex, true
 }
 
 func (s *ActiveSessionState) ItemAt(idx int) (*ActiveSessionQuestion, bool) {

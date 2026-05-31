@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -40,16 +41,17 @@ func (r *QuestionRepository) GetByID(ctx context.Context, id int) (*model.Questi
 }
 
 // GetNewQuestions returns questions that haven't been reviewed yet (next_review_at IS NULL).
-func (r *QuestionRepository) GetNewQuestions(ctx context.Context, language, level, category string, limit int) ([]model.Question, error) {
+func (r *QuestionRepository) GetNewQuestions(ctx context.Context, language, level, category string, excludeIDs []int, limit int) ([]model.Question, error) {
 	var questions []model.Question
 	err := r.db.SelectContext(ctx, &questions, `
 		SELECT * FROM questions
 		WHERE language = $1 AND proficiency_level = $2
 		AND ($3 = '' OR category = $3)
+		AND NOT (id = ANY(COALESCE($4::int[], '{}')))
 		AND next_review_at IS NULL
 		ORDER BY difficulty ASC, RANDOM()
-		LIMIT $4
-	`, language, level, category, limit)
+		LIMIT $5
+	`, language, level, category, pq.Array(excludeIDs), limit)
 	return questions, err
 }
 

@@ -140,7 +140,7 @@ func (s *ActiveSessionService) RecordAnswer(ctx context.Context, sessionID, ques
 		return err
 	}
 
-	item, idx, ok := state.FindItemByQuestionID(questionID)
+	item, idx, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		return fmt.Errorf("%w session_id=%d question_id=%d", ErrActiveSessionQuestionNotFound, sessionID, questionID)
 	}

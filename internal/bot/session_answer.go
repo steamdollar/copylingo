@@ -19,7 +19,7 @@ func (sf *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQ
 	if err != nil {
 		return
 	}
-	item, _, ok := state.FindItemByQuestionID(questionID)
+	item, _, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		return
 	}
@@ -69,7 +69,7 @@ func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sess
 		sf.showActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
-	item, currentIdx, ok := state.FindItemByQuestionID(questionID)
+	item, currentIdx, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		log.Printf("Question not found in active session session=%d question=%d", sessionID, questionID)
 		return

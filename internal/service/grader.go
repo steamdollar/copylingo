@@ -154,7 +154,7 @@ func (g *GraderService) questionFromActiveSession(ctx context.Context, sessionID
 	if err != nil {
 		return nil, err
 	}
-	item, _, ok := state.FindItemByQuestionID(questionID)
+	item, _, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		return nil, fmt.Errorf("%w session_id=%d question_id=%d", ErrActiveSessionQuestionNotFound, sessionID, questionID)
 	}
