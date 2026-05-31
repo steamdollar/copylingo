@@ -67,7 +67,7 @@ func NewHandwritingService(
 	renderer StrokeRenderer,
 ) *HandwritingService {
 	if renderer == nil {
-		renderer = NewPNGStrokeRenderer(512, 48)
+		renderer = NewDefaultPNGStrokeRenderer()
 	}
 	return &HandwritingService{
 		activeSession: activeSession,

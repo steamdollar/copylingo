@@ -401,3 +401,69 @@
   - 범용 규칙만 추가: anchoring 위험은 가장 낮지만 실제 실패 모드의 우선순위를 모델에 충분히 전달하지 못할 수 있어 기각.
   - 여러 few-shot 예시 추가: 사례별 적중률은 높아질 수 있으나 prompt가 회귀 테스트 목록처럼 비대해지고 특정 문자에 과적합될 수 있어 기각.
   - 기존 ADR-016만 유지: 대체 OCR 해석에 대한 명시적 제한이 없어 기각.
+
+---
+
+## ADR-019: 손글씨 채점은 Static PNG Evidence Boundary 안에서만 판정
+
+- **날짜**: 2026-05-31
+- **상태**: 채택됨
+- **연관 ADR**: ADR-016 (손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선), ADR-018 (손글씨 가나 채점은 Expected Text 기반 Conditional Verification으로 제한)
+- **맥락**:
+  - Mini App은 사용자가 손가락으로 그린 sampled stroke points를 서버에 전송한다.
+  - 서버는 points를 static PNG로 rebuild하고, LLM에는 최종 PNG만 전달한다.
+  - LLM에는 stroke 순서, 시작점, 진행 방향 같은 temporal pen-movement 정보가 전달되지 않는다.
+  - 실제 사용에서 LLM이 획순이나 작성 방향을 근거로 feedback을 생성하고, `ン/ソ`, `シ/ツ`, `ヤ/や`, 탁점/반탁점처럼 bitmap상 애매한 입력을 오답 처리하는 false negative가 발생했다.
+- **결정**:
+  - Prompt에 입력 provenance를 짧게 명시한다: 모바일 canvas에서 수집한 sampled stroke points를 서버가 static PNG로 rebuild했고, LLM은 그 PNG만 받는다.
+  - LLM은 final visible bitmap만 평가한다.
+  - 획순, 시작점, 작성 방향, pen movement를 추론하거나 채점 근거로 사용하지 않는다.
+  - feedback에서도 획순, 시작점, 작성 방향, pen movement를 언급하지 않는다.
+  - 다른 문자와 구분하려면 temporal pen-movement 정보가 필요한 경우, `Expected Text`가 plausible하면 정답 처리한다.
+  - script identity 또는 diacritic type이 rough mobile handwriting에서 애매하면, `Expected Text`가 plausible한 경우 정답 처리한다.
+  - 특정 혼동 문자 pair를 Prompt에 계속 누적하지 않고 범용 규칙으로 유지한다.
+- **장점**:
+  - LLM 입력에 존재하지 않는 정보를 근거로 한 hallucination을 억제한다.
+  - `Expected Text` 기반 Conditional Verification의 판정 경계를 더 명확히 한다.
+  - 문자 pair별 예시 누적으로 인한 Prompt 비대화와 anchoring을 줄인다.
+- **단점 / 트레이드오프**:
+  - 애매한 문자와 mark를 정답 처리하므로 false positive가 증가할 수 있다.
+  - Prompt만으로 provider model의 규칙 준수를 완전히 보장할 수 없다.
+  - 서버 rebuild PNG 자체의 손실 여부는 별도 Renderer 정합성 검증이 필요하다.
+- **대안**:
+  - 혼동 문자 pair별 few-shot 예시 추가: 단기 적중률은 올라갈 수 있으나 Prompt 유지보수 부담과 anchoring 위험이 커서 기각.
+  - 획순 feedback만 금지하고 provenance는 생략: 금지 이유와 evidence boundary가 약해져 기각.
+  - Do nothing: 근거 없는 획순 feedback과 false negative가 지속되어 기각.
+
+---
+
+## ADR-020: 손글씨 PNG Renderer는 Bounded Aspect-Ratio Canvas를 사용
+
+- **날짜**: 2026-05-31
+- **상태**: 채택됨
+- **연관 ADR**: ADR-016 (손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선), ADR-019 (손글씨 채점은 Static PNG Evidence Boundary 안에서만 판정)
+- **맥락**:
+  - Mini App은 답안 글자 수에 비례해 가로로 긴 canvas를 제공한다.
+  - 기존 서버 Renderer는 모든 답안을 고정 `512x512` PNG로 rebuild했다.
+  - 긴 답안은 제한된 정사각형 안에 fit되면서 글자당 픽셀이 감소하고, 작은 가나·탁점·반탁점 같은 미세 feature가 뭉개질 수 있다.
+  - 반대로 이미지를 무제한 확장하면 Base64 upload bytes, provider image processing latency, cost가 증가한다.
+- **결정**:
+  - 손글씨 PNG Renderer는 원본 stroke bounding box 비율을 유지하는 uniform scale을 사용한다.
+  - 기본 canvas 높이는 기존 검증값인 `512px`로 유지한다.
+  - canvas 폭은 bounding box 비율에 따라 `512~1536px` 범위에서 계산한다.
+  - 가로로 긴 답안은 폭을 확장하되 `1536px`를 넘지 않는다.
+  - 짧거나 세로로 긴 답안은 폭을 `512px` 아래로 줄이지 않는다.
+  - padding은 기존 `48px`, brush 반경은 높이 기준 비례값을 유지한다.
+  - `512~1536px` 범위는 calibration 시작점으로 사용하고, 실제 품질·latency 확인 후 별도 ADR로 조정할 수 있다.
+- **장점**:
+  - 다글자 답안의 작은 feature를 고정 정사각형보다 더 많은 픽셀로 보존한다.
+  - 원본 비율을 유지해 stretch distortion을 만들지 않는다.
+  - 최대 폭을 제한해 upload 및 provider 처리 비용 증가를 통제한다.
+- **단점 / 트레이드오프**:
+  - 기존보다 PNG dimensions와 Base64 payload가 증가할 수 있다.
+  - 매우 긴 답안은 `1536px` 상한 때문에 여전히 축소된다.
+  - 최적 상한값은 실제 Mini App 품질·latency 확인이 필요하다.
+- **대안**:
+  - 고정 `1024x1024` 확대: 단일 문자에도 불필요한 비용이 증가하고 긴 답안 비율 문제가 유지되어 기각.
+  - 폭 무제한 확장: 품질은 높아질 수 있으나 upload·latency·cost 상한이 없어 기각.
+  - 기존 `512x512` 유지: 다글자 미세 feature 손실 가능성이 유지되어 기각.

@@ -40,6 +40,7 @@ func TestBuildHandwritingSystemPromptDefinesFeedbackPolicy(t *testing.T) {
 		"Return a Korean correction note ONLY for an error you can clearly see in the image, and only when a reliable note exists",
 		"Explain only which expected feature is clearly missing or wrong",
 		"Do not propose, transcribe, or mention an alternative character",
+		"Never mention stroke order, starting point, writing direction, or pen movement",
 		"If you are not sure why it is wrong, return an empty string",
 	} {
 		if !strings.Contains(prompt, want) {
@@ -68,6 +69,26 @@ func TestBuildHandwritingSystemPromptDefinesConditionalVerificationPolicy(t *tes
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("system prompt does not contain conditional verification policy %q: %q", want, prompt)
+		}
+	}
+}
+
+func TestBuildHandwritingSystemPromptDefinesStaticPNGEvidenceBoundary(t *testing.T) {
+	t.Parallel()
+
+	prompt := buildHandwritingSystemPrompt()
+
+	for _, want := range []string{
+		"student drew with a finger on a mobile canvas",
+		"server collected sampled stroke points, rebuilt them as a static PNG, and sent only that PNG",
+		"Temporal pen-movement information is not available",
+		"Evaluate only the final visible bitmap",
+		"Do not infer or grade stroke order, starting point, writing direction, or pen movement",
+		"require knowing stroke direction or pen movement",
+		"When script identity or diacritic type is visually ambiguous in rough mobile handwriting",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("system prompt does not contain static PNG evidence boundary %q: %q", want, prompt)
 		}
 	}
 }
@@ -136,6 +157,9 @@ func TestBuildHandwritingResponseFormatUsesStrictJSONSchema(t *testing.T) {
 	}
 	if description, ok := schema.Properties["feedback"]["description"].(string); !ok || !strings.Contains(description, "Empty when correct") {
 		t.Fatalf("feedback description = %v, want Empty when correct policy", schema.Properties["feedback"]["description"])
+	}
+	if description := schema.Properties["feedback"]["description"].(string); !strings.Contains(description, "stroke order") {
+		t.Fatalf("feedback description = %q, want static PNG evidence boundary", description)
 	}
 	if len(schema.Required) != 2 || schema.Required[0] != "is_correct" || schema.Required[1] != "feedback" {
 		t.Fatalf("schema required = %v, want [is_correct feedback]", schema.Required)

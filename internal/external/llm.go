@@ -187,10 +187,14 @@ JSON schema:
 
 Decision policy:
 - This is conditional verification against the provided Expected Text, not open-ended OCR.
+- Input provenance: the student drew with a finger on a mobile canvas. The server collected sampled stroke points, rebuilt them as a static PNG, and sent only that PNG. Temporal pen-movement information is not available in this image.
+- Evaluate only the final visible bitmap.
+- Do not infer or grade stroke order, starting point, writing direction, or pen movement. The image does not contain reliable evidence for them.
 - Grade generously. This is low-stakes beginner practice; a wrong rejection discourages the learner far more than a lenient acceptance helps. When in any doubt, return true.
 - Default to true when the Expected Text is a plausible reading of the image.
 - Do not search for or prefer an alternative transcription.
 - If the image resembles both the Expected Text and another kana or kanji, return true when the Expected Text remains plausible.
+- If distinguishing the Expected Text from another character would require knowing stroke direction or pen movement, return true when the Expected Text remains plausible.
 - Accept rough mobile handwriting, joined or separated strokes, uneven proportions, and ambiguous small kana or diacritic marks when plausibly present.
 - For a short kana word, compare the full expected string in order.
 - Return false ONLY when you are highly confident of a clear, specific error you can name (a character clearly missing, extra, swapped, or clearly a different shape). If you cannot name a concrete observable error, return true.
@@ -198,6 +202,7 @@ Decision policy:
 Marks and script (do not over-reject on these):
 - Diacritics (゛dakuten / ゜handakuten) render as tiny, low-resolution marks. If a diacritic is plausibly present where one is expected, accept it. NEVER reject solely because you cannot tell dakuten from handakuten, or cannot count the exact number of dots.
 - Do NOT reject for hiragana-vs-katakana unless the written shape clearly and unambiguously belongs to the other script. Treat visually similar shapes as the Expected Text.
+- When script identity or diacritic type is visually ambiguous in rough mobile handwriting, return true when the Expected Text remains plausible.
 
 Apply this principle generally, not only to this example:
 - Expected Text: オ
@@ -209,6 +214,7 @@ Feedback policy:
 - Never invent or guess a correction. Return a Korean correction note ONLY for an error you can clearly see in the image, and only when a reliable note exists.
 - Explain only which expected feature is clearly missing or wrong.
 - Do not propose, transcribe, or mention an alternative character.
+- Never mention stroke order, starting point, writing direction, or pen movement.
 - If you are not sure why it is wrong, return an empty string. A wrong correction is worse than none.
 - Do not praise, encourage, or add filler.`
 }
@@ -226,7 +232,7 @@ func buildHandwritingResponseFormat() *openai.ChatCompletionResponseFormat {
 					"is_correct": { "type": "boolean" },
 						"feedback": {
 							"type": "string",
-							"description": "Empty when correct. When incorrect, optional short Korean correction note about a clearly missing or wrong expected feature. Do not mention alternative characters."
+							"description": "Empty when correct. When incorrect, optional short Korean correction note about a clearly missing or wrong expected feature. Do not mention alternative characters, stroke order, starting point, writing direction, or pen movement."
 						}
 				},
 				"required": ["is_correct", "feedback"],

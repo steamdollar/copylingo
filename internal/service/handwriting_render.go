@@ -11,25 +11,43 @@ import (
 
 var ErrEmptyStrokes = errors.New("empty handwriting strokes")
 
+const (
+	defaultHandwritingRenderHeight   = 512
+	defaultHandwritingRenderMaxWidth = 1536
+	defaultHandwritingRenderPadding  = 48
+)
+
 // StrokeRenderer converts vector strokes into the compact image sent to Gemini.
 type StrokeRenderer interface {
 	RenderPNG(strokes []Stroke) ([]byte, error)
 }
 
 type PNGStrokeRenderer struct {
-	size    int
-	padding int
-	brush   int
+	height   int
+	maxWidth int
+	padding  int
+	brush    int
 }
 
-func NewPNGStrokeRenderer(size, padding int) *PNGStrokeRenderer {
+func NewDefaultPNGStrokeRenderer() *PNGStrokeRenderer {
+	return NewPNGStrokeRenderer(
+		defaultHandwritingRenderHeight,
+		defaultHandwritingRenderMaxWidth,
+		defaultHandwritingRenderPadding,
+	)
+}
+
+func NewPNGStrokeRenderer(height, maxWidth, padding int) *PNGStrokeRenderer {
+	if maxWidth < height {
+		maxWidth = height
+	}
 	// 획 두께를 캔버스 크기에 비례시켜, 해상도를 올려도 stroke가 상대적으로 얇아지지 않게 한다.
 	// (256→5, 512→10) 탁점/반탁점 같은 미세 마크가 다운스케일 후에도 살아남도록.
-	brush := size / 51
+	brush := height / 51
 	if brush < 3 {
 		brush = 3
 	}
-	return &PNGStrokeRenderer{size: size, padding: padding, brush: brush}
+	return &PNGStrokeRenderer{height: height, maxWidth: maxWidth, padding: padding, brush: brush}
 }
 
 func (r *PNGStrokeRenderer) RenderPNG(strokes []Stroke) ([]byte, error) {
@@ -54,15 +72,17 @@ func (r *PNGStrokeRenderer) RenderPNG(strokes []Stroke) ([]byte, error) {
 		return nil, ErrEmptyStrokes
 	}
 
-	img := image.NewRGBA(image.Rect(0, 0, r.size, r.size))
-	fill(img, color.RGBA{R: 255, G: 255, B: 255, A: 255})
-
 	width := math.Max(maxX-minX, 1)
 	height := math.Max(maxY-minY, 1)
-	drawSize := float64(r.size - r.padding*2)
-	scale := drawSize / math.Max(width, height)
-	offsetX := (float64(r.size) - width*scale) / 2
-	offsetY := (float64(r.size) - height*scale) / 2
+	canvasWidth := r.canvasWidth(width, height)
+	img := image.NewRGBA(image.Rect(0, 0, canvasWidth, r.height))
+	fill(img, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+
+	drawWidth := float64(canvasWidth - r.padding*2)
+	drawHeight := float64(r.height - r.padding*2)
+	scale := math.Min(drawWidth/width, drawHeight/height)
+	offsetX := (float64(canvasWidth) - width*scale) / 2
+	offsetY := (float64(r.height) - height*scale) / 2
 
 	black := color.RGBA{A: 255}
 	for _, stroke := range strokes {
@@ -85,6 +105,18 @@ func (r *PNGStrokeRenderer) RenderPNG(strokes []Stroke) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func (r *PNGStrokeRenderer) canvasWidth(contentWidth, contentHeight float64) int {
+	drawHeight := float64(r.height - r.padding*2)
+	width := int(math.Ceil(contentWidth/contentHeight*drawHeight)) + r.padding*2
+	if width < r.height {
+		return r.height
+	}
+	if width > r.maxWidth {
+		return r.maxWidth
+	}
+	return width
 }
 
 func fill(img *image.RGBA, c color.RGBA) {
