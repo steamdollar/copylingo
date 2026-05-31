@@ -369,3 +369,35 @@
   - read-through cache만 도입: DB write hot path가 남고 ADR-013의 batch flush 목표를 달성하지 못해 기각.
   - JOIN query만 추가: 구현은 단순하지만 progress write와 손글씨 중복 lookup 문제가 유지되어 기각.
   - DB fallback 허용: Redis state 손실 시 미flush progress를 잃은 DB 상태로 사용자를 계속 진행시킬 수 있어 기각.
+
+---
+
+## ADR-018: 손글씨 가나 채점은 Expected Text 기반 Conditional Verification으로 제한
+
+- **날짜**: 2026-05-30
+- **상태**: 채택됨
+- **연관 ADR**: ADR-016 (손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선)
+- **맥락**:
+  - ADR-016에 따라 초보자 모바일 손글씨의 false negative를 줄이는 prompt rubric을 적용했으나, 실제 사용에서 맞게 쓴 `ふ`, `オ`, `ニャ`, `びゃ`가 오답 처리되는 사례가 추가로 발생했다.
+  - 특히 `オ`를 visually similar kanji인 `才`로 판정한 사례는 모델이 `Expected Text` 검증보다 대체 OCR 해석을 우선할 수 있음을 보여준다.
+  - 이 기능은 시험식 OCR이 아니라 정답을 이미 알고 있는 학습 흐름의 Binary Grading이다. 대체 transcription 생성은 채점 목적에 필요하지 않다.
+- **결정**:
+  - 손글씨 채점 prompt를 `Expected Text` 기반 **Conditional Verification**으로 명시한다.
+  - `Expected Text`가 plausible하게 읽히면 다른 kana 또는 kanji 해석 가능성이 있더라도 accept한다.
+  - 모델이 대체 transcription을 탐색하거나 우선하지 않도록 지시한다.
+  - rough mobile handwriting, joined/separated strokes, uneven proportions, ambiguous small kana, dakuten/handakuten 등은 plausibly present하면 accept한다.
+  - 특정 문자에만 과적합되지 않도록 범용 규칙을 우선 기술하고, 실제 실패 사례인 `Expected Text: オ`, alternative interpretation `才`를 대표 예시 하나로만 추가한다.
+  - 정답 feedback은 empty string으로 유지한다. 오답 feedback은 Expected Text에서 명확히 누락되거나 잘못된 feature가 있을 때만 짧은 한국어 correction note 한 문장으로 반환한다.
+  - feedback에서 대체 문자를 제안, transcription, 언급하지 않는다. 신뢰할 수 있는 correction note가 없으면 empty string을 반환한다.
+- **장점**:
+  - Binary Verification 경계를 명확히 하여 대체 OCR 해석으로 인한 false negative를 줄인다.
+  - 예시를 하나로 제한해 특정 문자에 대한 anchoring과 prompt 비대화를 억제한다.
+  - 오답 feedback을 Expected Text 기준으로 제한해 학습 UX를 유지하면서 대체 OCR 해석으로의 회귀를 억제한다.
+- **단점 / 트레이드오프**:
+  - false negative 감소를 우선하므로 visually similar character에 대한 false positive가 증가할 수 있다.
+  - 오답 feedback을 제한하므로 대체 문자 비교를 활용한 상세 교정은 제공하지 않는다.
+  - prompt 변경만으로 모델의 판정 일관성이 완전히 보장되지는 않는다. 실제 사례 기반 회귀 검증이 별도로 필요하다.
+- **대안**:
+  - 범용 규칙만 추가: anchoring 위험은 가장 낮지만 실제 실패 모드의 우선순위를 모델에 충분히 전달하지 못할 수 있어 기각.
+  - 여러 few-shot 예시 추가: 사례별 적중률은 높아질 수 있으나 prompt가 회귀 테스트 목록처럼 비대해지고 특정 문자에 과적합될 수 있어 기각.
+  - 기존 ADR-016만 유지: 대체 OCR 해석에 대한 명시적 제한이 없어 기각.
