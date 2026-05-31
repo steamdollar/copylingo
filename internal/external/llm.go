@@ -224,10 +224,10 @@ func buildHandwritingResponseFormat() *openai.ChatCompletionResponseFormat {
 				"type": "object",
 				"properties": {
 					"is_correct": { "type": "boolean" },
-					"feedback": {
-						"type": "string",
-						"description": "Empty when correct. When incorrect, optional short Korean correction note without repeating the expected text."
-					}
+						"feedback": {
+							"type": "string",
+							"description": "Empty when correct. When incorrect, optional short Korean correction note about a clearly missing or wrong expected feature. Do not mention alternative characters."
+						}
 				},
 				"required": ["is_correct", "feedback"],
 				"additionalProperties": false
