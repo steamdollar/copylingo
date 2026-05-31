@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -12,6 +13,17 @@ import (
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/service"
 )
+
+// brTagPattern matches <br>, <br/>, <br /> (any case). Telegram's HTML parse mode
+// rejects <br> ("Unsupported start tag"), so we convert it to a literal newline
+// before sending. This protects every outgoing message, including question prompts
+// stored in the DB with <br> hints.
+var brTagPattern = regexp.MustCompile(`(?i)<br\s*/?>`)
+
+// sanitizeTelegramHTML makes text safe for ParseMode=HTML messages.
+func sanitizeTelegramHTML(text string) string {
+	return brTagPattern.ReplaceAllString(text, "\n")
+}
 
 // BotAPI defines the interface for Telegram bot interactions to allow mocking.
 type BotAPI interface {
@@ -65,7 +77,6 @@ func (b *Bot) Start() {
 	for {
 		select {
 		case update := <-updates:
-			// update listen
 			go b.handleUpdate(update)
 		case <-b.stopCh:
 			log.Println("Telegram bot stopped")
@@ -87,7 +98,7 @@ func (b *Bot) PushSession(ctx context.Context, chatID int64, sessionID int, sess
 
 // SendMessage sends a text message to a chat.
 func (b *Bot) SendMessage(chatID int64, text string) error {
-	msg := tgbotapi.NewMessage(chatID, text)
+	msg := tgbotapi.NewMessage(chatID, sanitizeTelegramHTML(text))
 	msg.ParseMode = "HTML"
 	_, err := b.api.Send(msg)
 	return err
@@ -95,7 +106,7 @@ func (b *Bot) SendMessage(chatID int64, text string) error {
 
 // SendMessageWithKeyboard sends a message with an inline keyboard.
 func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
-	msg := tgbotapi.NewMessage(chatID, text)
+	msg := tgbotapi.NewMessage(chatID, sanitizeTelegramHTML(text))
 	msg.ParseMode = "HTML"
 	if len(keyboard.InlineKeyboard) > 0 {
 		msg.ReplyMarkup = keyboard
@@ -106,7 +117,7 @@ func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbota
 
 // SendMessageWithReplyMarkup sends a message with custom Telegram reply markup.
 func (b *Bot) SendMessageWithReplyMarkup(chatID int64, text string, replyMarkup interface{}) (int, error) {
-	msg := tgbotapi.NewMessage(chatID, text)
+	msg := tgbotapi.NewMessage(chatID, sanitizeTelegramHTML(text))
 	msg.ParseMode = "HTML"
 	msg.ReplyMarkup = replyMarkup
 	sent, err := b.api.Send(msg)
@@ -125,7 +136,7 @@ func (b *Bot) EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotap
 
 // EditMessage edits an existing message.
 func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *tgbotapi.InlineKeyboardMarkup) error {
-	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
+	edit := tgbotapi.NewEditMessageText(chatID, messageID, sanitizeTelegramHTML(text))
 	edit.ParseMode = "HTML"
 	if keyboard != nil && len(keyboard.InlineKeyboard) > 0 {
 		edit.ReplyMarkup = keyboard

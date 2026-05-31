@@ -89,6 +89,28 @@ func kanaScriptLabel(kana string) string {
 	return "가나"
 }
 
+func kanaDisambiguationHint(kana string) string {
+	switch kana {
+	case "じ", "ず":
+		return "さ행에 탁점"
+	case "ぢ", "づ":
+		return "た행에 탁점"
+	case "ジ", "ズ":
+		return "サ행에 탁점"
+	case "ヂ", "ヅ":
+		return "タ행에 탁점"
+	default:
+		return ""
+	}
+}
+
+func appendKanaDisambiguationHint(prompt, kana string) string {
+	if hint := kanaDisambiguationHint(kana); hint != "" {
+		return fmt.Sprintf("%s<br>힌트: <b>%s</b>", prompt, hint)
+	}
+	return prompt
+}
+
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.DBName, cfg.DB.SSLMode)
@@ -203,6 +225,7 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 		} else {
 			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 고르시오", promptVal, scriptLabel)
 		}
+		prompt = appendKanaDisambiguationHint(prompt, answerVal)
 	}
 
 	var explanation string
@@ -227,13 +250,14 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 
 func buildHandwritingQuestion(romaji, kana string) *model.Question {
 	scriptLabel := kanaScriptLabel(kana)
+	prompt := fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 손글씨로 쓰세요", romaji, scriptLabel)
 
 	return &model.Question{
 		Type:             model.QuestionKanaHandwriting,
 		Language:         "ja",
 		ProficiencyLevel: "N5",
 		Category:         "handwriting",
-		Prompt:           fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 손글씨로 쓰세요", romaji, scriptLabel),
+		Prompt:           appendKanaDisambiguationHint(prompt, kana),
 		Options:          []byte("[]"),
 		CorrectAnswer:    kana,
 		Explanation:      fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자는 <b>%s</b>입니다.", romaji, scriptLabel, kana),
