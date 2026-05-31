@@ -92,7 +92,7 @@ Bot은 세션 진행을 유지하고, Mini App은 canvas stroke data를 HTTP로 
 
 ```
 [Telegram Bot]
-  → web_app button: /miniapp/handwriting?session_id=...&question_id=...
+  → web_app button: /miniapp/handwriting?session_id=...&question_id=...&prompt=...
 [Mini App]
   → POST /api/miniapp/handwriting/submit
      { init_data, session_id, question_id, strokes }

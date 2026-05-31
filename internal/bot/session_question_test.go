@@ -28,7 +28,7 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 
 	t.Run("empty base url", func(t *testing.T) {
 		b.cfg.Server.PublicBaseURL = ""
-		_, err := sf.handwritingMiniAppURL(1, 1, "jp", "n5", "prompt")
+		_, err := sf.handwritingMiniAppURL(1, 1, "jp", "n5", "prompt", 1)
 		if err == nil {
 			t.Error("expected error for empty base URL")
 		}
@@ -37,7 +37,7 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 	t.Run("valid url", func(t *testing.T) {
 		b.cfg.Server.PublicBaseURL = "https://api.example.com/"
 		prompt := "뜻 <b>'학교'</b>에 해당하는 일본어 단어를 손글씨로 쓰세요"
-		got, err := sf.handwritingMiniAppURL(123, 456, "jp", "n5", prompt)
+		got, err := sf.handwritingMiniAppURL(123, 456, "jp", "n5", prompt, 2)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -53,6 +53,9 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 		}
 		if gotPrompt := u.Query().Get("prompt"); gotPrompt != prompt {
 			t.Errorf("prompt = %q, want %q", gotPrompt, prompt)
+		}
+		if gotCells := u.Query().Get("cells"); gotCells != "2" {
+			t.Errorf("cells = %q, want %q", gotCells, "2")
 		}
 	})
 }

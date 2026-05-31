@@ -3,26 +3,33 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>CopyLingo 손글씨 답안</title>
-    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css?v=2605200114">
+    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css?v=2605310100">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
     <main class="shell">
       <section class="hero">
-        <p class="eyebrow">CopyLingo Kana</p>
-        <h1>화면에 글자를 써 주세요</h1>
-        <p class="hint">한 글자를 크게 쓰고 제출하면 AI가 정답 문자와 비교해 채점합니다.</p>
+        <p class="hint">글자 또는 단어를 쓰고 제출하세요</p>
       </section>
 
       <section class="card">
-        <canvas id="pad" width="320" height="320" aria-label="손글씨 입력 패드"></canvas>
+        <div id="questionPanel" class="question-panel" hidden>
+          <span class="question-eyebrow">문제</span>
+          <p id="questionPrompt" class="question-prompt"></p>
+        </div>
+        <div id="padViewport" class="pad-viewport">
+          <canvas id="pad" width="320" height="320" aria-label="손글씨 입력 패드"></canvas>
+        </div>
+        <label id="padScrollControl" class="pad-scroll-control" for="padScroll">
+          <span>좌우 이동</span>
+          <input id="padScroll" type="range" min="0" max="0" value="0">
+        </label>
         <div class="actions">
           <button id="clear" class="secondary" type="button">지우기</button>
           <button id="submit" class="primary" type="button">제출하기</button>
         </div>
         <div id="loadingPanel" class="loading-panel" hidden>
-          <div class="loading-header">
+          <div id="loadingHeader" class="loading-header">
             <span class="spinner" aria-hidden="true"></span>
             <span class="loading-title">채점 중입니다</span>
           </div>
@@ -35,6 +42,6 @@
       </section>
     </main>
 
-    <script src="/miniapp/handwriting/assets/app.js?v=2605290115"></script>
+    <script src="/miniapp/handwriting/assets/app.js?v=2605310100"></script>
   </body>
 </html>

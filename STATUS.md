@@ -28,8 +28,6 @@
 
 - [ ] 학습 팁 AI 생성 (scheduler 통합) — (lang, level) 잔고 < 50 일 때 세션 빌드마다 2-3개 LLM 으로 생성. see [docs/todos/tip_scheduler_generation.md](docs/todos/tip_scheduler_generation.md)
 
-- [ ] 손글씨 채점 결과 후 Tip Card 유지 — 응답 후 spinner 는 닫되 마지막 tip 은 계속 표시. see [docs/todos/handwriting_tip_persist_after_result.md](docs/todos/handwriting_tip_persist_after_result.md)
-
 - [ ] LLM 채점 반환값 구조체화 — `bool, string, error` tuple 대신 `(GradeResult, error)`로 의미 명확화. see [docs/todos/llm_grade_result_return_refactor.md](docs/todos/llm_grade_result_return_refactor.md)
 
 - [ ] 손글씨 채점 관측 로깅 보강 — stroke/point count와 image_bytes/render/llm 시간을 함께 기록해 튜닝 근거 확보. see [docs/todos/handwriting_scoring_observability.md](docs/todos/handwriting_scoring_observability.md)
@@ -40,6 +38,10 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-30 | Telegram Mini App tuning | `2605302255_telegram_mini_app_tuning.md` |
+| 2026-05-30 | kana ji/zu 역방향 문항 행 힌트 추가 및 로컬 DB 보정 | `2605302242_kana_ji_zu_disambiguation.md` |
+| 2026-05-30 | 손글씨 채점 Conditional Verification prompt 보강 | `2605301343_handwriting_conditional_verification.md` |
+| 2026-05-30 | 동일 세션 중복 문항 출제 및 already-answered 오판 수정 | `2605300945_session_question_dedup.md` |
 | 2026-05-28 | Redis Active Session State 구현 | `2605281946_redis_active_session_state.md` |
 | 2026-05-28 | 손글씨 LLM 채점 튜닝 (generation bound + prompt rubric) | `2605281551_handwriting_llm_generation_bounds.md` |
 | 2026-05-28 | Mini App HandlerDeps 생성자 정리 | `2605281528_miniapp_handler_deps.md` |

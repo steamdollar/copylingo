@@ -94,7 +94,9 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 
 	switch question.Type {
 	case model.QuestionKanaHandwriting:
-		miniAppURL, err := sf.handwritingMiniAppURL(sessionID, question.ID, question.Language, question.ProficiencyLevel)
+		// cells = answer 글자 수. 정답 문자열 자체는 cheat 방지를 위해 client로 보내지 않고, 길이만 전달해 캔버스 폭을 글자 수에 비례시킨다.
+		cells := len([]rune(question.CorrectAnswer))
+		miniAppURL, err := sf.handwritingMiniAppURL(sessionID, question.ID, question.Language, question.ProficiencyLevel, question.Prompt, cells)
 		if err != nil {
 			text += "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요."
 			return text, nil, false
@@ -176,7 +178,7 @@ func (sf *SessionFlow) nextUnansweredQuestionIndex(ctx context.Context, sessionI
 }
 
 // TODO: 이 함수 굳이 이렇게 복잡하게 짜야 함?
-func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int, language, level string) (string, error) {
+func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int, language, level, prompt string, cells int) (string, error) {
 	baseURL := strings.TrimRight(sf.bot.cfg.Server.PublicBaseURL, "/")
 	if baseURL == "" {
 		return "", fmt.Errorf("server public base url is empty")
@@ -190,6 +192,11 @@ func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int, language
 	q.Set("question_id", strconv.Itoa(questionID))
 	q.Set("language", language)
 	q.Set("level", level)
+	q.Set("prompt", prompt)
+	if cells < 1 {
+		cells = 1
+	}
+	q.Set("cells", strconv.Itoa(cells))
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
