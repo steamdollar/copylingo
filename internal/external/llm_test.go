@@ -37,10 +37,10 @@ func TestBuildHandwritingSystemPromptDefinesFeedbackPolicy(t *testing.T) {
 
 	for _, want := range []string{
 		"If is_correct is true, feedback must be an empty string",
-		"one short Korean correction note only when a reliable note exists",
+		"Return a Korean correction note ONLY for an error you can clearly see in the image, and only when a reliable note exists",
 		"Explain only which expected feature is clearly missing or wrong",
 		"Do not propose, transcribe, or mention an alternative character",
-		"If no reliable correction note exists, return an empty string",
+		"If you are not sure why it is wrong, return an empty string",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("system prompt does not contain feedback policy %q: %q", want, prompt)
@@ -60,7 +60,7 @@ func TestBuildHandwritingSystemPromptDefinesConditionalVerificationPolicy(t *tes
 		"another kana or kanji",
 		"ambiguous small kana or diacritic marks when plausibly present",
 		"full expected string in order",
-		"cannot plausibly be read as the Expected Text",
+		"Return false ONLY when you are highly confident of a clear, specific error",
 		"Apply this principle generally, not only to this example",
 		"Expected Text: オ",
 		"visually similar kanji 才",
@@ -174,8 +174,8 @@ func TestBuildHandwritingChatCompletionRequestConstrainsGeneration(t *testing.T)
 	if imagePart.ImageURL == nil {
 		t.Fatal("image part ImageURL is nil")
 	}
-	if imagePart.ImageURL.Detail != openai.ImageURLDetailLow {
-		t.Fatalf("image detail = %q, want %q", imagePart.ImageURL.Detail, openai.ImageURLDetailLow)
+	if imagePart.ImageURL.Detail != openai.ImageURLDetailHigh {
+		t.Fatalf("image detail = %q, want %q", imagePart.ImageURL.Detail, openai.ImageURLDetailHigh)
 	}
 }
 

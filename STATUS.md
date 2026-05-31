@@ -38,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-05-31 | 손글씨 이미지 Detail 정책 테스트 정합성 복구 | `2605312040_handwriting_image_detail_test_sync.md` |
 | 2026-05-30 | Telegram Mini App tuning | `2605302255_telegram_mini_app_tuning.md` |
 | 2026-05-30 | kana ji/zu 역방향 문항 행 힌트 추가 및 로컬 DB 보정 | `2605302242_kana_ji_zu_disambiguation.md` |
 | 2026-05-30 | 손글씨 채점 Conditional Verification prompt 보강 | `2605301343_handwriting_conditional_verification.md` |

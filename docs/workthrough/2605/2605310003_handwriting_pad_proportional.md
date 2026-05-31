@@ -5,7 +5,7 @@
 손글씨 채점 정확도가 낮다는 사용자 보고. 원인 분석 결과 두 축:
 
 1. **입력 area 문제** — 캔버스가 720×320 고정이라 한 글자를 써도 글자가 패드 대비 작게 그려지고, 256px PNG로 정규화되며 탁점/반탁점·작은 가나 같은 미세 feature가 뭉개짐. 다글자 단어는 항상 가로 스크롤 필요.
-2. **이미지 해상도/디테일 문제**(별건, 본 작업 범위 밖) — 렌더 256px + `Detail: low` 라 LLM이 ゛/゜, 작은 ャ 등을 오인. → 별도 제언으로 남김.
+2. **이미지 해상도/디테일 문제**(별건) — 렌더 256px + `Detail: low` 라 LLM이 ゛/゜, 작은 ャ 등을 오인. 이후 별도 변경으로 렌더 512px + `Detail: high`를 적용했다.
 
 본 작업은 (1)의 입력 area를 **답안 글자 수에 비례**하도록 변경한다.
 
@@ -38,6 +38,6 @@
 - `go test ./internal/bot/ ./internal/service/ ./internal/external/ ./internal/miniapp/` 전부 PASS.
 - Mini App UI는 텔레그램 왕복이 필요해 수동 확인은 사용자 단에서 진행.
 
-## 후속(별도 제언, 미적용)
+## 후속 적용
 
-- 채점 false negative의 근본 원인은 렌더 해상도(256px)와 `Detail: low`. → 렌더 size 상향(예: 512) + `Detail: high`, 프롬프트 leniency 강화를 사용자 승인 후 별도 작업으로 진행 예정.
+- 채점 false negative 완화를 위해 별도 변경으로 렌더 size를 512px로 상향하고 `Detail: high`를 적용했다.
