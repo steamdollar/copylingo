@@ -125,12 +125,12 @@ menu:settings                     → 설정
 | 테이블 | PK | 주요 용도 |
 |---|---|---|
 | `users` | Telegram ID (BIGINT) | 사용자 프로필, 스트릭, XP |
-| `contents` | UUID | 수집된 학습 자료 |
-| `questions` | UUID | AI 생성 문제 + 통계 |
-| `sessions` | UUID | 학습 세션 (상태 머신) |
-| `user_answers` | UUID | 개별 답변 기록 |
-| `srs_schedule` | UUID (UNIQUE: user+question) | SM-2 복습 스케줄 |
-| `article_responses` | UUID | 독후감 + AI 대화 로그 |
+| `contents` | SERIAL | 외부에서 수집한 원문 |
+| `materials` | SERIAL | Study Session에서 노출할 학습 단위 SSOT |
+| `questions` | SERIAL | Quiz 문항 + 통계 + 현재 전역 SRS 상태 |
+| `sessions` | SERIAL | Quiz 학습 세션 상태 |
+| `session_questions` | SERIAL | Session별 문항 순서와 답안 |
+| `tips` | SERIAL | 손글씨 채점 대기 중 노출할 학습 팁 |
 
 ## 핵심 알고리즘: SM-2
 

@@ -27,6 +27,7 @@
 | **Gemini CLI** | main session에서 만든 TODO 문서를 받음 | **자기완결 명세를 명세 그대로 실행**. 판단이 필요한 지점이 나오면 즉시 중단하고 사용자에게 질문 |
 
 > Gemini CLI는 **main 작업 흐름에서 떨어져 나온 자기완결 TODO 실행자**입니다. 자기완결적이지 않은 작업은 보내지 않습니다.
+> Runtime에 native subagent 도구가 노출된 경우 [`docs/NATIVE_SUBAGENT_DELEGATION.md`](docs/NATIVE_SUBAGENT_DELEGATION.md)를 우선 따릅니다. Gemini CLI를 외부 process로 호출할 때는 [`docs/GEMINI_CLI_DELEGATION.md`](docs/GEMINI_CLI_DELEGATION.md)의 model 선택, 재시도, 복구 규칙을 따릅니다. 호출된 Gemini CLI executor는 [`docs/GEMINI_CLI_EXECUTION.md`](docs/GEMINI_CLI_EXECUTION.md)를 읽고 실행합니다.
 
 ### 역할 대체 / fallback
 
@@ -191,4 +192,7 @@
 - [docs/ADR.md](docs/ADR.md) — 기술 의사결정 기록
 - [docs/workthrough/](docs/workthrough/) — 완료된 작업 상세 기록
 - [docs/todos/](docs/todos/) — 별도 session에서 실행될 TODO의 자기완결 plan 문서
+- [docs/NATIVE_SUBAGENT_DELEGATION.md](docs/NATIVE_SUBAGENT_DELEGATION.md) — runtime native child-agent spawn protocol
+- [docs/GEMINI_CLI_DELEGATION.md](docs/GEMINI_CLI_DELEGATION.md) — Gemini CLI external delegation, 재시도, 복구 protocol
+- [docs/GEMINI_CLI_EXECUTION.md](docs/GEMINI_CLI_EXECUTION.md) — 호출된 Gemini CLI executor가 읽는 최소 실행 contract
 - [Makefile](Makefile) — 개발 명령어 (`make test`, `make infra`, `make migrate`, `make build` 등). README.md "Makefile" 섹션에도 표로 정리됨

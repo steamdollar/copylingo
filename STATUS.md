@@ -32,12 +32,17 @@
 
 - [ ] 손글씨 client/server rebuild 정합성 검증 — 동일 stroke JSON 기준 Mini App canvas와 서버 PNG 비교. see [docs/todos/handwriting_rebuild_parity_verification.md](docs/todos/handwriting_rebuild_parity_verification.md)
 
+- [ ] Future Gemini CLI Invocation Stabilization — Gemini CLI wrapper로 provider retry와 Tool Call 오류 탐지를 표준화. see [docs/todos/future_gemini_cli_invocation_stabilization.md](docs/todos/future_gemini_cli_invocation_stabilization.md)
+
 - 손글씨 쓰기 채점 - 너무 오래 걸림. 대안 필요. (속도를 줄이던가, 그 사이에 뭘 하게끔 하던가)
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-02 | Native Spawn 및 Gemini CLI External Delegation Protocol 문서화 | `2606022109_agent_delegation_protocol.md` |
+| 2026-06-02 | Study용 N5 Vocabulary Material Catalog 500개 확장 | `2606022041_expand_n5_vocab_material_catalog.md` |
+| 2026-06-02 | Study Module Task 1: Material SSOT 및 Vocabulary Seed 추가 | `2606021642_material_ssot_seed.md` |
 | 2026-06-02 | 가타카나 `ユ`·`ヲ` 손글씨 문항 제외 | `2606020056_katakana_handwriting_exclusion.md` |
 | 2026-06-01 | 일별 JSONL Structured Logging 도입 | `2606011418_structured_logging.md` |
 | 2026-05-31 | 손글씨 채점 정확도 튜닝 (Detail + Prompt + Renderer) | `2605312040_handwriting_image_detail_test_sync.md` |

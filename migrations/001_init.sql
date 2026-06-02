@@ -1,5 +1,5 @@
 -- CopyLingo Initial Schema (Multi-language Support)
--- 6 tables: users, contents, questions (with SRS), sessions, session_questions, tips
+-- 7 tables: users, contents, materials, questions (with SRS), sessions, session_questions, tips
 
 -----------------------------------------------------------
 -- users
@@ -32,6 +32,22 @@ CREATE TABLE IF NOT EXISTS contents (
     is_article      BOOLEAN NOT NULL DEFAULT FALSE,
     collected_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (source_url)                                         -- Prevent duplicate collection
+);
+
+-----------------------------------------------------------
+-- materials (study concepts shown before quizzes)
+-----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS materials (
+    id                SERIAL PRIMARY KEY,
+    material_key      VARCHAR(255) NOT NULL UNIQUE,              -- '{language}:{domain}:{stable_slug}'
+    content_id        INT REFERENCES contents(id) ON DELETE SET NULL,
+    category          VARCHAR(30) NOT NULL,                      -- model.MaterialCategory whitelist
+    language          VARCHAR(10) NOT NULL,                      -- ISO 639-1
+    proficiency_level VARCHAR(10) NOT NULL,                      -- JLPT: N5-N1, CEFR: A1-C2
+    title             VARCHAR(512) NOT NULL,
+    payload           JSONB NOT NULL DEFAULT '{}',
+    difficulty        INT NOT NULL DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 10),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -----------------------------------------------------------

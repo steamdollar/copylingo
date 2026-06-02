@@ -10,6 +10,7 @@ import (
 type Repositories struct {
 	User            *UserRepository
 	Content         *ContentRepository
+	Material        *MaterialRepository
 	Question        *QuestionRepository
 	Session         *SessionRepository
 	SessionQuestion *SessionQuestionRepository
@@ -22,6 +23,7 @@ func NewRepositories(db *sqlx.DB) *Repositories {
 	return &Repositories{
 		User:            NewUserRepository(db),
 		Content:         NewContentRepository(db),
+		Material:        NewMaterialRepository(db),
 		Question:        NewQuestionRepository(db),
 		Session:         NewSessionRepository(db),
 		SessionQuestion: NewSessionQuestionRepository(db),
