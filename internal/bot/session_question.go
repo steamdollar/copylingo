@@ -3,7 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"strconv"
 	"strings"
@@ -21,7 +21,11 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 	// get active session from redis
 	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
 	if err != nil {
-		log.Printf("Error getting active session state for session %d: %v", sessionID, err)
+		slog.ErrorContext(ctx, "Failed to get active session state",
+			"event", "telegram.question.session_lookup_failed",
+			"session_id", sessionID,
+			"error", err,
+		)
 		sf.showActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
@@ -43,7 +47,12 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 
 	// set current question index at redis
 	if err := sf.bot.services.ActiveSession.SetCurrentIndex(ctx, sessionID, questionIdx); err != nil {
-		log.Printf("Error setting active session index session=%d idx=%d: %v", sessionID, questionIdx, err)
+		slog.ErrorContext(ctx, "Failed to set active session index",
+			"event", "telegram.question.index_update_failed",
+			"session_id", sessionID,
+			"question_index", questionIdx,
+			"error", err,
+		)
 		sf.showActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
@@ -116,13 +125,24 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		}
 		msgID, err := sf.bot.SendMessageWithReplyMarkup(chatID, text, replyMarkup)
 		if err != nil {
-			log.Printf("Error sending handwriting message chat=%d session=%d question=%d: %v", chatID, sessionID, question.ID, err)
+			slog.ErrorContext(ctx, "Failed to send handwriting message",
+				"event", "telegram.question.handwriting_send_failed",
+				"chat_id", chatID,
+				"session_id", sessionID,
+				"question_id", question.ID,
+				"error", err,
+			)
 			return "", nil, true
 		}
 		key := config.HandwritingMessageRedisKey.Format(sessionID, question.ID)
 		val := fmt.Sprintf("%d:%d", chatID, msgID)
 		if err := sf.bot.rdb.Set(ctx, key, val, time.Hour).Err(); err != nil {
-			log.Printf("Error caching handwriting message id session=%d question=%d: %v", sessionID, question.ID, err)
+			slog.ErrorContext(ctx, "Failed to cache handwriting message ID",
+				"event", "telegram.question.handwriting_cache_failed",
+				"session_id", sessionID,
+				"question_id", question.ID,
+				"error", err,
+			)
 		}
 		return "", nil, true
 

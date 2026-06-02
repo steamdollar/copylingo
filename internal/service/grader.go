@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/observability"
 )
 
 type graderUserRepo interface {
@@ -86,6 +87,11 @@ func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questio
 
 func (g *GraderService) GradeHandwritingWithQuestion(ctx context.Context, sessionID, questionID int, question *model.Question, renderedImage []byte) (bool, string, error) {
 	startedAt := time.Now()
+	ctx = observability.WithAttrs(ctx,
+		slog.String("source", "service.grader"),
+		slog.Int("session_id", sessionID),
+		slog.Int("question_id", questionID),
+	)
 
 	if question == nil || question.ID != questionID {
 		return false, "", fmt.Errorf("grade handwriting question mismatch session_id=%d question_id=%d", sessionID, questionID)
@@ -104,8 +110,13 @@ func (g *GraderService) GradeHandwritingWithQuestion(ctx context.Context, sessio
 	if err := g.recordGradingResult(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
 		return false, "", err
 	}
-	log.Printf("[Handwriting] grader total=%s llm=%s record=%s session_id=%d question_id=%d is_correct=%t",
-		time.Since(startedAt), gradedAt.Sub(startedAt), time.Since(gradedAt), sessionID, questionID, isCorrect)
+	slog.InfoContext(ctx, "Handwriting grader completed",
+		"event", "handwriting.grader.completed",
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+		"llm_duration_ms", gradedAt.Sub(startedAt).Milliseconds(),
+		"record_duration_ms", time.Since(gradedAt).Milliseconds(),
+		"is_correct", isCorrect,
+	)
 
 	return isCorrect, feedback, nil
 }

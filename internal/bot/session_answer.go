@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
 
@@ -63,15 +64,24 @@ func (sf *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Messag
 }
 
 func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessionID, questionID int, selectedAnswer string, editMessageID *int) {
+	ctx = observability.WithAttrs(ctx,
+		slog.Int("session_id", sessionID),
+		slog.Int("question_id", questionID),
+	)
 	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
 	if err != nil {
-		log.Printf("Error getting active session for answer: %v", err)
+		slog.ErrorContext(ctx, "Failed to get active session for answer",
+			"event", "telegram.answer.session_lookup_failed",
+			"error", err,
+		)
 		sf.showActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
 	item, currentIdx, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
-		log.Printf("Question not found in active session session=%d question=%d", sessionID, questionID)
+		slog.WarnContext(ctx, "Question not found in active session",
+			"event", "telegram.answer.question_not_found",
+		)
 		return
 	}
 	if item.SessionQuestion.IsCorrect != nil {
@@ -96,14 +106,20 @@ func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sess
 			sf.bot.api.Send(errMsg)
 			isCorrect = false
 			if recordErr := sf.bot.services.ActiveSession.RecordAnswer(ctx, sessionID, questionID, selectedAnswer, false); recordErr != nil {
-				log.Printf("Error recording fallback wrong answer: %v", recordErr)
+				slog.ErrorContext(ctx, "Failed to record fallback wrong answer",
+					"event", "telegram.answer.fallback_record_failed",
+					"error", recordErr,
+				)
 				return
 			}
 		} else if errors.Is(err, service.ErrActiveSessionAlreadyAnswered) {
 			sf.bot.SendMessage(chatID, "이미 답변한 문제입니다.")
 			return
 		} else {
-			log.Printf("Error grading answer: %v", err)
+			slog.ErrorContext(ctx, "Failed to grade answer",
+				"event", "telegram.answer.grading_failed",
+				"error", err,
+			)
 			return
 		}
 	}

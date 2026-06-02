@@ -3,28 +3,38 @@ package bot
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/observability"
 )
 
 // RefreshStaleMiniAppMessages is called once at server startup to check in-progress sessions.
 // If the next unanswered question is a handwriting task and the Mini App URL has changed,
 // it re-sends the question with a fresh URL.
 func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
+	ctx = observability.WithAttrs(ctx,
+		slog.String("interaction_id", observability.NewInteractionID("job-restart_recovery")),
+		slog.String("source", "telegram.restart_recovery"),
+	)
 	baseURL := b.cfg.Server.PublicBaseURL
 	if baseURL == "" {
-		log.Printf("[restart-recovery] PublicBaseURL empty; skipping")
+		slog.InfoContext(ctx, "Restart recovery skipped because public base URL is empty",
+			"event", "telegram.restart_recovery.skipped",
+		)
 		return
 	}
 	currentFp := callback.MiniAppURLFingerprint(baseURL)
 
 	sessions, err := b.services.SessionBuilder.GetAllInProgressSessions(ctx)
 	if err != nil {
-		log.Printf("[restart-recovery] list in_progress sessions: %v", err)
+		slog.ErrorContext(ctx, "Failed to list in-progress sessions for restart recovery",
+			"event", "telegram.restart_recovery.session_list_failed",
+			"error", err,
+		)
 		return
 	}
 
@@ -37,7 +47,11 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 
 		state, err := b.services.ActiveSession.Get(ctx, s.ID)
 		if err != nil {
-			log.Printf("[restart-recovery] active session state unavailable session=%d: %v", s.ID, err)
+			slog.ErrorContext(ctx, "Active session state unavailable during restart recovery",
+				"event", "telegram.restart_recovery.active_state_unavailable",
+				"session_id", s.ID,
+				"error", err,
+			)
 			continue
 		}
 
@@ -60,7 +74,11 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 		}
 
 		// (b) re-send the question with fresh URL
-		log.Printf("[restart-recovery] refreshing stale link for session=%d user=%d", s.ID, s.UserID)
+		slog.InfoContext(ctx, "Refreshing stale handwriting link",
+			"event", "telegram.restart_recovery.link_refreshing",
+			"session_id", s.ID,
+			"user_id", s.UserID,
+		)
 		b.SendMessage(s.UserID, "🔄 손글씨 링크가 갱신되었습니다. 아래 버튼으로 다시 진행해 주세요.")
 		b.flow.showQuestion(ctx, s.UserID, nil, s.ID, idx)
 

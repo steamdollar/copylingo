@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
 
@@ -159,7 +163,8 @@ func (b *Bot) ClearInlineKeyboard(chatID int64, messageID int) error {
 }
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
-	ctx := context.Background()
+	startedAt := time.Now()
+	ctx := observability.WithAttrs(context.Background(), telegramUpdateAttrs(update)...)
 
 	if update.Message != nil {
 		// text input handle
@@ -168,6 +173,84 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 		// button click handle
 		b.handleCallback(ctx, update.CallbackQuery)
 	}
+
+	slog.InfoContext(ctx, "Telegram update completed",
+		"event", "telegram.update.completed",
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+	)
+}
+
+func telegramUpdateAttrs(update tgbotapi.Update) []slog.Attr {
+	interactionID := observability.NewInteractionID("tg")
+	// updateID: a unique ID for each update received by the bot.
+	if update.UpdateID > 0 {
+		interactionID = fmt.Sprintf("tg-%d", update.UpdateID)
+	}
+	attrs := []slog.Attr{
+		slog.String("interaction_id", interactionID),
+		slog.String("source", "telegram"),
+		slog.Int("update_id", update.UpdateID),
+	}
+
+	switch {
+	case update.Message != nil:
+		attrs = append(attrs, slog.String("update_type", "message"))
+		if update.Message.From != nil {
+			attrs = append(attrs, slog.Int64("user_id", update.Message.From.ID))
+		}
+		if update.Message.Chat != nil {
+			attrs = append(attrs, slog.Int64("chat_id", update.Message.Chat.ID))
+		}
+		if update.Message.IsCommand() {
+			attrs = append(attrs, slog.String("command", update.Message.Command()))
+		}
+	case update.CallbackQuery != nil:
+		attrs = append(attrs,
+			slog.String("update_type", "callback"),
+			slog.String("callback_type", callbackType(update.CallbackQuery.Data)),
+		)
+		if update.CallbackQuery.From != nil {
+			attrs = append(attrs, slog.Int64("user_id", update.CallbackQuery.From.ID))
+		}
+		if update.CallbackQuery.Message != nil && update.CallbackQuery.Message.Chat != nil {
+			attrs = append(attrs, slog.Int64("chat_id", update.CallbackQuery.Message.Chat.ID))
+		}
+		attrs = append(attrs, callbackIDAttrs(update.CallbackQuery.Data)...)
+	default:
+		attrs = append(attrs, slog.String("update_type", "unknown"))
+	}
+	return attrs
+}
+
+func callbackType(data string) string {
+	switch {
+	case strings.HasPrefix(data, "menu:"):
+		return "menu"
+	case strings.HasPrefix(data, config.PrefixSession):
+		return "session"
+	case strings.HasPrefix(data, config.PrefixQuestion):
+		return "question"
+	default:
+		return "unknown"
+	}
+}
+
+func callbackIDAttrs(data string) []slog.Attr {
+	parts := strings.Split(data, ":")
+	if len(parts) < 2 {
+		return nil
+	}
+	sessionID, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil
+	}
+	attrs := []slog.Attr{slog.Int("session_id", sessionID)}
+	if strings.HasPrefix(data, config.PrefixQuestion) && len(parts) >= 3 && parts[2] != "next" {
+		if questionID, err := strconv.Atoi(parts[2]); err == nil {
+			attrs = append(attrs, slog.Int("question_id", questionID))
+		}
+	}
+	return attrs
 }
 
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
@@ -249,7 +332,10 @@ func (b *Bot) handleMenu(ctx context.Context, msg *tgbotapi.Message) {
 func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.User) {
 	user, err := b.services.User.GetUser(ctx, from.ID, from.UserName)
 	if err != nil {
-		log.Printf("Error getting user: %v", err)
+		slog.ErrorContext(ctx, "Failed to get user for main menu",
+			"event", "telegram.menu.user_lookup_failed",
+			"error", err,
+		)
 	}
 
 	reviewCount, _ := b.services.SRS.GetDueCount(ctx)
@@ -391,7 +477,10 @@ func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {
 	// 1. Ensure user exists
 	user, err := b.services.User.GetUser(ctx, msg.From.ID, msg.From.UserName)
 	if err != nil {
-		log.Printf("Error getting user for /test: %v", err)
+		slog.ErrorContext(ctx, "Failed to get user for test session",
+			"event", "telegram.test.user_lookup_failed",
+			"error", err,
+		)
 		b.SendMessage(msg.Chat.ID, "❌ 사용자 정보를 확인할 수 없습니다.")
 		return
 	}
@@ -399,7 +488,11 @@ func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {
 	// 2. Build a morning session (9 new + 6 review)
 	session, err := b.services.SessionBuilder.BuildMorningSession(ctx, user.ID, user.Language, user.ProficiencyLevel)
 	if err != nil {
-		log.Printf("Error building session for /test: %v", err)
+		slog.ErrorContext(ctx, "Failed to build test session",
+			"event", "telegram.test.session_build_failed",
+			"user_id", user.ID,
+			"error", err,
+		)
 		b.SendMessage(msg.Chat.ID, "❌ 세션 생성 중 오류가 발생했습니다.")
 		return
 	}
@@ -411,12 +504,21 @@ func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {
 
 	// 3. Push the session immediately
 	if err := b.PushSession(ctx, user.ID, session.ID, "morning"); err != nil {
-		log.Printf("Error pushing session for /test: %v", err)
+		slog.ErrorContext(ctx, "Failed to push test session",
+			"event", "telegram.test.session_push_failed",
+			"user_id", user.ID,
+			"session_id", session.ID,
+			"error", err,
+		)
 		b.SendMessage(msg.Chat.ID, "❌ 세션 발송에 실패했습니다.")
 		return
 	}
 
-	log.Printf("[Test] Manually triggered morning session for user %d", user.ID)
+	slog.InfoContext(ctx, "Test session triggered",
+		"event", "telegram.test.session_triggered",
+		"user_id", user.ID,
+		"session_id", session.ID,
+	)
 }
 
 // languageDisplayName returns a human-readable name for the language code.

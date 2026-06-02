@@ -25,6 +25,9 @@ data/audio/*.mp3
 data/audio/*.wav
 data/audio/*.ogg
 
+# Logs
+logs/
+
 # Env
 .env
 .env.local

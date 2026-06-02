@@ -3,7 +3,7 @@ package miniapp
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +17,7 @@ import (
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
 
@@ -99,6 +100,7 @@ func RegisterRoutes(r *gin.Engine, cfg *config.Config, services *service.Service
 }
 
 func (h *Handler) ListTips(c *gin.Context) {
+	ctx := observability.WithAttrs(c.Request.Context(), slog.String("source", "miniapp.tips"))
 	language := strings.TrimSpace(c.Query("language"))
 	level := strings.TrimSpace(c.Query("level"))
 	if language == "" || level == "" {
@@ -116,9 +118,14 @@ func (h *Handler) ListTips(c *gin.Context) {
 		}
 	}
 
-	tips, err := h.tip.ListActive(c.Request.Context(), language, level, limit)
+	tips, err := h.tip.ListActive(ctx, language, level, limit)
 	if err != nil {
-		log.Printf("[Tips] list failed language=%s level=%s: %v", language, level, err)
+		slog.ErrorContext(ctx, "Failed to list tips",
+			"event", "miniapp.tips.list_failed",
+			"language", language,
+			"level", level,
+			"error", err,
+		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load tips"})
 		return
 	}
@@ -132,6 +139,7 @@ func (h *Handler) ListTips(c *gin.Context) {
 
 func (h *Handler) SubmitHandwriting(c *gin.Context) {
 	startedAt := time.Now()
+	ctx := observability.WithAttrs(c.Request.Context(), slog.String("source", "miniapp.handwriting"))
 
 	var req handwritingSubmitRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -144,8 +152,13 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid telegram init data"})
 		return
 	}
+	ctx = observability.WithAttrs(ctx,
+		slog.Int64("user_id", user.ID),
+		slog.Int("session_id", req.SessionID),
+		slog.Int("question_id", req.QuestionID),
+	)
 
-	result, err := h.handwriting.SubmitAnswer(c.Request.Context(), service.HandwritingSubmitRequest{
+	result, err := h.handwriting.SubmitAnswer(ctx, service.HandwritingSubmitRequest{
 		UserID:     user.ID,
 		SessionID:  req.SessionID,
 		QuestionID: req.QuestionID,
@@ -153,15 +166,23 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 	})
 	if err != nil {
 		publicErr := handwritingPublicError(err)
-		log.Printf("[Handwriting] submit failed status=%d session_id=%d question_id=%d: %v", publicErr.status, req.SessionID, req.QuestionID, err)
+		slog.ErrorContext(ctx, "Handwriting submission failed",
+			"event", "handwriting.submit.failed",
+			"status", publicErr.status,
+			"error", err,
+		)
 		c.JSON(publicErr.status, gin.H{"error": publicErr.message})
 		return
 	}
 
-	log.Printf("[Handwriting] submit total=%s session_id=%d question_id=%d is_correct=%t", time.Since(startedAt), req.SessionID, req.QuestionID, result.IsCorrect)
+	slog.InfoContext(ctx, "Handwriting submission completed",
+		"event", "handwriting.submit.completed",
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+		"is_correct", result.IsCorrect,
+	)
 
 	// Refresh Telegram message buttons in background
-	go h.refreshHandwritingMessage(req.SessionID, req.QuestionID)
+	go h.refreshHandwritingMessage(context.WithoutCancel(ctx), req.SessionID, req.QuestionID)
 
 	c.JSON(http.StatusOK, result)
 }
@@ -188,40 +209,58 @@ func handwritingPublicError(err error) publicError {
 	}
 }
 
-func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
+func (h *Handler) refreshHandwritingMessage(parent context.Context, sessionID, questionID int) {
+	parent = observability.WithAttrs(parent,
+		slog.String("source", "miniapp.handwriting.cleanup"),
+		slog.Int("session_id", sessionID),
+		slog.Int("question_id", questionID),
+	)
 	if h.rdb == nil || h.messenger == nil || h.cfg == nil {
-		log.Printf("[Handwriting] cleanup skipped: dependency missing session=%d question=%d", sessionID, questionID)
+		slog.WarnContext(parent, "Handwriting cleanup skipped because dependency is missing",
+			"event", "handwriting.cleanup.skipped",
+		)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 15*time.Second)
 	defer cancel()
 
 	key := config.HandwritingMessageRedisKey.Format(sessionID, questionID)
 	val, err := h.rdb.Get(ctx, key).Result()
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
-			log.Printf("[Handwriting] failed to get message id from redis session=%d question=%d: %v", sessionID, questionID, err)
+			slog.ErrorContext(ctx, "Failed to get handwriting message ID",
+				"event", "handwriting.cleanup.message_lookup_failed",
+				"error", err,
+			)
 		}
 		return
 	}
 
 	chatID, msgID, err := bot.ParseHandwritingMessageRef(val)
 	if err != nil {
-		log.Printf("[Handwriting] invalid message id format in redis value=%q: %v", val, err)
+		slog.ErrorContext(ctx, "Invalid handwriting message ID format",
+			"event", "handwriting.cleanup.invalid_message_id",
+			"error", err,
+		)
 		return
 	}
 
 	// We need to know the question index to format the "Next" button.
 	state, err := h.activeSession.Get(ctx, sessionID)
 	if err != nil {
-		log.Printf("[Handwriting] failed to get active session state for cleanup session=%d: %v", sessionID, err)
+		slog.ErrorContext(ctx, "Failed to get active session state for handwriting cleanup",
+			"event", "handwriting.cleanup.session_lookup_failed",
+			"error", err,
+		)
 		return
 	}
 
 	_, questionIdx, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
-		log.Printf("[Handwriting] question not found in session for cleanup session=%d question=%d", sessionID, questionID)
+		slog.WarnContext(ctx, "Question not found in session for handwriting cleanup",
+			"event", "handwriting.cleanup.question_not_found",
+		)
 		return
 	}
 
@@ -234,6 +273,11 @@ func (h *Handler) refreshHandwritingMessage(sessionID, questionID int) {
 	)
 
 	if err := h.messenger.EditMessageReplyMarkup(chatID, msgID, markup); err != nil {
-		log.Printf("[Handwriting] failed to edit message reply markup chat=%d msg=%d: %v", chatID, msgID, err)
+		slog.ErrorContext(ctx, "Failed to edit handwriting message reply markup",
+			"event", "handwriting.cleanup.reply_markup_failed",
+			"chat_id", chatID,
+			"message_id", msgID,
+			"error", err,
+		)
 	}
 }

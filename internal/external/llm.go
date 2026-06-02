@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/observability"
 )
 
 // LLMClient defines AI-backed grading paths that cannot be handled by exact string matching.
@@ -116,6 +117,7 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 // GradeHandwriting verifies whether a rendered handwriting image matches the expected Japanese text.
 func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error) {
 	startedAt := time.Now()
+	ctx = observability.WithAttrs(ctx, slog.String("source", "external.llm"))
 
 	if c.client == nil || c.model == "" {
 		return false, "", ErrAIConfigMissing
@@ -139,7 +141,13 @@ func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt,
 	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
 		return false, "", fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
 	}
-	log.Printf("[Handwriting] llm model=%s elapsed=%s image_bytes=%d is_correct=%t", c.model, time.Since(startedAt), len(pngImage), result.IsCorrect)
+	slog.InfoContext(ctx, "Handwriting LLM grading completed",
+		"event", "handwriting.llm.completed",
+		"model", c.model,
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+		"image_bytes", len(pngImage),
+		"is_correct", result.IsCorrect,
+	)
 
 	return result.IsCorrect, result.Feedback, nil
 }
@@ -203,6 +211,12 @@ Marks and script (do not over-reject on these):
 - Diacritics (゛dakuten / ゜handakuten) render as tiny, low-resolution marks. If a diacritic is plausibly present where one is expected, accept it. NEVER reject solely because you cannot tell dakuten from handakuten, or cannot count the exact number of dots.
 - Do NOT reject for hiragana-vs-katakana unless the written shape clearly and unambiguously belongs to the other script. Treat visually similar shapes as the Expected Text.
 - When script identity or diacritic type is visually ambiguous in rough mobile handwriting, return true when the Expected Text remains plausible.
+
+Contracted sounds (yoon; small ゃ / ゅ / ょ or ャ / ュ / ョ):
+- Small kana handwritten with a finger often have rough proportions and simplified shapes. Do NOT require textbook size, proportions, or exact shape.
+- When the Expected Text contains a small kana, return true if a plausible second small mark is present in the expected position and the full Expected Text remains plausible.
+- Return false for a small-kana issue ONLY when the small kana is clearly absent or clearly replaced by an unrelated shape.
+- Do NOT claim that a small kana is full-sized, malformed, or wrong unless that is unambiguous from the final bitmap. When uncertain, return true.
 
 Apply this principle generally, not only to this example:
 - Expected Text: オ

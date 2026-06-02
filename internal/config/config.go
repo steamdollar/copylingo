@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
@@ -17,6 +18,7 @@ type Config struct {
 	LLM      LLMConfig      `mapstructure:"llm"`
 	TTS      TTSConfig      `mapstructure:"tts"`
 	Schedule ScheduleConfig `mapstructure:"schedule"`
+	Logging  LoggingConfig  `mapstructure:"logging"`
 }
 
 type ServerConfig struct {
@@ -79,6 +81,13 @@ type ScheduleConfig struct {
 	EveningPushCron    string `mapstructure:"evening_push_cron"`    // 오후 세션 푸시 크론
 }
 
+type LoggingConfig struct {
+	Dir           string `mapstructure:"dir"`
+	Level         string `mapstructure:"level"`
+	RetentionDays int    `mapstructure:"retention_days"`
+	Timezone      string `mapstructure:"timezone"`
+}
+
 // Load reads config from file and environment variables.
 func Load() (*Config, error) {
 	viper.Reset()
@@ -115,17 +124,29 @@ func Load() (*Config, error) {
 	viper.SetDefault("redis.password", "")
 	viper.SetDefault("redis.db", 0)
 	viper.SetDefault("telegram.debug", false)
+
+	// llm
 	viper.SetDefault("llm.model", "gemini-3.1-flash-lite")                                       // default to LLM model
 	viper.SetDefault("llm.base_url", "https://generativelanguage.googleapis.com/v1beta/openai/") // LLM compatibility layer
+
+	// tts
 	viper.SetDefault("tts.enabled", true)
 	viper.SetDefault("tts.audio_dir", "./data/audio")
 	viper.SetDefault("tts.language_code", "ja-JP")
 	viper.SetDefault("tts.voice_name", "ja-JP-Neural2-B")
+
+	// session schedule
 	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *") // 매일 03:00
 	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")  // 매일 07:30
 	viper.SetDefault("schedule.morning_push_cron", "0 8 * * *")    // 매일 08:00
 	viper.SetDefault("schedule.evening_build_cron", "30 20 * * *") // 매일 20:30
 	viper.SetDefault("schedule.evening_push_cron", "0 21 * * *")   // 매일 21:00
+
+	// logging
+	viper.SetDefault("logging.dir", "./logs")
+	viper.SetDefault("logging.level", "INFO")
+	viper.SetDefault("logging.retention_days", 30)
+	viper.SetDefault("logging.timezone", "Asia/Seoul")
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -179,6 +200,10 @@ func bindEnv() error {
 		"schedule.morning_push_cron",
 		"schedule.evening_build_cron",
 		"schedule.evening_push_cron",
+		"logging.dir",
+		"logging.level",
+		"logging.retention_days",
+		"logging.timezone",
 	}
 	for _, key := range keys {
 		if err := viper.BindEnv(key); err != nil {
@@ -194,6 +219,20 @@ func (c *Config) validate() error {
 	}
 	if c.LLM.APIKey == "" {
 		log.Println("[WARN] llm.api_key is not set. AI features may be disabled.")
+	}
+	if strings.TrimSpace(c.Logging.Dir) == "" {
+		return fmt.Errorf("logging.dir is required")
+	}
+	switch strings.ToUpper(strings.TrimSpace(c.Logging.Level)) {
+	case "DEBUG", "INFO", "WARN", "ERROR":
+	default:
+		return fmt.Errorf("logging.level must be one of DEBUG, INFO, WARN, ERROR")
+	}
+	if c.Logging.RetentionDays < 1 {
+		return fmt.Errorf("logging.retention_days must be positive")
+	}
+	if _, err := time.LoadLocation(c.Logging.Timezone); err != nil {
+		return fmt.Errorf("logging.timezone is invalid: %w", err)
 	}
 	return nil
 }

@@ -421,6 +421,9 @@
   - feedback에서도 획순, 시작점, 작성 방향, pen movement를 언급하지 않는다.
   - 다른 문자와 구분하려면 temporal pen-movement 정보가 필요한 경우, `Expected Text`가 plausible하면 정답 처리한다.
   - script identity 또는 diacritic type이 rough mobile handwriting에서 애매하면, `Expected Text`가 plausible한 경우 정답 처리한다.
+  - 요음의 작은 `ゃ/ゅ/ょ`, `ャ/ュ/ョ`는 손가락 입력에서 비율과 shape가 거칠 수 있으므로 textbook size, proportions, exact shape를 요구하지 않는다.
+  - 요음은 expected 위치에 plausible한 두 번째 작은 mark가 있고 전체 `Expected Text`가 plausible하면 정답 처리한다.
+  - 요음 오답 처리는 작은 kana가 명확히 없거나 unrelated shape로 명확히 대체된 경우로 제한한다.
   - 특정 혼동 문자 pair를 Prompt에 계속 누적하지 않고 범용 규칙으로 유지한다.
 - **장점**:
   - LLM 입력에 존재하지 않는 정보를 근거로 한 hallucination을 억제한다.

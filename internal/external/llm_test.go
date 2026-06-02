@@ -93,6 +93,24 @@ func TestBuildHandwritingSystemPromptDefinesStaticPNGEvidenceBoundary(t *testing
 	}
 }
 
+func TestBuildHandwritingSystemPromptDefinesYoonTolerance(t *testing.T) {
+	t.Parallel()
+
+	prompt := buildHandwritingSystemPrompt()
+
+	for _, want := range []string{
+		"Contracted sounds (yoon; small ゃ / ゅ / ょ or ャ / ュ / ョ)",
+		"Do NOT require textbook size, proportions, or exact shape",
+		"a plausible second small mark is present in the expected position",
+		"ONLY when the small kana is clearly absent or clearly replaced by an unrelated shape",
+		"Do NOT claim that a small kana is full-sized, malformed, or wrong unless that is unambiguous from the final bitmap",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("system prompt does not contain yoon tolerance policy %q: %q", want, prompt)
+		}
+	}
+}
+
 func TestBuildHandwritingUserPromptIncludesContextAndExpectedText(t *testing.T) {
 	t.Parallel()
 

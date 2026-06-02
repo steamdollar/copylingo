@@ -243,6 +243,36 @@ Redis      (healthy) ──┘
 
 ---
 
+## 로그
+
+Application Log는 stdout과 `./logs/copylingo-YYYY-MM-DD.jsonl`에 동시에 기록된다.
+파일명과 JSON의 `time`은 기본적으로 `Asia/Seoul` 기준이며, 30일이 지난 일별 파일은 자동 삭제된다.
+
+```bash
+# 오늘 로그 확인
+tail -f logs/copylingo-$(date +%F).jsonl | jq
+
+# ERROR 로그만 조회
+jq 'select(.level == "ERROR")' logs/copylingo-2026-06-01.jsonl
+
+# 동일 요청 또는 Telegram Update 추적
+jq 'select(.interaction_id == "tg-12345")' logs/copylingo-2026-06-01.jsonl
+```
+
+환경별로 다음 값을 조정할 수 있다.
+
+| 환경변수 | 기본값 |
+|---|---|
+| `COPYLINGO_LOGGING_DIR` | `./logs` |
+| `COPYLINGO_LOGGING_LEVEL` | `INFO` |
+| `COPYLINGO_LOGGING_RETENTION_DAYS` | `30` |
+| `COPYLINGO_LOGGING_TIMEZONE` | `Asia/Seoul` |
+
+HTTP request, Telegram Update, Scheduler job은 진입점에서 `interaction_id`를 부여한다.
+Token, Telegram `init_data`, 사용자 답안 원문, stroke 좌표는 로그에 기록하지 않는다.
+
+---
+
 ## Makefile
 
 | 명령어 | 동작 |

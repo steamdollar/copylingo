@@ -38,6 +38,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-02 | 가타카나 `ユ`·`ヲ` 손글씨 문항 제외 | `2606020056_katakana_handwriting_exclusion.md` |
+| 2026-06-01 | 일별 JSONL Structured Logging 도입 | `2606011418_structured_logging.md` |
 | 2026-05-31 | 손글씨 채점 정확도 튜닝 (Detail + Prompt + Renderer) | `2605312040_handwriting_image_detail_test_sync.md` |
 | 2026-05-30 | Telegram Mini App tuning | `2605302255_telegram_mini_app_tuning.md` |
 | 2026-05-30 | kana ji/zu 역방향 문항 행 힌트 추가 및 로컬 DB 보정 | `2605302242_kana_ji_zu_disambiguation.md` |

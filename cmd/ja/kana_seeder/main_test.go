@@ -137,3 +137,29 @@ func TestUnambiguousReverseKanaQuestionsDoNotIncludeHint(t *testing.T) {
 		t.Fatalf("handwriting prompt unexpectedly contains hint: %q", handwriting.Prompt)
 	}
 }
+
+func TestShouldSeedHandwritingQuestion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		kana string
+		want bool
+	}{
+		{name: "katakana yu excluded", kana: "ユ", want: false},
+		{name: "katakana wo excluded", kana: "ヲ", want: false},
+		{name: "hiragana yu remains", kana: "ゆ", want: true},
+		{name: "hiragana wo remains", kana: "を", want: true},
+		{name: "other katakana remains", kana: "ヨ", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := shouldSeedHandwritingQuestion(tt.kana); got != tt.want {
+				t.Fatalf("shouldSeedHandwritingQuestion(%q) = %t, want %t", tt.kana, got, tt.want)
+			}
+		})
+	}
+}

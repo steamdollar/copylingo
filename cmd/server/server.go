@@ -150,7 +150,7 @@ func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client, services *s
 	}
 
 	r := gin.New()
-	r.Use(gin.Recovery())
+	r.Use(requestLoggingMiddleware(), structuredRecoveryMiddleware())
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {

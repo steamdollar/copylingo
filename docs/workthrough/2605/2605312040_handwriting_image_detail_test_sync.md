@@ -22,12 +22,16 @@
   - feedback assertion을 현재 correction note 제한 문구와 맞췄다.
   - Prompt provenance와 static PNG evidence boundary를 검증하는 회귀 테스트를 추가했다.
   - feedback Prompt와 strict JSON schema가 획순 관련 언급을 금지하는지 검증했다.
+  - 요음 small kana tolerance rubric을 검증하는 회귀 테스트를 추가했다.
 - `internal/external/llm.go`
   - Prompt에 static PNG 입력 provenance를 추가했다.
   - final visible bitmap만 평가하도록 제한했다.
   - 획순, 시작점, 작성 방향, pen movement 추론과 feedback 언급을 금지했다.
   - temporal pen-movement 정보가 있어야 구분할 수 있는 경우 `Expected Text`가 plausible하면 정답 처리하도록 명시했다.
   - script identity 또는 diacritic type이 애매한 경우에도 `Expected Text`가 plausible하면 정답 처리하도록 명시했다.
+  - 요음의 작은 `ゃ/ゅ/ょ`, `ャ/ュ/ョ`는 textbook size, proportions, exact shape를 요구하지 않도록 명시했다.
+  - expected 위치에 plausible한 두 번째 작은 mark가 있고 전체 `Expected Text`가 plausible하면 정답 처리하도록 명시했다.
+  - 요음 오답 처리는 작은 kana가 명확히 없거나 unrelated shape로 명확히 대체된 경우로 제한했다.
   - strict JSON schema의 `feedback` description에도 같은 제한을 반영했다.
 - `internal/service/handwriting_render.go`
   - 기본 Renderer 정책을 `height=512`, `width=512~1536`, `padding=48`로 정의했다.
@@ -59,6 +63,8 @@
 - Mini App은 sampled stroke points를 서버에 보내고, 서버는 이를 static PNG로 rebuild한다.
 - LLM에는 최종 PNG만 전달되므로 획순, 시작점, 작성 방향, pen movement는 판정 근거로 사용할 수 없다.
 - 혼동 문자 pair를 Prompt에 계속 추가하지 않고 범용 evidence boundary를 유지한다.
+- 요음 small kana는 손가락 입력 특성을 고려해 textbook 형태와 비율을 강제하지 않는다.
+- 요음은 expected 위치의 작은 mark가 plausible하면 정답 처리하고, 명확한 누락 또는 unrelated shape만 오답 처리한다.
 
 ### Bounded Aspect-Ratio Renderer
 

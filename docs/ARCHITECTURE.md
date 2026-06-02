@@ -147,8 +147,41 @@ menu:settings                     → 설정
 
 ease_factor 업데이트:
   EF += 0.1 - (5 - quality) × (0.08 + (5 - quality) × 0.02)
-  EF = max(EF, 1.3)
+EF = max(EF, 1.3)
 ```
+
+## Structured Logging
+
+Application Log는 Standard Library `log/slog`의 JSON Handler를 사용한다.
+stdout과 `logs/copylingo-YYYY-MM-DD.jsonl`에 동시에 기록하며, 일별 파일은 기본 30일간 보관한다.
+
+```mermaid
+flowchart LR
+    HTTP[HTTP Request] --> HM[Gin Middleware]
+    TG[Telegram Update] --> TM[Update Wrapper]
+    JOB[Scheduler Job] --> JM[Job Wrapper]
+    HM --> CTX[Context + interaction_id]
+    TM --> CTX
+    JM --> CTX
+    CTX --> APP[Service / External Client]
+    APP --> SLOG[log/slog JSONHandler]
+    SLOG --> STDOUT[stdout]
+    SLOG --> FILE[Daily JSONL File]
+```
+
+Correlation ID 규칙:
+
+| 진입점 | `interaction_id` |
+|---|---|
+| HTTP | `http-{random 128-bit hex}` |
+| Telegram Update | `tg-{update_id}`. 유효한 `update_id`가 없으면 random fallback |
+| Scheduler job | `job-{job_name}-{random 128-bit hex}` |
+
+보안 규칙:
+
+- 기록 가능: `user_id`, `chat_id`, `session_id`, `question_id`, status, latency
+- 기록 금지: token, Telegram `init_data`, 사용자 답안 원문, stroke 좌표, HTTP body와 query
+- 파일 로그는 장애 분석용 Application Log이며 DB 상태나 Audit Log의 SSOT가 아니다.
 
 ## 의존성
 

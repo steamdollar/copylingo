@@ -37,3 +37,9 @@ schedule:
   morning_push_cron: "0 8 * * *"       # 매일 08:00 - 오전 세션 푸시
   evening_build_cron: "30 20 * * *"    # 매일 20:30 - 오후 세션 빌드
   evening_push_cron: "0 21 * * *"      # 매일 21:00 - 오후 세션 푸시
+
+logging:
+  dir: ./logs
+  level: INFO
+  retention_days: 30
+  timezone: Asia/Seoul

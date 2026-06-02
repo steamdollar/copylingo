@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/observability"
 )
 
 type handwritingActiveSession interface {
@@ -78,6 +79,12 @@ func NewHandwritingService(
 
 func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSubmitRequest) (*HandwritingSubmitResult, error) {
 	startedAt := time.Now()
+	ctx = observability.WithAttrs(ctx,
+		slog.String("source", "service.handwriting"),
+		slog.Int64("user_id", req.UserID),
+		slog.Int("session_id", req.SessionID),
+		slog.Int("question_id", req.QuestionID),
+	)
 
 	state, err := s.activeSession.Get(ctx, req.SessionID)
 	if err != nil {
@@ -112,8 +119,13 @@ func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSu
 		}
 		return nil, fmt.Errorf("grade handwriting answer: %w", err)
 	}
-	log.Printf("[Handwriting] service total=%s render=%s grade=%s session_id=%d question_id=%d image_bytes=%d",
-		time.Since(startedAt), renderedAt.Sub(startedAt), time.Since(renderedAt), req.SessionID, req.QuestionID, len(renderedImage))
+	slog.InfoContext(ctx, "Handwriting service completed",
+		"event", "handwriting.service.completed",
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+		"render_duration_ms", renderedAt.Sub(startedAt).Milliseconds(),
+		"grade_duration_ms", time.Since(renderedAt).Milliseconds(),
+		"image_bytes", len(renderedImage),
+	)
 
 	return &HandwritingSubmitResult{
 		IsCorrect:     isCorrect,

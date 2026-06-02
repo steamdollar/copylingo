@@ -1,9 +1,11 @@
 package miniapp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,11 +14,34 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
 
 type mockTipRepo struct {
 	listActiveFn func(ctx context.Context, language, level string, limit int) ([]model.Tip, error)
+}
+
+func TestRefreshHandwritingMessagePreservesParentCorrelation(t *testing.T) {
+	var output bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(observability.NewContextHandler(slog.NewJSONHandler(&output, nil))))
+	defer slog.SetDefault(previous)
+
+	ctx := observability.WithAttrs(context.Background(), slog.String("interaction_id", "http-parent"))
+	handler := NewHandler(HandlerDeps{})
+	handler.refreshHandwritingMessage(context.WithoutCancel(ctx), 1, 2)
+
+	var entry map[string]any
+	if err := json.Unmarshal(output.Bytes(), &entry); err != nil {
+		t.Fatalf("json.Unmarshal(%q) error = %v", output.Bytes(), err)
+	}
+	if got := entry["interaction_id"]; got != "http-parent" {
+		t.Fatalf("entry[interaction_id] = %#v, want http-parent", got)
+	}
+	if got := entry["event"]; got != "handwriting.cleanup.skipped" {
+		t.Fatalf("entry[event] = %#v, want handwriting.cleanup.skipped", got)
+	}
 }
 
 func (m *mockTipRepo) ListActive(ctx context.Context, language, level string, limit int) ([]model.Tip, error) {

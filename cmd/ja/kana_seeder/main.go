@@ -161,6 +161,9 @@ func main() {
 
 	// Type 3: Romaji -> Kana handwriting (Mini App)
 	for _, kana := range kanaList {
+		if !shouldSeedHandwritingQuestion(kana) {
+			continue
+		}
 		romaji := kanaMap[kana]
 		questions = append(questions, buildHandwritingQuestion(romaji, kana))
 	}
@@ -171,6 +174,15 @@ func main() {
 	}
 
 	log.Printf("Successfully inserted %d Kana questions.", len(questions))
+}
+
+func shouldSeedHandwritingQuestion(kana string) bool {
+	switch kana {
+	case "ユ", "ヲ":
+		return false
+	default:
+		return true
+	}
 }
 
 // buildQuestion constructs a Kana question for batch insertion.

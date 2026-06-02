@@ -3,7 +3,7 @@ package bot
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +27,11 @@ func (sf *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuer
 	// get in-progess session for user, if exists, and resume
 	resumed, err := sf.getInProgressSessions(ctx, cb)
 	if err != nil {
-		log.Printf("Error fetching in-progress sessions user_id=%d: %v", cb.From.ID, err)
+		slog.ErrorContext(ctx, "Failed to fetch in-progress sessions",
+			"event", "telegram.session.in_progress_lookup_failed",
+			"user_id", cb.From.ID,
+			"error", err,
+		)
 		sf.showSessionFetchError(cb)
 		return
 	}
@@ -37,7 +41,11 @@ func (sf *SessionFlow) StartStudy(ctx context.Context, cb *tgbotapi.CallbackQuer
 
 	// get pending session for user, if exists, and show start button
 	if err := sf.getPendingSessions(ctx, cb); err != nil {
-		log.Printf("Error fetching pending sessions user_id=%d: %v", cb.From.ID, err)
+		slog.ErrorContext(ctx, "Failed to fetch pending sessions",
+			"event", "telegram.session.pending_lookup_failed",
+			"user_id", cb.From.ID,
+			"error", err,
+		)
 		sf.showSessionFetchError(cb)
 	}
 }
@@ -84,7 +92,11 @@ func (sf *SessionFlow) getInProgressSessions(ctx context.Context, cb *tgbotapi.C
 	session := inProgressSessions[0]
 	nextIdx, err := sf.nextUnansweredQuestionIndex(ctx, session.ID)
 	if err != nil {
-		log.Printf("Error finding next unanswered question for session %d: %v", session.ID, err)
+		slog.ErrorContext(ctx, "Failed to find next unanswered question",
+			"event", "telegram.session.next_question_lookup_failed",
+			"session_id", session.ID,
+			"error", err,
+		)
 		sf.bot.EditMessage(chatID, cb.Message.MessageID,
 			"⚠️ 진행 중 세션 상태가 만료되었습니다. 새 세션을 다시 시작해 주세요.",
 			mainMenuKeyboard(),
@@ -140,7 +152,9 @@ func (sf *SessionFlow) HandleSessionCallback(ctx context.Context, cb *tgbotapi.C
 
 	sessionID, err := strconv.Atoi(parts[1])
 	if err != nil {
-		log.Printf("Invalid session ID in callback: %s", parts[1])
+		slog.WarnContext(ctx, "Invalid session ID in callback",
+			"event", "telegram.callback.invalid_session_id",
+		)
 		return
 	}
 	action := parts[2]
@@ -204,13 +218,21 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 	// update session status at db (pending > in progress)
 	if err := sf.bot.
 		services.SessionBuilder.StartSession(ctx, sessionID); err != nil {
-		log.Printf("Error starting session: %v", err)
+		slog.ErrorContext(ctx, "Failed to start session",
+			"event", "telegram.session.start_failed",
+			"session_id", sessionID,
+			"error", err,
+		)
 		return
 	}
 
 	// session fetch by id, set at redis
 	if _, err := sf.bot.services.ActiveSession.CreateFromDB(ctx, sessionID); err != nil {
-		log.Printf("Error creating active session state: %v", err)
+		slog.ErrorContext(ctx, "Failed to create active session state",
+			"event", "telegram.session.active_state_create_failed",
+			"session_id", sessionID,
+			"error", err,
+		)
 		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ 세션 상태를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.")
 		return
 	}
@@ -226,7 +248,11 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 func (sf *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
 	result, err := sf.bot.services.Grader.CompleteSession(ctx, sessionID, cb.From.ID)
 	if err != nil {
-		log.Printf("Error completing session: %v", err)
+		slog.ErrorContext(ctx, "Failed to complete session",
+			"event", "telegram.session.complete_failed",
+			"session_id", sessionID,
+			"error", err,
+		)
 		return
 	}
 
