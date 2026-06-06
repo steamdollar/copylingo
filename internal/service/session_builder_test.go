@@ -74,8 +74,19 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 	}
 
 	collectedNewCount := 0
+	getNewQuestionsCalls := 0
 	qFetcher := &mockQuestionFetcher{
 		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+			if getNewQuestionsCalls == 0 {
+				if cat != string(model.CategoryVocabulary) {
+					t.Fatalf("expected first category %q, got %q", model.CategoryVocabulary, cat)
+				}
+				if limit != 5 {
+					t.Fatalf("expected 5 reserved vocabulary slots, got %d", limit)
+				}
+			}
+			getNewQuestionsCalls++
+
 			// Random Slot Relay will call this multiple times for different categories.
 			// Each call should have a reasonable limit.
 			if limit < 0 {
@@ -128,6 +139,111 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 	}
 	if session == nil {
 		t.Fatal("expected session to be created")
+	}
+}
+
+func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+
+	srsMock := &mockSRS{
+		getDueReviewsFn: func(ctx context.Context, limit int) ([]model.Question, error) {
+			if limit != 6 {
+				t.Fatalf("expected review limit 6 after vocabulary reservation, got %d", limit)
+			}
+			return []model.Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil
+		},
+	}
+	qFetcher := &mockQuestionFetcher{
+		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+			if cat != string(model.CategoryVocabulary) {
+				t.Fatalf("expected reserved vocabulary fetch, got category %q", cat)
+			}
+			if limit != 4 {
+				t.Fatalf("expected 4 reserved vocabulary slots, got %d", limit)
+			}
+			return []model.Question{{ID: 101}, {ID: 102}, {ID: 103}, {ID: 104}}, nil
+		},
+	}
+	sStore := &mockSessionStore{
+		createSessionFn: func(ctx context.Context, s *model.Session) error {
+			if s.TotalQuestions != 10 {
+				t.Fatalf("expected total 10, got %d", s.TotalQuestions)
+			}
+			s.ID = 10
+			return nil
+		},
+	}
+	sqStore := &mockSessionQuestionStore{
+		createSessionQuestionsFn: func(ctx context.Context, sqs []model.SessionQuestion) error {
+			if len(sqs) != 10 {
+				t.Fatalf("expected 10 session questions, got %d", len(sqs))
+			}
+			for i, wantID := range []int{101, 102, 103, 104} {
+				if got := sqs[6+i].QuestionID; got != wantID {
+					t.Fatalf("session question %d id = %d, want %d", 6+i, got, wantID)
+				}
+			}
+			return nil
+		},
+	}
+
+	builder := NewSessionBuilderService(qFetcher, sStore, sqStore, srsMock)
+	session, err := builder.BuildEveningSession(ctx, userID, "ja", "N5")
+	if err != nil {
+		t.Fatalf("BuildEveningSession failed: %v", err)
+	}
+	if session == nil {
+		t.Fatal("expected session")
+	}
+}
+
+func TestBuildEveningSession_FillsVocabularyShortageWithRelay(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+	vocabularyCalls := 0
+
+	srsMock := &mockSRS{
+		getDueReviewsFn: func(ctx context.Context, limit int) ([]model.Question, error) {
+			return []model.Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil
+		},
+	}
+	qFetcher := &mockQuestionFetcher{
+		getNewQuestionsFn: func(ctx context.Context, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+			if cat == string(model.CategoryVocabulary) {
+				vocabularyCalls++
+				if vocabularyCalls == 1 {
+					return []model.Question{{ID: 101}, {ID: 102}}, nil
+				}
+			}
+			if cat == "" {
+				return []model.Question{{ID: 201}, {ID: 202}}, nil
+			}
+			return nil, nil
+		},
+	}
+	sStore := &mockSessionStore{
+		createSessionFn: func(ctx context.Context, s *model.Session) error {
+			if s.TotalQuestions != 10 {
+				t.Fatalf("expected total 10, got %d", s.TotalQuestions)
+			}
+			s.ID = 10
+			return nil
+		},
+	}
+	sqStore := &mockSessionQuestionStore{
+		createSessionQuestionsFn: func(ctx context.Context, sqs []model.SessionQuestion) error {
+			return nil
+		},
+	}
+
+	builder := NewSessionBuilderService(qFetcher, sStore, sqStore, srsMock)
+	session, err := builder.BuildEveningSession(ctx, userID, "ja", "N5")
+	if err != nil {
+		t.Fatalf("BuildEveningSession failed: %v", err)
+	}
+	if session == nil {
+		t.Fatal("expected session")
 	}
 }
 

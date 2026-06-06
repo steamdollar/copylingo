@@ -61,3 +61,33 @@
   - `contents` 재사용: 외부 원문과 기초 학습 개념의 lifecycle이 섞여 기각.
   - `questions` 재사용: Quiz 표현 중복 때문에 Study 진도 SSOT로 부적합하여 기각.
   - `material_key` 없이 SERIAL PK만 사용: Seeder Idempotency를 보장하기 어려워 기각.
+
+---
+
+## ADR-023: Daily Session은 Vocabulary 슬롯을 최소 1/3 예약
+
+- **날짜**: 2026-06-03
+- **상태**: 채택됨
+- **맥락**:
+  - 기존 Random Slot Relay는 `kana`, `handwriting`, `vocabulary`, `grammar` 순서로 새 문항 슬롯을 랜덤 배분한다.
+  - 앞 카테고리가 슬롯을 먼저 가져가고, 최종 fallback도 낮은 `difficulty`를 우선하므로 Vocabulary 노출량이 지나치게 낮아질 수 있다.
+  - Kana 복습을 유지하면서도 실제 단어 학습 비중을 세션 전체의 `1/3 ~ 1/2` 이상으로 높일 필요가 있다.
+- **결정**:
+  - Morning, Evening Daily Session은 총 문제 수의 `ceil(1/3)` 슬롯을 신규 Vocabulary Question에 먼저 예약한다.
+  - 예약 Vocabulary 재고가 부족하면 기존 Random Slot Relay와 전체 fallback이 빈 슬롯을 채운다.
+  - 총 문제 수를 유지하기 위해 review 상한은 예약 Vocabulary 슬롯을 제외한 수로 제한한다.
+  - Morning Session은 기존 `review 6 + new 9` 구성을 유지한다.
+  - Evening Session은 `review 8 + new 2`에서 최대 `review 6 + vocabulary 4` 중심 구성으로 변경한다.
+  - Review 전용 Session은 Vocabulary 예약 정책을 적용하지 않는다.
+- **장점**:
+  - Daily Session마다 Vocabulary 최소 노출량을 예측할 수 있다.
+  - Vocabulary 재고 부족 시 세션 자체가 비지 않고 기존 카테고리로 degrade한다.
+  - Repository Interface와 Schema를 변경하지 않는다.
+- **단점 / 트레이드오프**:
+  - Evening Session에서 한 번에 처리하는 SRS due review 수가 최대 8개에서 6개로 줄어든다.
+  - 신규 Vocabulary 재고가 부족하면 최소 1/3 비율은 보장되지 않는다.
+  - 사용자별 학습 목적에 따른 조합 선택은 아직 지원하지 않는다.
+- **대안**:
+  - 새 문항 슬롯의 절반만 Vocabulary로 예약: Evening Session 전체의 1/3을 보장하지 못해 기각.
+  - Relay 순서만 Vocabulary 우선으로 변경: 최소 비율을 명시적으로 보장하지 못해 기각.
+  - 기존 Random Slot Relay 유지: Kana 편중 문제가 지속되어 기각.

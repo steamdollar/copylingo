@@ -9,7 +9,10 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-const maxPerCategory = 6
+const (
+	maxPerCategory                = 6
+	minVocabularyRatioDenominator = 3
+)
 
 var defaultCategoryOrder = []model.QuestionCategory{
 	model.CategoryKana,
@@ -58,27 +61,25 @@ func NewSessionBuilderService(
 	}
 }
 
-// BuildMorningSession creates a morning session: 60% new + 40% review, total 15 questions.
+// BuildMorningSession creates a morning session with up to 40% review, total 15 questions.
 func (s *SessionBuilderService) BuildMorningSession(ctx context.Context, userID int64, language, level string) (*model.Session, error) {
 	const totalQuestions = 15
-	const newQuestionCount = 9 // 60%
-	const reviewCount = 6      // 40%
+	const reviewCount = 6 // Up to 40%
 
-	return s.buildSession(ctx, userID, language, level, model.SessionMorning, totalQuestions, newQuestionCount, reviewCount)
+	return s.buildSession(ctx, userID, language, level, model.SessionMorning, totalQuestions, reviewCount)
 }
 
-// BuildEveningSession creates an evening session: 20% supplementary + 80% review, total 10 questions.
+// BuildEveningSession creates an evening session with vocabulary reservation, total 10 questions.
 func (s *SessionBuilderService) BuildEveningSession(ctx context.Context, userID int64, language, level string) (*model.Session, error) {
 	const totalQuestions = 10
-	const newQuestionCount = 2 // 20% supplementary
-	const reviewCount = 8      // 80%
+	const reviewCount = 8 // Reduced to 6 when reserving 4 vocabulary slots.
 
-	return s.buildSession(ctx, userID, language, level, model.SessionEvening, totalQuestions, newQuestionCount, reviewCount)
+	return s.buildSession(ctx, userID, language, level, model.SessionEvening, totalQuestions, reviewCount)
 }
 
 // BuildReviewSession creates an on-demand review session from SRS due items.
 func (s *SessionBuilderService) BuildReviewSession(ctx context.Context, userID int64, limit int) (*model.Session, error) {
-	return s.buildSession(ctx, userID, "", "", model.SessionReview, limit, 0, limit)
+	return s.buildSession(ctx, userID, "", "", model.SessionReview, limit, limit)
 }
 
 func (s *SessionBuilderService) buildSession(
@@ -86,12 +87,19 @@ func (s *SessionBuilderService) buildSession(
 	userID int64,
 	language, level string,
 	sessionType model.SessionType,
-	totalQuestions, newCount, reviewCount int,
+	totalQuestions, reviewCount int,
 ) (*model.Session, error) {
 	var sessionQuestions []model.SessionQuestion
 	selectedQuestionIDs := make(map[int]struct{}, totalQuestions)
 	excludeIDs := make([]int, 0, totalQuestions)
 	order := 0
+	reservedVocabularyCount := 0
+	if language != "" && level != "" {
+		reservedVocabularyCount = divideRoundingUp(totalQuestions, minVocabularyRatioDenominator)
+		if maxReviewCount := totalQuestions - reservedVocabularyCount; reviewCount > maxReviewCount {
+			reviewCount = maxReviewCount
+		}
+	}
 
 	appendQuestion := func(questionID int, isReview bool) bool {
 		if _, exists := selectedQuestionIDs[questionID]; exists {
@@ -121,11 +129,23 @@ func (s *SessionBuilderService) buildSession(
 		}
 	}
 
-	// 2. Fill remaining with new questions (Random Slot Relay)
-	remainingNew := totalQuestions - len(sessionQuestions)
-	if remainingNew < newCount {
-		remainingNew = newCount
+	// 2. Reserve at least one-third of daily session slots for new vocabulary.
+	// If vocabulary inventory is short, the relay below fills the remaining slots.
+	if reservedVocabularyCount > 0 {
+		newQs, err := s.questionRepo.GetNewQuestions(
+			ctx, language, level, string(model.CategoryVocabulary), excludeIDs, reservedVocabularyCount,
+		)
+		if err != nil {
+			log.Printf("Error getting reserved vocabulary questions: %v", err)
+		} else {
+			for _, q := range newQs {
+				appendQuestion(q.ID, false)
+			}
+		}
 	}
+
+	// 3. Fill remaining with new questions (Random Slot Relay)
+	remainingNew := totalQuestions - len(sessionQuestions)
 
 	if remainingNew > 0 && language != "" && level != "" {
 		// Prepare categories for relay. The last empty category acts as a general fallback.
@@ -198,6 +218,10 @@ func (s *SessionBuilderService) buildSession(
 	}
 
 	return session, nil
+}
+
+func divideRoundingUp(dividend, divisor int) int {
+	return (dividend + divisor - 1) / divisor
 }
 
 func (s *SessionBuilderService) GetSessionsByStatus(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {

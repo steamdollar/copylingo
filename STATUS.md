@@ -34,12 +34,15 @@
 
 - [ ] Future Gemini CLI Invocation Stabilization — Gemini CLI wrapper로 provider retry와 Tool Call 오류 탐지를 표준화. see [docs/todos/future_gemini_cli_invocation_stabilization.md](docs/todos/future_gemini_cli_invocation_stabilization.md)
 
+- [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
+
 - 손글씨 쓰기 채점 - 너무 오래 걸림. 대안 필요. (속도를 줄이던가, 그 사이에 뭘 하게끔 하던가)
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-03 | Daily Session Vocabulary 최소 1/3 예약 정책 적용 | `2606030140_daily_session_vocabulary_reservation.md` |
 | 2026-06-02 | Native Spawn 및 Gemini CLI External Delegation Protocol 문서화 | `2606022109_agent_delegation_protocol.md` |
 | 2026-06-02 | Study용 N5 Vocabulary Material Catalog 500개 확장 | `2606022041_expand_n5_vocab_material_catalog.md` |
 | 2026-06-02 | Study Module Task 1: Material SSOT 및 Vocabulary Seed 추가 | `2606021642_material_ssot_seed.md` |
