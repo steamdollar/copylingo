@@ -8,6 +8,27 @@ import (
 	"testing"
 )
 
+func TestNewDefaultPNGStrokeRendererAppliesNewDefaults(t *testing.T) {
+	renderer := NewDefaultPNGStrokeRenderer()
+
+	// Wide input should be capped at max width
+	img := renderTestPNG(t, renderer, []Stroke{
+		{
+			Points: []StrokePoint{
+				{X: 0, Y: 0},
+				{X: 10000, Y: 10},
+			},
+		},
+	})
+
+	if img.Bounds().Dy() != 768 {
+		t.Errorf("expected height 768, got %d", img.Bounds().Dy())
+	}
+	if img.Bounds().Dx() != 2304 {
+		t.Errorf("expected width 2304, got %d", img.Bounds().Dx())
+	}
+}
+
 func TestPNGStrokeRendererRenderPNG(t *testing.T) {
 	renderer := NewPNGStrokeRenderer(64, 192, 8)
 

@@ -12,9 +12,9 @@ import (
 var ErrEmptyStrokes = errors.New("empty handwriting strokes")
 
 const (
-	defaultHandwritingRenderHeight   = 512
-	defaultHandwritingRenderMaxWidth = 1536
-	defaultHandwritingRenderPadding  = 48
+	defaultHandwritingRenderHeight   = 768
+	defaultHandwritingRenderMaxWidth = 2304
+	defaultHandwritingRenderPadding  = 72
 )
 
 // StrokeRenderer converts vector strokes into the compact image sent to Gemini.

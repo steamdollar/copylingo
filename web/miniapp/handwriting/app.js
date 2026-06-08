@@ -16,9 +16,12 @@ const tipEyebrow = document.getElementById("tipEyebrow");
 const tipBody = document.getElementById("tipBody");
 const params = new URLSearchParams(window.location.search);
 
-// 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 한 글자당 정사각형 셀 하나.
-const PAD_CELL_PX = 320;
-const PAD_HEIGHT_PX = 320;
+// 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
+const PAD_CELL_CSS_PX = 320;
+const PAD_HEIGHT_CSS_PX = 320;
+const PAD_SCALE = 2;
+const PAD_CELL_PX = PAD_CELL_CSS_PX * PAD_SCALE;
+const PAD_HEIGHT_PX = PAD_HEIGHT_CSS_PX * PAD_SCALE;
 const PAD_MAX_CELLS = 8;
 
 const TIP_INTERVAL_MS = 15000;
@@ -66,11 +69,11 @@ function configurePad() {
 
 	canvas.width = width;
 	canvas.height = PAD_HEIGHT_PX;
-	canvas.style.width = `${width}px`;
-	canvas.style.height = `${PAD_HEIGHT_PX}px`;
-	canvas.style.backgroundSize = `${PAD_CELL_PX}px ${PAD_CELL_PX}px`;
+	canvas.style.width = `${PAD_CELL_CSS_PX * cells}px`;
+	canvas.style.height = `${PAD_HEIGHT_CSS_PX}px`;
+	canvas.style.backgroundSize = `${PAD_CELL_CSS_PX}px ${PAD_HEIGHT_CSS_PX}px`;
 
-	ctx.lineWidth = 10;
+	ctx.lineWidth = 10 * PAD_SCALE;
 	ctx.lineCap = "round";
 	ctx.lineJoin = "round";
 	ctx.strokeStyle = "#111811";

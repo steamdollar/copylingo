@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker-up docker-down migrate dev app-up app-logs restart-db restart-redis infra tunnel tmux tmux-stop
+.PHONY: build run test clean docker-up docker-down migrate dev app-up app-logs restart-app restart-db restart-redis infra tunnel tmux tmux-stop
 
 # Build the application
 build:
@@ -49,6 +49,37 @@ app-up:
 app-logs:
 	docker compose logs -f app
 
+# Restart the local app process without touching tunnel, DB, or Redis
+restart-app:
+	@echo "[copylingo] restarting app..."
+	@if ! tmux has-session -t copylingo 2>/dev/null; then \
+		echo "[copylingo] tmux session 'copylingo' is not running. Start it with 'make tmux' first." >&2; \
+		exit 1; \
+	fi
+	@pane=$$(tmux list-panes -t copylingo -F '#{pane_id} #{pane_index} #{pane_current_command} #{pane_title}' | awk '$$4=="copylingo-app"{print $$1; exit}'); \
+	if [ -z "$$pane" ]; then \
+		pane=$$(tmux list-panes -t copylingo -F '#{pane_id} #{pane_index} #{pane_current_command}' | awk '$$2!="0" && $$3=="make"{print $$1; exit}'); \
+	fi; \
+	if [ -n "$$pane" ]; then \
+		tmux kill-pane -t "$$pane" 2>/dev/null || true; \
+	fi; \
+	docker stop copylingo-app 2>/dev/null || true; \
+	pkill -f '^air$$' 2>/dev/null || true; \
+	pkill -f '^go run ./cmd/server$$' 2>/dev/null || true; \
+	if command -v fuser >/dev/null 2>&1; then fuser -k 8080/tcp 2>/dev/null || true; fi; \
+	new_pane=$$(tmux split-window -h -P -F '#{pane_id}' -t copylingo:0.0 'make dev'); \
+	tmux select-pane -T copylingo-app -t "$$new_pane"; \
+	tmux select-layout -t copylingo tiled >/dev/null
+	@for i in $$(seq 1 30); do \
+		if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then \
+			echo "[copylingo] app is ready: http://localhost:8080/health"; \
+			exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo "[copylingo] app did not become ready within 30s" >&2; \
+	exit 1
+
 # Restart specific instances
 restart-db:
 	docker compose restart postgres
@@ -80,9 +111,13 @@ tmux: infra
 		tmux kill-session -t copylingo 2>/dev/null || true; \
 		exit 1; \
 	fi; \
-	tmux split-window -h -t copylingo "make dev"; \
-	tmux split-window -v -t copylingo "docker compose logs -f postgres"; \
-	tmux split-window -v -t copylingo:0.2 "docker compose logs -f redis"; \
+	tmux select-pane -T copylingo-tunnel -t copylingo:0.0; \
+	app_pane=$$(tmux split-window -h -P -F '#{pane_id}' -t copylingo "make dev"); \
+	tmux select-pane -T copylingo-app -t "$$app_pane"; \
+	db_pane=$$(tmux split-window -v -P -F '#{pane_id}' -t copylingo "docker compose logs -f postgres"); \
+	tmux select-pane -T copylingo-postgres -t "$$db_pane"; \
+	redis_pane=$$(tmux split-window -v -P -F '#{pane_id}' -t "$$db_pane" "docker compose logs -f redis"); \
+	tmux select-pane -T copylingo-redis -t "$$redis_pane"; \
 	tmux select-layout -t copylingo tiled
 	@tmux select-pane -t copylingo:0.0
 	@echo "--------------------------------------------------------"

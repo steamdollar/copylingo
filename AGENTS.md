@@ -29,6 +29,16 @@
 > Gemini CLI는 **main 작업 흐름에서 떨어져 나온 자기완결 TODO 실행자**입니다. 자기완결적이지 않은 작업은 보내지 않습니다.
 > Runtime에 native subagent 도구가 노출된 경우 [`docs/NATIVE_SUBAGENT_DELEGATION.md`](docs/NATIVE_SUBAGENT_DELEGATION.md)를 우선 따릅니다. Gemini CLI를 외부 process로 호출할 때는 [`docs/GEMINI_CLI_DELEGATION.md`](docs/GEMINI_CLI_DELEGATION.md)의 model 선택, 재시도, 복구 규칙을 따릅니다. 호출된 Gemini CLI executor는 [`docs/GEMINI_CLI_EXECUTION.md`](docs/GEMINI_CLI_EXECUTION.md)를 읽고 실행합니다.
 
+### Subagent 위임 ROI 원칙
+
+Subagent/Gemini 위임은 token 절감을 위한 수단이지 기본값이 아닙니다. Agent는 위임 전에 먼저 비용 대비 효과를 판단합니다.
+
+- 먼저 `rg`, `git diff`, `go test` 등 cheap local scan으로 후보 규모와 작업 성격을 산정합니다.
+- 후보가 10개 이하이거나 정규 패턴 기반의 기계적 검색이면 main agent가 직접 처리합니다.
+- 후보가 많거나 semantic review, 코드 흐름 분석, 테스트 공백 분석처럼 분류 비용이 큰 경우에만 subagent를 호출합니다.
+- 위임 시 "전체 코드베이스를 봐라"보다 "이 후보 목록을 분류하라"처럼 입력 범위를 제한합니다.
+- subagent 결과는 최종 판단이 아닙니다. main agent가 핵심 후보를 재검증하고 최종 판단과 검증 책임을 집니다.
+
 ### 역할 대체 / fallback
 
 > 역할 matrix는 기본값이며 권한 제한이 아닙니다. 사용자가 직접 다른 배정을 지정하면 해당 agent가 수행하되, §3 작업 protocol은 동일하게 적용합니다.
@@ -64,6 +74,8 @@
   2. **plan**: 비자명한 작업이면 plan을 사용자와 합의한 뒤 구현 시작
   3. **구현**: `internal/` 레이어 구조와 코딩 규칙(§5) 준수
   4. **검증**: 코드/마이그레이션/설정 변경 시 `make test` **필수**. 문서-only 작업이면 미실행 사유를 workthrough에 기록
+     - 로컬 runtime에 반영되어야 하는 Go 서버, Mini App static asset, 설정 변경은 검증 후 `make restart-app`으로 App 인스턴스를 재시작하고 `http://localhost:8080/health` 확인까지 수행한다.
+     - DB/Redis/Tunnel은 해당 구성요소를 직접 변경한 경우에만 별도 재시작한다.
   5. **종료**:
      - `STATUS.md` 갱신 — **현재 요청이 "진행 중" 항목 자체를 완료하는 경우에만** "진행 중" → "📝 최근 완료"로 이동. 진행 중 항목과 무관한 side task(예: 문서 정리, 우발적 발견 처리)는 STATUS.md를 건드리지 않거나 "📝 최근 완료"에 한 줄만 추가
      - trivial하지 않은 작업에 대해 `docs/workthrough/YYMMDDhhmm_<job>.md` 생성 — 변경 파일, 결정 사항, 검증 결과
