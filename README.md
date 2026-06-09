@@ -2,25 +2,27 @@
 
 CopyLingo is a personal Japanese learning automation app built around Telegram.
 
-It collects Japanese learning material, generates practice exercises, delivers them through Telegram, grades user answers, and schedules review sessions with an SRS-style workflow. The project is both a real tool I use for my own study and a backend portfolio project focused on practical automation, data modeling, and service integration.
+It is being built to manage Japanese study materials, generate practice exercises, deliver them through Telegram, grade user answers, and schedule review sessions with an SRS-style workflow. The project is both a real tool I use for my own study and a backend portfolio project focused on practical automation, data modeling, and service integration.
 
 ## What it does
 
 Core flow:
 
 ```text
-Content collection → exercise generation → Telegram delivery → answer submission → grading → spaced review
+Study material → exercise generation → Telegram delivery → answer submission → grading → spaced review
 ```
 
 Main capabilities:
 
-- Collects reading material and JLPT-oriented study data from external sources
+- Manages seeded Japanese study materials and generated practice questions
 - Generates Japanese practice exercises for vocabulary, kana, reading, and handwriting flows
 - Delivers questions through a Telegram bot with inline interactions
 - Supports Telegram Mini App based handwriting submissions
 - Stores learning materials, questions, sessions, and review state in PostgreSQL
 - Uses Redis for session/cache-related runtime state
 - Produces structured application logs with interaction IDs for debugging
+
+Planned content ingestion from external reading/JLPT sources is tracked separately in the roadmap and project documents.
 
 ## Why this project exists
 
@@ -40,11 +42,10 @@ That means the project intentionally focuses on backend concerns such as data mo
           ├── PostgreSQL :5432
           ├── Redis :6379
           ├── Gemini API
-          ├── Google Cloud TTS
-          └── External content sources
+          └── Google Cloud TTS
 ```
 
-The Go server owns crawling, API calls, question generation orchestration, Telegram interaction handling, grading, and review scheduling.
+The Go server owns question generation orchestration, Telegram interaction handling, grading, review scheduling, Mini App endpoints, and supporting API calls.
 
 ## Tech stack
 
@@ -214,16 +215,6 @@ Security note: tokens, Telegram `init_data`, raw user answers, and handwriting s
 | `make docker-up` | Start the full Docker Compose stack |
 | `make docker-down` | Stop the full Docker Compose stack |
 | `make test` | Run tests |
-
-## Content sources
-
-| Source | Purpose | Collection method | JLPT level |
-|---|---|---|---|
-| NHK Web Easy | Reading material | RSS feed | N4~N3 |
-| NHK News | Reading material | RSS feed | N2~N1 |
-| Tanos JLPT | Vocabulary / grammar seed data | HTML GET | N1~N5 |
-| JLPT Sensei | Grammar patterns | HTML GET | N1~N5 |
-| jlpt.jp official site | Sample questions | HTML GET | N1~N5 |
 
 ## Project docs
 
