@@ -16,6 +16,7 @@ const (
 	PrefixMenu     = "menu:"
 	PrefixSession  = "session:"
 	PrefixQuestion = "q:"
+	PrefixStudy    = "study:"
 )
 
 // Callback Data Actions
@@ -58,6 +59,9 @@ const (
 	FormatSessionFinish  = "session:%d:finish"
 	FormatQuestionAnswer = "q:%d:%d:%d"
 	FormatQuestionNext   = "q:%d:next:%d"
+	FormatStudyStart     = "study:%d:start"
+	FormatStudyNext      = "study:%d:next:%d"
+	FormatStudyFinish    = "study:%d:finish:%d"
 )
 
 type RedisKeyFormat string
@@ -76,6 +80,11 @@ const (
 	// Value: JSON-encoded model.ActiveSessionState containing session metadata,
 	// ordered session_questions, question copies, progress, current index, and timestamps.
 	ActiveSessionWorkingSetRedisKey RedisKeyFormat = "session:%d:working_set"
+
+	// StudySessionWorkingSetRedisKey stores the full in-progress study session working set.
+	// Value: JSON-encoded model.StudyActiveSessionState containing session metadata,
+	// ordered session_materials, material copies, progress, current index, and timestamps.
+	StudySessionWorkingSetRedisKey RedisKeyFormat = "study_session:%d:working_set"
 
 	// UserActiveQuestionRedisKey tracks the text-answer question currently waiting for a chat reply.
 	// Value: "session_id:question_index". Used by fill-blank/subjective text input handling.

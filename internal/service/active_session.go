@@ -2,12 +2,9 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
@@ -30,12 +27,6 @@ type activeSessionRepository interface {
 	FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error
 }
 
-type activeSessionRedis interface {
-	Get(ctx context.Context, key string) *redis.StringCmd
-	Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd
-	Del(ctx context.Context, keys ...string) *redis.IntCmd
-}
-
 type activeSessionScheduler interface {
 	ScheduleAnswer(question *model.Question, isCorrect bool)
 }
@@ -55,13 +46,31 @@ type SessionResult struct {
 
 // ActiveSessionService owns the Redis working set for in-progress learning sessions.
 type ActiveSessionService struct {
-	repo activeSessionRepository
-	rdb  activeSessionRedis
-	srs  activeSessionScheduler
+	repo  activeSessionRepository
+	store *workingSetStore[model.ActiveSessionState]
+	srs   activeSessionScheduler
 }
 
-func NewActiveSessionService(repo activeSessionRepository, rdb activeSessionRedis, srs activeSessionScheduler) *ActiveSessionService {
-	return &ActiveSessionService{repo: repo, rdb: rdb, srs: srs}
+func NewActiveSessionService(
+	repo activeSessionRepository,
+	rdb workingSetRedis,
+	srs activeSessionScheduler,
+) *ActiveSessionService {
+	return &ActiveSessionService{
+		repo: repo,
+		store: newWorkingSetStore[model.ActiveSessionState](
+			rdb,
+			activeSessionWorkingSetKey,
+			activeSessionWorkingSetTTL,
+			validateActiveSessionState,
+			workingSetErrors{
+				DependencyMissing: ErrActiveSessionDependencyMissing,
+				NotFound:          ErrActiveSessionNotFound,
+				Corrupt:           ErrActiveSessionCorrupt,
+			},
+		),
+		srs: srs,
+	}
 }
 
 func (s *ActiveSessionService) CreateFromDB(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
@@ -88,36 +97,20 @@ func (s *ActiveSessionService) CreateFromDB(ctx context.Context, sessionID int) 
 
 // Get retrieves the active session working set from Redis. If not found, it attempts to recover from DB and store in Redis.
 func (s *ActiveSessionService) Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
-	if s.rdb == nil {
-		return nil, ErrActiveSessionDependencyMissing
-	}
-
-	key := activeSessionWorkingSetKey(sessionID)
-	raw, err := s.rdb.Get(ctx, key).Result()
+	state, err := s.store.get(ctx, sessionID)
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			// Auto-recover from DB if missing in Redis
+		if errors.Is(err, ErrActiveSessionNotFound) {
 			state, err := s.CreateFromDB(ctx, sessionID)
 			if err != nil {
 				return nil, fmt.Errorf("%w session_id=%d: %v", ErrActiveSessionNotFound, sessionID, err)
 			}
 			return state, nil
 		}
-		return nil, fmt.Errorf("get active session state session_id=%d: %w", sessionID, err)
+		return nil, err
 	}
 
-	var state model.ActiveSessionState
-	if err := json.Unmarshal([]byte(raw), &state); err != nil {
-		_ = s.Delete(ctx, sessionID)
-		return nil, fmt.Errorf("%w session_id=%d: %v", ErrActiveSessionCorrupt, sessionID, err)
-	}
-	if state.Version != model.ActiveSessionStateVersion || state.Session.ID != sessionID {
-		_ = s.Delete(ctx, sessionID)
-		return nil, fmt.Errorf("%w session_id=%d", ErrActiveSessionCorrupt, sessionID)
-	}
 	state.RecountAnswered()
-
-	return &state, nil
+	return state, nil
 }
 
 func (s *ActiveSessionService) SetCurrentIndex(ctx context.Context, sessionID, idx int) error {
@@ -134,7 +127,12 @@ func (s *ActiveSessionService) SetCurrentIndex(ctx context.Context, sessionID, i
 	return s.save(ctx, state)
 }
 
-func (s *ActiveSessionService) RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {
+func (s *ActiveSessionService) RecordAnswer(
+	ctx context.Context,
+	sessionID, questionID int,
+	userAnswer string,
+	isCorrect bool,
+) error {
 	state, err := s.Get(ctx, sessionID)
 	if err != nil {
 		return err
@@ -192,24 +190,14 @@ func (s *ActiveSessionService) Flush(ctx context.Context, sessionID int, userID 
 }
 
 func (s *ActiveSessionService) Delete(ctx context.Context, sessionID int) error {
-	if s.rdb == nil {
-		return ErrActiveSessionDependencyMissing
-	}
-	if err := s.rdb.Del(ctx, activeSessionWorkingSetKey(sessionID)).Err(); err != nil {
+	if err := s.store.delete(ctx, sessionID); err != nil {
 		return fmt.Errorf("delete active session working set session_id=%d: %w", sessionID, err)
 	}
 	return nil
 }
 
 func (s *ActiveSessionService) save(ctx context.Context, state *model.ActiveSessionState) error {
-	if s.rdb == nil {
-		return ErrActiveSessionDependencyMissing
-	}
-	raw, err := json.Marshal(state)
-	if err != nil {
-		return fmt.Errorf("marshal active session state session_id=%d: %w", state.Session.ID, err)
-	}
-	if err := s.rdb.Set(ctx, activeSessionWorkingSetKey(state.Session.ID), raw, activeSessionWorkingSetTTL).Err(); err != nil {
+	if err := s.store.save(ctx, state.Session.ID, state); err != nil {
 		return fmt.Errorf("set active session working set session_id=%d: %w", state.Session.ID, err)
 	}
 	return nil
@@ -234,4 +222,11 @@ func sessionResultFromState(state *model.ActiveSessionState) *SessionResult {
 
 func activeSessionWorkingSetKey(sessionID int) string {
 	return config.ActiveSessionWorkingSetRedisKey.Format(sessionID)
+}
+
+func validateActiveSessionState(state *model.ActiveSessionState, sessionID int) error {
+	if state.Version != model.ActiveSessionStateVersion || state.Session.ID != sessionID {
+		return ErrActiveSessionCorrupt
+	}
+	return nil
 }

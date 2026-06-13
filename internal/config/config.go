@@ -61,7 +61,7 @@ type TelegramConfig struct {
 // 마이그레이션이 필요할 때 로직 코드 수정 전혀 없이 환경변수(BaseURL, API Key)만으로 즉각 교체할 수 있어 유지보수성이 극대화
 type LLMConfig struct {
 	APIKey  string `mapstructure:"api_key"`
-	Model   string `mapstructure:"model"`    // gpt-4o-mini
+	Model   string `mapstructure:"model"`    // gemini-3.1-flash-lite
 	BaseURL string `mapstructure:"base_url"` // https://generativelanguage.googleapis.com/v1beta/openai/
 }
 
@@ -77,6 +77,7 @@ type ScheduleConfig struct {
 	ContentCollectCron string `mapstructure:"content_collect_cron"` // 콘텐츠 수집 크론
 	MorningBuildCron   string `mapstructure:"morning_build_cron"`   // 오전 세션 빌드 크론
 	MorningPushCron    string `mapstructure:"morning_push_cron"`    // 오전 세션 푸시 크론
+	StudyPushCron      string `mapstructure:"study_push_cron"`      // 정오 Study 세션 푸시 크론
 	EveningBuildCron   string `mapstructure:"evening_build_cron"`   // 오후 세션 빌드 크론
 	EveningPushCron    string `mapstructure:"evening_push_cron"`    // 오후 세션 푸시 크론
 }
@@ -126,8 +127,11 @@ func Load() (*Config, error) {
 	viper.SetDefault("telegram.debug", false)
 
 	// llm
-	viper.SetDefault("llm.model", "gemini-3.1-flash-lite")                                       // default to LLM model
-	viper.SetDefault("llm.base_url", "https://generativelanguage.googleapis.com/v1beta/openai/") // LLM compatibility layer
+	viper.SetDefault("llm.model", "gemini-3.1-flash-lite") // default to LLM model
+	viper.SetDefault(
+		"llm.base_url",
+		"https://generativelanguage.googleapis.com/v1beta/openai/",
+	) // LLM compatibility layer
 
 	// tts
 	viper.SetDefault("tts.enabled", true)
@@ -139,6 +143,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *") // 매일 03:00
 	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")  // 매일 07:30
 	viper.SetDefault("schedule.morning_push_cron", "0 8 * * *")    // 매일 08:00
+	viper.SetDefault("schedule.study_push_cron", "0 12 * * *")     // 매일 12:00
 	viper.SetDefault("schedule.evening_build_cron", "30 20 * * *") // 매일 20:30
 	viper.SetDefault("schedule.evening_push_cron", "0 21 * * *")   // 매일 21:00
 
@@ -198,6 +203,7 @@ func bindEnv() error {
 		"schedule.content_collect_cron",
 		"schedule.morning_build_cron",
 		"schedule.morning_push_cron",
+		"schedule.study_push_cron",
 		"schedule.evening_build_cron",
 		"schedule.evening_push_cron",
 		"logging.dir",

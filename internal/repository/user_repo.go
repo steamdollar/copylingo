@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
+
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -24,13 +26,13 @@ func (r *UserRepository) GetOrCreate(ctx context.Context, telegramID int64, user
 	}
 
 	// Create new user with default Japanese/N5
-	_, err = r.db.ExecContext(ctx, `
+	// TODO: ja, N5 defaults should be determined by user input or locale
+	if _, err := r.db.ExecContext(ctx, `
 		INSERT INTO users (id, username, language, proficiency_level, streak_days, timezone)
 		VALUES ($1, $2, 'ja', 'N5', 0, 'Asia/Seoul')
 		ON CONFLICT (id) DO NOTHING
-	`, telegramID, username)
-	if err != nil {
-		return nil, err
+	`, telegramID, username); err != nil {
+		return nil, fmt.Errorf("UserRepository.GetOrCreate telegram_id=%d: %w", telegramID, err)
 	}
 
 	return r.GetByID(ctx, telegramID)
@@ -78,10 +80,12 @@ func (r *UserRepository) UpdateStreak(ctx context.Context, userID int64) error {
 		newStreak = user.StreakDays + 1
 	}
 
-	_, err = r.db.ExecContext(ctx, `
+	if _, err := r.db.ExecContext(ctx, `
 		UPDATE users SET streak_days = $2, streak_last_date = $3 WHERE id = $1
-	`, userID, newStreak, today)
-	return err
+	`, userID, newStreak, today); err != nil {
+		return fmt.Errorf("UserRepository.UpdateStreak user_id=%d: %w", userID, err)
+	}
+	return nil
 }
 
 // GetAllUsers returns all registered users (for scheduled pushes).

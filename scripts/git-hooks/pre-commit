@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# CopyLingo pre-commit hook
+# staged 된 .go 파일을 golangci-lint fmt(golines 줄바꿈 + gofmt + goimports)로
+# 자동 정리하고 다시 stage 한다. → 커밋만 하면 라인 폭/포맷이 자동 정돈됨.
+#
+# 활성화: make hooks   (git config core.hooksPath scripts/git-hooks)
+set -euo pipefail
+
+# staged 상태의 Go 파일만 대상 (추가/수정/복사된 것)
+mapfile -t files < <(git diff --cached --name-only --diff-filter=ACM -- '*.go')
+[ ${#files[@]} -eq 0 ] && exit 0
+
+# golangci-lint 탐색: PATH 우선, 없으면 GOPATH/bin
+LINT="golangci-lint"
+if ! command -v "$LINT" >/dev/null 2>&1; then
+	LINT="$(go env GOPATH)/bin/golangci-lint"
+fi
+if [ ! -x "$LINT" ] && ! command -v "$LINT" >/dev/null 2>&1; then
+	echo "pre-commit: golangci-lint 가 없습니다. 'make lint-install' 후 다시 커밋하세요." >&2
+	exit 1
+fi
+
+# 포맷 적용 (working tree 파일을 직접 수정) 후 재-stage
+"$LINT" fmt "${files[@]}"
+git add -- "${files[@]}"

@@ -8,27 +8,31 @@ import (
 
 // Repositories holds all repository instances.
 type Repositories struct {
-	User            *UserRepository
-	Content         *ContentRepository
-	Material        *MaterialRepository
-	Question        *QuestionRepository
-	Session         *SessionRepository
-	SessionQuestion *SessionQuestionRepository
-	ActiveSession   *ActiveSessionRepository
-	Tip             *TipRepository
+	User               *UserRepository
+	Content            *ContentRepository
+	Material           *MaterialRepository
+	Question           *QuestionRepository
+	Session            *SessionRepository
+	SessionQuestion    *SessionQuestionRepository
+	SessionMaterial    *SessionMaterialRepository
+	ActiveSession      *ActiveSessionRepository
+	StudyActiveSession *StudyActiveSessionRepository
+	Tip                *TipRepository
 }
 
 // NewRepositories creates all repositories with the given DB connection.
 func NewRepositories(db *sqlx.DB) *Repositories {
 	return &Repositories{
-		User:            NewUserRepository(db),
-		Content:         NewContentRepository(db),
-		Material:        NewMaterialRepository(db),
-		Question:        NewQuestionRepository(db),
-		Session:         NewSessionRepository(db),
-		SessionQuestion: NewSessionQuestionRepository(db),
-		ActiveSession:   NewActiveSessionRepository(db),
-		Tip:             NewTipRepository(db),
+		User:               NewUserRepository(db),
+		Content:            NewContentRepository(db),
+		Material:           NewMaterialRepository(db),
+		Question:           NewQuestionRepository(db),
+		Session:            NewSessionRepository(db),
+		SessionQuestion:    NewSessionQuestionRepository(db),
+		SessionMaterial:    NewSessionMaterialRepository(db),
+		ActiveSession:      NewActiveSessionRepository(db),
+		StudyActiveSession: NewStudyActiveSessionRepository(db),
+		Tip:                NewTipRepository(db),
 	}
 }
 

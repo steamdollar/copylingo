@@ -1,0 +1,97 @@
+# golangci-lint v2 설정 — CopyLingo
+# 핵심 목적: 라인이 옆으로 과하게 퍼지는 것을 막고(golines 자동 줄바꿈 + lll 보고),
+#            실무 표준 수준의 정적 분석을 적용한다.
+#
+# 사용법:
+#   make lint   → 진단만 (golangci-lint run)
+#   make fmt    → 포매터 자동 적용 (gofmt/goimports/golines) + 자동수정 가능한 린터 fix
+version: "2"
+
+run:
+  timeout: 5m
+
+# ---------------------------------------------------------------------------
+# 진단용 린터 (보고 위주). 자동 줄바꿈은 아래 formatters.golines가 담당.
+# ---------------------------------------------------------------------------
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - revive # golint 후속 — 네이밍/스타일
+    - gocritic # 광범위한 코드 스멜
+    - gocyclo # 순환 복잡도
+    - misspell # 오타
+    - errorlint # %w 래핑/에러 비교 정확성 (프로젝트 에러 규약과 일치)
+    - bodyclose # http response body 닫힘 보장
+    - unconvert # 불필요한 타입 변환
+    - nakedret # 긴 함수의 naked return 금지
+    - nolintlint # //nolint 지시문 위생
+    - lll # 라인 길이 — golines가 못 줄인 잔여분을 보고
+
+  settings:
+    lll:
+      line-length: 120
+      tab-width: 4
+    gocyclo:
+      min-complexity: 25
+    misspell:
+      locale: US
+    nakedret:
+      max-func-lines: 30
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: var-declaration
+        - name: var-naming
+
+  exclusions:
+    generated: lax
+    presets:
+      - common-false-positives
+      - std-error-handling
+    rules:
+      # 테스트 코드는 길이/복잡도/에러체크를 느슨하게
+      - path: _test\.go
+        linters:
+          - lll
+          - gocyclo
+          - errcheck
+          - bodyclose
+      # 마이그레이션/생성물 등 긴 SQL 문자열 라인 허용
+      - source: '^\s*//go:'
+        linters:
+          - lll
+
+# ---------------------------------------------------------------------------
+# 포매터 — `golangci-lint fmt` (= make fmt) 로 자동 적용/수정.
+# golines가 긴 라인을 실제로 줄바꿈해 준다.
+# ---------------------------------------------------------------------------
+formatters:
+  enable:
+    - gofmt
+    - goimports
+    - golines
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/lsj/copylingo
+    golines:
+      max-len: 120
+      tab-len: 4
+      # 긴 주석까지 강제로 자르지는 않음 (코드 라인 위주로 정리)
+      shorten-comments: false
+      reformat-tags: true

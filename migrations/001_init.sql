@@ -1,5 +1,5 @@
 -- CopyLingo Initial Schema (Multi-language Support)
--- 7 tables: users, contents, materials, questions (with SRS), sessions, session_questions, tips
+-- 9 tables: users, contents, materials, user_material_progress, questions (with SRS), sessions, session_materials, session_questions, tips
 
 -----------------------------------------------------------
 -- users
@@ -51,6 +51,27 @@ CREATE TABLE IF NOT EXISTS materials (
 );
 
 -----------------------------------------------------------
+-- user_material_progress (user-specific SRS state for study materials)
+-----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_material_progress (
+    user_id          BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    material_id      INT NOT NULL REFERENCES materials(id),
+    ease_factor      DOUBLE PRECISION NOT NULL DEFAULT 2.5,
+    interval_days    INT NOT NULL DEFAULT 0,
+    repetitions      INT NOT NULL DEFAULT 0,
+    next_review_at   TIMESTAMPTZ,
+    last_studied_at  TIMESTAMPTZ,
+    times_studied    INT NOT NULL DEFAULT 0,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, material_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_material_progress_due
+    ON user_material_progress(user_id, next_review_at)
+    WHERE next_review_at IS NOT NULL;
+
+-----------------------------------------------------------
 -- questions (generated learning questions + SRS state)
 -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS questions (
@@ -87,7 +108,8 @@ CREATE INDEX IF NOT EXISTS idx_questions_language_level ON questions(language, p
 CREATE TABLE IF NOT EXISTS sessions (
     id              SERIAL PRIMARY KEY,
     user_id         BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type            VARCHAR(20) NOT NULL,                       -- morning, evening, review, article
+    type            VARCHAR(20) NOT NULL,                       -- morning, evening, review, article, study
+    mode            VARCHAR(20) NOT NULL,                       -- quiz | study (application-owned enum)
     status          VARCHAR(20) NOT NULL DEFAULT 'pending',     -- pending, in_progress, completed, expired
     total_questions INT NOT NULL DEFAULT 0,
     correct_count   INT NOT NULL DEFAULT 0,
@@ -97,6 +119,22 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at);
+
+-----------------------------------------------------------
+-- session_materials (join: session <-> material + study progress)
+-----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS session_materials (
+    id              SERIAL PRIMARY KEY,
+    session_id      INT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    material_id     INT NOT NULL REFERENCES materials(id),
+    material_order  INT NOT NULL,
+    studied_at      TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (session_id, material_id),
+    UNIQUE (session_id, material_order)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_materials_session_id ON session_materials(session_id);
 
 -----------------------------------------------------------
 -- session_questions (join: session <-> question + user answer)

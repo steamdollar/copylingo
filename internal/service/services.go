@@ -10,14 +10,16 @@ import (
 
 // Services holds all service instances.
 type Services struct {
-	User           *UserService
-	SRS            *SRSService
-	SessionBuilder *SessionBuilderService
-	ActiveSession  *ActiveSessionService
-	Grader         *GraderService
-	Handwriting    *HandwritingService
-	Analyzer       *AnalyzerService
-	Tip            *TipService
+	User               *UserService
+	SRS                *SRSService
+	SessionBuilder     *SessionBuilderService
+	StudySession       *StudySessionService
+	StudyActiveSession *StudyActiveSessionService
+	ActiveSession      *ActiveSessionService
+	Grader             *GraderService
+	Handwriting        *HandwritingService
+	Analyzer           *AnalyzerService
+	Tip                *TipService
 }
 
 // NewServices creates all services with the given dependencies.
@@ -33,10 +35,12 @@ func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.C
 		SRS:  srsService,
 		SessionBuilder: NewSessionBuilderService(repos.Question,
 			repos.Session, repos.SessionQuestion, srsService),
-		ActiveSession: activeSessionService,
-		Grader:        graderService,
-		Handwriting:   NewHandwritingService(activeSessionService, graderService, nil),
-		Analyzer:      NewAnalyzerService(repos.User, repos.SessionQuestion),
-		Tip:           NewTipService(repos.Tip),
+		StudySession:       NewStudySessionService(repos.Material, repos.Session, repos.SessionMaterial),
+		StudyActiveSession: NewStudyActiveSessionService(repos.StudyActiveSession, repos.Session, rdb),
+		ActiveSession:      activeSessionService,
+		Grader:             graderService,
+		Handwriting:        NewHandwritingService(activeSessionService, graderService, nil),
+		Analyzer:           NewAnalyzerService(repos.User, repos.SessionQuestion),
+		Tip:                NewTipService(repos.Tip),
 	}
 }

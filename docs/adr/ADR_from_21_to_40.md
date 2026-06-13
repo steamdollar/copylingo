@@ -91,3 +91,79 @@
   - 새 문항 슬롯의 절반만 Vocabulary로 예약: Evening Session 전체의 1/3을 보장하지 못해 기각.
   - Relay 순서만 Vocabulary 우선으로 변경: 최소 비율을 명시적으로 보장하지 못해 기각.
   - 기존 Random Slot Relay 유지: Kana 편중 문제가 지속되어 기각.
+
+---
+
+## ADR-024: Study Session은 sessions 공통 Parent와 session_materials Child로 관리
+
+- **날짜**: 2026-06-06
+- **상태**: 채택됨
+- **맥락**:
+  - Study Module은 `materials`를 학습 카드 SSOT로 추가했지만, 실제 사용자 session lifecycle에는 아직 연결되지 않았다.
+  - Quiz Session과 Study Session은 payload child가 다르지만, 사용자에게 Push되고 시작/완료되는 lifecycle은 같다.
+  - 기존 `sessions`에는 `user_id`, `type`, `status`, `started_at`, `completed_at`, `created_at` 등 공통 lifecycle 컬럼이 이미 있다.
+- **결정**:
+  - 별도 `study_sessions` parent table을 만들지 않고 기존 `sessions`를 Quiz/Study 공통 parent로 유지한다.
+  - `sessions.mode VARCHAR(20) NOT NULL`를 추가해 interaction model을 `quiz`와 `study`로 구분한다.
+  - `mode` 값은 DB default에 기대지 않고 application layer의 `model.SessionMode` enum으로 명시적으로 세팅하고 검증한다.
+  - Study child table로 `session_materials`를 추가한다.
+  - Material 반복 학습 상태는 `user_material_progress`에 user별 SRS state로 저장한다.
+  - `session_materials.session_id`는 `sessions(id) ON DELETE CASCADE`를 사용한다. Session이 삭제되면 child progress row는 독립 의미가 없다.
+  - `session_materials.material_id`는 `materials(id)` FK를 두되 CASCADE를 사용하지 않는다. Material은 catalog SSOT라 session 삭제 lifecycle에 종속되지 않는다.
+  - Study 진행 상태는 진행 중에는 Redis Working Set에 저장하고, 완료 시 DB에 한 번에 flush한다.
+  - Quiz `ActiveSessionService`와 Study `StudyActiveSessionService`는 domain service를 분리하되, Redis get/save/delete 공통 로직은 generic `workingSetStore[T]`로 공유한다.
+  - Study card 이동 callback은 Redis의 `StudyActiveSessionState`만 갱신한다. `session_materials.studied_at`, `sessions.status`, `user_material_progress`는 finish 시 transaction으로 반영한다.
+  - Redis miss 또는 재시작 복구 시에는 DB의 `sessions`와 `session_materials`에서 Study Working Set을 재구성한다.
+  - DB flush는 이미 completed 된 session이면 material/progress 갱신을 건너뛰어 중복 finish callback에도 progress를 재증가시키지 않는다.
+  - 정오 Study Session 생성은 due Material(`next_review_at <= NOW()`)을 우선하고, 부족한 슬롯은 신규 Material(`progress row 없음`)로 채운다.
+  - 정오 Scheduler는 사용자 `language`, `proficiency_level`에 맞는 Material로 `mode='study'`, `type='study'` session을 생성하고 Telegram으로 Push한다.
+- **장점**:
+  - Session lifecycle, Scheduler, Telegram push 관점을 공통 parent로 재사용할 수 있다.
+  - Quiz child(`session_questions`)와 Study child(`session_materials`)가 분리되어 payload별 책임이 명확하다.
+  - `sessions.mode`로 기존 Quiz flow가 Study session을 잘못 ActiveSession으로 로드하는 문제를 차단할 수 있다.
+  - Study card마다 DB write를 하지 않으므로 callback 진행 중 DB 부하와 write amplification을 줄일 수 있다.
+  - Redis Working Set 공통 로직을 공유해 Quiz/Study의 cache lifecycle 오류 처리와 corrupt state 삭제 정책을 일관되게 유지할 수 있다.
+  - 완료 시 transaction flush로 `sessions`, `session_materials`, `user_material_progress`의 상태 전이를 한 경계에 묶을 수 있다.
+  - 기존 Question SRS는 `questions` row 자체에 state가 있어 user별 SRS가 아니다. Material SRS는 처음부터 user별 progress table로 분리해 다중 사용자 확장성을 확보한다.
+- **단점 / 트레이드오프**:
+  - `sessions.total_questions`, `correct_count` 명칭은 Study에는 어색하다. 현재는 Breaking Change를 피하고 Study의 material count를 `total_questions`에 저장한다.
+  - Study와 Quiz의 완료 의미가 달라 향후 analytics에서 mode별 aggregation 분기가 필요하다.
+  - 하나의 parent table에 여러 mode가 공존하므로 repository query는 mode 조건을 명시해야 한다.
+  - Redis Working Set이 유실되면 마지막 DB flush 이전 card 진행 상태는 복구되지 않는다. 현재는 DB 상태 기준으로 미학습 카드부터 재개한다.
+  - 완료 직전까지 DB에는 card별 `studied_at`이 반영되지 않으므로 실시간 학습 진행률 analytics는 Redis 또는 별도 event stream을 봐야 한다.
+  - `user_material_progress`는 Material용 SRS를 먼저 도입하므로, 향후 Question SRS도 `user_question_progress`로 분리하는 후속 설계가 필요하다.
+- **대안**:
+  - 별도 `study_sessions` parent table: Study 도메인 컬럼명은 깔끔하지만 status/start/complete/push/history 로직이 중복되고 전체 학습 timeline 조회가 UNION 중심이 되어 기각.
+  - `materials`를 Telegram 메시지로만 Push: 구현은 빠르지만 session 기록, idempotency, 완료 추적이 없어 기각.
+  - `materials` table에 SRS 컬럼 추가: Question SRS와 비슷하지만 user별 반복 상태를 표현할 수 없어 기각.
+  - `session_materials` 이력만으로 least-seen/oldest-seen 정렬: schema 추가 없이 반복 노출은 가능하지만 interval/ease factor 기반 Review Scheduling이 없어 기각.
+  - Study card마다 DB write: 구현은 단순하지만 card 수와 사용자 수가 늘 때 callback path에서 N write가 발생해 기각.
+  - Quiz `ActiveSessionService`를 Study에도 직접 재사용: Redis lifecycle은 공유할 수 있지만 answer scheduling, correct count, question payload 의미가 달라 domain coupling이 커져 기각.
+  - `session_materials`에 FK를 두지 않음: sharding/MSA 환경에서는 선택될 수 있으나 현재 단일 Postgres SSOT에서는 orphan row 리스크가 더 커 기각.
+
+## ADR-025: 코드 스타일은 golangci-lint v2로 강제하고 라인 폭 정리는 commit-time에 자동화
+
+- **날짜**: 2026-06-12
+- **상태**: 채택됨
+- **맥락**:
+  - `make lint`는 golangci-lint를 호출했지만 `.golangci.yml` 설정도 바이너리도 없어 사실상 동작하지 않았다.
+  - 라인이 옆으로 과하게 퍼지는 것을 막고 싶지만, gofmt/goimports/gopls는 라인 길이 줄바꿈을 하지 않는다.
+  - 포매팅을 위해 매번 수동 명령을 실행하는 것은 누락되기 쉽다. "코드만 작성하면 자동 정리"가 요구사항이었다.
+- **결정**:
+  - golangci-lint **v2** 스키마(`.golangci.yml`)를 SSOT로 두고 `linters`(진단)와 `formatters`(자동 적용)를 분리한다.
+  - 라인 길이 기준은 **120자**로 통일한다. `golines` 포매터가 120자 초과 라인을 자동 줄바꿈하고, golines가 못 줄이는 잔여분(긴 문자열 리터럴 등)은 `lll` 린터가 보고만 한다.
+  - 자동화 시점은 **save-time이 아니라 commit-time**으로 한다. git pre-commit hook(`scripts/git-hooks/pre-commit`)이 staged `.go`를 `golangci-lint fmt` 후 재-stage한다. hook은 레포에 커밋하고 `make hooks`(`core.hooksPath`)로 활성화한다.
+  - 린터는 실무 표준 세트(standard + revive, gocritic, gocyclo, misspell, errorlint, bodyclose, unconvert, nakedret, nolintlint, lll)를 적용한다. 테스트 파일은 길이/복잡도/에러체크 룰을 완화한다.
+- **장점**:
+  - 라인 폭 정리가 사람 손과 무관하게 commit마다 일관 적용된다.
+  - hook과 설정이 레포에 있어 에디터·OS 독립적이고 재현 가능하다 (실무 CI/팀 환경 가정).
+  - `errorlint`가 프로젝트의 `%w` 에러 래핑 규약(CLAUDE.md §5)을 정적으로 보강한다.
+  - 포매팅을 gopls의 save-time 동작에 묶지 않아 golines 같은 비-gopls 포매터도 안정적으로 적용된다.
+- **단점 / 트레이드오프**:
+  - `core.hooksPath`는 로컬 git 설정이라 새 클론 환경마다 `make hooks` 1회가 필요하다.
+  - 포맷이 commit 시점에만 적용되므로 작성 중 에디터에서는 긴 라인이 그대로 보인다(save-time보다 피드백이 늦음).
+  - hook은 staged 파일을 working-tree에서 포맷 후 add하므로, 같은 파일의 unstaged 변경이 함께 stage될 수 있다(부분 커밋 시 주의).
+- **대안**:
+  - VSCode save-time 포맷(formatTool→golines / Run-on-Save 확장): 피드백은 즉각적이나 설정이 개인 PC에 종속되고 에디터 의존성이 커 기각.
+  - `lll`만 적용(보고 전용): 위반을 알려주지만 자동 수정이 없어 "치면 자동" 요구를 충족하지 못해 기각.
+  - pre-commit/lefthook 프레임워크: 기능은 풍부하나 외부 도구 의존성이 늘어 단순 git hook + Makefile로 충분하다 판단해 기각.

@@ -35,7 +35,12 @@ func (f *fakeActiveSessionRedis) Get(ctx context.Context, key string) *redis.Str
 	return redis.NewStringResult(val, nil)
 }
 
-func (f *fakeActiveSessionRedis) Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd {
+func (f *fakeActiveSessionRedis) Set(
+	ctx context.Context,
+	key string,
+	value any,
+	expiration time.Duration,
+) *redis.StatusCmd {
 	if f.setErr != nil {
 		return redis.NewStatusResult("", f.setErr)
 	}
@@ -69,7 +74,10 @@ type fakeActiveSessionRepo struct {
 	flushFn func(ctx context.Context, state *model.ActiveSessionState) error
 }
 
-func (f *fakeActiveSessionRepo) LoadActiveSession(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
+func (f *fakeActiveSessionRepo) LoadActiveSession(
+	ctx context.Context,
+	sessionID int,
+) (*model.ActiveSessionState, error) {
 	return f.loadFn(ctx, sessionID)
 }
 
@@ -168,6 +176,28 @@ func TestActiveSessionGetCorruptDeletesKey(t *testing.T) {
 	}
 }
 
+func TestActiveSessionGetCorruptReturnsDeleteError(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	deleteErr := errors.New("redis delete failed")
+	rdb := newFakeActiveSessionRedis()
+	key := config.ActiveSessionWorkingSetRedisKey.Format(sessionID)
+	rdb.values[key] = "{broken"
+	rdb.delErr = deleteErr
+	svc := NewActiveSessionService(nil, rdb, nil)
+
+	_, err := svc.Get(ctx, sessionID)
+	if !errors.Is(err, ErrActiveSessionCorrupt) {
+		t.Fatalf("expected ErrActiveSessionCorrupt, got %v", err)
+	}
+	if !errors.Is(err, deleteErr) {
+		t.Fatalf("expected delete error in error chain, got %v", err)
+	}
+	if _, ok := rdb.values[key]; !ok {
+		t.Fatal("expected corrupt key to remain when delete fails")
+	}
+}
+
 func TestActiveSessionRecordAnswerUpdatesProgressAndSRS(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
@@ -196,7 +226,11 @@ func TestActiveSessionRecordAnswerUpdatesProgressAndSRS(t *testing.T) {
 		t.Fatalf("expected correct answer, got %+v", item.SessionQuestion.IsCorrect)
 	}
 	if item.Question.TimesServed != 1 || item.Question.TimesCorrect != 1 {
-		t.Fatalf("expected stats to increment, got served=%d correct=%d", item.Question.TimesServed, item.Question.TimesCorrect)
+		t.Fatalf(
+			"expected stats to increment, got served=%d correct=%d",
+			item.Question.TimesServed,
+			item.Question.TimesCorrect,
+		)
 	}
 	if item.Question.NextReviewAt == nil || item.Question.LastReviewedAt == nil {
 		t.Fatal("expected SRS timestamps to be set")

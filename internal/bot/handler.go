@@ -44,6 +44,7 @@ type Bot struct {
 	services *service.Services
 	rdb      redis.Cmdable
 	flow     *SessionFlow
+	study    *StudyFlow
 	stopCh   chan struct{}
 }
 
@@ -65,6 +66,7 @@ func New(cfg *config.Config, services *service.Services, rdb redis.Cmdable) (*Bo
 	}
 
 	bot.flow = NewSessionFlow(bot)
+	bot.study = NewStudyFlow(bot)
 
 	return bot, nil
 }
@@ -96,11 +98,20 @@ func (b *Bot) Stop() {
 	b.api.StopReceivingUpdates()
 }
 
-// PushSession: 시간마다 세션 시작 메시지 전송
+// PushSession: push session container message to user
 func (b *Bot) PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error {
 	return b.flow.PushSession(ctx, chatID, sessionID, sessionType)
 }
 
+// PushStudySession: sends a material-based study session start message.
+func (b *Bot) PushStudySession(ctx context.Context, chatID int64, sessionID int) error {
+	if b.study == nil {
+		b.study = NewStudyFlow(b)
+	}
+	return b.study.PushSession(ctx, chatID, sessionID)
+}
+
+// TODO: sendMessage, SendMessageWithKeyboard 굳이 따로 두는 이유가?
 // SendMessage sends a text message to a chat.
 func (b *Bot) SendMessage(chatID int64, text string) error {
 	msg := tgbotapi.NewMessage(chatID, sanitizeTelegramHTML(text))
@@ -230,6 +241,8 @@ func callbackType(data string) string {
 		return "session"
 	case strings.HasPrefix(data, config.PrefixQuestion):
 		return "question"
+	case strings.HasPrefix(data, config.PrefixStudy):
+		return "study"
 	default:
 		return "unknown"
 	}
@@ -305,6 +318,11 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.flow.HandleSessionCallback(ctx, cb)
 	case strings.HasPrefix(data, config.PrefixQuestion):
 		b.flow.HandleAnswerCallback(ctx, cb)
+	case strings.HasPrefix(data, config.PrefixStudy):
+		if b.study == nil {
+			b.study = NewStudyFlow(b)
+		}
+		b.study.HandleCallback(ctx, cb)
 	}
 }
 

@@ -22,7 +22,12 @@ var defaultCategoryOrder = []model.QuestionCategory{
 }
 
 type questionFetcher interface {
-	GetNewQuestions(ctx context.Context, language, level, category string, excludeIDs []int, limit int) ([]model.Question, error)
+	GetNewQuestions(
+		ctx context.Context,
+		language, level, category string,
+		excludeIDs []int,
+		limit int,
+	) ([]model.Question, error)
 	GetByID(ctx context.Context, id int) (*model.Question, error)
 }
 
@@ -62,7 +67,11 @@ func NewSessionBuilderService(
 }
 
 // BuildMorningSession creates a morning session with up to 40% review, total 15 questions.
-func (s *SessionBuilderService) BuildMorningSession(ctx context.Context, userID int64, language, level string) (*model.Session, error) {
+func (s *SessionBuilderService) BuildMorningSession(
+	ctx context.Context,
+	userID int64,
+	language, level string,
+) (*model.Session, error) {
 	const totalQuestions = 15
 	const reviewCount = 6 // Up to 40%
 
@@ -70,7 +79,11 @@ func (s *SessionBuilderService) BuildMorningSession(ctx context.Context, userID 
 }
 
 // BuildEveningSession creates an evening session with vocabulary reservation, total 10 questions.
-func (s *SessionBuilderService) BuildEveningSession(ctx context.Context, userID int64, language, level string) (*model.Session, error) {
+func (s *SessionBuilderService) BuildEveningSession(
+	ctx context.Context,
+	userID int64,
+	language, level string,
+) (*model.Session, error) {
 	const totalQuestions = 10
 	const reviewCount = 8 // Reduced to 6 when reserving 4 vocabulary slots.
 
@@ -78,7 +91,11 @@ func (s *SessionBuilderService) BuildEveningSession(ctx context.Context, userID 
 }
 
 // BuildReviewSession creates an on-demand review session from SRS due items.
-func (s *SessionBuilderService) BuildReviewSession(ctx context.Context, userID int64, limit int) (*model.Session, error) {
+func (s *SessionBuilderService) BuildReviewSession(
+	ctx context.Context,
+	userID int64,
+	limit int,
+) (*model.Session, error) {
 	return s.buildSession(ctx, userID, "", "", model.SessionReview, limit, limit)
 }
 
@@ -201,6 +218,7 @@ func (s *SessionBuilderService) buildSession(
 	session := &model.Session{
 		UserID:         userID,
 		Type:           sessionType,
+		Mode:           model.SessionModeQuiz,
 		Status:         model.SessionPending,
 		TotalQuestions: len(sessionQuestions),
 	}
@@ -224,7 +242,11 @@ func divideRoundingUp(dividend, divisor int) int {
 	return (dividend + divisor - 1) / divisor
 }
 
-func (s *SessionBuilderService) GetSessionsByStatus(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+func (s *SessionBuilderService) GetSessionsByStatus(
+	ctx context.Context,
+	userID int64,
+	status config.SessionStatus,
+) ([]model.Session, error) {
 	return s.sessionRepo.GetSessionsByStatus(ctx, userID, status)
 }
 
@@ -249,6 +271,9 @@ func (s *SessionBuilderService) GetQuestion(ctx context.Context, questionID int)
 }
 
 // GetSessionQuestions returns all questions for a session.
-func (s *SessionBuilderService) GetSessionQuestions(ctx context.Context, sessionID int) ([]model.SessionQuestion, error) {
+func (s *SessionBuilderService) GetSessionQuestions(
+	ctx context.Context,
+	sessionID int,
+) ([]model.SessionQuestion, error) {
 	return s.sessionQuestionRepo.GetBySession(ctx, sessionID)
 }

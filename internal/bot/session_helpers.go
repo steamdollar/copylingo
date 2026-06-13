@@ -4,7 +4,9 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/model"
 )
 
 func (sf *SessionFlow) showSessionFetchError(cb *tgbotapi.CallbackQuery) {
@@ -49,9 +51,20 @@ func sessionTypeLabel(t string) string {
 		return "🔄 복습"
 	case "article":
 		return "📖 아티클"
+	case "study":
+		return "☀️ 정오 학습"
 	default:
 		return t
 	}
+}
+
+func firstQuizSession(sessions []model.Session) (model.Session, bool) {
+	for _, session := range sessions {
+		if session.Mode == "" || session.Mode == model.SessionModeQuiz {
+			return session, true
+		}
+	}
+	return model.Session{}, false
 }
 
 func truncate(s string, maxLen int) string {

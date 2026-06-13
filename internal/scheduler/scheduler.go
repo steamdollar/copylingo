@@ -26,7 +26,13 @@ type Scheduler struct {
 }
 
 // New creates a new Scheduler.
-func New(cfg *config.Config, services *service.Services, bot *bot.Bot, orchestrator *pipeline.Orchestrator, c *cron.Cron) *Scheduler {
+func New(
+	cfg *config.Config,
+	services *service.Services,
+	bot *bot.Bot,
+	orchestrator *pipeline.Orchestrator,
+	c *cron.Cron,
+) *Scheduler {
 	return &Scheduler{
 		cfg:          cfg,
 		services:     services,
@@ -40,10 +46,9 @@ func New(cfg *config.Config, services *service.Services, bot *bot.Bot, orchestra
 func (s *Scheduler) Start() {
 	// Content collection (daily at 03:00)
 	if s.orchestrator != nil && s.cfg.Schedule.ContentCollectCron != "" {
-		_, err := s.cron.AddFunc(s.cfg.Schedule.ContentCollectCron, func() {
+		if _, err := s.cron.AddFunc(s.cfg.Schedule.ContentCollectCron, func() {
 			s.runJob("content_collection", 10*time.Minute, s.collectContent)
-		})
-		if err != nil {
+		}); err != nil {
 			slog.Error("Failed to register scheduler job",
 				"event", "scheduler.job.registration_failed",
 				"source", "scheduler",
@@ -61,12 +66,11 @@ func (s *Scheduler) Start() {
 	}
 
 	// Morning session: build and push
-	_, err := s.cron.AddFunc(s.cfg.Schedule.MorningPushCron, func() {
+	if _, err := s.cron.AddFunc(s.cfg.Schedule.MorningPushCron, func() {
 		s.runJob("morning_push", 0, func(ctx context.Context) error {
 			return s.buildAndPushSessions(ctx, model.SessionMorning)
 		})
-	})
-	if err != nil {
+	}); err != nil {
 		slog.Error("Failed to register scheduler job",
 			"event", "scheduler.job.registration_failed",
 			"source", "scheduler",
@@ -82,13 +86,31 @@ func (s *Scheduler) Start() {
 		)
 	}
 
+	// Study session: build and push
+	if _, err := s.cron.AddFunc(s.cfg.Schedule.StudyPushCron, func() {
+		s.runJob("study_push", 0, s.buildAndPushStudySessions)
+	}); err != nil {
+		slog.Error("Failed to register scheduler job",
+			"event", "scheduler.job.registration_failed",
+			"source", "scheduler",
+			"job", "study_push",
+			"error", err,
+		)
+	} else {
+		slog.Info("Scheduler job registered",
+			"event", "scheduler.job.registered",
+			"source", "scheduler",
+			"job", "study_push",
+			"cron", s.cfg.Schedule.StudyPushCron,
+		)
+	}
+
 	// Evening session: build and push
-	_, err = s.cron.AddFunc(s.cfg.Schedule.EveningPushCron, func() {
+	if _, err := s.cron.AddFunc(s.cfg.Schedule.EveningPushCron, func() {
 		s.runJob("evening_push", 0, func(ctx context.Context) error {
 			return s.buildAndPushSessions(ctx, model.SessionEvening)
 		})
-	})
-	if err != nil {
+	}); err != nil {
 		slog.Error("Failed to register scheduler job",
 			"event", "scheduler.job.registration_failed",
 			"source", "scheduler",
@@ -183,9 +205,19 @@ func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.
 
 		switch sessionType {
 		case model.SessionMorning:
-			session, err = s.services.SessionBuilder.BuildMorningSession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+			session, err = s.services.SessionBuilder.BuildMorningSession(
+				ctx,
+				user.ID,
+				user.Language,
+				user.ProficiencyLevel,
+			)
 		case model.SessionEvening:
-			session, err = s.services.SessionBuilder.BuildEveningSession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+			session, err = s.services.SessionBuilder.BuildEveningSession(
+				ctx,
+				user.ID,
+				user.Language,
+				user.ProficiencyLevel,
+			)
 		}
 
 		if err != nil {
@@ -230,6 +262,61 @@ func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.
 	}
 	if failures > 0 {
 		return fmt.Errorf("%d session operations failed", failures)
+	}
+	return nil
+}
+
+func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
+	users, err := s.services.User.GetAllUsers(ctx)
+	if err != nil {
+		return fmt.Errorf("get users for study sessions: %w", err)
+	}
+
+	var failures int
+	for _, user := range users {
+		session, err := s.services.StudySession.BuildStudySession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+		if err != nil {
+			failures++
+			slog.ErrorContext(ctx, "Failed to build study session",
+				"event", "scheduler.study_session.build_failed",
+				"user_id", user.ID,
+				"language", user.Language,
+				"level", user.ProficiencyLevel,
+				"error", err,
+			)
+			continue
+		}
+
+		if session == nil {
+			slog.WarnContext(ctx, "No study materials available for session",
+				"event", "scheduler.study_session.empty",
+				"user_id", user.ID,
+				"language", user.Language,
+				"level", user.ProficiencyLevel,
+			)
+			continue
+		}
+
+		if err := s.bot.PushStudySession(ctx, user.ID, session.ID); err != nil {
+			failures++
+			slog.ErrorContext(ctx, "Failed to push study session",
+				"event", "scheduler.study_session.push_failed",
+				"user_id", user.ID,
+				"session_id", session.ID,
+				"error", err,
+			)
+			continue
+		}
+
+		slog.InfoContext(ctx, "Study session pushed",
+			"event", "scheduler.study_session.pushed",
+			"user_id", user.ID,
+			"session_id", session.ID,
+			"total_materials", session.TotalQuestions,
+		)
+	}
+	if failures > 0 {
+		return fmt.Errorf("%d study session operations failed", failures)
 	}
 	return nil
 }

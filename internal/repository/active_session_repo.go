@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -25,6 +26,7 @@ type activeSessionRow struct {
 	SessionID         int                    `db:"session_id"`
 	UserID            int64                  `db:"user_id"`
 	SessionType       model.SessionType      `db:"session_type"`
+	SessionMode       model.SessionMode      `db:"session_mode"`
 	SessionStatus     model.SessionStatus    `db:"session_status"`
 	TotalQuestions    int                    `db:"total_questions"`
 	CorrectCount      int                    `db:"correct_count"`
@@ -59,13 +61,17 @@ type activeSessionRow struct {
 }
 
 // LoadActiveSession loads the full ordered session state in one DB round-trip.
-func (r *ActiveSessionRepository) LoadActiveSession(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
+func (r *ActiveSessionRepository) LoadActiveSession(
+	ctx context.Context,
+	sessionID int,
+) (*model.ActiveSessionState, error) {
 	var rows []activeSessionRow
 	if err := r.db.SelectContext(ctx, &rows, `
 		SELECT
 			s.id AS session_id,
 			s.user_id,
 			s.type AS session_type,
+			s.mode AS session_mode,
 			s.status AS session_status,
 			s.total_questions,
 			s.correct_count,
@@ -116,6 +122,7 @@ func (r *ActiveSessionRepository) LoadActiveSession(ctx context.Context, session
 			ID:             first.SessionID,
 			UserID:         first.UserID,
 			Type:           first.SessionType,
+			Mode:           first.SessionMode,
 			Status:         first.SessionStatus,
 			TotalQuestions: first.TotalQuestions,
 			CorrectCount:   first.CorrectCount,
@@ -210,12 +217,20 @@ func markSessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.ActiveS
 		WHERE id = $1 AND status <> $2
 	`, state.Session.ID, model.SessionCompleted, correctCount)
 	if err != nil {
-		return false, fmt.Errorf("ActiveSessionRepository.markSessionCompleted session_id=%d: %w", state.Session.ID, err)
+		return false, fmt.Errorf(
+			"ActiveSessionRepository.markSessionCompleted session_id=%d: %w",
+			state.Session.ID,
+			err,
+		)
 	}
 
 	rows, err := res.RowsAffected()
 	if err != nil {
-		return false, fmt.Errorf("ActiveSessionRepository.markSessionCompleted rows session_id=%d: %w", state.Session.ID, err)
+		return false, fmt.Errorf(
+			"ActiveSessionRepository.markSessionCompleted rows session_id=%d: %w",
+			state.Session.ID,
+			err,
+		)
 	}
 	return rows > 0, nil
 }

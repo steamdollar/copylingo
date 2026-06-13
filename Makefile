@@ -149,9 +149,24 @@ infra:
 tunnel:
 	./scripts/start_quick_tunnel.sh
 
-# Lint
+# Lint (진단만)
 lint:
 	golangci-lint run ./...
+
+# Format: gofmt/goimports/golines 자동 적용 (긴 라인 자동 줄바꿈) + 자동수정 가능한 린트 fix
+fmt:
+	golangci-lint fmt ./...
+	golangci-lint run --fix ./...
+
+# golangci-lint v2 설치 (.golangci.yml 사용)
+lint-install:
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+
+# git pre-commit hook 활성화 (commit 시 staged .go 자동 포맷/줄바꿈)
+hooks:
+	chmod +x scripts/git-hooks/*
+	git config core.hooksPath scripts/git-hooks
+	@echo "pre-commit hook 활성화됨 (core.hooksPath=scripts/git-hooks)"
 
 # Download dependencies
 deps:

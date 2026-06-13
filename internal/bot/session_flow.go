@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
@@ -63,7 +64,14 @@ func (sf *SessionFlow) getPendingSessions(ctx context.Context, cb *tgbotapi.Call
 		)
 		return nil
 	}
-	session := sessions[0]
+	session, ok := firstQuizSession(sessions)
+	if !ok {
+		sf.bot.EditMessage(chatID, cb.Message.MessageID,
+			"📚 현재 대기 중인 문제 풀이 세션이 없습니다.\n다음 세션이 자동으로 전송될 예정입니다!",
+			mainMenuKeyboard(),
+		)
+		return nil
+	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf(config.FormatSessionStart, session.ID)),
@@ -85,11 +93,11 @@ func (sf *SessionFlow) getInProgressSessions(ctx context.Context, cb *tgbotapi.C
 	if err != nil {
 		return false, err
 	}
-	if len(inProgressSessions) == 0 {
+	session, ok := firstQuizSession(inProgressSessions)
+	if !ok {
 		return false, nil
 	}
 
-	session := inProgressSessions[0]
 	nextIdx, err := sf.nextUnansweredQuestionIndex(ctx, session.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to find next unanswered question",
