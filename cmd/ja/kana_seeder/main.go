@@ -10,6 +10,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/repository"
@@ -194,6 +195,10 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 	isFillBlank := rand.Float32() < 0.7
 
 	qType := model.QuestionFillBlank
+	skill := model.SkillKanaRecall
+	if isToRomaji {
+		skill = model.SkillKanaReading
+	}
 	var options []string
 	if !isFillBlank {
 		qType = model.QuestionMultipleChoice
@@ -249,6 +254,7 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 
 	return &model.Question{
 		Type:             qType,
+		Skill:            model.SkillPtr(skill),
 		Language:         "ja",
 		ProficiencyLevel: "N5",
 		Category:         "kana",
@@ -266,6 +272,7 @@ func buildHandwritingQuestion(romaji, kana string) *model.Question {
 
 	return &model.Question{
 		Type:             model.QuestionKanaHandwriting,
+		Skill:            model.SkillPtr(model.SkillKanaHandwriting),
 		Language:         "ja",
 		ProficiencyLevel: "N5",
 		Category:         "handwriting",

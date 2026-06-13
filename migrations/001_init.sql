@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS questions (
     id              SERIAL PRIMARY KEY,
     content_id      INT REFERENCES contents(id) ON DELETE SET NULL,
     type            VARCHAR(30) NOT NULL,                       -- multiple_choice, fill_blank, etc.
+    item_type       VARCHAR(64),                                -- model.QuestionItemType whitelist; nullable for legacy rows
     language        VARCHAR(10) NOT NULL DEFAULT 'ja',          -- ISO 639-1
     proficiency_level VARCHAR(10) NOT NULL DEFAULT 'N5',        -- Target level
     category        VARCHAR(30) NOT NULL,                       -- vocabulary, grammar, kanji, reading, listening

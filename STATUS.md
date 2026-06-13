@@ -44,6 +44,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-13 | Question Item Type taxonomy 및 기존 question backfill | `2606131243_question_item_type_taxonomy.md` |
 | 2026-06-08 | Study Session Redis Working Set 및 완료 시 flush 적용 | `2606081615_study_active_session_redis_working_set.md` |
 | 2026-06-08 | 정오 Study Session Vocabulary-only 8개 조정 | `2606080038_study_session_vocabulary_only.md` |
 | 2026-06-06 | 정오 Study Material Session Scheduler 구현 | `2606062301_study_session_scheduler.md` |

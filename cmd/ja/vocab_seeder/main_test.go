@@ -17,6 +17,9 @@ func TestBuildKanaToMeaningQuestion(t *testing.T) {
 	if q.Type != model.QuestionMultipleChoice {
 		t.Fatalf("type = %q, want %q", q.Type, model.QuestionMultipleChoice)
 	}
+	if q.Skill == nil || *q.Skill != model.SkillVocabMeaning {
+		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillVocabMeaning)
+	}
 	if q.Category != model.CategoryVocabulary {
 		t.Fatalf("category = %q, want %q", q.Category, model.CategoryVocabulary)
 	}
@@ -64,6 +67,9 @@ func TestBuildMeaningToKanaQuestion(t *testing.T) {
 	if q.Type != model.QuestionFillBlank {
 		t.Fatalf("type = %q, want %q", q.Type, model.QuestionFillBlank)
 	}
+	if q.Skill == nil || *q.Skill != model.SkillVocabRecall {
+		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillVocabRecall)
+	}
 	if q.CorrectAnswer != word.Kana {
 		t.Fatalf("correct answer = %q, want %q", q.CorrectAnswer, word.Kana)
 	}
@@ -87,6 +93,9 @@ func TestBuildMeaningToKanaHandwritingQuestion(t *testing.T) {
 
 	if q.Type != model.QuestionKanaHandwriting {
 		t.Fatalf("type = %q, want %q", q.Type, model.QuestionKanaHandwriting)
+	}
+	if q.Skill == nil || *q.Skill != model.SkillVocabHandwriting {
+		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillVocabHandwriting)
 	}
 	if q.Category != model.CategoryVocabulary {
 		t.Fatalf("category = %q, want %q", q.Category, model.CategoryVocabulary)

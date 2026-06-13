@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/lsj/copylingo/internal/model"
 )
 
 func TestKanaScriptLabel(t *testing.T) {
@@ -55,6 +57,25 @@ func TestBuildQuestionType2PromptIncludesScriptLabel(t *testing.T) {
 				t.Fatalf("explanation %q does not contain %q", q.Explanation, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildQuestionSetsSkill(t *testing.T) {
+	t.Parallel()
+
+	toRomaji := buildQuestion("あ", "a", []string{"i", "u", "e", "o"}, true)
+	if toRomaji.Skill == nil || *toRomaji.Skill != model.SkillKanaReading {
+		t.Fatalf("toRomaji skill = %v, want %q", toRomaji.Skill, model.SkillKanaReading)
+	}
+
+	toKana := buildQuestion("a", "あ", []string{"い", "う", "え", "お"}, false)
+	if toKana.Skill == nil || *toKana.Skill != model.SkillKanaRecall {
+		t.Fatalf("toKana skill = %v, want %q", toKana.Skill, model.SkillKanaRecall)
+	}
+
+	handwriting := buildHandwritingQuestion("a", "あ")
+	if handwriting.Skill == nil || *handwriting.Skill != model.SkillKanaHandwriting {
+		t.Fatalf("handwriting skill = %v, want %q", handwriting.Skill, model.SkillKanaHandwriting)
 	}
 }
 

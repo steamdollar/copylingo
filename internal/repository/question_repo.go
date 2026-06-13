@@ -8,6 +8,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -41,7 +42,12 @@ func (r *QuestionRepository) GetByID(ctx context.Context, id int) (*model.Questi
 }
 
 // GetNewQuestions returns questions that haven't been reviewed yet (next_review_at IS NULL).
-func (r *QuestionRepository) GetNewQuestions(ctx context.Context, language, level, category string, excludeIDs []int, limit int) ([]model.Question, error) {
+func (r *QuestionRepository) GetNewQuestions(
+	ctx context.Context,
+	language, level, category string,
+	excludeIDs []int,
+	limit int,
+) ([]model.Question, error) {
 	var questions []model.Question
 	err := r.db.SelectContext(ctx, &questions, `
 		SELECT * FROM questions
@@ -101,11 +107,11 @@ func (r *QuestionRepository) IncrementCorrect(ctx context.Context, id int) error
 }
 
 func buildQuestionBatchInsertQuery(questions []*model.Question) (string, []any) {
-	const columnCount = 11
+	const columnCount = 12
 
 	var query strings.Builder
 	query.WriteString(`
-		INSERT INTO questions (content_id, type, language, proficiency_level, category, prompt, options, correct_answer, explanation, audio_path, difficulty)
+		INSERT INTO questions (content_id, type, item_type, language, proficiency_level, category, prompt, options, correct_answer, explanation, audio_path, difficulty)
 		VALUES
 	`)
 
@@ -117,13 +123,15 @@ func buildQuestionBatchInsertQuery(questions []*model.Question) (string, []any) 
 
 		base := i * columnCount
 		query.WriteString(fmt.Sprintf(
-			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9, base+10, base+11,
+			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6,
+			base+7, base+8, base+9, base+10, base+11, base+12,
 		))
 
 		args = append(args,
 			q.ContentID,
 			q.Type,
+			q.Skill,
 			q.Language,
 			q.ProficiencyLevel,
 			q.Category,

@@ -167,3 +167,32 @@
   - VSCode save-time 포맷(formatTool→golines / Run-on-Save 확장): 피드백은 즉각적이나 설정이 개인 PC에 종속되고 에디터 의존성이 커 기각.
   - `lll`만 적용(보고 전용): 위반을 알려주지만 자동 수정이 없어 "치면 자동" 요구를 충족하지 못해 기각.
   - pre-commit/lefthook 프레임워크: 기능은 풍부하나 외부 도구 의존성이 늘어 단순 git hook + Makefile로 충분하다 판단해 기각.
+
+---
+
+## ADR-026: Question Type은 풀이 방식으로 유지하고 Item Type으로 JLPT Taxonomy를 분리
+
+- **날짜**: 2026-06-13
+- **상태**: 채택됨
+- **맥락**:
+  - `questions.type`은 기존 데이터와 코드에서 `multiple_choice`, `fill_blank`, `subjective`, `kana_handwriting`처럼 Telegram rendering 및 grading mode로 사용된다.
+  - JLPT N1까지 확장하려면 `kanji_reading`, `vocab_usage`, `text_grammar`, `reading_integrated`, `listening_key_point` 같은 공식 문항 taxonomy도 별도로 추적해야 한다.
+  - `questions.type`에 JLPT taxonomy를 직접 넣으면 `SessionFlow.renderByType`, `GraderService`, `HandwritingService`의 hot path와 기존 seed data가 깨진다.
+- **결정**:
+  - `questions.type`은 하위호환을 위해 풀이/채점 방식(answer/rendering mode)으로 유지한다.
+  - `questions.item_type VARCHAR(64)`를 nullable column으로 추가해 실제 측정 skill taxonomy를 기록한다.
+  - Go model에는 `model.Skill` enum을 추가한다.
+  - 초기 taxonomy는 현재 앱 내부 학습 유형(`kana_reading`, `kana_recall`, `kana_handwriting`, `vocab_meaning`, `vocab_recall`, `vocab_handwriting`)과 JLPT official-style 유형을 함께 포함한다.
+  - 기존 DB row는 현재 `type + category` 조합으로 의미가 명확한 6개 조합만 backfill한다. 의미가 불명확한 row는 향후에도 nullable 상태를 허용한다.
+- **장점**:
+  - 기존 Telegram rendering, grading, handwriting flow를 변경하지 않고 JLPT taxonomy를 추가할 수 있다.
+  - 향후 세션 배분은 broad `category`, 풀이 방식은 `type`, 세부 측정 skill은 `item_type`으로 각각 분리해 볼 수 있다.
+  - N1 문제 생성기에서 official skill별 prompt/template/평가 통계를 만들 수 있다.
+- **단점 / 트레이드오프**:
+  - `type`, `category`, `item_type` 세 축을 구분해야 하므로 model 설명과 generator discipline이 중요해진다.
+  - `item_type`을 nullable로 시작하므로 analytics에서 `NULL` guard가 필요하다.
+  - 현재 SRS는 question row 자체에 묶여 있어 skill별 사용자별 숙련도 추적은 별도 `user_question_progress` 설계가 필요하다.
+- **대안**:
+  - `questions.type` 하나에 모든 taxonomy를 통합: schema는 단순하지만 기존 rendering/grading 의미와 충돌해 기각.
+  - `questions.type`을 JLPT taxonomy로 재정의하고 기존 데이터를 backfill: 현재 `multiple_choice/kana` 같은 row에서 taxonomy를 완전히 복원할 수 없어 기각.
+  - `category`만 세분화: broad analytics 축을 잃고 vocabulary/grammar/reading 같은 상위 도메인 필터링이 흐려져 기각.

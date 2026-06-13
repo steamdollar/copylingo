@@ -10,6 +10,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/repository"
@@ -183,6 +184,7 @@ func buildKanaToMeaningQuestion(rng *rand.Rand, word vocabWord, wrongPool []voca
 
 	return &model.Question{
 		Type:             model.QuestionMultipleChoice,
+		Skill:            model.SkillPtr(model.SkillVocabMeaning),
 		Language:         vocabLanguage,
 		ProficiencyLevel: vocabProficiencyLevel,
 		Category:         model.CategoryVocabulary,
@@ -198,6 +200,7 @@ func buildMeaningToKanaQuestion(word vocabWord) *model.Question {
 	scriptLabel := kanaScriptLabel(word.Kana)
 	return &model.Question{
 		Type:             model.QuestionFillBlank,
+		Skill:            model.SkillPtr(model.SkillVocabRecall),
 		Language:         vocabLanguage,
 		ProficiencyLevel: vocabProficiencyLevel,
 		Category:         model.CategoryVocabulary,
@@ -213,6 +216,7 @@ func buildMeaningToKanaHandwritingQuestion(word vocabWord) *model.Question {
 	scriptLabel := kanaScriptLabel(word.Kana)
 	return &model.Question{
 		Type:             model.QuestionKanaHandwriting,
+		Skill:            model.SkillPtr(model.SkillVocabHandwriting),
 		Language:         vocabLanguage,
 		ProficiencyLevel: vocabProficiencyLevel,
 		Category:         model.CategoryVocabulary,
