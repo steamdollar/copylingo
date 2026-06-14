@@ -74,7 +74,7 @@ type fakeActiveSessionRepo struct {
 	flushFn func(ctx context.Context, state *model.ActiveSessionState) error
 }
 
-func (f *fakeActiveSessionRepo) LoadActiveSession(
+func (f *fakeActiveSessionRepo) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.ActiveSessionState, error) {

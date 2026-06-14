@@ -23,7 +23,7 @@ var (
 )
 
 type activeSessionRepository interface {
-	LoadActiveSession(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
+	LoadQuestionSessionWithStateBySessionID(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
 	FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error
 }
 
@@ -79,7 +79,7 @@ func (s *ActiveSessionService) CreateFromDB(ctx context.Context, sessionID int) 
 	}
 
 	// retrieve target session from db (session - sessionQuestions - questions)
-	state, err := s.repo.LoadActiveSession(ctx, sessionID)
+	state, err := s.repo.LoadQuestionSessionWithStateBySessionID(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("create active session from db session_id=%d: %w", sessionID, err)
 	}

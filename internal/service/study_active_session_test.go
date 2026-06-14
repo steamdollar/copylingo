@@ -17,7 +17,7 @@ type fakeStudyActiveRepo struct {
 	flushFn func(ctx context.Context, state *model.StudyActiveSessionState) error
 }
 
-func (f *fakeStudyActiveRepo) LoadStudyActiveSession(
+func (f *fakeStudyActiveRepo) LoadStudySessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
@@ -46,7 +46,7 @@ func TestStudyActiveSessionStartLoadsAndStoresWorkingSet(t *testing.T) {
 	repo := &fakeStudyActiveRepo{
 		loadFn: func(ctx context.Context, gotSessionID int) (*model.StudyActiveSessionState, error) {
 			if gotSessionID != sessionID {
-				t.Fatalf("LoadStudyActiveSession sessionID = %d, want %d", gotSessionID, sessionID)
+				t.Fatalf("LoadStudySessionWithStateBySessionID sessionID = %d, want %d", gotSessionID, sessionID)
 			}
 			return studyActiveState(sessionID, userID, model.SessionPending), nil
 		},

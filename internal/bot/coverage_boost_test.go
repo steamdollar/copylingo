@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -39,7 +40,10 @@ type activeRepoStub struct {
 	flushed bool
 }
 
-func (a *activeRepoStub) LoadActiveSession(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
+func (a *activeRepoStub) LoadQuestionSessionWithStateBySessionID(
+	ctx context.Context,
+	sessionID int,
+) (*model.ActiveSessionState, error) {
 	return nil, nil
 }
 func (a *activeRepoStub) FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error {
@@ -114,7 +118,12 @@ func TestFinishSession_Summary(t *testing.T) {
 			},
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 2, IsCorrect: &wrong, UserAnswer: ptr("banana")},
-				Question:        model.Question{ID: 2, Type: model.QuestionMultipleChoice, Prompt: "fruit?", CorrectAnswer: "apple"},
+				Question: model.Question{
+					ID:            2,
+					Type:          model.QuestionMultipleChoice,
+					Prompt:        "fruit?",
+					CorrectAnswer: "apple",
+				},
 			},
 		},
 	}
@@ -279,7 +288,12 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 		Items: []model.ActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1},
-				Question:        model.Question{ID: 1, Type: model.QuestionMultipleChoice, Prompt: "Pick one", Options: opts},
+				Question: model.Question{
+					ID:      1,
+					Type:    model.QuestionMultipleChoice,
+					Prompt:  "Pick one",
+					Options: opts,
+				},
 			},
 		},
 	}
@@ -378,7 +392,12 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 		Items: []model.ActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
-				Question:        model.Question{ID: questionID, Type: model.QuestionMultipleChoice, CorrectAnswer: "apple", Explanation: "fruit"},
+				Question: model.Question{
+					ID:            questionID,
+					Type:          model.QuestionMultipleChoice,
+					CorrectAnswer: "apple",
+					Explanation:   "fruit",
+				},
 			},
 		},
 	}
@@ -418,7 +437,12 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 		Items: []model.ActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
-				Question:        model.Question{ID: questionID, Type: model.QuestionSubjective, Prompt: "Translate", CorrectAnswer: "x"},
+				Question: model.Question{
+					ID:            questionID,
+					Type:          model.QuestionSubjective,
+					Prompt:        "Translate",
+					CorrectAnswer: "x",
+				},
 			},
 		},
 	}

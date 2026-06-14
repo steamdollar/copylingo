@@ -35,11 +35,14 @@ const (
 	SessionExpired    SessionStatus = "expired"
 )
 
-// Session represents a learning session containing a set of questions.
+// Session represents a persisted learning session.
 type Session struct {
-	ID             int           `db:"id"              json:"id"`
-	UserID         int64         `db:"user_id"         json:"user_id"`
-	Type           SessionType   `db:"type"            json:"type"`
+	ID     int   `db:"id"      json:"id"`
+	UserID int64 `db:"user_id" json:"user_id"`
+	// Type captures product intent such as morning, evening, review, or study.
+	Type SessionType `db:"type" json:"type"`
+	// Mode selects the runtime flow and child table: quiz uses session_questions,
+	// study uses session_materials.
 	Mode           SessionMode   `db:"mode"            json:"mode"`
 	Status         SessionStatus `db:"status"          json:"status"`
 	TotalQuestions int           `db:"total_questions" json:"total_questions"`

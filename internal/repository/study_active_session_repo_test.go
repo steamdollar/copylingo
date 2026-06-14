@@ -12,7 +12,7 @@ func TestStudySessionFromRowMapsParentSession(t *testing.T) {
 	startedAt := now.Add(-time.Minute)
 	completedAt := now
 
-	session := studySessionFromRow(studyActiveSessionRow{
+	session := studySessionFromRow(studySessionWithStateRow{
 		SessionIDForParent: 77,
 		UserID:             123,
 		SessionType:        model.SessionStudy,

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -19,7 +20,7 @@ func TestHandleTextInput(t *testing.T) {
 	active := service.NewActiveSessionService(nil, rdb, mSRS)
 	mLLM := &mockLLM{}
 	grader := service.NewGraderService(nil, active, mLLM)
-	
+
 	mAPI := &mockBotAPI{}
 	b := &Bot{
 		api: mAPI,
@@ -46,7 +47,7 @@ func TestHandleTextInput(t *testing.T) {
 	t.Run("active question state exists", func(t *testing.T) {
 		sessionID := 10
 		rdb.values[config.UserActiveQuestionRedisKey.Format(chatID)] = "10:0"
-		
+
 		state := &model.ActiveSessionState{
 			Version: model.ActiveSessionStateVersion,
 			Session: model.Session{ID: sessionID},
@@ -102,7 +103,12 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 		Items: []model.ActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
-				Question:        model.Question{ID: questionID, CorrectAnswer: "apple", Explanation: "It's a fruit", Type: model.QuestionMultipleChoice},
+				Question: model.Question{
+					ID:            questionID,
+					CorrectAnswer: "apple",
+					Explanation:   "It's a fruit",
+					Type:          model.QuestionMultipleChoice,
+				},
 			},
 		},
 	}

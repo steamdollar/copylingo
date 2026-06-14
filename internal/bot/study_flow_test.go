@@ -72,7 +72,7 @@ type botStudyActiveRepo struct {
 	flushedState *model.StudyActiveSessionState
 }
 
-func (r *botStudyActiveRepo) LoadStudyActiveSession(
+func (r *botStudyActiveRepo) LoadStudySessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {

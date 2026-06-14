@@ -4,10 +4,13 @@ import "time"
 
 const ActiveSessionStateVersion = 1
 
-// ActiveSessionState is the Redis working state for an in-progress session.
+// ActiveSessionState is the Redis working state for an in-progress quiz session.
 type ActiveSessionState struct {
-	Version       int                     `json:"version"`
-	Session       Session                 `json:"session"`
+	Version int `json:"version"`
+	// Session is copied from the sessions table and flushed back on complete.
+	Session Session `json:"session"`
+	// Items are copied from session_questions + questions and mutated in Redis
+	// while the user answers.
 	Items         []ActiveSessionQuestion `json:"items"`
 	CurrentIndex  int                     `json:"current_index"`
 	AnsweredCount int                     `json:"answered_count"`

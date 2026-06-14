@@ -23,7 +23,7 @@ var (
 )
 
 type studyActiveSessionRepository interface {
-	LoadStudyActiveSession(ctx context.Context, sessionID int) (*model.StudyActiveSessionState, error)
+	LoadStudySessionWithStateBySessionID(ctx context.Context, sessionID int) (*model.StudyActiveSessionState, error)
 	FlushStudyActiveSession(ctx context.Context, state *model.StudyActiveSessionState) error
 }
 
@@ -112,7 +112,7 @@ func (s *StudyActiveSessionService) loadFromDB(
 	if s.repo == nil {
 		return nil, ErrStudyActiveSessionDependencyMissing
 	}
-	state, err := s.repo.LoadStudyActiveSession(ctx, sessionID)
+	state, err := s.repo.LoadStudySessionWithStateBySessionID(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("create study active session from db session_id=%d: %w", sessionID, err)
 	}

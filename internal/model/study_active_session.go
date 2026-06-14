@@ -6,8 +6,11 @@ const StudyActiveSessionStateVersion = 1
 
 // StudyActiveSessionState is the Redis working state for an in-progress study session.
 type StudyActiveSessionState struct {
-	Version                     int                    `json:"version"`
-	Session                     Session                `json:"session"`
+	Version int `json:"version"`
+	// Session is copied from the sessions table and flushed back on complete.
+	Session Session `json:"session"`
+	// Items are copied from session_materials + materials and mutated in Redis
+	// as materials are marked studied.
 	Items                       []StudySessionMaterial `json:"items"`
 	CurrentIndex                int                    `json:"current_index"`
 	StudiedCount                int                    `json:"studied_count"`

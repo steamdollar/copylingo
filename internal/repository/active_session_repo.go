@@ -13,7 +13,7 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// ActiveSessionRepository loads and flushes Redis-backed active session state.
+// ActiveSessionRepository loads and flushes Redis-backed question session state.
 type ActiveSessionRepository struct {
 	db *sqlx.DB
 }
@@ -22,7 +22,7 @@ func NewActiveSessionRepository(db *sqlx.DB) *ActiveSessionRepository {
 	return &ActiveSessionRepository{db: db}
 }
 
-type activeSessionRow struct {
+type questionSessionWithStateRow struct {
 	SessionID         int                    `db:"session_id"`
 	UserID            int64                  `db:"user_id"`
 	SessionType       model.SessionType      `db:"session_type"`
@@ -60,12 +60,12 @@ type activeSessionRow struct {
 	QuestionCreatedAt time.Time              `db:"question_created_at"`
 }
 
-// LoadActiveSession loads the full ordered session state in one DB round-trip.
-func (r *ActiveSessionRepository) LoadActiveSession(
+// LoadQuestionSessionWithStateBySessionID loads the full ordered question session state in one DB round-trip.
+func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.ActiveSessionState, error) {
-	var rows []activeSessionRow
+	var rows []questionSessionWithStateRow
 	if err := r.db.SelectContext(ctx, &rows, `
 		SELECT
 			s.id AS session_id,
@@ -109,10 +109,18 @@ func (r *ActiveSessionRepository) LoadActiveSession(
 		WHERE s.id = $1
 		ORDER BY sq.question_order
 	`, sessionID); err != nil {
-		return nil, fmt.Errorf("ActiveSessionRepository.LoadActiveSession session_id=%d: %w", sessionID, err)
+		return nil, fmt.Errorf(
+			"ActiveSessionRepository.LoadQuestionSessionWithStateBySessionID session_id=%d: %w",
+			sessionID,
+			err,
+		)
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("ActiveSessionRepository.LoadActiveSession session_id=%d: %w", sessionID, sql.ErrNoRows)
+		return nil, fmt.Errorf(
+			"ActiveSessionRepository.LoadQuestionSessionWithStateBySessionID session_id=%d: %w",
+			sessionID,
+			sql.ErrNoRows,
+		)
 	}
 
 	first := rows[0]
@@ -175,7 +183,7 @@ func (r *ActiveSessionRepository) LoadActiveSession(
 	return state, nil
 }
 
-// FlushActiveSession persists the active state in a single DB transaction.
+// FlushActiveSession persists the question session state in a single DB transaction.
 func (r *ActiveSessionRepository) FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {

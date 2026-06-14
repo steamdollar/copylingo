@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -21,11 +22,20 @@ type mockSessionStore struct {
 func (m *mockSessionStore) CreateSession(ctx context.Context, s *model.Session) error {
 	return m.createSessionFn(ctx, s)
 }
-func (m *mockSessionStore) GetByID(ctx context.Context, id int) (*model.Session, error) { return nil, nil }
-func (m *mockSessionStore) GetSessionsByStatus(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+func (m *mockSessionStore) GetByID(ctx context.Context, id int) (*model.Session, error) {
+	return nil, nil
+}
+
+func (m *mockSessionStore) GetSessionsByStatus(
+	ctx context.Context,
+	userID int64,
+	status config.SessionStatus,
+) ([]model.Session, error) {
 	return m.getSessionsByStatusFn(ctx, userID, status)
 }
-func (m *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) { return nil, nil }
+func (m *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
+	return nil, nil
+}
 func (m *mockSessionStore) Start(ctx context.Context, id int) error {
 	return m.startFn(ctx, id)
 }
@@ -103,7 +113,14 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 		Version: model.ActiveSessionStateVersion,
 		Session: model.Session{ID: 10},
 		Items: []model.ActiveSessionQuestion{
-			{Question: model.Question{Prompt: "Q1", Type: model.QuestionMultipleChoice, ID: 1, Options: json.RawMessage(`["A"]`)}},
+			{
+				Question: model.Question{
+					Prompt:  "Q1",
+					Type:    model.QuestionMultipleChoice,
+					ID:      1,
+					Options: json.RawMessage(`["A"]`),
+				},
+			},
 		},
 	}
 	raw, _ := json.Marshal(state)
@@ -134,7 +151,7 @@ func TestStartReview_NoneDue(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	mSRSRepo := &mockSRSRepoWithCount{count: 5} // Has due questions
 	srs := service.NewSRSService(mSRSRepo)
-	
+
 	mSessionStore := &mockSessionStore{
 		createSessionFn: func(ctx context.Context, s *model.Session) error {
 			s.ID = 100
@@ -262,7 +279,7 @@ func TestHandleSessionCallback(t *testing.T) {
 		// ActiveSession.CreateFromDB will fail because sessionStore.GetByID is nil.
 		// Let's just mock StartSession and see it logs and returns.
 		// Wait, startSession calls showQuestion which needs active session.
-		// I'll skip deep testing here as it requires complex mocks, 
+		// I'll skip deep testing here as it requires complex mocks,
 		// but I can at least check it doesn't crash.
 		sf.HandleSessionCallback(ctx, cb)
 	})

@@ -21,7 +21,7 @@ func NewStudyActiveSessionRepository(db *sqlx.DB) *StudyActiveSessionRepository 
 	return &StudyActiveSessionRepository{db: db}
 }
 
-type studyActiveSessionRow struct {
+type studySessionWithStateRow struct {
 	SessionIDForParent int                 `db:"session_id_for_parent"`
 	UserID             int64               `db:"user_id"`
 	SessionType        model.SessionType   `db:"session_type"`
@@ -51,11 +51,11 @@ type studyActiveSessionRow struct {
 	MaterialCreatedAt time.Time              `db:"material_created_at"`
 }
 
-func (r *StudyActiveSessionRepository) LoadStudyActiveSession(
+func (r *StudyActiveSessionRepository) LoadStudySessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
-	var rows []studyActiveSessionRow
+	var rows []studySessionWithStateRow
 	if err := r.db.SelectContext(ctx,
 		&rows,
 		`
@@ -95,11 +95,15 @@ func (r *StudyActiveSessionRepository) LoadStudyActiveSession(
 		sessionID,
 		model.SessionModeStudy,
 	); err != nil {
-		return nil, fmt.Errorf("StudyActiveSessionRepository.LoadStudyActiveSession session_id=%d: %w", sessionID, err)
+		return nil, fmt.Errorf(
+			"StudyActiveSessionRepository.LoadStudySessionWithStateBySessionID session_id=%d: %w",
+			sessionID,
+			err,
+		)
 	}
 	if len(rows) == 0 {
 		return nil, fmt.Errorf(
-			"StudyActiveSessionRepository.LoadStudyActiveSession session_id=%d: %w",
+			"StudyActiveSessionRepository.LoadStudySessionWithStateBySessionID session_id=%d: %w",
 			sessionID,
 			sql.ErrNoRows,
 		)
@@ -114,7 +118,7 @@ func (r *StudyActiveSessionRepository) LoadStudyActiveSession(
 		CurrentIndex: 0,
 	}
 	for _, row := range rows {
-		state.Items = append(state.Items, studyActiveSessionMaterialFromRow(row))
+		state.Items = append(state.Items, studySessionMaterialFromRow(row))
 	}
 	state.RecountStudied()
 	state.CaptureInitiallyStudied()
@@ -122,7 +126,7 @@ func (r *StudyActiveSessionRepository) LoadStudyActiveSession(
 	return state, nil
 }
 
-func studySessionFromRow(row studyActiveSessionRow) model.Session {
+func studySessionFromRow(row studySessionWithStateRow) model.Session {
 	return model.Session{
 		ID:             row.SessionIDForParent,
 		UserID:         row.UserID,
@@ -181,7 +185,7 @@ func (r *StudyActiveSessionRepository) FlushStudyActiveSession(
 	return nil
 }
 
-func studyActiveSessionMaterialFromRow(row studyActiveSessionRow) model.StudySessionMaterial {
+func studySessionMaterialFromRow(row studySessionWithStateRow) model.StudySessionMaterial {
 	return model.StudySessionMaterial{
 		SessionMaterial: model.SessionMaterial{
 			ID:            row.SessionMaterialID,
