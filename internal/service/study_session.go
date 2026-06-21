@@ -7,7 +7,7 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-const studySessionMaterialCount = 8
+const studySessionMaterialCount = 10
 
 type studyMaterialStore interface {
 	GetForStudySession(ctx context.Context, userID int64, language, level string, limit int) ([]model.Material, error)

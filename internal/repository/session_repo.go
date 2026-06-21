@@ -74,21 +74,33 @@ func (r *SessionRepository) ListInProgress(ctx context.Context) ([]model.Session
 
 // Start marks a session as in_progress.
 func (r *SessionRepository) Start(ctx context.Context, id int) error {
-	if _, err := r.db.ExecContext(ctx, `
+	result, err := r.db.ExecContext(ctx, `
 		UPDATE sessions SET status = 'in_progress', started_at = NOW() WHERE id = $1
-	`, id); err != nil {
+	`, id)
+	if err != nil {
 		return fmt.Errorf("SessionRepository.Start id=%d: %w", id, err)
+	}
+	if rows, err := result.RowsAffected(); err != nil {
+		return fmt.Errorf("SessionRepository.Start id=%d rows affected: %w", id, err)
+	} else if rows == 0 {
+		return fmt.Errorf("SessionRepository.Start id=%d: session not found", id)
 	}
 	return nil
 }
 
 func (r *SessionRepository) Complete(ctx context.Context, id int, correctCount int) error {
-	if _, err := r.db.ExecContext(ctx, `
+	result, err := r.db.ExecContext(ctx, `
 		UPDATE sessions SET
 			status = 'completed', correct_count = $2, completed_at = NOW()
 		WHERE id = $1
-	`, id, correctCount); err != nil {
+	`, id, correctCount)
+	if err != nil {
 		return fmt.Errorf("SessionRepository.Complete id=%d: %w", id, err)
+	}
+	if rows, err := result.RowsAffected(); err != nil {
+		return fmt.Errorf("SessionRepository.Complete id=%d rows affected: %w", id, err)
+	} else if rows == 0 {
+		return fmt.Errorf("SessionRepository.Complete id=%d: session not found", id)
 	}
 	return nil
 }

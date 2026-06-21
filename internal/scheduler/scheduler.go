@@ -105,6 +105,25 @@ func (s *Scheduler) Start() {
 		)
 	}
 
+	// Afternoon study session: build and push
+	if _, err := s.cron.AddFunc(s.cfg.Schedule.AfternoonStudyPushCron, func() {
+		s.runJob("afternoon_study_push", 0, s.buildAndPushStudySessions)
+	}); err != nil {
+		slog.Error("Failed to register scheduler job",
+			"event", "scheduler.job.registration_failed",
+			"source", "scheduler",
+			"job", "afternoon_study_push",
+			"error", err,
+		)
+	} else {
+		slog.Info("Scheduler job registered",
+			"event", "scheduler.job.registered",
+			"source", "scheduler",
+			"job", "afternoon_study_push",
+			"cron", s.cfg.Schedule.AfternoonStudyPushCron,
+		)
+	}
+
 	// Evening session: build and push
 	if _, err := s.cron.AddFunc(s.cfg.Schedule.EveningPushCron, func() {
 		s.runJob("evening_push", 0, func(ctx context.Context) error {

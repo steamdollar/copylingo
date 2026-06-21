@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 
 	"github.com/lsj/copylingo/internal/model"
 )
@@ -16,6 +17,24 @@ type MaterialRepository struct {
 
 func NewMaterialRepository(db *sqlx.DB) *MaterialRepository {
 	return &MaterialRepository{db: db}
+}
+
+// GetByMaterialKeys returns materials whose stable material keys are included in keys.
+func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	var materials []model.Material
+	if err := r.db.SelectContext(ctx, &materials, `
+		SELECT *
+		FROM materials
+		WHERE material_key = ANY($1)
+		ORDER BY material_key
+	`, pq.Array(keys)); err != nil {
+		return nil, fmt.Errorf("MaterialRepository.GetByMaterialKeys count=%d: %w", len(keys), err)
+	}
+	return materials, nil
 }
 
 // GetForStudySession returns level-matched due or new vocabulary materials for a user.

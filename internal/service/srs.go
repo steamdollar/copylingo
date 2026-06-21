@@ -8,7 +8,7 @@ import (
 )
 
 type questionQuerier interface {
-	GetDueReviews(ctx context.Context, limit int) ([]model.Question, error)
+	GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error)
 	GetDueReviewCount(ctx context.Context) (int, error)
 	UpdateSRS(ctx context.Context, q *model.Question) error
 }
@@ -17,7 +17,7 @@ type questionQuerier interface {
 // srsScheduler는 GraderService와 SessionBuilderService가 SRSService에 의존할 때 쓰는 계약.
 // *SRSService가 암묵적으로 만족한다.
 type srsScheduler interface {
-	GetDueReviews(ctx context.Context, limit int) ([]model.Question, error)
+	GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error)
 	GetDueCount(ctx context.Context) (int, error)
 	ProcessAnswer(ctx context.Context, q *model.Question, isCorrect bool) error
 }
@@ -81,8 +81,8 @@ func (s *SRSService) updateSchedule(q *model.Question, quality int) {
 }
 
 // GetDueReviews returns questions due for review.
-func (s *SRSService) GetDueReviews(ctx context.Context, limit int) ([]model.Question, error) {
-	return s.questionRepo.GetDueReviews(ctx, limit)
+func (s *SRSService) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
+	return s.questionRepo.GetDueReviews(ctx, userID, limit)
 }
 
 // GetDueCount returns the number of questions due for review.

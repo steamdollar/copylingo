@@ -74,9 +74,7 @@ make infra
 make migrate
 
 # 3. Seed study materials and questions
-go run ./cmd/ja/material_seeder
-go run ./cmd/ja/kana_seeder
-go run ./cmd/ja/vocab_seeder
+go run ./cmd/ja/seeder
 
 # 4. Run the Go server
 COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>" \
@@ -125,7 +123,7 @@ export COPYLINGO_LLM_API_KEY="<llm-api-key>"
 
 make infra
 make migrate
-go run ./cmd/ja/kana_seeder
+go run ./cmd/ja/seeder
 go run ./cmd/server
 ```
 

@@ -76,6 +76,60 @@ func TestStartStudy_NoSessions(t *testing.T) {
 	}
 }
 
+func TestStartStudy_PendingStudySession(t *testing.T) {
+	ctx := context.Background()
+	mAPI := &mockBotAPI{}
+	mSessionStore := &mockSessionStore{
+		getSessionsByStatusFn: func(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+			if status == config.SessionStatusPending {
+				return []model.Session{{
+					ID:             10,
+					Type:           model.SessionStudy,
+					Mode:           model.SessionModeStudy,
+					Status:         model.SessionPending,
+					TotalQuestions: 8,
+				}}, nil
+			}
+			return nil, nil
+		},
+	}
+	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
+	b := &Bot{
+		api: mAPI,
+		services: &service.Services{
+			SessionBuilder: sb,
+		},
+	}
+	sf := NewSessionFlow(b)
+
+	cb := &tgbotapi.CallbackQuery{
+		From: &tgbotapi.User{ID: 123},
+		Message: &tgbotapi.Message{
+			Chat:      &tgbotapi.Chat{ID: 456},
+			MessageID: 789,
+		},
+	}
+
+	sf.StartStudy(ctx, cb)
+
+	if len(mAPI.sentMessages) == 0 {
+		t.Fatal("expected message sent")
+	}
+	sent := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	if !strings.Contains(sent.Text, "Study Session 준비됨") {
+		t.Errorf("wrong text: %s", sent.Text)
+	}
+	if sent.ReplyMarkup == nil ||
+		len(sent.ReplyMarkup.InlineKeyboard) == 0 ||
+		len(sent.ReplyMarkup.InlineKeyboard[0]) == 0 ||
+		sent.ReplyMarkup.InlineKeyboard[0][0].CallbackData == nil {
+		t.Fatalf("unexpected reply markup: %+v", sent.ReplyMarkup)
+	}
+	if got := *sent.ReplyMarkup.InlineKeyboard[0][0].CallbackData; got != "study:10:start" {
+		t.Fatalf("callback = %q, want study:10:start", got)
+	}
+}
+
 func TestStartStudy_ResumeInProgress(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
@@ -201,7 +255,7 @@ type mockSRSRepoWithCount struct {
 	count int
 }
 
-func (m *mockSRSRepoWithCount) GetDueReviews(ctx context.Context, limit int) ([]model.Question, error) {
+func (m *mockSRSRepoWithCount) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
 	if m.count > 0 {
 		return make([]model.Question, m.count), nil
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -88,7 +89,13 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 
 type emptyQuestionFetcher struct{}
 
-func (e *emptyQuestionFetcher) GetNewQuestions(ctx context.Context, language, level, category string, excludeIDs []int, limit int) ([]model.Question, error) {
+func (e *emptyQuestionFetcher) GetNewQuestions(
+	ctx context.Context,
+	userID int64,
+	language, level, category string,
+	excludeIDs []int,
+	limit int,
+) ([]model.Question, error) {
 	return nil, nil
 }
 func (e *emptyQuestionFetcher) GetByID(ctx context.Context, id int) (*model.Question, error) {

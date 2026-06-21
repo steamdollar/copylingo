@@ -9,13 +9,13 @@ import (
 )
 
 type mockQuestionQuerier struct {
-	getDueReviewsFn     func(ctx context.Context, limit int) ([]model.Question, error)
+	getDueReviewsFn     func(ctx context.Context, userID int64, limit int) ([]model.Question, error)
 	getDueReviewCountFn func(ctx context.Context) (int, error)
 	updateSRSFn         func(ctx context.Context, q *model.Question) error
 }
 
-func (m *mockQuestionQuerier) GetDueReviews(ctx context.Context, limit int) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, limit)
+func (m *mockQuestionQuerier) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
+	return m.getDueReviewsFn(ctx, userID, limit)
 }
 
 func (m *mockQuestionQuerier) GetDueReviewCount(ctx context.Context) (int, error) {

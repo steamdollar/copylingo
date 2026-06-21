@@ -46,7 +46,7 @@
   - `material_key`는 `{language}:{domain}:{stable_slug}` 형식의 Business Key이며 UNIQUE Constraint로 Idempotent Upsert를 보장한다.
   - Kana Slug는 Romaji 중복을 피하기 위해 Unicode code point를 사용한다. 예: `ja:kana:u3042`.
   - Vocabulary Slug는 Level을 제외한 안정 ID를 사용한다. 예: `ja:vocab:word_024`.
-  - Material Seed는 `cmd/ja/material_seeder`가 독립적으로 수행한다. 기존 Kana/Vocab Question Seeder는 Material을 변경하지 않는다.
+  - JA Seed는 `cmd/ja/seeder`가 Material 생성 후 Question 생성을 한 흐름에서 수행한다.
   - 초기 Material Seed 범위는 Vocabulary로 제한한다. Kana, Grammar, Sentence Material은 Study UX 도입 순서에 맞춰 후속 추가한다.
   - 기존 Quiz Question과 SRS 구조는 Task 1에서 변경하지 않는다.
 - **장점**:
@@ -196,3 +196,44 @@
   - `questions.type` 하나에 모든 taxonomy를 통합: schema는 단순하지만 기존 rendering/grading 의미와 충돌해 기각.
   - `questions.type`을 JLPT taxonomy로 재정의하고 기존 데이터를 backfill: 현재 `multiple_choice/kana` 같은 row에서 taxonomy를 완전히 복원할 수 없어 기각.
   - `category`만 세분화: broad analytics 축을 잃고 vocabulary/grammar/reading 같은 상위 도메인 필터링이 흐려져 기각.
+
+---
+
+## ADR-027: Task 4는 Seed Source 정리 후 Question-Material FK를 재생성
+
+- **날짜**: 2026-06-15
+- **상태**: 채택됨
+- **맥락**:
+  - Study Module Task 1~3에서 `materials`, `session_materials`, `user_material_progress`, Study Session Push가 구현됐다.
+  - 다음 단계는 Study Material과 Quiz Question의 관계를 연결하는 것이다.
+  - 기존에는 Vocabulary Material catalog와 Vocabulary Question catalog가 서로 다른 seeder에 분리되어 있었다. Material은 500개, Question은 100개 기준이라 장기적으로 drift가 생길 수 있었다.
+  - Backfill command로 기존 row를 보정할 수는 있지만, seed source 자체가 계속 갈라져 있으면 같은 문제가 반복된다.
+- **결정**:
+  - `questions.material_id INT NULL REFERENCES materials(id) ON DELETE SET NULL`을 추가한다.
+  - `questions.material_id`에는 partial index를 둔다.
+  - Seed Question 식별을 위해 `questions.question_key VARCHAR(255) UNIQUE`를 추가한다.
+  - JA seed catalog는 `cmd/ja`로 통합한다.
+  - `cmd/ja`는 Kana map, N5 Vocabulary 500개, Kana/Vocabulary Material builder, stable `material_key` helper의 SSOT다.
+  - JA Seeder는 Kana Material과 Vocabulary Material을 모두 upsert한 뒤 `material_key`로 Material을 조회한다.
+  - JA Seeder는 기존 Kana/Vocabulary Question 생성 유형을 유지하고 생성 Question에 `material_id`와 stable `question_key`를 저장한다.
+  - JA Seeder는 deterministic generation과 `ON CONFLICT (question_key) DO UPDATE`로 재실행 멱등성을 보장한다.
+  - 기존 Backfill command는 제거한다.
+  - 로컬 재생성은 `users`를 보존하고 학습 데이터 테이블을 reset한 뒤 Material, Question, pending Study Session을 다시 생성한다.
+  - `user_question_progress` 도입, Quiz SRS user별 분리, Study 완료 Material의 Evening Quiz 편성 반영은 후속 Task로 분리한다.
+  - 기존 `questions` SRS 컬럼과 `SessionBuilderService` 편성 정책은 이번 Task에서 변경하지 않는다.
+- **장점**:
+  - Study Material과 Quiz Question의 추적 관계를 seed 시점부터 보장한다.
+  - Material/Question catalog drift를 줄인다.
+  - Backfill match 조건에 의존하지 않는다.
+  - 기존 Quiz/Study Session hot path와 SRS 동작을 건드리지 않아 회귀 리스크가 낮다.
+  - 후속 Study 기반 Quiz 편성 작업에서 사용할 명확한 FK 기반이 생긴다.
+- **단점 / 트레이드오프**:
+  - 현재 Quiz SRS가 `questions` row에 저장되는 다중 사용자 한계는 남는다.
+  - `material_id`만 연결해도 Study 완료 Material이 자동으로 Quiz에 출제되지는 않는다.
+  - 로컬 reset은 기존 sessions/progress/contents/tips를 삭제하므로 운영 데이터에는 그대로 적용할 수 없다.
+  - Question Seeder는 아직 idempotent upsert가 아니라 reset 없는 재실행 시 중복 row를 만들 수 있다.
+- **대안**:
+  - `user_question_progress`까지 즉시 도입: 장기 구조는 더 정확하지만 SRSService, Grader, SessionBuilder 영향 범위가 커져 이번 Task에서는 기각.
+  - `question_materials` join table 도입: 다중 Material 문항 확장성은 있으나 현재 Vocabulary 1문항-1Material 관계에는 과해 기각.
+  - Backfill command 유지: 기존 row 보정에는 유용하지만 seed source drift를 근본적으로 해결하지 못해 기각.
+  - Do nothing: Study와 Quiz 사이의 추적 기반이 계속 없어져 기각.

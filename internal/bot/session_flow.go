@@ -64,10 +64,26 @@ func (sf *SessionFlow) getPendingSessions(ctx context.Context, cb *tgbotapi.Call
 		)
 		return nil
 	}
+	if studySession, ok := firstStudySession(sessions); ok {
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf(config.FormatStudyStart, studySession.ID)),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain),
+			),
+		)
+		text := fmt.Sprintf(
+			"☀️ <b>Study Session 준비됨</b>\n\n총 %d개 Material\n\n준비되면 시작 버튼을 누르세요!",
+			studySession.TotalQuestions,
+		)
+		sf.bot.EditMessage(chatID, cb.Message.MessageID, text, &keyboard)
+		return nil
+	}
 	session, ok := firstQuizSession(sessions)
 	if !ok {
 		sf.bot.EditMessage(chatID, cb.Message.MessageID,
-			"📚 현재 대기 중인 문제 풀이 세션이 없습니다.\n다음 세션이 자동으로 전송될 예정입니다!",
+			"📚 현재 대기 중인 학습 세션이 없습니다.\n다음 세션이 자동으로 전송될 예정입니다!",
 			mainMenuKeyboard(),
 		)
 		return nil
@@ -92,6 +108,13 @@ func (sf *SessionFlow) getInProgressSessions(ctx context.Context, cb *tgbotapi.C
 		GetSessionsByStatus(ctx, cb.From.ID, config.SessionStatusInProgress)
 	if err != nil {
 		return false, err
+	}
+	if studySession, ok := firstStudySession(inProgressSessions); ok {
+		if sf.bot.study == nil {
+			sf.bot.study = NewStudyFlow(sf.bot)
+		}
+		sf.bot.study.startSession(ctx, cb, studySession.ID)
+		return true, nil
 	}
 	session, ok := firstQuizSession(inProgressSessions)
 	if !ok {

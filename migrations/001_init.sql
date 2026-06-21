@@ -76,7 +76,9 @@ CREATE INDEX IF NOT EXISTS idx_user_material_progress_due
 -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS questions (
     id              SERIAL PRIMARY KEY,
+    question_key    VARCHAR(255) UNIQUE,                        -- stable seed key; nullable for legacy/runtime rows
     content_id      INT REFERENCES contents(id) ON DELETE SET NULL,
+    material_id     INT REFERENCES materials(id) ON DELETE SET NULL,
     type            VARCHAR(30) NOT NULL,                       -- multiple_choice, fill_blank, etc.
     item_type       VARCHAR(64),                                -- model.QuestionItemType whitelist; nullable for legacy rows
     language        VARCHAR(10) NOT NULL DEFAULT 'ja',          -- ISO 639-1
@@ -102,6 +104,8 @@ CREATE TABLE IF NOT EXISTS questions (
 CREATE INDEX IF NOT EXISTS idx_questions_next_review ON questions(next_review_at)
     WHERE next_review_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_questions_language_level ON questions(language, proficiency_level);
+CREATE INDEX IF NOT EXISTS idx_questions_material_id ON questions(material_id)
+    WHERE material_id IS NOT NULL;
 
 -----------------------------------------------------------
 -- sessions (learning sessions)

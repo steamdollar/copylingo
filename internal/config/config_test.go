@@ -12,7 +12,11 @@ func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnv(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Chdir(tmpDir)
 
-	if err := os.WriteFile(".env", []byte("COPYLINGO_SERVER_PUBLIC_BASE_URL=https://fresh.trycloudflare.com\n"), 0o600); err != nil {
+	if err := os.WriteFile(
+		".env",
+		[]byte("COPYLINGO_SERVER_PUBLIC_BASE_URL=https://fresh.trycloudflare.com\n"),
+		0o600,
+	); err != nil {
 		t.Fatalf("write .env: %v", err)
 	}
 
@@ -61,6 +65,38 @@ func TestLoadLoggingDefaults(t *testing.T) {
 	}
 	if got, want := cfg.Logging.Timezone, "Asia/Seoul"; got != want {
 		t.Fatalf("Logging.Timezone = %q, want %q", got, want)
+	}
+}
+
+func TestLoadScheduleDefaults(t *testing.T) {
+	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
+	t.Chdir(t.TempDir())
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got, want := cfg.Schedule.StudyPushCron, "0 12 * * *"; got != want {
+		t.Fatalf("Schedule.StudyPushCron = %q, want %q", got, want)
+	}
+	if got, want := cfg.Schedule.AfternoonStudyPushCron, "30 16 * * *"; got != want {
+		t.Fatalf("Schedule.AfternoonStudyPushCron = %q, want %q", got, want)
+	}
+}
+
+func TestLoadScheduleEnvOverrides(t *testing.T) {
+	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
+	t.Setenv("COPYLINGO_SCHEDULE_AFTERNOON_STUDY_PUSH_CRON", "0 17 * * *")
+	t.Chdir(t.TempDir())
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got, want := cfg.Schedule.AfternoonStudyPushCron, "0 17 * * *"; got != want {
+		t.Fatalf("Schedule.AfternoonStudyPushCron = %q, want %q", got, want)
 	}
 }
 

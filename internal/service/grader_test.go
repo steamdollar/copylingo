@@ -28,7 +28,12 @@ func (m *mockGraderActiveSession) Get(ctx context.Context, sessionID int) (*mode
 	return m.getFn(ctx, sessionID)
 }
 
-func (m *mockGraderActiveSession) RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {
+func (m *mockGraderActiveSession) RecordAnswer(
+	ctx context.Context,
+	sessionID, questionID int,
+	userAnswer string,
+	isCorrect bool,
+) error {
 	return m.recordAnswerFn(ctx, sessionID, questionID, userAnswer, isCorrect)
 }
 
@@ -41,13 +46,13 @@ func (m *mockGraderActiveSession) Delete(ctx context.Context, sessionID int) err
 }
 
 type mockSRS struct {
-	getDueReviewsFn func(ctx context.Context, limit int) ([]model.Question, error)
+	getDueReviewsFn func(ctx context.Context, userID int64, limit int) ([]model.Question, error)
 	getDueCountFn   func(ctx context.Context) (int, error)
 	processAnswerFn func(ctx context.Context, q *model.Question, isCorrect bool) error
 }
 
-func (m *mockSRS) GetDueReviews(ctx context.Context, limit int) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, limit)
+func (m *mockSRS) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
+	return m.getDueReviewsFn(ctx, userID, limit)
 }
 func (m *mockSRS) GetDueCount(ctx context.Context) (int, error) {
 	return m.getDueCountFn(ctx)
@@ -65,7 +70,12 @@ type mockLLM struct {
 func (m *mockLLM) GradeAnswer(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error) {
 	return m.gradeAnswerFn(ctx, prompt, correctAnswer, userAnswer)
 }
-func (m *mockLLM) GradeHandwriting(ctx context.Context, prompt, correctAnswer string, image []byte) (bool, string, error) {
+
+func (m *mockLLM) GradeHandwriting(
+	ctx context.Context,
+	prompt, correctAnswer string,
+	image []byte,
+) (bool, string, error) {
 	return m.gradeHandwritingFn(ctx, prompt, correctAnswer, image)
 }
 func (m *mockLLM) Translate(ctx context.Context, text, targetLang string) (string, error) {

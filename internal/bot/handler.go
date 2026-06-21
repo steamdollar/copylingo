@@ -285,6 +285,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		b.handleStats(ctx, msg)
 	case config.CommandStreak:
 		b.handleStreak(ctx, msg)
+	case config.CommandStudy:
+		b.handleStudy(ctx, msg)
 	case config.CommandTest:
 		b.handleTest(ctx, msg)
 	case config.CommandHelp:
@@ -471,6 +473,7 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 
 <b>명령어:</b>
 /menu - 메인 메뉴
+/study - Study Material 세션 즉시 생성
 /stats - 학습 통계
 /streak - 스트릭 확인
 /exit - 현재 입력 취소 (세션은 보존, /menu 에서 재개)
@@ -489,6 +492,50 @@ func (b *Bot) handleExit(ctx context.Context, msg *tgbotapi.Message) {
 	key := config.UserActiveQuestionRedisKey.Format(msg.Chat.ID)
 	b.rdb.Del(ctx, key)
 	b.SendMessage(msg.Chat.ID, "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요.")
+}
+
+func (b *Bot) handleStudy(ctx context.Context, msg *tgbotapi.Message) {
+	user, err := b.services.User.GetUser(ctx, msg.From.ID, msg.From.UserName)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to get user for study session",
+			"event", "telegram.study.command_user_lookup_failed",
+			"error", err,
+		)
+		b.SendMessage(msg.Chat.ID, "❌ 사용자 정보를 확인할 수 없습니다.")
+		return
+	}
+
+	session, err := b.services.StudySession.BuildStudySession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to build study session from command",
+			"event", "telegram.study.command_build_failed",
+			"user_id", user.ID,
+			"error", err,
+		)
+		b.SendMessage(msg.Chat.ID, "❌ Study Session 생성 중 오류가 발생했습니다.")
+		return
+	}
+	if session == nil {
+		b.SendMessage(msg.Chat.ID, "⚠️ 현재 학습 가능한 Study Material이 없습니다.")
+		return
+	}
+
+	if err := b.PushStudySession(ctx, msg.Chat.ID, session.ID); err != nil {
+		slog.ErrorContext(ctx, "Failed to push study session from command",
+			"event", "telegram.study.command_push_failed",
+			"user_id", user.ID,
+			"session_id", session.ID,
+			"error", err,
+		)
+		b.SendMessage(msg.Chat.ID, "❌ Study Session 발송에 실패했습니다.")
+		return
+	}
+
+	slog.InfoContext(ctx, "Study session triggered from command",
+		"event", "telegram.study.command_triggered",
+		"user_id", user.ID,
+		"session_id", session.ID,
+	)
 }
 
 func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {

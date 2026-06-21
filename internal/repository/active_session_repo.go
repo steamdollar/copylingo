@@ -40,6 +40,7 @@ type questionSessionWithStateRow struct {
 	IsCorrect         *bool                  `db:"is_correct"`
 	QuestionID        int                    `db:"question_id"`
 	ContentID         *int                   `db:"content_id"`
+	MaterialID        *int                   `db:"material_id"`
 	QuestionType      model.QuestionType     `db:"question_type"`
 	Language          string                 `db:"language"`
 	ProficiencyLevel  string                 `db:"proficiency_level"`
@@ -85,6 +86,7 @@ func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 			sq.is_correct,
 			q.id AS question_id,
 			q.content_id,
+			q.material_id,
 			q.type AS question_type,
 			q.language,
 			q.proficiency_level,
@@ -157,6 +159,7 @@ func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 			Question: model.Question{
 				ID:               row.QuestionID,
 				ContentID:        row.ContentID,
+				MaterialID:       row.MaterialID,
 				Type:             row.QuestionType,
 				Language:         row.Language,
 				ProficiencyLevel: row.ProficiencyLevel,

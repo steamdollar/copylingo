@@ -67,6 +67,15 @@ func firstQuizSession(sessions []model.Session) (model.Session, bool) {
 	return model.Session{}, false
 }
 
+func firstStudySession(sessions []model.Session) (model.Session, bool) {
+	for _, session := range sessions {
+		if session.Mode == model.SessionModeStudy {
+			return session, true
+		}
+	}
+	return model.Session{}, false
+}
+
 func truncate(s string, maxLen int) string {
 	runes := []rune(s)
 	if len(runes) <= maxLen {

@@ -26,7 +26,7 @@ Study Session과 Quiz Session은 분리하되, 기존 Quiz 경로를 유지하�
 - Level은 변경 가능한 Metadata이므로 Key에 넣지 않고 `proficiency_level` 컬럼으로만 관리한다.
 - `payload`는 가나, 단어, 문법, 문장처럼 형태가 다른 카드 데이터를 수용한다.
 - Migration은 기존 SQL 파일에 `IF NOT EXISTS`를 포함해 추가한다.
-- `cmd/ja/material_seeder`는 기존 Question Seeder와 독립적으로 Vocabulary Material만 Upsert한다.
+- `cmd/ja/seeder`는 Material 생성 후 Question 생성을 한 흐름에서 수행한다.
 - 초기 repo-owned curated N5 Vocabulary Catalog는 500개다.
 - Kana Material, Grammar Material, Sentence Material은 Study UX 우선순위에 맞춰 후속 범위로 보류한다.
 
@@ -66,14 +66,20 @@ Study Session과 Quiz Session은 분리하되, 기존 Quiz 경로를 유지하�
 
 ## Task 4. `questions`와 `materials` 연결 검토
 
-- 상태: 기록만 남기며 구현하지 않는다.
-- 후보 변경: `questions.material_id INT NULL REFERENCES materials(id) ON DELETE SET NULL`.
+- 상태: 구현 완료 (`questions.material_id`, JA seed catalog `cmd/ja` 통합, DB reset/seed 재생성).
+- 적용 변경: `questions.material_id INT NULL REFERENCES materials(id) ON DELETE SET NULL`.
+- 적용 변경: `questions.question_key VARCHAR(255) UNIQUE`로 seed Question 멱등 upsert 지원.
 - 목적: 하나의 Material에 객관식, 주관식, 손글씨 등 여러 Quiz 표현을 연결한다.
-- 향후 검토: Study한 Material 중 일부를 당일 Quiz Session에 포함할지 결정한다.
-- 향후 검토: 새 문제와 복습 문제의 비율, 출제 시점, Scheduler 연결 방식을 결정한다.
-- 향후 검토: SRS SSOT를 `(user_id, question_id)` 또는 `(user_id, material_id)` 중 어디에 둘지 결정한다.
-- 향후 검토: 기존 Question 데이터 Backfill과 Seeder 구조 변경 범위를 정한다.
-- 위 결정은 별도 ADR 합의 후 구현한다.
+- `cmd/ja`가 Kana map과 N5 Vocabulary 500개 catalog의 SSOT다.
+- JA Seeder는 Kana Material 208개와 Vocabulary Material 500개를 먼저 생성한다.
+- JA Seeder는 `material_key`로 Material을 조회하고, 생성 Question에 `material_id`를 저장한다.
+- JA Seeder는 deterministic generation과 `question_key` upsert로 재실행 멱등성을 보장한다.
+- 기존 Backfill command는 제거하고, user 보존 DB reset 후 seed를 재실행하는 방식으로 전환했다.
+- reset 후 pending Study Session row도 `cmd/admin/build_study_sessions`로 재생성한다.
+- 이번 MVP에서는 SRS, SessionBuilder, Scheduler 정책을 변경하지 않는다.
+- 후속 검토: Study한 Material 중 일부를 당일 Quiz Session에 포함할지 결정한다.
+- 후속 검토: 새 문제와 복습 문제의 비율, 출제 시점, Scheduler 연결 방식을 결정한다.
+- 후속 검토: Quiz SRS를 user별 `user_question_progress`로 분리할지 결정한다.
 
 ## 권장 구현 순서
 

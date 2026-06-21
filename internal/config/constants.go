@@ -45,6 +45,8 @@ const (
 	CommandStats BotCommand = "stats"
 	// 현재 스트릭(연속 학습 일수) 확인
 	CommandStreak BotCommand = "streak"
+	// Study Material 세션 즉시 생성 및 발송
+	CommandStudy BotCommand = "study"
 	// 테스트용 세션 즉시 발송
 	CommandTest BotCommand = "test"
 	// 도움말 및 명령어 안내

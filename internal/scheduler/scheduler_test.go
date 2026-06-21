@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/robfig/cron/v3"
+
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/observability"
 )
 
@@ -60,5 +63,24 @@ func TestRunJobLogsFailure(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), `"error":"push failed"`) {
 		t.Fatalf("failure reason missing: %s", output.String())
+	}
+}
+
+func TestStartRegistersAfternoonStudyPushJob(t *testing.T) {
+	c := cron.New()
+	scheduler := New(&config.Config{
+		Schedule: config.ScheduleConfig{
+			MorningPushCron:        "0 8 * * *",
+			StudyPushCron:          "0 12 * * *",
+			AfternoonStudyPushCron: "30 16 * * *",
+			EveningPushCron:        "0 21 * * *",
+		},
+	}, nil, nil, nil, c)
+
+	scheduler.Start()
+	defer scheduler.Stop()
+
+	if got, want := len(c.Entries()), 4; got != want {
+		t.Fatalf("registered cron entries = %d, want %d", got, want)
 	}
 }

@@ -35,6 +35,25 @@ func (r *QuestionRepository) CreateBatch(ctx context.Context, questions []*model
 	return nil
 }
 
+// UpsertSeedBatch inserts or refreshes seed-owned questions identified by stable question_key.
+func (r *QuestionRepository) UpsertSeedBatch(ctx context.Context, questions []*model.Question) error {
+	if len(questions) == 0 {
+		return nil
+	}
+	for idx, question := range questions {
+		if question.QuestionKey == nil || *question.QuestionKey == "" {
+			return fmt.Errorf("QuestionRepository.UpsertSeedBatch question_index=%d: missing question_key", idx)
+		}
+	}
+
+	query, args := buildQuestionBatchUpsertQuery(questions)
+	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("QuestionRepository.UpsertSeedBatch count=%d: %w", len(questions), err)
+	}
+
+	return nil
+}
+
 func (r *QuestionRepository) GetByID(ctx context.Context, id int) (*model.Question, error) {
 	q := &model.Question{}
 	err := r.db.GetContext(ctx, q, `SELECT * FROM questions WHERE id = $1`, id)
@@ -44,34 +63,64 @@ func (r *QuestionRepository) GetByID(ctx context.Context, id int) (*model.Questi
 // GetNewQuestions returns questions that haven't been reviewed yet (next_review_at IS NULL).
 func (r *QuestionRepository) GetNewQuestions(
 	ctx context.Context,
+	userID int64,
 	language, level, category string,
 	excludeIDs []int,
 	limit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
-	err := r.db.SelectContext(ctx, &questions, `
-		SELECT * FROM questions
-		WHERE language = $1 AND proficiency_level = $2
-		AND ($3 = '' OR category = $3)
-		AND NOT (id = ANY(COALESCE($4::int[], '{}')))
-		AND next_review_at IS NULL
-		ORDER BY difficulty ASC, RANDOM()
-		LIMIT $5
-	`, language, level, category, pq.Array(excludeIDs), limit)
+	err := r.db.SelectContext(
+		ctx,
+		&questions,
+		newQuestionsForStudiedMaterialsQuery,
+		userID,
+		language,
+		level,
+		category,
+		pq.Array(excludeIDs),
+		limit,
+	)
 	return questions, err
 }
 
+const newQuestionsForStudiedMaterialsQuery = `
+		SELECT q.*
+		FROM questions q
+		LEFT JOIN user_material_progress ump
+			ON ump.material_id = q.material_id
+			AND ump.user_id = $1
+			AND ump.times_studied > 0
+		WHERE q.language = $2 AND q.proficiency_level = $3
+		AND ($4 = '' OR q.category = $4)
+		AND NOT (q.id = ANY(COALESCE($5::int[], '{}')))
+		AND q.next_review_at IS NULL
+		ORDER BY
+			CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
+			q.difficulty ASC,
+			RANDOM()
+		LIMIT $6
+	`
+
 // GetDueReviews returns questions due for SRS review.
-func (r *QuestionRepository) GetDueReviews(ctx context.Context, limit int) ([]model.Question, error) {
+func (r *QuestionRepository) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
 	var questions []model.Question
-	err := r.db.SelectContext(ctx, &questions, `
-		SELECT * FROM questions
-		WHERE next_review_at IS NOT NULL AND next_review_at <= NOW()
-		ORDER BY next_review_at ASC
-		LIMIT $1
-	`, limit)
+	err := r.db.SelectContext(ctx, &questions, dueReviewsForStudiedMaterialsQuery, userID, limit)
 	return questions, err
 }
+
+const dueReviewsForStudiedMaterialsQuery = `
+		SELECT q.*
+		FROM questions q
+		LEFT JOIN user_material_progress ump
+			ON ump.material_id = q.material_id
+			AND ump.user_id = $1
+			AND ump.times_studied > 0
+		WHERE q.next_review_at IS NOT NULL AND q.next_review_at <= NOW()
+		ORDER BY
+			CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
+			q.next_review_at ASC
+		LIMIT $2
+	`
 
 // GetDueReviewCount returns the number of questions due for review.
 func (r *QuestionRepository) GetDueReviewCount(ctx context.Context) (int, error) {
@@ -107,11 +156,40 @@ func (r *QuestionRepository) IncrementCorrect(ctx context.Context, id int) error
 }
 
 func buildQuestionBatchInsertQuery(questions []*model.Question) (string, []any) {
-	const columnCount = 12
+	query, args := buildQuestionBatchBaseQuery(questions)
+	return query, args
+}
+
+func buildQuestionBatchUpsertQuery(questions []*model.Question) (string, []any) {
+	query, args := buildQuestionBatchBaseQuery(questions)
+	query += `
+		ON CONFLICT (question_key) DO UPDATE SET
+			content_id = EXCLUDED.content_id,
+			material_id = EXCLUDED.material_id,
+			type = EXCLUDED.type,
+			item_type = EXCLUDED.item_type,
+			language = EXCLUDED.language,
+			proficiency_level = EXCLUDED.proficiency_level,
+			category = EXCLUDED.category,
+			prompt = EXCLUDED.prompt,
+			options = EXCLUDED.options,
+			correct_answer = EXCLUDED.correct_answer,
+			explanation = EXCLUDED.explanation,
+			audio_path = EXCLUDED.audio_path,
+			difficulty = EXCLUDED.difficulty
+	`
+	return query, args
+}
+
+func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
+	const columnCount = 14
 
 	var query strings.Builder
 	query.WriteString(`
-		INSERT INTO questions (content_id, type, item_type, language, proficiency_level, category, prompt, options, correct_answer, explanation, audio_path, difficulty)
+		INSERT INTO questions (
+			question_key, content_id, material_id, type, item_type, language, proficiency_level,
+			category, prompt, options, correct_answer, explanation, audio_path, difficulty
+		)
 		VALUES
 	`)
 
@@ -123,13 +201,15 @@ func buildQuestionBatchInsertQuery(questions []*model.Question) (string, []any) 
 
 		base := i * columnCount
 		query.WriteString(fmt.Sprintf(
-			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6,
-			base+7, base+8, base+9, base+10, base+11, base+12,
+			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7,
+			base+8, base+9, base+10, base+11, base+12, base+13, base+14,
 		))
 
 		args = append(args,
+			q.QuestionKey,
 			q.ContentID,
+			q.MaterialID,
 			q.Type,
 			q.Skill,
 			q.Language,

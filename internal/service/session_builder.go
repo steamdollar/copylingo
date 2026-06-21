@@ -24,6 +24,7 @@ var defaultCategoryOrder = []model.QuestionCategory{
 type questionFetcher interface {
 	GetNewQuestions(
 		ctx context.Context,
+		userID int64,
 		language, level, category string,
 		excludeIDs []int,
 		limit int,
@@ -136,7 +137,7 @@ func (s *SessionBuilderService) buildSession(
 	// 1. Get review questions from SRS (due reviews)
 	// TODO: language 별로 가져와야 하는거 아닌가?
 	if reviewCount > 0 {
-		reviews, err := s.srs.GetDueReviews(ctx, reviewCount)
+		reviews, err := s.srs.GetDueReviews(ctx, userID, reviewCount)
 		if err != nil {
 			log.Printf("Error getting due reviews: %v", err)
 		} else {
@@ -150,7 +151,7 @@ func (s *SessionBuilderService) buildSession(
 	// If vocabulary inventory is short, the relay below fills the remaining slots.
 	if reservedVocabularyCount > 0 {
 		newQs, err := s.questionRepo.GetNewQuestions(
-			ctx, language, level, string(model.CategoryVocabulary), excludeIDs, reservedVocabularyCount,
+			ctx, userID, language, level, string(model.CategoryVocabulary), excludeIDs, reservedVocabularyCount,
 		)
 		if err != nil {
 			log.Printf("Error getting reserved vocabulary questions: %v", err)
@@ -192,7 +193,7 @@ func (s *SessionBuilderService) buildSession(
 			}
 
 			if alloc > 0 {
-				newQs, err := s.questionRepo.GetNewQuestions(ctx, language, level, cat, excludeIDs, alloc)
+				newQs, err := s.questionRepo.GetNewQuestions(ctx, userID, language, level, cat, excludeIDs, alloc)
 				if err != nil {
 					log.Printf("Error getting new questions for category %s: %v", cat, err)
 					continue

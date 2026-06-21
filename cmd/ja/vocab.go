@@ -1,12 +1,12 @@
-package main
+package ja
 
 const (
-	vocabLanguage         = "ja"
-	vocabProficiencyLevel = "N5"
-	vocabDifficulty       = 2
+	VocabLanguage         = "ja"
+	VocabProficiencyLevel = "N5"
+	VocabDifficulty       = 2
 )
 
-type vocabWord struct {
+type VocabWord struct {
 	ID           string
 	Kana         string
 	Kanji        string
@@ -14,7 +14,7 @@ type vocabWord struct {
 	PartOfSpeech string
 }
 
-var n5Words = []vocabWord{
+var N5Words = []VocabWord{
 	{ID: "n5_word_001", Kana: "わたし", Kanji: "私", MeaningKo: "나", PartOfSpeech: "pronoun"},
 	{ID: "n5_word_002", Kana: "あなた", Kanji: "あなた", MeaningKo: "당신", PartOfSpeech: "pronoun"},
 	{ID: "n5_word_003", Kana: "ひと", Kanji: "人", MeaningKo: "사람", PartOfSpeech: "noun"},

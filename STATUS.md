@@ -38,12 +38,17 @@
 
 - [ ] ScheduleConfig cron custom type 전환 — cron expression 전용 타입과 config validation 도입. see [docs/todos/schedule_cronexpr_config_type.md](docs/todos/schedule_cronexpr_config_type.md)
 
-- 손글씨 쓰기 채점 - 너무 오래 걸림. 대안 필요. (속도를 줄이던가, 그 사이에 뭘 하게끔 하던가)
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-21 | `/study` Study Session 즉시 생성 command 추가 | `2606212040_study_command.md` |
+| 2026-06-17 | Quiz 후보 Study Material 우선순위 + Level Fallback | `2606170926_quiz_studied_priority_fallback.md` |
+| 2026-06-17 | Study Session 메뉴 진입 및 stale session 복구 | `2606170915_study_session_menu_recovery.md` |
+| 2026-06-16 | Quiz 후보를 학습 완료 Material로 제한 | `2606162305_quiz_studied_material_filter.md` |
+| 2026-06-15 | 오후 Study Session Push 추가 | `2606151436_afternoon_study_push.md` |
+| 2026-06-15 | JA Seeder 단일 command 통합 | `2606151409_ja_seeder_consolidation.md` |
 | 2026-06-13 | Question Item Type taxonomy 및 기존 question backfill | `2606131243_question_item_type_taxonomy.md` |
 | 2026-06-08 | Study Session Redis Working Set 및 완료 시 flush 적용 | `2606081615_study_active_session_redis_working_set.md` |
 | 2026-06-08 | 정오 Study Session Vocabulary-only 8개 조정 | `2606080038_study_session_vocabulary_only.md` |

@@ -6,17 +6,22 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
-	"github.com/redis/go-redis/v9"
 )
 
 type mockBotAPI struct {
 	sentMessages []tgbotapi.Chattable
+	sendErr      error
 }
 
 func (m *mockBotAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
 	m.sentMessages = append(m.sentMessages, c)
+	if m.sendErr != nil {
+		return tgbotapi.Message{}, m.sendErr
+	}
 	return tgbotapi.Message{MessageID: 1001}, nil
 }
 
@@ -71,7 +76,7 @@ type mockSRS struct {
 }
 
 func (m *mockSRS) ScheduleAnswer(q *model.Question, isCorrect bool) {}
-func (m *mockSRS) GetDueCount(ctx context.Context) (int, error)       { return 0, nil }
+func (m *mockSRS) GetDueCount(ctx context.Context) (int, error)     { return 0, nil }
 
 type mockLLM struct {
 	gradeFn func(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error)
@@ -83,7 +88,12 @@ func (m *mockLLM) GradeAnswer(ctx context.Context, prompt, correctAnswer, userAn
 	}
 	return true, "", nil
 }
-func (m *mockLLM) GradeHandwriting(ctx context.Context, prompt, correctAnswer string, image []byte) (bool, string, error) {
+
+func (m *mockLLM) GradeHandwriting(
+	ctx context.Context,
+	prompt, correctAnswer string,
+	image []byte,
+) (bool, string, error) {
 	return false, "", nil
 }
 func (m *mockLLM) Translate(ctx context.Context, text, targetLang string) (string, error) {

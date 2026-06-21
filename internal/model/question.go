@@ -81,7 +81,9 @@ const (
 // Question represents a single learning question with embedded SRS state.
 type Question struct {
 	ID               int              `db:"id"                json:"id"`
+	QuestionKey      *string          `db:"question_key"      json:"question_key,omitempty"`
 	ContentID        *int             `db:"content_id"        json:"content_id"`
+	MaterialID       *int             `db:"material_id"       json:"material_id,omitempty"`
 	Type             QuestionType     `db:"type"              json:"type"`
 	Skill            *Skill           `db:"item_type"         json:"item_type,omitempty"`
 	Language         string           `db:"language"          json:"language"`          // ISO 639-1: 'ja', 'el', 'en'
