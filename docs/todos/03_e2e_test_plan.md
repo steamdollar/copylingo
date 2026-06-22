@@ -31,7 +31,7 @@
 ### 공용 하니스 — **패키지 배치 주의**
 
 > ⚠️ **확인된 제약 두 가지가 e2e 패키지 위치를 결정한다:**
-> 1. `service.NewServices(repos, cfg, rdb)`는 내부에서 `external.NewLLMClient(cfg)`로 **LLM을 직접 생성**한다 → `NewServices`로는 mockLLM 주입 불가. **개별 생성자로 직접 조립**해야 한다(예: `service.NewGraderService(repos.User, activeSvc, mockLLM)`, `service.NewActiveSessionService(repos.ActiveSession, rdb, srs)` 등 — 시그니처는 services.go 참조).
+> 1. `service.NewServices(repos, cfg, rdb)`는 내부에서 `external.NewLLMClient(cfg)`를 `service.NewLLMService(...)`로 감싸 **LLMService를 직접 생성**한다 → `NewServices`로는 mockLLM 주입 불가. **개별 생성자로 직접 조립**해야 한다(예: `service.NewGraderService(repos.User, activeSvc, mockLLM)`, `service.NewActiveSessionService(repos.ActiveSession, rdb, srs)` 등 — 시그니처는 services.go 참조).
 > 2. `Bot` struct의 필드는 모두 **unexported**이고, `bot.New(...)`는 실제 텔레그램 토큰으로 `tgbotapi.NewBotAPI`를 호출(네트워크) → 외부 `test/e2e` 패키지에서는 mock api를 끼운 Bot을 만들 수 없다.
 >
 > **따라서 권장 배치:** bot 경유 시나리오(E2E-1/2/4)는 **`package bot` 내부에 `//go:build e2e` 파일**로 둔다(예: `internal/bot/e2e_session_test.go`). 그래야 `&Bot{api: &mockBotAPI{}, rdb: realRedis, services: 직접조립}` + `NewSessionFlow(b)` 가 가능하고 기존 `mockBotAPI`도 재사용된다. HTTP 전용 시나리오(E2E-3)는 `package miniapp` 내부 `//go:build e2e` 또는 `test/e2e`(핸들러가 exported라 가능)에 둔다.

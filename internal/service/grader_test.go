@@ -64,7 +64,6 @@ func (m *mockSRS) ProcessAnswer(ctx context.Context, q *model.Question, correct 
 type mockLLM struct {
 	gradeAnswerFn      func(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error)
 	gradeHandwritingFn func(ctx context.Context, prompt, correctAnswer string, image []byte) (bool, string, error)
-	translateFn        func(ctx context.Context, text, targetLang string) (string, error)
 }
 
 func (m *mockLLM) GradeAnswer(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error) {
@@ -78,8 +77,8 @@ func (m *mockLLM) GradeHandwriting(
 ) (bool, string, error) {
 	return m.gradeHandwritingFn(ctx, prompt, correctAnswer, image)
 }
-func (m *mockLLM) Translate(ctx context.Context, text, targetLang string) (string, error) {
-	return m.translateFn(ctx, text, targetLang)
+func (m *mockLLM) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
+	return "answer", nil
 }
 
 func TestGradeAnswer_Correct(t *testing.T) {

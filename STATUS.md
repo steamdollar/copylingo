@@ -43,6 +43,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-21 | Telegram `/llm` owner-only 질문 및 tip candidate 수집 추가 | `2606212134_telegram_llm_tip_candidates.md` |
 | 2026-06-21 | `/study` Study Session 즉시 생성 command 추가 | `2606212040_study_command.md` |
 | 2026-06-17 | Quiz 후보 Study Material 우선순위 + Level Fallback | `2606170926_quiz_studied_priority_fallback.md` |
 | 2026-06-17 | Study Session 메뉴 진입 및 stale session 복구 | `2606170915_study_session_menu_recovery.md` |

@@ -8,6 +8,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -94,6 +95,31 @@ func (s *commandStudySessionMaterialStore) CreateSessionMaterials(
 	}
 	s.created = append(s.created, sms...)
 	return nil
+}
+
+type llmTipCandidateStore struct {
+	created []*model.TipCandidate
+	err     error
+}
+
+func (s *llmTipCandidateStore) Create(ctx context.Context, candidate *model.TipCandidate) error {
+	return s.CreateCandidate(ctx, candidate)
+}
+
+func (s *llmTipCandidateStore) CreateCandidate(ctx context.Context, candidate *model.TipCandidate) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.created = append(s.created, candidate)
+	return nil
+}
+
+func (s *llmTipCandidateStore) ListActive(
+	ctx context.Context,
+	language, level string,
+	limit int,
+) ([]model.Tip, error) {
+	return nil, nil
 }
 
 func TestLanguageDisplayName(t *testing.T) {
@@ -206,6 +232,151 @@ func TestHandleMessage_UnknownCommand(t *testing.T) {
 	}
 }
 
+func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
+	api := &mockBotAPI{}
+	rdb := &testRedis{values: map[string]string{}}
+	b := &Bot{
+		api: api,
+		rdb: rdb,
+	}
+
+	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	b.handleMessage(context.Background(), commandMessage("/llm", allowedUserID, 456, "learner"))
+
+	if got := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; got != "1" {
+		t.Fatalf("LLM pending key = %q, want 1", got)
+	}
+	if len(api.sentMessages) != 1 {
+		t.Fatalf("sent messages = %d, want 1", len(api.sentMessages))
+	}
+	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
+	if !strings.Contains(sent.Text, "LLM mode 활성화") {
+		t.Fatalf("message text = %q", sent.Text)
+	}
+}
+
+func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {
+	api := &mockBotAPI{}
+	rdb := &testRedis{values: map[string]string{}}
+	b := &Bot{
+		api: api,
+		rdb: rdb,
+	}
+
+	b.handleMessage(context.Background(), commandMessage("/llm", config.LLMAllowedTelegramUserIDs[0]+1, 456, "learner"))
+
+	if len(rdb.values) != 0 {
+		t.Fatalf("redis values = %+v, want empty", rdb.values)
+	}
+	if len(api.sentMessages) != 0 {
+		t.Fatalf("sent messages = %d, want 0", len(api.sentMessages))
+	}
+}
+
+func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.T) {
+	api := &mockBotAPI{}
+	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	rdb := &testRedis{values: map[string]string{
+		config.UserLLMPendingRedisKey.Format(allowedUserID): "1",
+	}}
+	tipStore := &llmTipCandidateStore{}
+	userRepo := &mockUserRepo{
+		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+			if id != allowedUserID || username != "learner" {
+				t.Fatalf("GetUser args = (%d, %s), want (%d, learner)",
+					id, username, allowedUserID)
+			}
+			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N4"}, nil
+		},
+	}
+	var gotQuestion string
+	b := &Bot{
+		api: api,
+		cfg: &config.Config{LLM: config.LLMConfig{
+			Model: "test-model",
+		}},
+		rdb: rdb,
+		services: &service.Services{
+			User: service.NewUserService(userRepo),
+			LLM: service.NewLLMService(&mockLLM{
+				answerFn: func(ctx context.Context, question string) (string, error) {
+					gotQuestion = question
+					return "honoo는 불꽃이고 <tag>는 escape 대상입니다.", nil
+				},
+			}),
+			Tip: service.NewTipService(tipStore),
+		},
+	}
+
+	b.handleMessage(context.Background(),
+		plainMessage("hi, honowo의 차이가 뭐야?", allowedUserID, 456, "learner"))
+
+	if gotQuestion != "hi, honowo의 차이가 뭐야?" {
+		t.Fatalf("question = %q", gotQuestion)
+	}
+	if _, ok := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; ok {
+		t.Fatal("LLM pending key still exists")
+	}
+	if len(tipStore.created) != 1 {
+		t.Fatalf("tip candidates = %d, want 1", len(tipStore.created))
+	}
+	candidate := tipStore.created[0]
+	if candidate.UserID != allowedUserID || candidate.Username != "learner" ||
+		candidate.Language != "ja" || candidate.ProficiencyLevel != "N4" ||
+		candidate.Question != "hi, honowo의 차이가 뭐야?" {
+		t.Fatalf("candidate = %+v", candidate)
+	}
+	if candidate.SourceModel == nil || *candidate.SourceModel != "test-model" {
+		t.Fatalf("source model = %#v, want test-model", candidate.SourceModel)
+	}
+	if len(api.sentMessages) != 2 {
+		t.Fatalf("sent messages = %d, want 2", len(api.sentMessages))
+	}
+	answer := api.sentMessages[1].(tgbotapi.MessageConfig)
+	if !strings.Contains(answer.Text, "&lt;tag&gt;") {
+		t.Fatalf("answer text was not escaped: %q", answer.Text)
+	}
+}
+
+func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
+	api := &mockBotAPI{}
+	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	rdb := &testRedis{values: map[string]string{
+		config.UserLLMPendingRedisKey.Format(allowedUserID): "1",
+	}}
+	userRepo := &mockUserRepo{
+		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N5"}, nil
+		},
+	}
+	b := &Bot{
+		api: api,
+		rdb: rdb,
+		services: &service.Services{
+			User: service.NewUserService(userRepo),
+			LLM: service.NewLLMService(&mockLLM{
+				answerFn: func(ctx context.Context, question string) (string, error) {
+					return "", errors.New("provider failed")
+				},
+			}),
+			Tip: service.NewTipService(&llmTipCandidateStore{}),
+		},
+	}
+
+	b.handleMessage(context.Background(), plainMessage("honoo가 뭐야?", allowedUserID, 456, "learner"))
+
+	if _, ok := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; ok {
+		t.Fatal("LLM pending key still exists after answer failure")
+	}
+	if len(api.sentMessages) != 2 {
+		t.Fatalf("sent messages = %d, want 2", len(api.sentMessages))
+	}
+	failure := api.sentMessages[1].(tgbotapi.MessageConfig)
+	if !strings.Contains(failure.Text, "다시 질문하려면 /llm") {
+		t.Fatalf("failure text = %q", failure.Text)
+	}
+}
+
 func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	ctx := context.Background()
 	api := &mockBotAPI{}
@@ -236,8 +407,8 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	b.handleMessage(ctx, commandMessage("/study", 123, 456, "learner"))
 
 	if materialStore.userID != 123 || materialStore.language != "ja" ||
-		materialStore.level != "N5" || materialStore.limit != 8 {
-		t.Fatalf("GetForStudySession args = (%d, %s, %s, %d), want (123, ja, N5, 8)",
+		materialStore.level != "N5" || materialStore.limit <= 0 {
+		t.Fatalf("GetForStudySession args = (%d, %s, %s, %d), want user/language/level and positive limit",
 			materialStore.userID, materialStore.language, materialStore.level, materialStore.limit)
 	}
 	if len(sessionStore.created) != 1 {
@@ -380,6 +551,14 @@ func commandMessage(text string, userID, chatID int64, username string) *tgbotap
 		Entities: []tgbotapi.MessageEntity{
 			{Type: "bot_command", Offset: 0, Length: len(text)},
 		},
+		From: &tgbotapi.User{ID: userID, UserName: username},
+		Chat: &tgbotapi.Chat{ID: chatID},
+	}
+}
+
+func plainMessage(text string, userID, chatID int64, username string) *tgbotapi.Message {
+	return &tgbotapi.Message{
+		Text: text,
 		From: &tgbotapi.User{ID: userID, UserName: username},
 		Chat: &tgbotapi.Chat{ID: chatID},
 	}

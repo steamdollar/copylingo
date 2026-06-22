@@ -49,15 +49,28 @@ func AllTipCategories() []TipCategory {
 }
 
 type Tip struct {
-	ID               int         `db:"id" json:"id"`
-	Language         string      `db:"language" json:"language"`
+	ID               int         `db:"id"                json:"id"`
+	Language         string      `db:"language"          json:"language"`
 	ProficiencyLevel string      `db:"proficiency_level" json:"proficiency_level"`
-	Category         TipCategory `db:"category" json:"category"`
-	Body             string      `db:"body" json:"body"`
+	Category         TipCategory `db:"category"          json:"category"`
+	Body             string      `db:"body"              json:"body"`
 
-	SourceModel     *string `db:"source_model" json:"-"`
+	SourceModel     *string `db:"source_model"      json:"-"`
 	SourcePromptVer *string `db:"source_prompt_ver" json:"-"`
-	IsActive        bool    `db:"is_active" json:"-"`
+	IsActive        bool    `db:"is_active"         json:"-"`
 
 	CreatedAt time.Time `db:"created_at" json:"-"`
+}
+
+// TipCandidate is a raw user LLM question/answer pair that can later be curated into a Tip.
+type TipCandidate struct {
+	ID               int       `db:"id"                json:"id"`
+	UserID           int64     `db:"user_id"           json:"user_id"`
+	Username         string    `db:"username"          json:"username"`
+	Language         string    `db:"language"          json:"language"`
+	ProficiencyLevel string    `db:"proficiency_level" json:"proficiency_level"`
+	Question         string    `db:"question"          json:"question"`
+	Answer           string    `db:"answer"            json:"answer"`
+	SourceModel      *string   `db:"source_model"      json:"-"`
+	CreatedAt        time.Time `db:"created_at"        json:"-"`
 }

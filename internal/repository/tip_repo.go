@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
+
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -29,6 +30,30 @@ func (r *TipRepository) Create(ctx context.Context, tip *model.Tip) error {
 	if err != nil {
 		return fmt.Errorf("TipRepository.Create language=%s level=%s category=%s: %w",
 			tip.Language, tip.ProficiencyLevel, tip.Category, err)
+	}
+	return nil
+}
+
+// CreateCandidate stores a raw LLM question/answer pair for later tip curation.
+func (r *TipRepository) CreateCandidate(ctx context.Context, candidate *model.TipCandidate) error {
+	err := r.db.QueryRowContext(ctx, `
+		INSERT INTO tip_candidates (
+			user_id, username, language, proficiency_level, question, answer, source_model
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, created_at
+	`,
+		candidate.UserID,
+		candidate.Username,
+		candidate.Language,
+		candidate.ProficiencyLevel,
+		candidate.Question,
+		candidate.Answer,
+		candidate.SourceModel,
+	).Scan(&candidate.ID, &candidate.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("TipRepository.CreateCandidate user_id=%d language=%s level=%s: %w",
+			candidate.UserID, candidate.Language, candidate.ProficiencyLevel, err)
 	}
 	return nil
 }

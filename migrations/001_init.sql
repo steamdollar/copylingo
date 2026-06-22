@@ -1,5 +1,5 @@
 -- CopyLingo Initial Schema (Multi-language Support)
--- 9 tables: users, contents, materials, user_material_progress, questions (with SRS), sessions, session_materials, session_questions, tips
+-- 10 tables: users, contents, materials, user_material_progress, questions (with SRS), sessions, session_materials, session_questions, tips, tip_candidates
 
 -----------------------------------------------------------
 -- users
@@ -174,3 +174,24 @@ CREATE TABLE IF NOT EXISTS tips (
 
 CREATE INDEX IF NOT EXISTS idx_tips_lang_level_active
     ON tips(language, proficiency_level) WHERE is_active;
+
+-----------------------------------------------------------
+-- tip_candidates (raw LLM question/answer pairs that can later become tips)
+-----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tip_candidates (
+    id                  SERIAL PRIMARY KEY,
+    user_id             BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    username            VARCHAR(255) NOT NULL DEFAULT '',
+    language            VARCHAR(10) NOT NULL,
+    proficiency_level   VARCHAR(10) NOT NULL,
+    question            TEXT NOT NULL,
+    answer              TEXT NOT NULL,
+    source_model        VARCHAR(64),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tip_candidates_lang_level_created
+    ON tip_candidates(language, proficiency_level, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_tip_candidates_user_created
+    ON tip_candidates(user_id, created_at DESC);

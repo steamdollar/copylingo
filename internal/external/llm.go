@@ -20,6 +20,8 @@ type LLMClient interface {
 	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error)
 	// GradeHandwriting is for QuestionKanaHandwriting only: binary visual verification of a rendered handwriting PNG.
 	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error)
+	// AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
+	AnswerLearningQuestion(ctx context.Context, question string) (string, error)
 }
 
 // GradeResult represents the structured JSON output from the LLM.
@@ -30,6 +32,7 @@ type GradeResult struct {
 
 const (
 	handwritingMaxCompletionTokens = 80
+	learningQuestionMaxTokens      = 700
 	// go-openai omits zero-valued temperature, so use a near-zero value to force low-variance decoding.
 	handwritingTemperature = 0.01
 )
@@ -54,7 +57,10 @@ func NewLLMClient(cfg *config.Config) LLMClient {
 
 // GradeAnswer evaluates a QuestionSubjective free-text answer by semantic similarity.
 // Fill-blank and multiple-choice answers are graded by exact string matching in GraderService.
-func (c *DefaultLLMClient) GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error) {
+func (c *DefaultLLMClient) GradeAnswer(
+	ctx context.Context,
+	questionPrompt, correctAnswer, userAnswer string,
+) (bool, string, error) {
 	if c.client == nil || c.model == "" {
 		return false, "", ErrAIConfigMissing
 	}
@@ -114,8 +120,45 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 	return result.IsCorrect, result.Feedback, nil
 }
 
+func (c *DefaultLLMClient) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
+	if c.client == nil || c.model == "" {
+		return "", ErrAIConfigMissing
+	}
+
+	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model:               c.model,
+		MaxCompletionTokens: learningQuestionMaxTokens,
+		Temperature:         0.2,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role: openai.ChatMessageRoleSystem,
+				Content: `You are CopyLingo's language-learning assistant.
+Answer in Korean by default.
+Be concise, accurate, and practical for a beginner-to-intermediate language learner.
+When the user asks about Japanese, include kana/romaji/meaning distinctions when useful.
+Do not use HTML tags or markdown code fences.`,
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: question,
+			},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("llm learning question request failed: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("empty llm learning question response")
+	}
+	return resp.Choices[0].Message.Content, nil
+}
+
 // GradeHandwriting verifies whether a rendered handwriting image matches the expected Japanese text.
-func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error) {
+func (c *DefaultLLMClient) GradeHandwriting(
+	ctx context.Context,
+	questionPrompt, correctAnswer string,
+	pngImage []byte,
+) (bool, string, error) {
 	startedAt := time.Now()
 	ctx = observability.WithAttrs(ctx, slog.String("source", "external.llm"))
 
@@ -152,7 +195,9 @@ func (c *DefaultLLMClient) GradeHandwriting(ctx context.Context, questionPrompt,
 	return result.IsCorrect, result.Feedback, nil
 }
 
-func buildHandwritingChatCompletionRequest(model, systemPrompt, userPrompt, imageURL string) openai.ChatCompletionRequest {
+func buildHandwritingChatCompletionRequest(
+	model, systemPrompt, userPrompt, imageURL string,
+) openai.ChatCompletionRequest {
 	return openai.ChatCompletionRequest{
 		Model:               model,
 		MaxCompletionTokens: handwritingMaxCompletionTokens,

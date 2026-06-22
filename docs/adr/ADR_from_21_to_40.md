@@ -237,3 +237,34 @@
   - `question_materials` join table 도입: 다중 Material 문항 확장성은 있으나 현재 Vocabulary 1문항-1Material 관계에는 과해 기각.
   - Backfill command 유지: 기존 row 보정에는 유용하지만 seed source drift를 근본적으로 해결하지 못해 기각.
   - Do nothing: Study와 Quiz 사이의 추적 기반이 계속 없어져 기각.
+
+---
+
+## ADR-028: Telegram `/llm` 질문은 owner user ID 배열과 Tip Candidate로 수집
+
+- **날짜**: 2026-06-21
+- **상태**: 채택됨
+- **맥락**:
+  - Telegram에서 즉석으로 LLM에게 언어 학습 질문을 하고 싶다.
+  - 질문/답변은 이후 유사 레벨 사용자에게 재사용 가능한 tip 후보가 될 수 있다.
+  - 단, 현재 기능은 개인 owner 워크플로우용이며 임의 사용자에게 LLM 비용과 저장 경로를 열면 abuse surface가 생긴다.
+- **결정**:
+  - `/llm` command로 Redis 기반 1회성 LLM mode를 활성화한다.
+  - 다음 plain text 1개만 LLM 질문으로 라우팅하고, 처리 후 pending key를 삭제한다.
+  - 접근 제어는 코드 내 배열 `config.LLMAllowedTelegramUserIDs`로 한다. 배열에 포함되지 않은 user ID면 LLM 호출과 DB write를 하지 않는다.
+  - 질문/답변은 `tip_candidates` 테이블에 저장한다. 저장 필드는 `user_id`, `username`, `language`, `proficiency_level`, `question`, `answer`, `source_model`, `created_at`이다.
+  - `tips`와 분리해 raw candidate와 노출 가능한 curated tip의 lifecycle을 분리한다.
+  - pass-through service/repository는 만들지 않는다. LLM 호출은 `external.LLMClient`를 감싼 `LLMService`, candidate 저장은 기존 Tip domain의 `TipService`/`TipRepository`가 담당한다.
+- **장점**:
+  - LLM 호출 전 owner user ID 배열 membership check로 비용/abuse를 차단한다.
+  - user의 `language`, `proficiency_level`을 함께 저장해 향후 비슷한 레벨 tip 추천/큐레이션에 사용할 수 있다.
+  - Redis 1회성 state라 대화 mode가 오래 남아 일반 답변/세션 답변을 계속 가로채지 않는다.
+  - `tips` 테이블 오염 없이 후보 데이터를 따로 쌓을 수 있다.
+- **단점 / 트레이드오프**:
+  - 허용 user 변경 시 코드 변경이 필요하다. 대신 설정 파싱/환경변수 관리 코드는 없다.
+  - Redis pending state가 TTL 전에 유실되면 사용자는 `/llm`을 다시 입력해야 한다.
+  - 후보 저장 실패는 사용자 답변 제공을 막지 않고 로그만 남긴다. candidate 수집 완전성은 로그/DB 모니터링이 필요하다.
+- **대안**:
+  - env allowlist: 설정 기반으로 더 유연하지만, 현재 단일 owner 기능에는 config/parsing/test 코드가 과해 기각.
+  - `tips`에 바로 저장: raw 질문/답변과 curated tip이 섞여 Mini App 노출 품질을 해쳐 기각.
+  - DB flag 기반 권한: 다중 admin 관리에는 좋지만 현재 범위에서는 schema/운영 절차가 커져 기각.

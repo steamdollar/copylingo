@@ -48,6 +48,15 @@ func (f *testRedis) Get(ctx context.Context, key string) *redis.StringCmd {
 	return redis.NewStringResult(val, nil)
 }
 
+func (f *testRedis) GetDel(ctx context.Context, key string) *redis.StringCmd {
+	val, ok := f.values[key]
+	if !ok {
+		return redis.NewStringResult("", redis.Nil)
+	}
+	delete(f.values, key)
+	return redis.NewStringResult(val, nil)
+}
+
 func (f *testRedis) Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd {
 	switch v := value.(type) {
 	case []byte:
@@ -79,7 +88,8 @@ func (m *mockSRS) ScheduleAnswer(q *model.Question, isCorrect bool) {}
 func (m *mockSRS) GetDueCount(ctx context.Context) (int, error)     { return 0, nil }
 
 type mockLLM struct {
-	gradeFn func(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error)
+	gradeFn  func(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error)
+	answerFn func(ctx context.Context, question string) (string, error)
 }
 
 func (m *mockLLM) GradeAnswer(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error) {
@@ -96,6 +106,9 @@ func (m *mockLLM) GradeHandwriting(
 ) (bool, string, error) {
 	return false, "", nil
 }
-func (m *mockLLM) Translate(ctx context.Context, text, targetLang string) (string, error) {
-	return "", nil
+func (m *mockLLM) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
+	if m.answerFn != nil {
+		return m.answerFn(ctx, question)
+	}
+	return "answer", nil
 }

@@ -48,8 +48,8 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 				t.Fatalf("GetForStudySession args = (%d, %s, %s), want (%d, ja, N5)",
 					gotUserID, language, level, userID)
 			}
-			if limit != 8 {
-				t.Fatalf("limit = %d, want 8", limit)
+			if limit != studySessionMaterialCount {
+				t.Fatalf("limit = %d, want %d", limit, studySessionMaterialCount)
 			}
 			return []model.Material{{ID: 10}, {ID: 11}}, nil
 		},

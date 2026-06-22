@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
@@ -46,6 +47,10 @@ func TestRefreshHandwritingMessagePreservesParentCorrelation(t *testing.T) {
 
 func (m *mockTipRepo) ListActive(ctx context.Context, language, level string, limit int) ([]model.Tip, error) {
 	return m.listActiveFn(ctx, language, level, limit)
+}
+
+func (m *mockTipRepo) CreateCandidate(ctx context.Context, candidate *model.TipCandidate) error {
+	return nil
 }
 
 func TestListTips(t *testing.T) {
@@ -208,7 +213,10 @@ type mockHandwritingService struct {
 	submitAnswerFn func(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error)
 }
 
-func (m *mockHandwritingService) SubmitAnswer(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error) {
+func (m *mockHandwritingService) SubmitAnswer(
+	ctx context.Context,
+	req service.HandwritingSubmitRequest,
+) (*service.HandwritingSubmitResult, error) {
 	return m.submitAnswerFn(ctx, req)
 }
 
@@ -231,8 +239,10 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 		notWantInBody string
 	}{
 		{
-			name:          "unknown llm error sanitized",
-			serviceErr:    errors.New(`grade handwriting answer: llm handwriting grading request failed: error, status code: 500, body: {"error":"provider internal stack"}`),
+			name: "unknown llm error sanitized",
+			serviceErr: errors.New(
+				`grade handwriting answer: llm handwriting grading request failed: error, status code: 500, body: {"error":"provider internal stack"}`,
+			),
 			wantStatus:    http.StatusServiceUnavailable,
 			wantBody:      "현재 AI 채점이 지연되고 있습니다. 잠시 후 다시 시도해 주세요.",
 			notWantInBody: "provider internal stack",

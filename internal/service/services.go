@@ -20,11 +20,12 @@ type Services struct {
 	Handwriting        *HandwritingService
 	Analyzer           *AnalyzerService
 	Tip                *TipService
+	LLM                *LLMService
 }
 
 // NewServices creates all services with the given dependencies.
 func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.Cmdable) *Services {
-	llm := external.NewLLMClient(cfg)
+	llm := NewLLMService(external.NewLLMClient(cfg))
 
 	srsService := NewSRSService(repos.Question)
 	activeSessionService := NewActiveSessionService(repos.ActiveSession, rdb, srsService)
@@ -42,5 +43,6 @@ func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.C
 		Handwriting:        NewHandwritingService(activeSessionService, graderService, nil),
 		Analyzer:           NewAnalyzerService(repos.User, repos.SessionQuestion),
 		Tip:                NewTipService(repos.Tip),
+		LLM:                llm,
 	}
 }

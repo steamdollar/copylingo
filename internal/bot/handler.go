@@ -269,9 +269,14 @@ func callbackIDAttrs(data string) []slog.Attr {
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	// if it is nor bot command, check if it is active question answer, if not, ignore or route to chat.
 	if !msg.IsCommand() {
+		if handled := b.handleLLMQuestion(ctx, msg); handled {
+			return
+		}
 		// Route plain text to session flow for FillBlank questions
-		if handled := b.flow.HandleTextInput(ctx, msg); !handled {
-			// Optional: Fallback to chat or ignore
+		if b.flow != nil {
+			if handled := b.flow.HandleTextInput(ctx, msg); !handled {
+				// Optional: Fallback to chat or ignore
+			}
 		}
 		return
 	}
@@ -287,6 +292,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		b.handleStreak(ctx, msg)
 	case config.CommandStudy:
 		b.handleStudy(ctx, msg)
+	case config.CommandLLM:
+		b.handleLLM(ctx, msg)
 	case config.CommandTest:
 		b.handleTest(ctx, msg)
 	case config.CommandHelp:
@@ -474,6 +481,7 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 <b>명령어:</b>
 /menu - 메인 메뉴
 /study - Study Material 세션 즉시 생성
+/llm - LLM 질문 mode 활성화
 /stats - 학습 통계
 /streak - 스트릭 확인
 /exit - 현재 입력 취소 (세션은 보존, /menu 에서 재개)
@@ -489,8 +497,11 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 }
 
 func (b *Bot) handleExit(ctx context.Context, msg *tgbotapi.Message) {
-	key := config.UserActiveQuestionRedisKey.Format(msg.Chat.ID)
-	b.rdb.Del(ctx, key)
+	keys := []string{config.UserActiveQuestionRedisKey.Format(msg.Chat.ID)}
+	if msg.From != nil {
+		keys = append(keys, config.UserLLMPendingRedisKey.Format(msg.From.ID))
+	}
+	b.rdb.Del(ctx, keys...)
 	b.SendMessage(msg.Chat.ID, "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요.")
 }
 

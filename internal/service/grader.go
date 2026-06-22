@@ -12,6 +12,11 @@ import (
 	"github.com/lsj/copylingo/internal/observability"
 )
 
+type graderLLM interface {
+	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error)
+	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error)
+}
+
 type graderUserRepo interface {
 	UpdateStreak(ctx context.Context, userID int64) error
 }
@@ -27,13 +32,13 @@ type graderActiveSession interface {
 type GraderService struct {
 	userRepo      graderUserRepo
 	activeSession graderActiveSession
-	llm           external.LLMClient
+	llm           graderLLM
 }
 
 func NewGraderService(
 	userRepo graderUserRepo,
 	activeSession graderActiveSession,
-	llm external.LLMClient,
+	llm graderLLM,
 ) *GraderService {
 	return &GraderService{
 		userRepo:      userRepo,
@@ -43,7 +48,11 @@ func NewGraderService(
 }
 
 // GradeAnswer grades a single answer and updates SRS accordingly.
-func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID int, userAnswer string) (bool, string, error) {
+func (g *GraderService) GradeAnswer(
+	ctx context.Context,
+	sessionID, questionID int,
+	userAnswer string,
+) (bool, string, error) {
 	question, err := g.questionFromActiveSession(ctx, sessionID, questionID)
 	if err != nil {
 		return false, "", err
@@ -51,9 +60,18 @@ func (g *GraderService) GradeAnswer(ctx context.Context, sessionID, questionID i
 	return g.GradeAnswerWithQuestion(ctx, sessionID, questionID, question, userAnswer)
 }
 
-func (g *GraderService) GradeAnswerWithQuestion(ctx context.Context, sessionID, questionID int, question *model.Question, userAnswer string) (bool, string, error) {
+func (g *GraderService) GradeAnswerWithQuestion(
+	ctx context.Context,
+	sessionID, questionID int,
+	question *model.Question,
+	userAnswer string,
+) (bool, string, error) {
 	if question == nil || question.ID != questionID {
-		return false, "", fmt.Errorf("grade answer question mismatch session_id=%d question_id=%d", sessionID, questionID)
+		return false, "", fmt.Errorf(
+			"grade answer question mismatch session_id=%d question_id=%d",
+			sessionID,
+			questionID,
+		)
 	}
 	var isCorrect bool
 	var feedback string
@@ -77,7 +95,11 @@ func (g *GraderService) GradeAnswerWithQuestion(ctx context.Context, sessionID, 
 	return isCorrect, feedback, nil
 }
 
-func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questionID int, renderedImage []byte) (bool, string, error) {
+func (g *GraderService) GradeHandwriting(
+	ctx context.Context,
+	sessionID, questionID int,
+	renderedImage []byte,
+) (bool, string, error) {
 	question, err := g.questionFromActiveSession(ctx, sessionID, questionID)
 	if err != nil {
 		return false, "", err
@@ -85,7 +107,12 @@ func (g *GraderService) GradeHandwriting(ctx context.Context, sessionID, questio
 	return g.GradeHandwritingWithQuestion(ctx, sessionID, questionID, question, renderedImage)
 }
 
-func (g *GraderService) GradeHandwritingWithQuestion(ctx context.Context, sessionID, questionID int, question *model.Question, renderedImage []byte) (bool, string, error) {
+func (g *GraderService) GradeHandwritingWithQuestion(
+	ctx context.Context,
+	sessionID, questionID int,
+	question *model.Question,
+	renderedImage []byte,
+) (bool, string, error) {
 	startedAt := time.Now()
 	ctx = observability.WithAttrs(ctx,
 		slog.String("source", "service.grader"),
@@ -94,7 +121,11 @@ func (g *GraderService) GradeHandwritingWithQuestion(ctx context.Context, sessio
 	)
 
 	if question == nil || question.ID != questionID {
-		return false, "", fmt.Errorf("grade handwriting question mismatch session_id=%d question_id=%d", sessionID, questionID)
+		return false, "", fmt.Errorf(
+			"grade handwriting question mismatch session_id=%d question_id=%d",
+			sessionID,
+			questionID,
+		)
 	}
 	if question.Type != model.QuestionKanaHandwriting {
 		return false, "", ErrHandwritingInvalidQuestion
@@ -128,7 +159,12 @@ func mapAIUnavailableError(err error) error {
 	return err
 }
 
-func (g *GraderService) recordGradingResult(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {
+func (g *GraderService) recordGradingResult(
+	ctx context.Context,
+	sessionID, questionID int,
+	userAnswer string,
+	isCorrect bool,
+) error {
 	if g.activeSession == nil {
 		return ErrActiveSessionDependencyMissing
 	}
@@ -157,7 +193,10 @@ func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, user
 	return result, nil
 }
 
-func (g *GraderService) questionFromActiveSession(ctx context.Context, sessionID, questionID int) (*model.Question, error) {
+func (g *GraderService) questionFromActiveSession(
+	ctx context.Context,
+	sessionID, questionID int,
+) (*model.Question, error) {
 	if g.activeSession == nil {
 		return nil, ErrActiveSessionDependencyMissing
 	}
@@ -167,10 +206,20 @@ func (g *GraderService) questionFromActiveSession(ctx context.Context, sessionID
 	}
 	item, _, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
-		return nil, fmt.Errorf("%w session_id=%d question_id=%d", ErrActiveSessionQuestionNotFound, sessionID, questionID)
+		return nil, fmt.Errorf(
+			"%w session_id=%d question_id=%d",
+			ErrActiveSessionQuestionNotFound,
+			sessionID,
+			questionID,
+		)
 	}
 	if item.SessionQuestion.IsCorrect != nil {
-		return nil, fmt.Errorf("%w session_id=%d question_id=%d", ErrActiveSessionAlreadyAnswered, sessionID, questionID)
+		return nil, fmt.Errorf(
+			"%w session_id=%d question_id=%d",
+			ErrActiveSessionAlreadyAnswered,
+			sessionID,
+			questionID,
+		)
 	}
 	return &item.Question, nil
 }

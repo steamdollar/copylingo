@@ -47,6 +47,8 @@ const (
 	CommandStreak BotCommand = "streak"
 	// Study Material 세션 즉시 생성 및 발송
 	CommandStudy BotCommand = "study"
+	// LLM 질의 모드 활성화
+	CommandLLM BotCommand = "llm"
 	// 테스트용 세션 즉시 발송
 	CommandTest BotCommand = "test"
 	// 도움말 및 명령어 안내
@@ -54,6 +56,11 @@ const (
 	// 현재 입력 취소 및 대기 상태 종료
 	CommandExit BotCommand = "exit"
 )
+
+// LLMAllowedTelegramUserIDs are the Telegram users allowed to use /llm.
+var LLMAllowedTelegramUserIDs = [...]int64{
+	2006481393,
+}
 
 // Callback Data Formats (for Sprintf)
 const (
@@ -91,6 +98,10 @@ const (
 	// UserActiveQuestionRedisKey tracks the text-answer question currently waiting for a chat reply.
 	// Value: "session_id:question_index". Used by fill-blank/subjective text input handling.
 	UserActiveQuestionRedisKey RedisKeyFormat = "user:%d:active_question"
+
+	// UserLLMPendingRedisKey tracks that the next plain-text message should be routed to LLM question mode.
+	// Value: "1". Used by the /llm one-shot chat flow.
+	UserLLMPendingRedisKey RedisKeyFormat = "user:%d:llm_pending"
 
 	// HandwritingMessageRedisKey stores the Telegram message that contains a handwriting Mini App button.
 	// Value: "chat_id:message_id". Used to remove stale inline buttons after Mini App submission.

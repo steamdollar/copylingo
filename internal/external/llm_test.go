@@ -173,10 +173,17 @@ func TestBuildHandwritingResponseFormatUsesStrictJSONSchema(t *testing.T) {
 	if got := schema.Properties["feedback"]["type"]; got != "string" {
 		t.Fatalf("feedback type = %v, want string", got)
 	}
-	if description, ok := schema.Properties["feedback"]["description"].(string); !ok || !strings.Contains(description, "Empty when correct") {
-		t.Fatalf("feedback description = %v, want Empty when correct policy", schema.Properties["feedback"]["description"])
+	if description, ok := schema.Properties["feedback"]["description"].(string); !ok ||
+		!strings.Contains(description, "Empty when correct") {
+		t.Fatalf(
+			"feedback description = %v, want Empty when correct policy",
+			schema.Properties["feedback"]["description"],
+		)
 	}
-	if description := schema.Properties["feedback"]["description"].(string); !strings.Contains(description, "stroke order") {
+	if description := schema.Properties["feedback"]["description"].(string); !strings.Contains(
+		description,
+		"stroke order",
+	) {
 		t.Fatalf("feedback description = %q, want static PNG evidence boundary", description)
 	}
 	if len(schema.Required) != 2 || schema.Required[0] != "is_correct" || schema.Required[1] != "feedback" {
@@ -289,6 +296,50 @@ func TestGradeAnswer_Success(t *testing.T) {
 	}
 	if !strings.Contains(feedback, "잘 하셨습니다") {
 		t.Fatalf("GradeAnswer() feedback = %q", feedback)
+	}
+}
+
+func TestAnswerLearningQuestionSuccess(t *testing.T) {
+	t.Parallel()
+
+	var req openai.ChatCompletionRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices": [{
+				"message": {
+					"content": "honoo는 일본어로 불꽃이라는 뜻입니다."
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	cfg := openai.DefaultConfig("test-api-key")
+	cfg.BaseURL = server.URL + "/v1"
+	client := &DefaultLLMClient{
+		client: openai.NewClientWithConfig(cfg),
+		model:  "test-model",
+	}
+
+	answer, err := client.AnswerLearningQuestion(context.Background(), "honoo가 뭐야?")
+	if err != nil {
+		t.Fatalf("AnswerLearningQuestion() error = %v", err)
+	}
+	if !strings.Contains(answer, "불꽃") {
+		t.Fatalf("AnswerLearningQuestion() answer = %q", answer)
+	}
+	if req.Model != "test-model" {
+		t.Fatalf("request model = %q, want test-model", req.Model)
+	}
+	if req.MaxCompletionTokens != learningQuestionMaxTokens {
+		t.Fatalf("MaxCompletionTokens = %d, want %d", req.MaxCompletionTokens, learningQuestionMaxTokens)
+	}
+	if len(req.Messages) != 2 || req.Messages[1].Content != "honoo가 뭐야?" {
+		t.Fatalf("request messages = %+v", req.Messages)
 	}
 }
 

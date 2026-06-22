@@ -183,7 +183,7 @@ Subagent/Gemini 위임은 token 절감을 위한 수단이지 기본값이 아�
 
 ### DB
 
-1. **마이그레이션**: `migrations/` 디렉토리에 `NNN_name.sql` **단일 파일**. `make migrate` 가 `NNN_*.sql` 을 파일명 순으로 일괄 적용.
+1. **마이그레이션**: 현재 프로젝트는 migration SQL을 여러 파일로 누적하지 않고 `migrations/001_init.sql` **하나만 유지**한다. schema 변경이 필요하면 새 `002_*.sql`을 만들지 말고 `001_init.sql`에 병합한다. `make migrate`는 `NNN_*.sql`을 순서대로 적용할 수 있지만, 운영 규칙은 단일 SQL 파일 유지다.
 2. **네이밍**: snake_case, 테이블명 복수형 (`users`, `questions`, `sessions`)
 3. **Timestamp**: 모든 테이블에 `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
 4. **JSONB**: 유연한 구조가 필요한 곳에 사용 (questions.options, sessions.questions, article_responses.conversation)

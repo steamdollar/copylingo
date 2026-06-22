@@ -133,7 +133,6 @@ func Load() (*Config, error) {
 		"llm.base_url",
 		"https://generativelanguage.googleapis.com/v1beta/openai/",
 	) // LLM compatibility layer
-
 	// tts
 	viper.SetDefault("tts.enabled", true)
 	viper.SetDefault("tts.audio_dir", "./data/audio")
