@@ -1,4 +1,4 @@
-package ja
+package catalog
 
 import (
 	"encoding/json"
@@ -21,13 +21,23 @@ type VocabularyMaterialPayload struct {
 	PartOfSpeech string `json:"part_of_speech"`
 }
 
+type GrammarMaterialPayload struct {
+	Pattern       string `json:"pattern"`
+	MeaningKo     string `json:"meaning_ko"`
+	ExplanationKo string `json:"explanation_ko"`
+	Example       string `json:"example"`
+	TranslationKo string `json:"translation_ko"`
+}
+
 func BuildAllMaterials() []*model.Material {
 	kanaMaterials := BuildKanaMaterials(KanaMap)
 	vocabMaterials := BuildVocabularyMaterials(N5Words)
+	grammarMaterials := BuildGrammarMaterials(N5GrammarPoints)
 
-	materials := make([]*model.Material, 0, len(kanaMaterials)+len(vocabMaterials))
+	materials := make([]*model.Material, 0, len(kanaMaterials)+len(vocabMaterials)+len(grammarMaterials))
 	materials = append(materials, kanaMaterials...)
 	materials = append(materials, vocabMaterials...)
+	materials = append(materials, grammarMaterials...)
 	return materials
 }
 
@@ -72,6 +82,28 @@ func BuildVocabularyMaterials(words []VocabWord) []*model.Material {
 	return materials
 }
 
+func BuildGrammarMaterials(points []GrammarPoint) []*model.Material {
+	materials := make([]*model.Material, 0, len(points))
+	for _, point := range points {
+		materials = append(materials, &model.Material{
+			MaterialKey:      MaterialKeyForGrammar(point),
+			Category:         model.MaterialCategoryGrammar,
+			Language:         VocabLanguage,
+			ProficiencyLevel: VocabProficiencyLevel,
+			Title:            point.Pattern,
+			Payload: mustMaterialJSON(GrammarMaterialPayload{
+				Pattern:       point.Pattern,
+				MeaningKo:     point.MeaningKo,
+				ExplanationKo: point.ExplanationKo,
+				Example:       point.Example,
+				TranslationKo: point.TranslationKo,
+			}),
+			Difficulty: GrammarDifficulty,
+		})
+	}
+	return materials
+}
+
 func MaterialKeyForKana(kana string) string {
 	parts := make([]string, 0, len([]rune(kana)))
 	for _, r := range kana {
@@ -82,6 +114,10 @@ func MaterialKeyForKana(kana string) string {
 
 func MaterialKeyForVocab(word VocabWord) string {
 	return "ja:vocab:" + strings.TrimPrefix(word.ID, "n5_")
+}
+
+func MaterialKeyForGrammar(point GrammarPoint) string {
+	return "ja:grammar:" + strings.TrimPrefix(point.ID, "n5_grammar_")
 }
 
 func ScriptLabel(kana string) string {

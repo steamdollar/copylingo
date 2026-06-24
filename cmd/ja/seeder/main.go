@@ -13,7 +13,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 
-	ja "github.com/lsj/copylingo/cmd/ja"
+	ja "github.com/lsj/copylingo/cmd/ja/catalog"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/repository"
@@ -26,8 +26,10 @@ const (
 )
 
 type vocabWord = ja.VocabWord
+type grammarPoint = ja.GrammarPoint
 
 var n5Words = ja.N5Words
+var n5GrammarPoints = ja.N5GrammarPoints
 
 func kanaScriptLabel(kana string) string {
 	return ja.ScriptLabel(kana)
@@ -94,14 +96,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load vocabulary materials: %v", err)
 	}
+	materialIDsByGrammarID, err := loadGrammarMaterialIDs(ctx, repos.Material, n5GrammarPoints)
+	if err != nil {
+		log.Fatalf("Failed to load grammar materials: %v", err)
+	}
 
 	rng := rand.New(rand.NewSource(1))
 
 	kanaQuestions := buildKanaQuestions(materialIDsByKana)
 	vocabularyQuestions := buildVocabularyQuestions(rng, n5Words, materialIDsByWordID)
-	questions := make([]*model.Question, 0, len(kanaQuestions)+len(vocabularyQuestions))
+	grammarQuestions := buildGrammarQuestions(rng, n5GrammarPoints, materialIDsByGrammarID)
+	questions := make([]*model.Question, 0, len(kanaQuestions)+len(vocabularyQuestions)+len(grammarQuestions))
 	questions = append(questions, kanaQuestions...)
 	questions = append(questions, vocabularyQuestions...)
+	questions = append(questions, grammarQuestions...)
 
 	if err := repos.Question.UpsertSeedBatch(ctx, questions); err != nil {
 		log.Printf("Failed to upsert Japanese questions batch: %v", err)
@@ -109,10 +117,11 @@ func main() {
 	}
 
 	log.Printf(
-		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d",
+		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d grammar=%d",
 		len(questions),
 		len(kanaQuestions),
 		len(vocabularyQuestions),
+		len(grammarQuestions),
 	)
 }
 
@@ -405,6 +414,164 @@ func formatCounterReadingPrompt(word vocabWord) string {
 
 func formatExplanation(word vocabWord) string {
 	return fmt.Sprintf("<b>%s</b> / <b>%s</b> = %s", word.Kana, word.Kanji, word.MeaningKo)
+}
+
+type grammarMaterialStore interface {
+	GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error)
+}
+
+func loadGrammarMaterialIDs(
+	ctx context.Context,
+	store grammarMaterialStore,
+	points []grammarPoint,
+) (map[string]int, error) {
+	keys := make([]string, 0, len(points))
+	keyByGrammarID := make(map[string]string, len(points))
+	for _, point := range points {
+		key := grammarMaterialKey(point)
+		keys = append(keys, key)
+		keyByGrammarID[point.ID] = key
+	}
+
+	materials, err := store.GetByMaterialKeys(ctx, keys)
+	if err != nil {
+		return nil, fmt.Errorf("load grammar material ids: %w", err)
+	}
+
+	idByKey := make(map[string]int, len(materials))
+	for _, material := range materials {
+		idByKey[material.MaterialKey] = material.ID
+	}
+
+	materialIDsByGrammarID := make(map[string]int, len(points))
+	missing := make([]string, 0)
+	for _, point := range points {
+		key := keyByGrammarID[point.ID]
+		id, ok := idByKey[key]
+		if !ok {
+			missing = append(missing, key)
+			continue
+		}
+		materialIDsByGrammarID[point.ID] = id
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing grammar materials: %s", strings.Join(missing, ", "))
+	}
+
+	return materialIDsByGrammarID, nil
+}
+
+func grammarMaterialKey(point grammarPoint) string {
+	return ja.MaterialKeyForGrammar(point)
+}
+
+func grammarQuestionKey(point grammarPoint, variant string) string {
+	return fmt.Sprintf("%s:%s", grammarMaterialKey(point), variant)
+}
+
+func buildGrammarQuestions(
+	rng *rand.Rand,
+	points []grammarPoint,
+	materialIDsByGrammarID map[string]int,
+) []*model.Question {
+	questions := make([]*model.Question, 0, len(points)*2)
+	for _, point := range points {
+		pointQuestions := []*model.Question{
+			buildGrammarMeaningQuestion(rng, point, points),
+			buildGrammarFormQuestion(point),
+		}
+		setQuestionKey(pointQuestions[0], grammarQuestionKey(point, "meaning"))
+		setQuestionKey(pointQuestions[1], grammarQuestionKey(point, "form"))
+		if materialID, ok := materialIDsByGrammarID[point.ID]; ok {
+			for _, question := range pointQuestions {
+				question.MaterialID = &materialID
+			}
+		}
+		questions = append(questions, pointQuestions...)
+	}
+	return questions
+}
+
+func buildGrammarMeaningQuestion(
+	rng *rand.Rand,
+	point grammarPoint,
+	wrongPool []grammarPoint,
+) *model.Question {
+	return &model.Question{
+		Type:             model.QuestionMultipleChoice,
+		Skill:            model.SkillPtr(model.SkillGrammarForm),
+		Language:         vocabLanguage,
+		ProficiencyLevel: vocabProficiencyLevel,
+		Category:         model.CategoryGrammar,
+		Prompt: fmt.Sprintf(
+			"다음 문법의 핵심 의미를 고르세요: <b>%s</b><br>예문: <b>%s</b>",
+			point.Pattern,
+			point.Example,
+		),
+		Options:       mustJSON(buildGrammarMeaningOptions(rng, point, wrongPool)),
+		CorrectAnswer: point.MeaningKo,
+		Explanation:   formatGrammarExplanation(point),
+		Difficulty:    ja.GrammarDifficulty,
+	}
+}
+
+func buildGrammarFormQuestion(point grammarPoint) *model.Question {
+	return &model.Question{
+		Type:             model.QuestionMultipleChoice,
+		Skill:            model.SkillPtr(model.SkillGrammarForm),
+		Language:         vocabLanguage,
+		ProficiencyLevel: vocabProficiencyLevel,
+		Category:         model.CategoryGrammar,
+		Prompt:           fmt.Sprintf("빈칸에 들어갈 알맞은 표현을 고르세요: <b>%s</b>", point.ClozePrompt),
+		Options:          mustJSON(point.FormOptions),
+		CorrectAnswer:    point.CorrectAnswer,
+		Explanation:      formatGrammarExplanation(point),
+		Difficulty:       ja.GrammarDifficulty,
+	}
+}
+
+func buildGrammarMeaningOptions(
+	rng *rand.Rand,
+	point grammarPoint,
+	wrongPool []grammarPoint,
+) []string {
+	options := []string{point.MeaningKo}
+	seen := map[string]bool{point.MeaningKo: true}
+
+	wrongMeanings := make([]string, 0, len(wrongPool))
+	for _, candidate := range wrongPool {
+		if candidate.MeaningKo == point.MeaningKo || seen[candidate.MeaningKo] {
+			continue
+		}
+		seen[candidate.MeaningKo] = true
+		wrongMeanings = append(wrongMeanings, candidate.MeaningKo)
+	}
+
+	rng.Shuffle(len(wrongMeanings), func(i, j int) {
+		wrongMeanings[i], wrongMeanings[j] = wrongMeanings[j], wrongMeanings[i]
+	})
+	for _, wrong := range wrongMeanings {
+		if len(options) >= 4 {
+			break
+		}
+		options = append(options, wrong)
+	}
+
+	rng.Shuffle(len(options), func(i, j int) {
+		options[i], options[j] = options[j], options[i]
+	})
+	return options
+}
+
+func formatGrammarExplanation(point grammarPoint) string {
+	return fmt.Sprintf(
+		"<b>%s</b>: %s<br>%s<br>예문: <b>%s</b> (%s)",
+		point.Pattern,
+		point.MeaningKo,
+		point.ExplanationKo,
+		point.Example,
+		point.TranslationKo,
+	)
 }
 
 func mustJSON(values []string) json.RawMessage {

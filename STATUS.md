@@ -43,6 +43,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-25 | N5 학습 데이터(grammar/vocab/kana) Go 리터럴 → embedded JSON 분리 | `2606250015_grammar_data_json_extraction.md` |
+| 2026-06-23 | N5 일본어 문법 seed 도입 → 60개 확장 및 학습 세션 연동 | `2606232110_expand_n5_grammar_study.md` |
 | 2026-06-21 | Telegram `/llm` owner-only 질문 및 tip candidate 수집 추가 | `2606212134_telegram_llm_tip_candidates.md` |
 | 2026-06-21 | `/study` Study Session 즉시 생성 command 추가 | `2606212040_study_command.md` |
 | 2026-06-17 | Quiz 후보 Study Material 우선순위 + Level Fallback | `2606170926_quiz_studied_priority_fallback.md` |
