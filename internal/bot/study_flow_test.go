@@ -177,6 +177,78 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 	}
 }
 
+func TestStudyFlowGrammarRendering(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 78
+	userID := int64(123)
+	api := &mockBotAPI{}
+	sessionStore := &botStudySessionStore{
+		session: &model.Session{
+			ID:     sessionID,
+			UserID: userID,
+			Type:   model.SessionStudy,
+			Mode:   model.SessionModeStudy,
+			Status: model.SessionPending,
+		},
+	}
+	grammarPayload := func(pattern, meaningKo, explanationKo, example, translationKo string) json.RawMessage {
+		payload, err := json.Marshal(map[string]string{
+			"pattern":        pattern,
+			"meaning_ko":     meaningKo,
+			"explanation_ko": explanationKo,
+			"example":        example,
+			"translation_ko": translationKo,
+		})
+		if err != nil {
+			panic(err)
+		}
+		return payload
+	}
+	items := []model.StudySessionMaterial{
+		{
+			SessionMaterial: model.SessionMaterial{
+				SessionID:     sessionID,
+				MaterialID:    20,
+				MaterialOrder: 0,
+			},
+			Material: model.Material{
+				ID:               20,
+				Category:         model.MaterialCategoryGrammar,
+				Language:         "ja",
+				ProficiencyLevel: "N5",
+				Title:            "は",
+				Payload:          grammarPayload("は", "주제 표시", "이미 알고 있는 주제", "私は学生です。", "저는 학생입니다."),
+			},
+		},
+	}
+	activeRepo := &botStudyActiveRepo{
+		session: sessionStore.session,
+		items:   items,
+	}
+	rdb := &testRedis{values: map[string]string{}}
+	studyActiveService := service.NewStudyActiveSessionService(activeRepo, sessionStore, rdb)
+	studyService := service.NewStudySessionService(
+		&botStudyMaterialStore{},
+		sessionStore,
+		&botStudySessionMaterialStore{items: items},
+	)
+	b := &Bot{
+		api: api,
+		services: &service.Services{
+			StudySession:       studyService,
+			StudyActiveSession: studyActiveService,
+		},
+	}
+	flow := NewStudyFlow(b)
+
+	flow.HandleCallback(ctx, studyCallback(config.FormatStudyStart, sessionID, 0, userID))
+	edit := lastEditMessage(t, api)
+	if !strings.Contains(edit.Text, "Grammar") || !strings.Contains(edit.Text, "주제 표시") ||
+		!strings.Contains(edit.Text, "이미 알고 있는 주제") {
+		t.Fatalf("grammar start edit text = %q", edit.Text)
+	}
+}
+
 func timeNowForTest() time.Time {
 	return time.Now()
 }

@@ -48,8 +48,8 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 				t.Fatalf("GetForStudySession args = (%d, %s, %s), want (%d, ja, N5)",
 					gotUserID, language, level, userID)
 			}
-			if limit != studySessionMaterialCount {
-				t.Fatalf("limit = %d, want %d", limit, studySessionMaterialCount)
+			if limit != DefaultStudySessionMaterialCount {
+				t.Fatalf("limit = %d, want %d", limit, DefaultStudySessionMaterialCount)
 			}
 			return []model.Material{{ID: 10}, {ID: 11}}, nil
 		},
@@ -88,6 +88,58 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 	}
 	if session == nil || session.ID != 99 {
 		t.Fatalf("session = %+v, want id 99", session)
+	}
+}
+
+func TestBuildStudySessionWithLimitUsesRequestedLimit(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+
+	materialStore := &mockStudyMaterialStore{
+		getForStudySessionFn: func(ctx context.Context, gotUserID int64, language, level string, limit int) ([]model.Material, error) {
+			if gotUserID != userID || language != "ja" || level != "N5" {
+				t.Fatalf("GetForStudySession args = (%d, %s, %s), want (%d, ja, N5)",
+					gotUserID, language, level, userID)
+			}
+			if limit != 20 {
+				t.Fatalf("limit = %d, want 20", limit)
+			}
+			return []model.Material{{ID: 10}}, nil
+		},
+	}
+	sessionStore := &mockStudySessionStore{
+		createSessionFn: func(ctx context.Context, s *model.Session) error {
+			s.ID = 99
+			return nil
+		},
+	}
+	sessionMaterialStore := &mockStudySessionMaterialStore{
+		createSessionMaterialsFn: func(ctx context.Context, sms []model.SessionMaterial) error {
+			return nil
+		},
+	}
+
+	svc := NewStudySessionService(materialStore, sessionStore, sessionMaterialStore)
+	session, err := svc.BuildStudySessionWithLimit(ctx, userID, "ja", "N5", 20)
+	if err != nil {
+		t.Fatalf("BuildStudySessionWithLimit failed: %v", err)
+	}
+	if session == nil || session.ID != 99 {
+		t.Fatalf("session = %+v, want id 99", session)
+	}
+}
+
+func TestBuildStudySessionWithLimitRejectsOutOfRangeLimit(t *testing.T) {
+	svc := NewStudySessionService(nil, nil, nil)
+
+	for _, limit := range []int{0, -1, MaxStudySessionMaterialCount + 1} {
+		_, err := svc.BuildStudySessionWithLimit(context.Background(), 123, "ja", "N5", limit)
+		if err == nil {
+			t.Fatalf("limit %d: expected error", limit)
+		}
+		if !strings.Contains(err.Error(), "invalid limit") {
+			t.Fatalf("limit %d: unexpected error: %v", limit, err)
+		}
 	}
 }
 

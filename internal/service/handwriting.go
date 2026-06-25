@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/lsj/copylingo/internal/model"
@@ -16,8 +18,15 @@ type handwritingActiveSession interface {
 }
 
 type graderClient interface {
-	GradeHandwritingWithQuestion(ctx context.Context, sessionID, questionID int, question *model.Question, renderedImage []byte) (bool, string, error)
+	GradeHandwritingWithQuestion(
+		ctx context.Context,
+		sessionID, questionID int,
+		question *model.Question,
+		renderedImage []byte,
+	) (bool, string, error)
 }
+
+var failedHandwritingImageDir = filepath.Join("logs", "images")
 
 var (
 	ErrHandwritingUnauthorized     = errors.New("handwriting submission is not owned by user")
@@ -77,7 +86,10 @@ func NewHandwritingService(
 	}
 }
 
-func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSubmitRequest) (*HandwritingSubmitResult, error) {
+func (s *HandwritingService) SubmitAnswer(
+	ctx context.Context,
+	req HandwritingSubmitRequest,
+) (*HandwritingSubmitResult, error) {
 	startedAt := time.Now()
 	ctx = observability.WithAttrs(ctx,
 		slog.String("source", "service.handwriting"),
@@ -112,12 +124,34 @@ func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSu
 	}
 	renderedAt := time.Now()
 
-	isCorrect, feedback, err := s.grader.GradeHandwritingWithQuestion(ctx, req.SessionID, req.QuestionID, question, renderedImage)
+	isCorrect, feedback, err := s.grader.GradeHandwritingWithQuestion(
+		ctx,
+		req.SessionID,
+		req.QuestionID,
+		question,
+		renderedImage,
+	)
 	if err != nil {
 		if errors.Is(err, ErrActiveSessionAlreadyAnswered) {
 			return nil, ErrHandwritingAlreadyAnswered
 		}
 		return nil, fmt.Errorf("grade handwriting answer: %w", err)
+	}
+	if !isCorrect {
+		imagePath, err := saveFailedHandwritingImage(item.SessionQuestion.ID, renderedImage)
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to save wrong handwriting image",
+				"event", "handwriting.service.failed_image_save_failed",
+				"session_question_id", item.SessionQuestion.ID,
+				"error", err,
+			)
+		} else {
+			slog.InfoContext(ctx, "Saved wrong handwriting image",
+				"event", "handwriting.service.failed_image_saved",
+				"session_question_id", item.SessionQuestion.ID,
+				"image_path", imagePath,
+			)
+		}
 	}
 	slog.InfoContext(ctx, "Handwriting service completed",
 		"event", "handwriting.service.completed",
@@ -133,4 +167,15 @@ func (s *HandwritingService) SubmitAnswer(ctx context.Context, req HandwritingSu
 		CorrectAnswer: question.CorrectAnswer,
 		Explanation:   question.Explanation,
 	}, nil
+}
+
+func saveFailedHandwritingImage(sessionQuestionID int, renderedImage []byte) (string, error) {
+	if err := os.MkdirAll(failedHandwritingImageDir, 0o755); err != nil {
+		return "", fmt.Errorf("create failed handwriting image directory: %w", err)
+	}
+	imagePath := filepath.Join(failedHandwritingImageDir, fmt.Sprintf("%d.png", sessionQuestionID))
+	if err := os.WriteFile(imagePath, renderedImage, 0o644); err != nil {
+		return "", fmt.Errorf("write failed handwriting image: %w", err)
+	}
+	return imagePath, nil
 }

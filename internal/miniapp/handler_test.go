@@ -13,7 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
@@ -164,49 +163,6 @@ func TestListTips(t *testing.T) {
 			t.Errorf("expected limit 50, got %d", capturedLimit)
 		}
 	})
-}
-
-func TestParseHandwritingMessageRef(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		raw        string
-		wantChatID int64
-		wantMsgID  int
-		wantErr    bool
-	}{
-		{name: "valid private chat", raw: "12345:678", wantChatID: 12345, wantMsgID: 678},
-		{name: "valid group chat", raw: "-10012345:678", wantChatID: -10012345, wantMsgID: 678},
-		{name: "missing separator", raw: "12345", wantErr: true},
-		{name: "bad chat id", raw: "abc:678", wantErr: true},
-		{name: "zero chat id", raw: "0:678", wantErr: true},
-		{name: "bad message id", raw: "12345:abc", wantErr: true},
-		{name: "zero message id", raw: "12345:0", wantErr: true},
-		{name: "negative message id", raw: "12345:-1", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			gotChatID, gotMsgID, err := bot.ParseHandwritingMessageRef(tt.raw)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if gotChatID != tt.wantChatID || gotMsgID != tt.wantMsgID {
-				t.Fatalf("bot.ParseHandwritingMessageRef()=(%d,%d), want (%d,%d)",
-					gotChatID, gotMsgID, tt.wantChatID, tt.wantMsgID)
-			}
-		})
-	}
 }
 
 type mockHandwritingService struct {

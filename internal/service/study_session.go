@@ -7,7 +7,10 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-const studySessionMaterialCount = 10
+const (
+	DefaultStudySessionMaterialCount = 15
+	MaxStudySessionMaterialCount     = 50
+)
 
 type studyMaterialStore interface {
 	GetForStudySession(ctx context.Context, userID int64, language, level string, limit int) ([]model.Material, error)
@@ -45,7 +48,20 @@ func (s *StudySessionService) BuildStudySession(
 	userID int64,
 	language, level string,
 ) (*model.Session, error) {
-	materials, err := s.materialRepo.GetForStudySession(ctx, userID, language, level, studySessionMaterialCount)
+	return s.BuildStudySessionWithLimit(ctx, userID, language, level, DefaultStudySessionMaterialCount)
+}
+
+func (s *StudySessionService) BuildStudySessionWithLimit(
+	ctx context.Context,
+	userID int64,
+	language, level string,
+	limit int,
+) (*model.Session, error) {
+	if limit <= 0 || limit > MaxStudySessionMaterialCount {
+		return nil, fmt.Errorf("build study session invalid limit user_id=%d limit=%d", userID, limit)
+	}
+
+	materials, err := s.materialRepo.GetForStudySession(ctx, userID, language, level, limit)
 	if err != nil {
 		return nil, fmt.Errorf("build study session fetch materials user_id=%d language=%s level=%s: %w",
 			userID, language, level, err)

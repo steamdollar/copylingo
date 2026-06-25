@@ -13,7 +13,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
@@ -62,10 +61,10 @@ type HandlerDeps struct {
 }
 
 type handwritingSubmitRequest struct {
-	InitData   string           `json:"init_data" binding:"required"`
-	SessionID  int              `json:"session_id" binding:"required"`
+	InitData   string           `json:"init_data"   binding:"required"`
+	SessionID  int              `json:"session_id"  binding:"required"`
 	QuestionID int              `json:"question_id" binding:"required"`
-	Strokes    []service.Stroke `json:"strokes" binding:"required"`
+	Strokes    []service.Stroke `json:"strokes"     binding:"required"`
 }
 
 func NewHandler(deps HandlerDeps) *Handler {
@@ -80,7 +79,13 @@ func NewHandler(deps HandlerDeps) *Handler {
 	}
 }
 
-func RegisterRoutes(r *gin.Engine, cfg *config.Config, services *service.Services, rdb *redis.Client, messenger TelegramMessenger) {
+func RegisterRoutes(
+	r *gin.Engine,
+	cfg *config.Config,
+	services *service.Services,
+	rdb *redis.Client,
+	messenger TelegramMessenger,
+) {
 	handler := NewHandler(HandlerDeps{
 		Handwriting:   services.Handwriting,
 		Tip:           services.Tip,
@@ -237,7 +242,7 @@ func (h *Handler) refreshHandwritingMessage(parent context.Context, sessionID, q
 		return
 	}
 
-	chatID, msgID, err := bot.ParseHandwritingMessageRef(val)
+	chatID, msgID, err := callback.ParseHandwritingMessageRef(val)
 	if err != nil {
 		slog.ErrorContext(ctx, "Invalid handwriting message ID format",
 			"event", "handwriting.cleanup.invalid_message_id",

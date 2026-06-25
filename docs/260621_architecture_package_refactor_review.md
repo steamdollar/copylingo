@@ -89,30 +89,33 @@
 
 ## Issue 2. `miniapp`가 `bot` 구현에 의존함
 
-**Issue**: `internal/miniapp`가 `internal/bot`을 import하고, Redis에 저장된 handwriting message ref를 parsing할 때 `bot.ParseHandwritingMessageRef`를 직접 호출한다. HTTP Mini App ingress와 Telegram Bot ingress는 형제 boundary여야 하므로, 한 ingress가 다른 ingress 구현체를 import하는 구조는 coupling이 강하다.
+**Issue**: `internal/miniapp`가 `internal/bot`을 import하고, Redis에 저장된 handwriting message ref를 parsing할 때 `bot.ParseHandwritingMessageRef`를 직접 호출했다. HTTP Mini App ingress와 Telegram Bot ingress는 형제 boundary여야 하므로, 한 ingress가 다른 ingress 구현체를 import하는 구조는 coupling이 강했다.
 
 근거:
 
-- [`internal/miniapp/handler.go`](../internal/miniapp/handler.go#L16)
-- [`internal/miniapp/handler.go`](../internal/miniapp/handler.go#L240)
-- [`internal/bot/util.go`](../internal/bot/util.go#L10)
+- Before: `internal/miniapp/handler.go`가 `internal/bot`을 import
+- Before: `internal/bot/util.go`의 `ParseHandwritingMessageRef`
+- After: [`internal/callback/callback.go`](../internal/callback/callback.go#L14)
+- After: [`internal/miniapp/handler.go`](../internal/miniapp/handler.go#L239)
+- After: [`internal/bot/restart_recovery.go`](../internal/bot/restart_recovery.go#L71)
 
 **Options**:
 
-- **A. recommended**: shared parser를 `internal/callback` 또는 별도 `internal/telegramref`로 이동
+- **A. selected**: shared parser를 이미 존재하는 `internal/callback`으로 이동
 - **B**: `miniapp` 내부에 parser를 중복 구현
 - **C. Do nothing**: `miniapp -> bot` import 유지
 
 **Metrics**:
 
-- 구현 공수: 0.5일
+- 실제 구현 범위: parser 이동 + 호출처 2곳 교체 + parser 테스트 이동
+- 구현 공수: 0.5일 미만
 - 리스크: 낮음
 - 타 코드 영향도: 낮음
 - 유지보수 부담: 감소
 
-**Recommendation**: Option A. 가장 작은 atomic refactor이며, BIG CHANGE 전에 먼저 처리해도 안전하다.
+**Recommendation**: Option A. 별도 `internal/telegramref` package는 만들지 않는다. `internal/callback` package가 이미 있고 bot/miniapp 양쪽이 import 중이므로 parser SSOT 위치로 충분하다.
 
-**Decision**: 사용자 결정 대기.
+**Decision**: 2026-06-22 완료. `miniapp -> bot` import 제거.
 
 ---
 
@@ -198,6 +201,8 @@
 2. `miniapp -> bot` import 제거
 3. 관련 테스트 이동/정리
 4. `make test`
+
+Status: 2026-06-22 완료. Parser는 `internal/callback.ParseHandwritingMessageRef`로 이동했고, 새 package는 만들지 않았다.
 
 Pros:
 

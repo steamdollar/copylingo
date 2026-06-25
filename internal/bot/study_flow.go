@@ -245,6 +245,8 @@ func renderStudyMaterial(material model.Material, idx, total int) string {
 	switch material.Category {
 	case model.MaterialCategoryVocabulary:
 		return header + title + renderVocabularyPayload(material.Payload)
+	case model.MaterialCategoryGrammar:
+		return header + title + renderGrammarPayload(material.Payload)
 	default:
 		return header + title + renderGenericPayload(material.Payload)
 	}
@@ -268,6 +270,39 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 	}
 	if strings.TrimSpace(vocab.PartOfSpeech) != "" {
 		lines = append(lines, fmt.Sprintf("품사: <b>%s</b>", escapeHTML(vocab.PartOfSpeech)))
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return "\n\n" + strings.Join(lines, "\n")
+}
+
+type grammarStudyPayload struct {
+	Pattern       string `json:"pattern"`
+	MeaningKo     string `json:"meaning_ko"`
+	ExplanationKo string `json:"explanation_ko"`
+	Example       string `json:"example"`
+	TranslationKo string `json:"translation_ko"`
+}
+
+func renderGrammarPayload(payload json.RawMessage) string {
+	var grammar grammarStudyPayload
+	if err := json.Unmarshal(payload, &grammar); err != nil {
+		return renderGenericPayload(payload)
+	}
+
+	lines := make([]string, 0, 4)
+	if strings.TrimSpace(grammar.MeaningKo) != "" {
+		lines = append(lines, fmt.Sprintf("의미: <b>%s</b>", escapeHTML(grammar.MeaningKo)))
+	}
+	if strings.TrimSpace(grammar.ExplanationKo) != "" {
+		lines = append(lines, fmt.Sprintf("설명: %s", escapeHTML(grammar.ExplanationKo)))
+	}
+	if strings.TrimSpace(grammar.Example) != "" {
+		lines = append(lines, fmt.Sprintf("예문: <b>%s</b>", escapeHTML(grammar.Example)))
+	}
+	if strings.TrimSpace(grammar.TranslationKo) != "" {
+		lines = append(lines, fmt.Sprintf("해석: %s", escapeHTML(grammar.TranslationKo)))
 	}
 	if len(lines) == 0 {
 		return ""

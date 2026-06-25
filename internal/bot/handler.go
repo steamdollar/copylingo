@@ -480,7 +480,7 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 
 <b>명령어:</b>
 /menu - 메인 메뉴
-/study - Study Material 세션 즉시 생성
+/study [개수] - Study Material 세션 즉시 생성
 /llm - LLM 질문 mode 활성화
 /stats - 학습 통계
 /streak - 스트릭 확인
@@ -506,6 +506,15 @@ func (b *Bot) handleExit(ctx context.Context, msg *tgbotapi.Message) {
 }
 
 func (b *Bot) handleStudy(ctx context.Context, msg *tgbotapi.Message) {
+	limit, err := parseStudyCommandLimit(msg.CommandArguments())
+	if err != nil {
+		b.SendMessage(msg.Chat.ID, fmt.Sprintf(
+			"❓ 사용법: /study [1-%d]\n예: /study 20",
+			service.MaxStudySessionMaterialCount,
+		))
+		return
+	}
+
 	user, err := b.services.User.GetUser(ctx, msg.From.ID, msg.From.UserName)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get user for study session",
@@ -516,11 +525,18 @@ func (b *Bot) handleStudy(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	session, err := b.services.StudySession.BuildStudySession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+	session, err := b.services.StudySession.BuildStudySessionWithLimit(
+		ctx,
+		user.ID,
+		user.Language,
+		user.ProficiencyLevel,
+		limit,
+	)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to build study session from command",
 			"event", "telegram.study.command_build_failed",
 			"user_id", user.ID,
+			"limit", limit,
 			"error", err,
 		)
 		b.SendMessage(msg.Chat.ID, "❌ Study Session 생성 중 오류가 발생했습니다.")
@@ -546,7 +562,27 @@ func (b *Bot) handleStudy(ctx context.Context, msg *tgbotapi.Message) {
 		"event", "telegram.study.command_triggered",
 		"user_id", user.ID,
 		"session_id", session.ID,
+		"limit", limit,
 	)
+}
+
+func parseStudyCommandLimit(args string) (int, error) {
+	args = strings.TrimSpace(args)
+	if args == "" {
+		return service.DefaultStudySessionMaterialCount, nil
+	}
+	fields := strings.Fields(args)
+	if len(fields) != 1 {
+		return 0, fmt.Errorf("expected one study limit argument")
+	}
+	limit, err := strconv.Atoi(fields[0])
+	if err != nil {
+		return 0, fmt.Errorf("parse study limit: %w", err)
+	}
+	if limit <= 0 || limit > service.MaxStudySessionMaterialCount {
+		return 0, fmt.Errorf("study limit out of range: %d", limit)
+	}
+	return limit, nil
 }
 
 func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {

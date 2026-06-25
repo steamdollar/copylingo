@@ -407,9 +407,10 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	b.handleMessage(ctx, commandMessage("/study", 123, 456, "learner"))
 
 	if materialStore.userID != 123 || materialStore.language != "ja" ||
-		materialStore.level != "N5" || materialStore.limit <= 0 {
-		t.Fatalf("GetForStudySession args = (%d, %s, %s, %d), want user/language/level and positive limit",
-			materialStore.userID, materialStore.language, materialStore.level, materialStore.limit)
+		materialStore.level != "N5" || materialStore.limit != service.DefaultStudySessionMaterialCount {
+		t.Fatalf("GetForStudySession args = (%d, %s, %s, %d), want user/language/level and default limit %d",
+			materialStore.userID, materialStore.language, materialStore.level, materialStore.limit,
+			service.DefaultStudySessionMaterialCount)
 	}
 	if len(sessionStore.created) != 1 {
 		t.Fatalf("created sessions = %d, want 1", len(sessionStore.created))
@@ -446,6 +447,49 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	}
 	if msg.ChatID != 456 {
 		t.Fatalf("chat ID = %d, want 456", msg.ChatID)
+	}
+}
+
+func TestHandleStudyCommandUsesRequestedLimit(t *testing.T) {
+	api := &mockBotAPI{}
+	materialStore := &commandStudyMaterialStore{
+		materials: []model.Material{
+			{ID: 10, Category: model.MaterialCategoryVocabulary, Language: "ja", ProficiencyLevel: "N5", Title: "みず"},
+			{ID: 11, Category: model.MaterialCategoryVocabulary, Language: "ja", ProficiencyLevel: "N5", Title: "ひと"},
+		},
+	}
+	sessionStore := &commandStudySessionStore{nextID: 321}
+	b := botWithStudyCommandDeps(api, nil, materialStore, sessionStore, &commandStudySessionMaterialStore{})
+
+	b.handleStudy(context.Background(), commandMessage("/study 20", 123, 456, "learner"))
+
+	if materialStore.limit != 20 {
+		t.Fatalf("limit = %d, want 20", materialStore.limit)
+	}
+	if len(sessionStore.created) != 1 {
+		t.Fatalf("created sessions = %d, want 1", len(sessionStore.created))
+	}
+}
+
+func TestHandleStudyCommandRejectsInvalidLimit(t *testing.T) {
+	api := &mockBotAPI{}
+	materialStore := &commandStudyMaterialStore{
+		materials: []model.Material{{ID: 10, Category: model.MaterialCategoryVocabulary}},
+	}
+	sessionStore := &commandStudySessionStore{nextID: 321}
+	b := botWithStudyCommandDeps(api, nil, materialStore, sessionStore, &commandStudySessionMaterialStore{})
+
+	b.handleStudy(context.Background(), commandMessage("/study 999", 123, 456, "learner"))
+
+	if materialStore.limit != 0 {
+		t.Fatalf("limit = %d, want 0 because material lookup should not run", materialStore.limit)
+	}
+	if len(sessionStore.created) != 0 {
+		t.Fatalf("created sessions = %d, want 0", len(sessionStore.created))
+	}
+	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
+	if !strings.Contains(sent.Text, "사용법: /study") {
+		t.Fatalf("message text = %q", sent.Text)
 	}
 }
 
@@ -546,10 +590,14 @@ func botWithStudyCommandDeps(
 }
 
 func commandMessage(text string, userID, chatID int64, username string) *tgbotapi.Message {
+	commandLength := len(text)
+	if idx := strings.IndexByte(text, ' '); idx >= 0 {
+		commandLength = idx
+	}
 	return &tgbotapi.Message{
 		Text: text,
 		Entities: []tgbotapi.MessageEntity{
-			{Type: "bot_command", Offset: 0, Length: len(text)},
+			{Type: "bot_command", Offset: 0, Length: commandLength},
 		},
 		From: &tgbotapi.User{ID: userID, UserName: username},
 		Chat: &tgbotapi.Chat{ID: chatID},

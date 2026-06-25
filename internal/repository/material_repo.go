@@ -37,7 +37,7 @@ func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []strin
 	return materials, nil
 }
 
-// GetForStudySession returns level-matched due or new vocabulary materials for a user.
+// GetForStudySession returns level-matched due or new vocabulary or grammar materials for a user.
 func (r *MaterialRepository) GetForStudySession(
 	ctx context.Context,
 	userID int64,
@@ -49,15 +49,39 @@ func (r *MaterialRepository) GetForStudySession(
 	}
 
 	var materials []model.Material
-	if err := r.db.SelectContext(ctx, &materials, `
-			SELECT m.*
+	categories := []string{string(model.MaterialCategoryVocabulary), string(model.MaterialCategoryGrammar)}
+	if err := r.db.SelectContext(ctx, &materials, studySessionMaterialsQuery,
+		userID, language, level, pq.Array(categories), limit); err != nil {
+		return nil, fmt.Errorf("MaterialRepository.GetForStudySession user_id=%d language=%s level=%s limit=%d: %w",
+			userID, language, level, limit, err)
+	}
+	return materials, nil
+}
+
+const studySessionMaterialsQuery = `
+		WITH candidates AS (
+			SELECT
+				m.*,
+				ROW_NUMBER() OVER (
+					PARTITION BY m.category
+					ORDER BY
+						CASE WHEN ump.next_review_at IS NULL THEN 1 ELSE 0 END ASC,
+						ump.next_review_at ASC NULLS LAST,
+						m.difficulty ASC,
+						m.id ASC
+				) AS category_rank,
+				CASE m.category
+					WHEN 'vocabulary' THEN 0
+					WHEN 'grammar' THEN 1
+					ELSE 2
+				END AS category_order
 			FROM materials m
 			LEFT JOIN user_material_progress ump
 			ON ump.material_id = m.id
-			AND ump.user_id = $1
+				AND ump.user_id = $1
 			WHERE m.language = $2
 			AND m.proficiency_level = $3
-			AND m.category = $4
+			AND m.category = ANY($4)
 			AND (ump.material_id IS NULL OR ump.next_review_at <= NOW())
 			AND NOT EXISTS (
 				SELECT 1
@@ -68,19 +92,22 @@ func (r *MaterialRepository) GetForStudySession(
 					AND s.mode = 'study'
 					AND s.status IN ('pending', 'in_progress')
 			)
-			ORDER BY
-				CASE WHEN ump.next_review_at IS NULL THEN 1 ELSE 0 END ASC,
-				ump.next_review_at ASC NULLS LAST,
-				m.difficulty ASC,
-				m.id ASC
-			LIMIT $5
-		`,
-		userID, language, level, model.MaterialCategoryVocabulary, limit); err != nil {
-		return nil, fmt.Errorf("MaterialRepository.GetForStudySession user_id=%d language=%s level=%s limit=%d: %w",
-			userID, language, level, limit, err)
-	}
-	return materials, nil
-}
+		)
+		SELECT
+			id,
+			material_key,
+			content_id,
+			category,
+			language,
+			proficiency_level,
+			title,
+			payload,
+			difficulty,
+			created_at
+		FROM candidates
+		ORDER BY category_rank ASC, category_order ASC
+		LIMIT $5
+	`
 
 // UpsertBatch inserts or refreshes materials identified by their stable material key.
 func (r *MaterialRepository) UpsertBatch(ctx context.Context, materials []*model.Material) error {

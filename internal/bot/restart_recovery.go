@@ -68,7 +68,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 		// (a) best-effort: edit old message to strip buttons via HandwritingMessageRedisKey
 		oldKey := config.HandwritingMessageRedisKey.Format(s.ID, q.ID)
 		if val, err := b.rdb.Get(ctx, oldKey).Result(); err == nil {
-			if chatID, msgID, perr := ParseHandwritingMessageRef(val); perr == nil {
+			if chatID, msgID, perr := callback.ParseHandwritingMessageRef(val); perr == nil {
 				_ = b.ClearInlineKeyboard(chatID, msgID)
 			}
 		}

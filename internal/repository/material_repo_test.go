@@ -47,3 +47,17 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 		t.Fatalf("len(args) = %d, want 16", len(args))
 	}
 }
+
+func TestStudySessionMaterialsQueryIncludesGrammarAndInterleavesCategories(t *testing.T) {
+	for _, want := range []string{
+		"m.category = ANY($4)",
+		"PARTITION BY m.category",
+		"WHEN 'vocabulary' THEN 0",
+		"WHEN 'grammar' THEN 1",
+		"ORDER BY category_rank ASC, category_order ASC",
+	} {
+		if !strings.Contains(studySessionMaterialsQuery, want) {
+			t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+		}
+	}
+}

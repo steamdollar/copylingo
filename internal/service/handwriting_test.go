@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/model"
@@ -20,7 +22,12 @@ type mockGraderClient struct {
 	gradeHandwritingFn func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error)
 }
 
-func (m *mockGraderClient) GradeHandwritingWithQuestion(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+func (m *mockGraderClient) GradeHandwritingWithQuestion(
+	ctx context.Context,
+	sid, qid int,
+	q *model.Question,
+	img []byte,
+) (bool, string, error) {
 	return m.gradeHandwritingFn(ctx, sid, qid, q, img)
 }
 
@@ -81,6 +88,60 @@ func TestSubmitAnswer_Success(t *testing.T) {
 	}
 	if res.CorrectAnswer != "あ" || res.Explanation != "hiragana a" {
 		t.Fatalf("unexpected public result: %+v", res)
+	}
+}
+
+func TestSubmitAnswer_WrongSavesRenderedImage(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+	sessionID := 10
+	questionID := 1
+	imageDir := t.TempDir()
+	previousImageDir := failedHandwritingImageDir
+	failedHandwritingImageDir = imageDir
+	defer func() { failedHandwritingImageDir = previousImageDir }()
+
+	active := &mockHandwritingActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+			return handwritingState(userID, sessionID, model.Question{
+				ID:            questionID,
+				Type:          model.QuestionKanaHandwriting,
+				CorrectAnswer: "あ",
+				Explanation:   "hiragana a",
+			}, false), nil
+		},
+	}
+	grader := &mockGraderClient{
+		gradeHandwritingFn: func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+			return false, "Try again", nil
+		},
+	}
+	renderer := &mockRenderer{
+		renderPNGFn: func(strokes []Stroke) ([]byte, error) {
+			return []byte("fake-image"), nil
+		},
+	}
+
+	svc := NewHandwritingService(active, grader, renderer)
+	res, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{
+		UserID:     userID,
+		SessionID:  sessionID,
+		QuestionID: questionID,
+		Strokes:    []Stroke{{Points: []StrokePoint{{X: 0, Y: 0}}}},
+	})
+
+	if err != nil {
+		t.Fatalf("SubmitAnswer failed: %v", err)
+	}
+	if res.IsCorrect {
+		t.Fatal("expected wrong handwriting result")
+	}
+	got, err := os.ReadFile(filepath.Join(imageDir, "100.png"))
+	if err != nil {
+		t.Fatalf("failed to read saved image: %v", err)
+	}
+	if string(got) != "fake-image" {
+		t.Fatalf("saved image = %q, want fake-image", string(got))
 	}
 }
 
