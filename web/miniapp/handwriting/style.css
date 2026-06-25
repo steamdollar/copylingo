@@ -30,11 +30,11 @@ body {
   width: min(100%, 460px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 28px 18px 24px;
+  padding: 14px 16px 16px;
 }
 
 .hero {
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 
 .eyebrow {
@@ -54,14 +54,14 @@ h1 {
 }
 
 .hint {
-  margin: 12px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .card {
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--border);
   border-radius: 28px;
   background: rgba(255, 253, 245, 0.82);
@@ -76,7 +76,8 @@ h1 {
 }
 
 .question-panel[hidden],
-.pad-scroll-control[hidden] {
+.pad-scroll-control[hidden],
+.overview-panel[hidden] {
   display: none;
 }
 
@@ -113,13 +114,13 @@ h1 {
 /* 실제 width/height/background-size 는 글자 수에 맞춰 app.js(configurePad)가 인라인으로 설정한다. */
 #pad {
   display: block;
-  width: 320px;
-  height: 320px;
+  width: 280px;
+  height: 280px;
   background:
     linear-gradient(rgba(31, 122, 82, 0.12) 1px, transparent 1px),
     linear-gradient(90deg, rgba(31, 122, 82, 0.12) 1px, transparent 1px),
     var(--field);
-  background-size: 320px 320px;
+  background-size: 280px 280px;
   touch-action: none;
 }
 
@@ -135,7 +136,7 @@ h1 {
 }
 
 .overview-panel {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .overview-eyebrow {
@@ -154,6 +155,8 @@ h1 {
   display: block;
   width: 100%;
   height: auto;
+  max-height: 150px;
+  object-fit: contain;
   border: 1px solid rgba(31, 122, 82, 0.24);
   border-radius: 14px;
   background:
@@ -165,7 +168,7 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .tools button {
@@ -182,7 +185,7 @@ h1 {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
   gap: 10px;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .actions-submit {
@@ -217,8 +220,8 @@ button:disabled {
 }
 
 .status {
-  min-height: 24px;
-  margin: 12px 4px 0;
+  min-height: 20px;
+  margin: 8px 4px 0;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.45;

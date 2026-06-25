@@ -12,6 +12,7 @@ const questionPanel = document.getElementById("questionPanel");
 const questionPrompt = document.getElementById("questionPrompt");
 const padViewport = document.getElementById("padViewport");
 const padScrollControl = document.getElementById("padScrollControl");
+const overviewPanel = document.getElementById("overviewPanel");
 const padScroll = document.getElementById("padScroll");
 const loadingPanel = document.getElementById("loadingPanel");
 const loadingHeader = document.getElementById("loadingHeader");
@@ -21,8 +22,8 @@ const tipBody = document.getElementById("tipBody");
 const params = new URLSearchParams(window.location.search);
 
 // 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
-const PAD_CELL_CSS_PX = 320;
-const PAD_HEIGHT_CSS_PX = 320;
+const PAD_CELL_CSS_PX = 280;
+const PAD_HEIGHT_CSS_PX = 280;
 const PAD_SCALE = 2;
 const PAD_CELL_PX = PAD_CELL_CSS_PX * PAD_SCALE;
 const PAD_HEIGHT_PX = PAD_HEIGHT_CSS_PX * PAD_SCALE;
@@ -114,6 +115,8 @@ function updatePadScrollRange() {
 	padScroll.max = String(maxScroll);
 	padScroll.value = String(Math.min(Number(padScroll.value), maxScroll));
 	padScrollControl.hidden = maxScroll === 0;
+	// 가로 넘침이 없으면 패드가 이미 전부 보이므로 미니맵을 숨겨 세로 공간을 아낀다.
+	overviewPanel.hidden = maxScroll === 0;
 }
 
 async function loadTips() {
