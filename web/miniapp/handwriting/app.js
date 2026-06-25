@@ -2,7 +2,11 @@ const tg = window.Telegram?.WebApp;
 const canvas = document.getElementById("pad");
 const ctx = canvas.getContext("2d");
 const clearButton = document.getElementById("clear");
+const undoButton = document.getElementById("undo");
+const eraserButton = document.getElementById("eraser");
 const submitButton = document.getElementById("submit");
+const overview = document.getElementById("overview");
+const overviewCtx = overview.getContext("2d");
 const statusEl = document.getElementById("status");
 const questionPanel = document.getElementById("questionPanel");
 const questionPrompt = document.getElementById("questionPrompt");
@@ -23,6 +27,8 @@ const PAD_SCALE = 2;
 const PAD_CELL_PX = PAD_CELL_CSS_PX * PAD_SCALE;
 const PAD_HEIGHT_PX = PAD_HEIGHT_CSS_PX * PAD_SCALE;
 const PAD_MAX_CELLS = 8;
+// 지우개 hit-test 반경(캔버스 좌표). 선 두께(10*PAD_SCALE)보다 약간 넉넉하게 잡아 손가락 오차를 흡수한다.
+const ERASER_HIT_PX = 14 * PAD_SCALE;
 
 const TIP_INTERVAL_MS = 15000;
 const TIP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -41,6 +47,8 @@ const state = {
 	drawing: false,
 	currentStroke: null,
 	strokes: [],
+	eraserMode: false,
+	erasingActive: false,
 };
 
 const tipState = {
@@ -77,6 +85,13 @@ function configurePad() {
 	ctx.lineCap = "round";
 	ctx.lineJoin = "round";
 	ctx.strokeStyle = "#111811";
+
+	// 미니맵은 메인 캔버스와 동일 해상도로 두고, CSS(width:100%)가 컨테이너 폭에 맞춰 축소한다.
+	// background-size 를 셀 폭(%)으로 잡아 글자 단위 분할선을 표시한다.
+	overview.width = width;
+	overview.height = PAD_HEIGHT_PX;
+	overview.style.backgroundSize = `${100 / cells}% 100%`;
+	renderOverview();
 }
 
 function renderQuestionPrompt() {
@@ -257,13 +272,100 @@ function endStroke(event) {
     state.strokes.push(state.currentStroke);
   }
   state.currentStroke = null;
+  renderOverview();
+}
+
+// state.strokes 를 단일 진실 소스로 캔버스 전체를 다시 그린다. undo/지우개/clear 후 호출.
+function redrawAll() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const stroke of state.strokes) {
+    drawStroke(stroke);
+  }
+  renderOverview();
+}
+
+function drawStroke(stroke) {
+  const pts = stroke.points;
+  if (pts.length === 0) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  if (pts.length === 1) {
+    // 점 하나짜리 획도 둥근 점으로 보이게 0 길이 선을 긋는다(lineCap: round).
+    ctx.lineTo(pts[0].x, pts[0].y);
+  } else {
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+  }
+  ctx.stroke();
+}
+
+// 메인 캔버스(획만, 배경 투명)를 미니맵에 1:1 복사한다. 격자/배경은 미니맵 CSS가 담당.
+function renderOverview() {
+  overviewCtx.clearRect(0, 0, overview.width, overview.height);
+  overviewCtx.drawImage(canvas, 0, 0);
+}
+
+function distToSegment(px, py, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - a.x, py - a.y);
+  let t = ((px - a.x) * dx + (py - a.y) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+}
+
+function strokeHit(stroke, x, y, radius) {
+  const pts = stroke.points;
+  if (pts.length === 1) {
+    return Math.hypot(pts[0].x - x, pts[0].y - y) <= radius;
+  }
+  for (let i = 1; i < pts.length; i++) {
+    if (distToSegment(x, y, pts[i - 1], pts[i]) <= radius) return true;
+  }
+  return false;
+}
+
+// 위에 그려진 획(배열 뒤쪽)부터 검사해 가장 위 획을 지운다.
+function eraseAt(event) {
+  event.preventDefault();
+  const point = pointFromEvent(event);
+  for (let i = state.strokes.length - 1; i >= 0; i--) {
+    if (strokeHit(state.strokes[i], point.x, point.y, ERASER_HIT_PX)) {
+      state.strokes.splice(i, 1);
+      redrawAll();
+      tg?.HapticFeedback?.impactOccurred?.("light");
+      return;
+    }
+  }
+}
+
+function undoStroke() {
+  if (state.strokes.length === 0) {
+    setStatus("되돌릴 획이 없습니다.");
+    return;
+  }
+  state.strokes.pop();
+  redrawAll();
+  setStatus("마지막 획을 지웠습니다.");
+}
+
+function toggleEraser() {
+  state.eraserMode = !state.eraserMode;
+  state.drawing = false;
+  state.currentStroke = null;
+  eraserButton.classList.toggle("active", state.eraserMode);
+  canvas.classList.toggle("erasing", state.eraserMode);
+  setStatus(state.eraserMode ? "지우개: 지울 획을 터치하세요." : "다시 쓸 수 있습니다.");
 }
 
 function clearPad() {
   state.strokes = [];
   state.currentStroke = null;
   state.drawing = false;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  state.erasingActive = false;
+  redrawAll();
   setStatus("다시 쓸 준비가 됐습니다.");
 }
 
@@ -285,8 +387,7 @@ async function submitAnswer() {
     return;
   }
 
-  submitButton.disabled = true;
-  clearButton.disabled = true;
+  setToolsDisabled(true);
   setStatus("");
   startLoading();
 
@@ -317,18 +418,51 @@ async function submitAnswer() {
     tg?.HapticFeedback?.notificationOccurred(payload.is_correct ? "success" : "error");
   } catch (error) {
     setStatus(error.message);
-    submitButton.disabled = false;
-    clearButton.disabled = false;
+    setToolsDisabled(false);
   } finally {
     stopLoading({ keepTip: true });
   }
 }
 
-canvas.addEventListener("pointerdown", beginStroke);
-canvas.addEventListener("pointermove", moveStroke);
-canvas.addEventListener("pointerup", endStroke);
-canvas.addEventListener("pointercancel", endStroke);
+function setToolsDisabled(disabled) {
+  submitButton.disabled = disabled;
+  clearButton.disabled = disabled;
+  undoButton.disabled = disabled;
+  eraserButton.disabled = disabled;
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  if (state.eraserMode) {
+    state.erasingActive = true;
+    eraseAt(event);
+    return;
+  }
+  beginStroke(event);
+});
+canvas.addEventListener("pointermove", (event) => {
+  if (state.eraserMode) {
+    if (state.erasingActive) eraseAt(event);
+    return;
+  }
+  moveStroke(event);
+});
+canvas.addEventListener("pointerup", (event) => {
+  if (state.eraserMode) {
+    state.erasingActive = false;
+    return;
+  }
+  endStroke(event);
+});
+canvas.addEventListener("pointercancel", (event) => {
+  if (state.eraserMode) {
+    state.erasingActive = false;
+    return;
+  }
+  endStroke(event);
+});
 clearButton.addEventListener("click", clearPad);
+undoButton.addEventListener("click", undoStroke);
+eraserButton.addEventListener("click", toggleEraser);
 submitButton.addEventListener("click", submitAnswer);
 padScroll.addEventListener("input", () => {
   padViewport.scrollLeft = Number(padScroll.value);

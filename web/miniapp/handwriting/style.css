@@ -134,11 +134,63 @@ h1 {
   accent-color: var(--accent);
 }
 
+.overview-panel {
+  margin-top: 14px;
+}
+
+.overview-eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--accent-dark);
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* width/height(auto)는 100%로 두고, background-size(셀 분할선)는 app.js가 인라인 설정한다. */
+.overview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(31, 122, 82, 0.24);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgba(31, 122, 82, 0.16) 1px, transparent 1px),
+    var(--field);
+}
+
+.tools {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.tools button {
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.tools button.active {
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+
 .actions {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
   gap: 10px;
   margin-top: 14px;
+}
+
+.actions-submit {
+  grid-template-columns: 1fr;
+}
+
+#pad.erasing {
+  cursor: cell;
 }
 
 button {

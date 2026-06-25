@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css?v=2605310100">
+    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css?v=2606250100">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body>
@@ -24,8 +24,16 @@
           <span>좌우 이동</span>
           <input id="padScroll" type="range" min="0" max="0" value="0">
         </label>
-        <div class="actions">
-          <button id="clear" class="secondary" type="button">지우기</button>
+        <section id="overviewPanel" class="overview-panel">
+          <span class="overview-eyebrow">전체 보기</span>
+          <canvas id="overview" class="overview" aria-hidden="true"></canvas>
+        </section>
+        <div class="tools">
+          <button id="undo" class="secondary" type="button">되돌리기</button>
+          <button id="eraser" class="secondary" type="button">지우개</button>
+          <button id="clear" class="secondary" type="button">전체 지우기</button>
+        </div>
+        <div class="actions actions-submit">
           <button id="submit" class="primary" type="button">제출하기</button>
         </div>
         <div id="loadingPanel" class="loading-panel" hidden>
@@ -42,6 +50,6 @@
       </section>
     </main>
 
-    <script src="/miniapp/handwriting/assets/app.js?v=2606080100"></script>
+    <script src="/miniapp/handwriting/assets/app.js?v=2606250100"></script>
   </body>
 </html>
