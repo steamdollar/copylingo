@@ -29,6 +29,26 @@ Keep work local when:
 - The task is tightly coupled to local edits.
 - The subtask requires a non-trivial decision not yet approved by the user.
 
+## Delegation ROI Gate
+
+Delegation (native subagent or Gemini) is a token-saving tool, not a default. Judge cost vs. benefit before delegating:
+
+- First size the work with a cheap local scan (`rg`, `git diff`, `go test`) to estimate candidate count and task nature.
+- If candidates are ≤10 or the task is a mechanical regex/pattern search, the main agent handles it directly.
+- Delegate only when candidates are many or classification cost is high — semantic review, code-flow analysis, test-gap analysis.
+- Scope the delegated input: prefer "classify this candidate list" over "scan the whole codebase".
+- A subagent result is not the final judgment. The main agent re-verifies key candidates and owns the final decision and verification.
+
+### Executor Selection
+
+Once delegation is justified, choose the executor:
+
+- **Default: native subagent.** For bulk mechanical work (large reads, classification, summarization), override the model down to **Haiku** — a clear cost reason per "Runtime Model".
+- **External Gemini CLI (=agy)** only when one of:
+  1. The user enabled conserve mode or explicitly requested it. Usage-headroom judgment belongs to the user — the agent cannot query Max plan usage.
+  2. Estimated batch token volume exceeds the threshold (gauge: **~50k tokens**, calibratable). Estimate `≈ Σ(items × per-item input+output)`; generation is output-dominated, bulk read is input-dominated.
+- When switching to the external executor, **report the estimate that triggered it** (e.g. "80 items × ~700 ≈ 56k > 50k"). Never judge "usage is tight" yourself — the in-session `tokens left` signal is the context window, not plan usage. React only to explicit in-band rate-limit warnings.
+
 ## Roles
 
 - `explorer`: answer a specific codebase question without editing files.
@@ -52,6 +72,7 @@ For explorers, ask one focused question and request file references.
 
 Native subagents inherit the parent model by default.
 Do not override the model unless the user requests it or the task has a clear cost or capability reason.
+Bulk mechanical work (large reads, classification, summarization) is a clear cost reason — prefer the **Haiku** tier for it, and reserve the parent (Opus/Sonnet) tier for judgment-bearing subtasks.
 
 ## Integration
 

@@ -43,6 +43,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-25 | AGENTS.md 정리: 죽은 ADR 링크 수정, 콜백 규약 dedup, §5 코딩규칙·위임 detail 분리 (210→164줄) | `2606251247_agents_md_cleanup.md` |
 | 2026-06-25 | N5 학습 데이터(grammar/vocab/kana) Go 리터럴 → embedded JSON 분리 | `2606250015_grammar_data_json_extraction.md` |
 | 2026-06-23 | N5 일본어 문법 seed 도입 → 60개 확장 및 학습 세션 연동 | `2606232110_expand_n5_grammar_study.md` |
 | 2026-06-23 | Study Session 기본량 상향 및 `/study [개수]` 지원 | `2606232010_study_session_limit.md` |
