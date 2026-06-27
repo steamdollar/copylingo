@@ -346,9 +346,9 @@
     "correct_answer": "でください",
     "form_options": [
       "でください",
-      "てださい",
       "てください",
-      "てみてください"
+      "てみてください",
+      "なさい"
     ]
   },
   {
@@ -957,6 +957,326 @@
       "より",
       "から",
       "と"
+    ]
+  },
+  {
+    "id": "n5_grammar_061",
+    "pattern": "くないです",
+    "meaning_ko": "~지 않습니다 (い형용사 부정)",
+    "explanation_ko": "い형용사의 어미 い를 く로 바꾸고 ないです를 붙여 정중하게 부정합니다.",
+    "example": "この問題は難しくないです。",
+    "translation_ko": "이 문제는 어렵지 않습니다.",
+    "cloze_prompt": "この問題は難し__。",
+    "correct_answer": "くないです",
+    "form_options": [
+      "くないです",
+      "くなかったです",
+      "いです",
+      "じゃないです"
+    ]
+  },
+  {
+    "id": "n5_grammar_062",
+    "pattern": "かったです",
+    "meaning_ko": "~었습니다 (い형용사 과거)",
+    "explanation_ko": "い형용사의 어미 い를 かった로 바꿔 정중한 과거를 나타냅니다.",
+    "example": "旅行は楽しかったです。",
+    "translation_ko": "여행은 즐거웠습니다.",
+    "cloze_prompt": "旅行は楽し__。",
+    "correct_answer": "かったです",
+    "form_options": [
+      "かったです",
+      "くなかったです",
+      "いです",
+      "かったでした"
+    ]
+  },
+  {
+    "id": "n5_grammar_063",
+    "pattern": "くなかったです",
+    "meaning_ko": "~지 않았습니다 (い형용사 과거 부정)",
+    "explanation_ko": "い형용사를 정중한 과거 부정형으로 나타냅니다.",
+    "example": "試験は難しくなかったです。",
+    "translation_ko": "시험은 어렵지 않았습니다.",
+    "cloze_prompt": "試験は難し__。",
+    "correct_answer": "くなかったです",
+    "form_options": [
+      "くなかったです",
+      "くないです",
+      "かったです",
+      "くないでした"
+    ]
+  },
+  {
+    "id": "n5_grammar_064",
+    "pattern": "くて",
+    "meaning_ko": "~고 / ~어서 (い형용사 연결)",
+    "explanation_ko": "い형용사의 어미 い를 くて로 바꿔 문장을 연결하거나 이유를 나타냅니다.",
+    "example": "この部屋は広くて明るいです。",
+    "translation_ko": "이 방은 넓고 밝습니다.",
+    "cloze_prompt": "この部屋は広__明るいです。",
+    "correct_answer": "くて",
+    "form_options": [
+      "くて",
+      "いで",
+      "くって",
+      "で"
+    ]
+  },
+  {
+    "id": "n5_grammar_065",
+    "pattern": "くなります",
+    "meaning_ko": "~아/어집니다 (い형용사 변화)",
+    "explanation_ko": "い형용사의 어미 い를 く로 바꾸고 なります를 붙여 상태 변화를 나타냅니다.",
+    "example": "春になると暖かくなります。",
+    "translation_ko": "봄이 되면 따뜻해집니다.",
+    "cloze_prompt": "春になると暖か__。",
+    "correct_answer": "くなります",
+    "form_options": [
+      "くなります",
+      "になります",
+      "くします",
+      "いなります"
+    ]
+  },
+  {
+    "id": "n5_grammar_066",
+    "pattern": "な",
+    "meaning_ko": "~한 (な형용사 + 명사)",
+    "explanation_ko": "な형용사가 명사를 수식할 때 어미에 な를 붙입니다.",
+    "example": "ここは静かな町です。",
+    "translation_ko": "여기는 조용한 동네입니다.",
+    "cloze_prompt": "ここは静か__町です。",
+    "correct_answer": "な",
+    "form_options": [
+      "な",
+      "の",
+      "い",
+      "だ"
+    ]
+  },
+  {
+    "id": "n5_grammar_067",
+    "pattern": "で",
+    "meaning_ko": "~고 / ~어서 (な형용사 연결)",
+    "explanation_ko": "な형용사를 で로 연결해 문장을 잇거나 이유를 나타냅니다.",
+    "example": "この店は有名で人気があります。",
+    "translation_ko": "이 가게는 유명하고 인기가 있습니다.",
+    "cloze_prompt": "この店は有名__人気があります。",
+    "correct_answer": "で",
+    "form_options": [
+      "で",
+      "くて",
+      "だ",
+      "なで"
+    ]
+  },
+  {
+    "id": "n5_grammar_068",
+    "pattern": "になります",
+    "meaning_ko": "~해집니다 / ~이 됩니다 (변화)",
+    "explanation_ko": "な형용사나 명사에 になります를 붙여 상태 변화를 나타냅니다.",
+    "example": "練習すると上手になります。",
+    "translation_ko": "연습하면 능숙해집니다.",
+    "cloze_prompt": "練習すると上手__。",
+    "correct_answer": "になります",
+    "form_options": [
+      "になります",
+      "くなります",
+      "にします",
+      "となります"
+    ]
+  },
+  {
+    "id": "n5_grammar_069",
+    "pattern": "ませんか",
+    "meaning_ko": "~하지 않겠습니까? (권유)",
+    "explanation_ko": "상대에게 무언가를 함께 하자고 정중하게 권유합니다.",
+    "example": "一緒に映画を見ませんか。",
+    "translation_ko": "같이 영화를 보지 않겠습니까?",
+    "cloze_prompt": "一緒に映画を見__。",
+    "correct_answer": "ませんか",
+    "form_options": [
+      "ませんか",
+      "ましょうか",
+      "ますか",
+      "ませんでした"
+    ]
+  },
+  {
+    "id": "n5_grammar_070",
+    "pattern": "でしょう",
+    "meaning_ko": "~겠지요 / ~일 것입니다 (추측)",
+    "explanation_ko": "확실하지 않은 일을 추측하여 말할 때 사용합니다.",
+    "example": "明日は晴れるでしょう。",
+    "translation_ko": "내일은 맑을 것입니다.",
+    "cloze_prompt": "明日は晴れる__。",
+    "correct_answer": "でしょう",
+    "form_options": [
+      "でしょう",
+      "だろう",
+      "ましょう",
+      "ようです"
+    ]
+  },
+  {
+    "id": "n5_grammar_071",
+    "pattern": "とき",
+    "meaning_ko": "~할 때 / ~일 때",
+    "explanation_ko": "어떤 동작이나 상태가 일어나는 시점을 나타냅니다.",
+    "example": "子供のとき、よく公園で遊びました。",
+    "translation_ko": "어렸을 때 자주 공원에서 놀았습니다.",
+    "cloze_prompt": "子供の__、よく公園で遊びました。",
+    "correct_answer": "とき",
+    "form_options": [
+      "とき",
+      "ところ",
+      "あいだ",
+      "まで"
+    ]
+  },
+  {
+    "id": "n5_grammar_072",
+    "pattern": "一番",
+    "meaning_ko": "가장 / 제일 (최상급)",
+    "explanation_ko": "여럿 가운데 정도가 가장 높음을 나타냅니다.",
+    "example": "クラスで田中さんが一番背が高いです。",
+    "translation_ko": "반에서 다나카 씨가 가장 키가 큽니다.",
+    "cloze_prompt": "クラスで田中さんが__背が高いです。",
+    "correct_answer": "一番",
+    "form_options": [
+      "一番",
+      "とても",
+      "もっと",
+      "ずっと"
+    ]
+  },
+  {
+    "id": "n5_grammar_073",
+    "pattern": "もう",
+    "meaning_ko": "이미 / 벌써",
+    "explanation_ko": "어떤 일이 이미 끝났음을 나타냅니다.",
+    "example": "もう昼ご飯を食べました。",
+    "translation_ko": "이미 점심을 먹었습니다.",
+    "cloze_prompt": "__昼ご飯を食べました。",
+    "correct_answer": "もう",
+    "form_options": [
+      "もう",
+      "まだ",
+      "もっと",
+      "ずっと"
+    ]
+  },
+  {
+    "id": "n5_grammar_074",
+    "pattern": "まだ〜ていません",
+    "meaning_ko": "아직 ~하지 않았습니다",
+    "explanation_ko": "어떤 동작이 아직 완료되지 않았음을 나타냅니다.",
+    "example": "まだ昼ご飯を食べていません。",
+    "translation_ko": "아직 점심을 먹지 않았습니다.",
+    "cloze_prompt": "まだ昼ご飯を食べ__。",
+    "correct_answer": "ていません",
+    "form_options": [
+      "ていません",
+      "ました",
+      "ています",
+      "ません"
+    ]
+  },
+  {
+    "id": "n5_grammar_075",
+    "pattern": "ぐらい",
+    "meaning_ko": "~정도 / ~쯤 (대략적인 양)",
+    "explanation_ko": "수량이나 시간이 대략 그 정도임을 나타냅니다.",
+    "example": "駅まで一時間ぐらいかかります。",
+    "translation_ko": "역까지 한 시간 정도 걸립니다.",
+    "cloze_prompt": "駅まで一時間__かかります。",
+    "correct_answer": "ぐらい",
+    "form_options": [
+      "ぐらい",
+      "ごろ",
+      "までに",
+      "しか"
+    ]
+  },
+  {
+    "id": "n5_grammar_076",
+    "pattern": "しか",
+    "meaning_ko": "~밖에 (부정과 호응)",
+    "explanation_ko": "뒤에 부정형이 와서 '그것뿐'임을 강조합니다.",
+    "example": "財布に百円しかありません。",
+    "translation_ko": "지갑에 백 엔밖에 없습니다.",
+    "cloze_prompt": "財布に百円__ありません。",
+    "correct_answer": "しか",
+    "form_options": [
+      "しか",
+      "だけ",
+      "ばかり",
+      "までに"
+    ]
+  },
+  {
+    "id": "n5_grammar_077",
+    "pattern": "だけ",
+    "meaning_ko": "~만 / ~뿐",
+    "explanation_ko": "그 범위로 한정됨을 나타냅니다.",
+    "example": "一つだけください。",
+    "translation_ko": "하나만 주세요.",
+    "cloze_prompt": "一つ__ください。",
+    "correct_answer": "だけ",
+    "form_options": [
+      "だけ",
+      "しか",
+      "ばかり",
+      "ぐらい"
+    ]
+  },
+  {
+    "id": "n5_grammar_078",
+    "pattern": "方",
+    "meaning_ko": "~하는 법 / 방법",
+    "explanation_ko": "동사 ます형 뒤에 붙어 그 동작을 하는 방법을 나타냅니다.",
+    "example": "漢字の書き方を教えてください。",
+    "translation_ko": "한자 쓰는 법을 가르쳐 주세요.",
+    "cloze_prompt": "漢字の書き__を教えてください。",
+    "correct_answer": "方",
+    "form_options": [
+      "方",
+      "こと",
+      "もの",
+      "ところ"
+    ]
+  },
+  {
+    "id": "n5_grammar_079",
+    "pattern": "ことにします",
+    "meaning_ko": "~하기로 합니다 (결정)",
+    "explanation_ko": "화자가 스스로 어떤 행동을 하기로 결정함을 나타냅니다.",
+    "example": "明日から毎日運動することにします。",
+    "translation_ko": "내일부터 매일 운동하기로 합니다.",
+    "cloze_prompt": "明日から毎日運動する__。",
+    "correct_answer": "ことにします",
+    "form_options": [
+      "ことにします",
+      "ことになります",
+      "つもりです",
+      "ようにします"
+    ]
+  },
+  {
+    "id": "n5_grammar_080",
+    "pattern": "にします",
+    "meaning_ko": "~하게 합니다 / ~로 정합니다",
+    "explanation_ko": "な형용사나 명사에 にします를 붙여 의도적으로 그 상태로 만듦을 나타냅니다.",
+    "example": "部屋をきれいにします。",
+    "translation_ko": "방을 깨끗하게 합니다.",
+    "cloze_prompt": "部屋をきれい__。",
+    "correct_answer": "にします",
+    "form_options": [
+      "にします",
+      "になります",
+      "くします",
+      "とします"
     ]
   }
 ]

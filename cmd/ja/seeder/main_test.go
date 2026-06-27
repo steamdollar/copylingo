@@ -488,8 +488,8 @@ func TestBuildGrammarFormQuestion(t *testing.T) {
 func TestSeederN5WordsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(n5Words) != 500 {
-		t.Fatalf("len(n5Words) = %d, want 500", len(n5Words))
+	if len(n5Words) != 540 {
+		t.Fatalf("len(n5Words) = %d, want 540", len(n5Words))
 	}
 
 	ids := make(map[string]bool, len(n5Words))
@@ -516,8 +516,8 @@ func TestSeederN5WordsIntegrity(t *testing.T) {
 func TestSeederN5GrammarPointsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(n5GrammarPoints) != 60 {
-		t.Fatalf("len(n5GrammarPoints) = %d, want 60", len(n5GrammarPoints))
+	if len(n5GrammarPoints) != 80 {
+		t.Fatalf("len(n5GrammarPoints) = %d, want 80", len(n5GrammarPoints))
 	}
 
 	ids := make(map[string]bool, len(n5GrammarPoints))
@@ -544,8 +544,8 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 	}
 
 	questions := buildVocabularyQuestions(rand.New(rand.NewSource(1)), n5Words, materialIDsByWordID)
-	if len(questions) != 1500 {
-		t.Fatalf("len(questions) = %d, want 1500", len(questions))
+	if len(questions) != 1620 {
+		t.Fatalf("len(questions) = %d, want 1620", len(questions))
 	}
 
 	countByType := map[model.QuestionType]int{}
@@ -568,14 +568,14 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 		seenKeys[*q.QuestionKey] = true
 	}
 
-	if countByType[model.QuestionMultipleChoice] != 500 {
-		t.Fatalf("multiple_choice count = %d, want 500", countByType[model.QuestionMultipleChoice])
+	if countByType[model.QuestionMultipleChoice] != 540 {
+		t.Fatalf("multiple_choice count = %d, want 540", countByType[model.QuestionMultipleChoice])
 	}
-	if countByType[model.QuestionFillBlank] != 500 {
-		t.Fatalf("fill_blank count = %d, want 500", countByType[model.QuestionFillBlank])
+	if countByType[model.QuestionFillBlank] != 540 {
+		t.Fatalf("fill_blank count = %d, want 540", countByType[model.QuestionFillBlank])
 	}
-	if countByType[model.QuestionKanaHandwriting] != 500 {
-		t.Fatalf("kana_handwriting count = %d, want 500", countByType[model.QuestionKanaHandwriting])
+	if countByType[model.QuestionKanaHandwriting] != 540 {
+		t.Fatalf("kana_handwriting count = %d, want 540", countByType[model.QuestionKanaHandwriting])
 	}
 	for _, key := range []string{
 		"ja:vocab:word_001:meaning",
@@ -597,8 +597,8 @@ func TestBuildGrammarQuestions(t *testing.T) {
 	}
 
 	questions := buildGrammarQuestions(rand.New(rand.NewSource(1)), n5GrammarPoints, materialIDsByGrammarID)
-	if len(questions) != 120 {
-		t.Fatalf("len(questions) = %d, want 120", len(questions))
+	if len(questions) != 160 {
+		t.Fatalf("len(questions) = %d, want 160", len(questions))
 	}
 
 	countByType := map[model.QuestionType]int{}
@@ -621,8 +621,8 @@ func TestBuildGrammarQuestions(t *testing.T) {
 		seenKeys[*q.QuestionKey] = true
 	}
 
-	if countByType[model.QuestionMultipleChoice] != 120 {
-		t.Fatalf("multiple_choice count = %d, want 120", countByType[model.QuestionMultipleChoice])
+	if countByType[model.QuestionMultipleChoice] != 160 {
+		t.Fatalf("multiple_choice count = %d, want 160", countByType[model.QuestionMultipleChoice])
 	}
 	for _, key := range []string{
 		"ja:grammar:001:meaning",

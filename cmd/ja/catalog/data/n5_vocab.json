@@ -248,7 +248,7 @@
     "id": "n5_word_036",
     "kana": "ゆき",
     "kanji": "雪",
-    "meaning_ko": "눈",
+    "meaning_ko": "눈 (날씨)",
     "part_of_speech": "noun"
   },
   {
@@ -465,7 +465,7 @@
     "id": "n5_word_067",
     "kana": "じゅう",
     "kanji": "十",
-    "meaning_ko": "열",
+    "meaning_ko": "열 (10)",
     "part_of_speech": "numeral"
   },
   {
@@ -556,7 +556,7 @@
     "id": "n5_word_080",
     "kana": "はなす",
     "kanji": "話す",
-    "meaning_ko": "말하다",
+    "meaning_ko": "말하다 (이야기하다)",
     "part_of_speech": "verb"
   },
   {
@@ -570,14 +570,14 @@
     "id": "n5_word_082",
     "kana": "ある",
     "kanji": "ある",
-    "meaning_ko": "있다",
+    "meaning_ko": "있다 (사물)",
     "part_of_speech": "verb"
   },
   {
     "id": "n5_word_083",
     "kana": "いる",
     "kanji": "いる",
-    "meaning_ko": "있다",
+    "meaning_ko": "있다 (사람·동물)",
     "part_of_speech": "verb"
   },
   {
@@ -836,7 +836,7 @@
     "id": "n5_word_120",
     "kana": "せんもん",
     "kanji": "専門",
-    "meaning_ko": "전공",
+    "meaning_ko": "전문",
     "part_of_speech": "noun"
   },
   {
@@ -1312,14 +1312,14 @@
     "id": "n5_word_188",
     "kana": "わかる",
     "kanji": "分かる",
-    "meaning_ko": "알다",
+    "meaning_ko": "알다 (이해하다)",
     "part_of_speech": "verb"
   },
   {
     "id": "n5_word_189",
     "kana": "しる",
     "kanji": "知る",
-    "meaning_ko": "알다",
+    "meaning_ko": "알다 (알고 있다)",
     "part_of_speech": "verb"
   },
   {
@@ -1333,7 +1333,7 @@
     "id": "n5_word_191",
     "kana": "いう",
     "kanji": "言う",
-    "meaning_ko": "말하다",
+    "meaning_ko": "말하다 (말을 꺼내다)",
     "part_of_speech": "verb"
   },
   {
@@ -1522,7 +1522,7 @@
     "id": "n5_word_218",
     "kana": "ふね",
     "kanji": "船",
-    "meaning_ko": "배",
+    "meaning_ko": "배 (탈것)",
     "part_of_speech": "noun"
   },
   {
@@ -1879,7 +1879,7 @@
     "id": "n5_word_269",
     "kana": "め",
     "kanji": "目",
-    "meaning_ko": "눈",
+    "meaning_ko": "눈 (신체)",
     "part_of_speech": "noun"
   },
   {
@@ -1928,7 +1928,7 @@
     "id": "n5_word_276",
     "kana": "おなか",
     "kanji": "お腹",
-    "meaning_ko": "배",
+    "meaning_ko": "배 (신체)",
     "part_of_speech": "noun"
   },
   {
@@ -1977,7 +1977,7 @@
     "id": "n5_word_283",
     "kana": "ねつ",
     "kanji": "熱",
-    "meaning_ko": "열",
+    "meaning_ko": "열 (발열)",
     "part_of_speech": "noun"
   },
   {
@@ -3498,5 +3498,285 @@
     "kanji": "呼ぶ",
     "meaning_ko": "부르다",
     "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_501",
+    "kana": "あう",
+    "kanji": "会う",
+    "meaning_ko": "만나다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_502",
+    "kana": "いれる",
+    "kanji": "入れる",
+    "meaning_ko": "넣다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_503",
+    "kana": "うる",
+    "kanji": "売る",
+    "meaning_ko": "팔다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_504",
+    "kana": "うたう",
+    "kanji": "歌う",
+    "meaning_ko": "노래하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_505",
+    "kana": "おくる",
+    "kanji": "送る",
+    "meaning_ko": "보내다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_506",
+    "kana": "おす",
+    "kanji": "押す",
+    "meaning_ko": "밀다/누르다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_507",
+    "kana": "おぼえる",
+    "kanji": "覚える",
+    "meaning_ko": "외우다/기억하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_508",
+    "kana": "かりる",
+    "kanji": "借りる",
+    "meaning_ko": "빌리다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_509",
+    "kana": "かす",
+    "kanji": "貸す",
+    "meaning_ko": "빌려주다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_510",
+    "kana": "こたえる",
+    "kanji": "答える",
+    "meaning_ko": "대답하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_511",
+    "kana": "こまる",
+    "kanji": "困る",
+    "meaning_ko": "곤란하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_512",
+    "kana": "すむ",
+    "kanji": "住む",
+    "meaning_ko": "살다 (거주)",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_513",
+    "kana": "すわる",
+    "kanji": "座る",
+    "meaning_ko": "앉다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_514",
+    "kana": "だす",
+    "kanji": "出す",
+    "meaning_ko": "꺼내다/내다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_515",
+    "kana": "ちがう",
+    "kanji": "違う",
+    "meaning_ko": "다르다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_516",
+    "kana": "てつだう",
+    "kanji": "手伝う",
+    "meaning_ko": "돕다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_517",
+    "kana": "とまる",
+    "kanji": "止まる",
+    "meaning_ko": "멈추다/서다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_518",
+    "kana": "ならぶ",
+    "kanji": "並ぶ",
+    "meaning_ko": "줄을 서다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_519",
+    "kana": "はじめる",
+    "kanji": "始める",
+    "meaning_ko": "시작하다 (타동)",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_520",
+    "kana": "みせる",
+    "kanji": "見せる",
+    "meaning_ko": "보여주다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_521",
+    "kana": "わたす",
+    "kanji": "渡す",
+    "meaning_ko": "건네다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_522",
+    "kana": "ふる",
+    "kanji": "降る",
+    "meaning_ko": "(비·눈이) 내리다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_523",
+    "kana": "ながい",
+    "kanji": "長い",
+    "meaning_ko": "길다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_524",
+    "kana": "みじかい",
+    "kanji": "短い",
+    "meaning_ko": "짧다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_525",
+    "kana": "おおい",
+    "kanji": "多い",
+    "meaning_ko": "많다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_526",
+    "kana": "すくない",
+    "kanji": "少ない",
+    "meaning_ko": "적다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_527",
+    "kana": "つよい",
+    "kanji": "強い",
+    "meaning_ko": "강하다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_528",
+    "kana": "よわい",
+    "kanji": "弱い",
+    "meaning_ko": "약하다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_529",
+    "kana": "おいしい",
+    "kanji": "美味しい",
+    "meaning_ko": "맛있다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_530",
+    "kana": "わかい",
+    "kanji": "若い",
+    "meaning_ko": "젊다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_531",
+    "kana": "しんせつ",
+    "kanji": "親切",
+    "meaning_ko": "친절함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_532",
+    "kana": "しずか",
+    "kanji": "静か",
+    "meaning_ko": "조용함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_533",
+    "kana": "ゆうめい",
+    "kanji": "有名",
+    "meaning_ko": "유명함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_534",
+    "kana": "すき",
+    "kanji": "好き",
+    "meaning_ko": "좋아함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_535",
+    "kana": "じょうず",
+    "kanji": "上手",
+    "meaning_ko": "잘함/능숙함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_536",
+    "kana": "きれい",
+    "kanji": "綺麗",
+    "meaning_ko": "예쁨/깨끗함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_537",
+    "kana": "ゆっくり",
+    "kanji": "ゆっくり",
+    "meaning_ko": "천천히",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_538",
+    "kana": "もっと",
+    "kanji": "もっと",
+    "meaning_ko": "더",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_539",
+    "kana": "すぐ",
+    "kanji": "すぐ",
+    "meaning_ko": "곧/바로",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_540",
+    "kana": "だんだん",
+    "kanji": "だんだん",
+    "meaning_ko": "점점",
+    "part_of_speech": "adverb"
   }
 ]

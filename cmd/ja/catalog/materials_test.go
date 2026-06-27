@@ -12,8 +12,8 @@ func TestBuildVocabularyMaterials(t *testing.T) {
 	t.Parallel()
 
 	materials := BuildVocabularyMaterials(N5Words)
-	if len(materials) != 500 {
-		t.Fatalf("len(materials) = %d, want 500", len(materials))
+	if len(materials) != 540 {
+		t.Fatalf("len(materials) = %d, want 540", len(materials))
 	}
 
 	keys := materialKeys(materials)
@@ -52,8 +52,8 @@ func TestBuildGrammarMaterials(t *testing.T) {
 	t.Parallel()
 
 	materials := BuildGrammarMaterials(N5GrammarPoints)
-	if len(materials) != 60 {
-		t.Fatalf("len(materials) = %d, want 60", len(materials))
+	if len(materials) != 80 {
+		t.Fatalf("len(materials) = %d, want 80", len(materials))
 	}
 
 	keys := materialKeys(materials)
@@ -143,8 +143,8 @@ func TestBuildAllMaterialsIncludesGrammar(t *testing.T) {
 func TestN5WordsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(N5Words) != 500 {
-		t.Fatalf("len(N5Words) = %d, want 500", len(N5Words))
+	if len(N5Words) != 540 {
+		t.Fatalf("len(N5Words) = %d, want 540", len(N5Words))
 	}
 
 	ids := make(map[string]bool, len(N5Words))
@@ -162,8 +162,8 @@ func TestN5WordsIntegrity(t *testing.T) {
 func TestN5GrammarPointsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(N5GrammarPoints) != 60 {
-		t.Fatalf("len(N5GrammarPoints) = %d, want 60", len(N5GrammarPoints))
+	if len(N5GrammarPoints) != 80 {
+		t.Fatalf("len(N5GrammarPoints) = %d, want 80", len(N5GrammarPoints))
 	}
 
 	ids := make(map[string]bool, len(N5GrammarPoints))

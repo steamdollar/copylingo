@@ -8,8 +8,8 @@ import "testing"
 // i.e. exactly what the seeder consumes.
 
 func TestN5Grammar_Integrity(t *testing.T) {
-	if len(N5GrammarPoints) != 60 {
-		t.Fatalf("expected 60 grammar points, got %d", len(N5GrammarPoints))
+	if len(N5GrammarPoints) != 80 {
+		t.Fatalf("expected 80 grammar points, got %d", len(N5GrammarPoints))
 	}
 	seen := make(map[string]bool, len(N5GrammarPoints))
 	for i, p := range N5GrammarPoints {
@@ -39,8 +39,8 @@ func TestN5Grammar_Integrity(t *testing.T) {
 }
 
 func TestN5Vocab_Integrity(t *testing.T) {
-	if len(N5Words) != 500 {
-		t.Fatalf("expected 500 vocab words, got %d", len(N5Words))
+	if len(N5Words) != 540 {
+		t.Fatalf("expected 540 vocab words, got %d", len(N5Words))
 	}
 	seen := make(map[string]bool, len(N5Words))
 	for i, w := range N5Words {
