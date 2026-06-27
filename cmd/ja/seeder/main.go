@@ -27,9 +27,11 @@ const (
 
 type vocabWord = ja.VocabWord
 type grammarPoint = ja.GrammarPoint
+type vocabContext = ja.VocabContext
 
 var n5Words = ja.N5Words
 var n5GrammarPoints = ja.N5GrammarPoints
+var n5VocabContext = ja.N5VocabContext
 
 func kanaScriptLabel(kana string) string {
 	return ja.ScriptLabel(kana)
@@ -105,10 +107,13 @@ func main() {
 
 	kanaQuestions := buildKanaQuestions(materialIDsByKana)
 	vocabularyQuestions := buildVocabularyQuestions(rng, n5Words, materialIDsByWordID)
+	vocabContextQuestions := buildVocabContextQuestions(rng, n5VocabContext, wordsByID(n5Words), materialIDsByWordID)
 	grammarQuestions := buildGrammarQuestions(rng, n5GrammarPoints, materialIDsByGrammarID)
-	questions := make([]*model.Question, 0, len(kanaQuestions)+len(vocabularyQuestions)+len(grammarQuestions))
+	questions := make([]*model.Question, 0,
+		len(kanaQuestions)+len(vocabularyQuestions)+len(vocabContextQuestions)+len(grammarQuestions))
 	questions = append(questions, kanaQuestions...)
 	questions = append(questions, vocabularyQuestions...)
+	questions = append(questions, vocabContextQuestions...)
 	questions = append(questions, grammarQuestions...)
 
 	if err := repos.Question.UpsertSeedBatch(ctx, questions); err != nil {
@@ -117,10 +122,11 @@ func main() {
 	}
 
 	log.Printf(
-		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d grammar=%d",
+		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d vocab_context=%d grammar=%d",
 		len(questions),
 		len(kanaQuestions),
 		len(vocabularyQuestions),
+		len(vocabContextQuestions),
 		len(grammarQuestions),
 	)
 }
@@ -295,6 +301,64 @@ func buildVocabularyQuestions(
 			}
 		}
 		questions = append(questions, wordQuestions...)
+	}
+	return questions
+}
+
+// wordsByID indexes the vocabulary catalog by word ID for context-question lookups.
+func wordsByID(words []vocabWord) map[string]vocabWord {
+	byID := make(map[string]vocabWord, len(words))
+	for _, word := range words {
+		byID[word.ID] = word
+	}
+	return byID
+}
+
+// buildVocabContextQuestions builds 文脈規定 (vocab_context) questions: one static
+// multiple-choice question per cloze sentence, mirroring the grammar form pattern.
+// Coverage is partial (only words present in contexts); each cloze shares the word's
+// explicit FormOptions/CorrectAnswer and links to the word's existing vocab material.
+func buildVocabContextQuestions(
+	rng *rand.Rand,
+	contexts []vocabContext,
+	wordByID map[string]vocabWord,
+	materialIDsByWordID map[string]int,
+) []*model.Question {
+	questions := make([]*model.Question, 0, len(contexts)*3)
+	for _, vc := range contexts {
+		word, ok := wordByID[vc.WordID]
+		if !ok {
+			// material_id is a nullable FK, so a typo'd word_id would silently
+			// insert a NULL link instead of erroring. Fail hard: a context entry
+			// must reference a real catalog word.
+			log.Fatalf("vocab_context: unknown word_id %q (not in N5Words)", vc.WordID)
+		}
+		materialID, ok := materialIDsByWordID[word.ID]
+		if !ok {
+			log.Fatalf("vocab_context: missing material for word_id %q", vc.WordID)
+		}
+		for i, cloze := range vc.Clozes {
+			options := append([]string(nil), vc.FormOptions...)
+			rng.Shuffle(len(options), func(a, b int) {
+				options[a], options[b] = options[b], options[a]
+			})
+			question := &model.Question{
+				Type:             model.QuestionMultipleChoice,
+				Skill:            model.SkillPtr(model.SkillVocabContext),
+				Language:         vocabLanguage,
+				ProficiencyLevel: vocabProficiencyLevel,
+				Category:         model.CategoryVocabulary,
+				Prompt:           fmt.Sprintf("빈칸에 들어갈 알맞은 단어를 고르세요: <b>%s</b>", cloze),
+				Options:          mustJSON(options),
+				CorrectAnswer:    vc.CorrectAnswer,
+				Explanation:      formatExplanation(word),
+				Difficulty:       vocabDifficulty,
+			}
+			id := materialID
+			question.MaterialID = &id
+			setQuestionKey(question, vocabularyQuestionKey(word, fmt.Sprintf("context:%d", i+1)))
+			questions = append(questions, question)
+		}
 	}
 	return questions
 }

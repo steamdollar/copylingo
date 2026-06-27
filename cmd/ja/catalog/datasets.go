@@ -18,6 +18,9 @@ var n5VocabJSON []byte
 //go:embed data/n5_grammar.json
 var n5GrammarJSON []byte
 
+//go:embed data/n5_vocab_context.json
+var n5VocabContextJSON []byte
+
 const (
 	VocabLanguage         = "ja"
 	VocabProficiencyLevel = "N5"
@@ -46,6 +49,17 @@ type GrammarPoint struct {
 	FormOptions   []string `json:"form_options"`
 }
 
+// VocabContext carries the cloze data for a single word's 文脈規定 questions.
+// WordID references an existing N5Words entry; coverage is partial by design
+// (only words with authored example sentences get context questions). Each
+// cloze in Clozes becomes one static question sharing FormOptions/CorrectAnswer.
+type VocabContext struct {
+	WordID        string   `json:"word_id"`
+	CorrectAnswer string   `json:"correct_answer"`
+	FormOptions   []string `json:"form_options"`
+	Clozes        []string `json:"clozes"`
+}
+
 // KanaMap maps each kana to its romaji. Script-label and hint logic lives in Go.
 var KanaMap = mustLoadJSON[map[string]string]("kana", kanaJSON)
 
@@ -54,6 +68,9 @@ var N5Words = mustLoadJSON[[]VocabWord]("n5_vocab", n5VocabJSON)
 
 // N5GrammarPoints is the N5 grammar catalog.
 var N5GrammarPoints = mustLoadJSON[[]GrammarPoint]("n5_grammar", n5GrammarJSON)
+
+// N5VocabContext is the N5 vocabulary 文脈規定 catalog (partial coverage).
+var N5VocabContext = mustLoadJSON[[]VocabContext]("n5_vocab_context", n5VocabContextJSON)
 
 // loadJSON decodes an embedded dataset into T.
 func loadJSON[T any](name string, data []byte) (T, error) {

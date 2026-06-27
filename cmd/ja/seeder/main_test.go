@@ -636,6 +636,76 @@ func TestBuildGrammarQuestions(t *testing.T) {
 	}
 }
 
+func TestBuildVocabContextQuestions(t *testing.T) {
+	t.Parallel()
+
+	materialIDsByWordID := make(map[string]int, len(n5Words))
+	for idx, word := range n5Words {
+		materialIDsByWordID[word.ID] = idx + 1
+	}
+
+	questions := buildVocabContextQuestions(
+		rand.New(rand.NewSource(1)),
+		n5VocabContext,
+		wordsByID(n5Words),
+		materialIDsByWordID,
+	)
+	if len(questions) != 45 {
+		t.Fatalf("len(questions) = %d, want 45", len(questions))
+	}
+
+	seenKeys := make(map[string]bool, len(questions))
+	for _, q := range questions {
+		if q.Type != model.QuestionMultipleChoice {
+			t.Fatalf("type = %q, want multiple_choice: %+v", q.Type, q)
+		}
+		if q.Skill == nil || *q.Skill != model.SkillVocabContext {
+			t.Fatalf("skill = %v, want vocab_context: %+v", q.Skill, q)
+		}
+		if q.Language != vocabLanguage || q.ProficiencyLevel != vocabProficiencyLevel ||
+			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
+			t.Fatalf("unexpected question metadata: %+v", q)
+		}
+		if q.MaterialID == nil {
+			t.Fatalf("material_id is nil for question: %+v", q)
+		}
+		if q.QuestionKey == nil || *q.QuestionKey == "" {
+			t.Fatalf("question_key is nil for question: %+v", q)
+		}
+		if seenKeys[*q.QuestionKey] {
+			t.Fatalf("duplicate question_key %q", *q.QuestionKey)
+		}
+		seenKeys[*q.QuestionKey] = true
+
+		options, err := q.GetOptions()
+		if err != nil {
+			t.Fatalf("GetOptions: %v", err)
+		}
+		if len(options) != 4 {
+			t.Fatalf("len(options) = %d, want 4: %+v", len(options), q)
+		}
+		found := false
+		for _, option := range options {
+			if option == q.CorrectAnswer {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("options %v do not contain correct answer %q", options, q.CorrectAnswer)
+		}
+	}
+
+	for _, key := range []string{
+		"ja:vocab:word_024:context:1",
+		"ja:vocab:word_024:context:3",
+		"ja:vocab:word_092:context:1",
+	} {
+		if !seenKeys[key] {
+			t.Fatalf("question_key %q not found", key)
+		}
+	}
+}
+
 func TestVocabularyMaterialKey(t *testing.T) {
 	t.Parallel()
 

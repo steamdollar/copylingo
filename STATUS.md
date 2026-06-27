@@ -43,6 +43,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-27 | 단어 문맥규정(vocab_context) 문항 도입: 예문 보유 15단어 × 3 cloze = 45문항, grammar cloze 미러(정적 N문항) | `2606/2606272150_vocab_context_question_type.md` |
 | 2026-06-26 | SRS 첫 복습 간격 1→3일 상향 (study material + quiz question): 매일 재등장 체감 해소 | `2606261451_study_srs_first_interval.md` |
 | 2026-06-25 | AGENTS.md 정리: 죽은 ADR 링크 수정, 콜백 규약 dedup, §5 코딩규칙·위임 detail 분리 (210→164줄) | `2606251247_agents_md_cleanup.md` |
 | 2026-06-25 | N5 학습 데이터(grammar/vocab/kana) Go 리터럴 → embedded JSON 분리 | `2606250015_grammar_data_json_extraction.md` |

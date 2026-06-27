@@ -203,6 +203,70 @@ func TestN5GrammarPointsIntegrity(t *testing.T) {
 	}
 }
 
+func TestN5VocabContextIntegrity(t *testing.T) {
+	t.Parallel()
+
+	if len(N5VocabContext) != 15 {
+		t.Fatalf("len(N5VocabContext) = %d, want 15", len(N5VocabContext))
+	}
+
+	wordIDs := make(map[string]bool, len(N5Words))
+	for _, word := range N5Words {
+		wordIDs[word.ID] = true
+	}
+
+	totalClozes := 0
+	seenWords := make(map[string]bool, len(N5VocabContext))
+	for _, vc := range N5VocabContext {
+		if !wordIDs[vc.WordID] {
+			t.Fatalf("vocab context references unknown word_id %q", vc.WordID)
+		}
+		if seenWords[vc.WordID] {
+			t.Fatalf("duplicate vocab context word_id %q", vc.WordID)
+		}
+		seenWords[vc.WordID] = true
+
+		if vc.CorrectAnswer == "" {
+			t.Fatalf("empty correct_answer for %+v", vc)
+		}
+		if len(vc.FormOptions) != 4 {
+			t.Fatalf("len(FormOptions) = %d for %+v, want 4", len(vc.FormOptions), vc)
+		}
+		hasAnswer := false
+		options := make(map[string]bool, len(vc.FormOptions))
+		for _, option := range vc.FormOptions {
+			if options[option] {
+				t.Fatalf("duplicate FormOptions value %q for %+v", option, vc)
+			}
+			options[option] = true
+			if option == vc.CorrectAnswer {
+				hasAnswer = true
+			}
+		}
+		if !hasAnswer {
+			t.Fatalf("FormOptions for %+v do not contain correct answer", vc)
+		}
+
+		// >= 2 clozes is a decided constraint: a single example would repeat
+		// verbatim on every SRS re-serve, defeating the reading-comprehension goal.
+		if len(vc.Clozes) < 2 {
+			t.Fatalf("vocab context %q must have >= 2 clozes, got %d", vc.WordID, len(vc.Clozes))
+		}
+		for _, cloze := range vc.Clozes {
+			totalClozes++
+			if !strings.Contains(cloze, "__") {
+				t.Fatalf("cloze for %q must contain blank marker: %q", vc.WordID, cloze)
+			}
+			if strings.Contains(cloze, vc.CorrectAnswer) {
+				t.Fatalf("cloze for %q reveals the correct answer: %q", vc.WordID, cloze)
+			}
+		}
+	}
+	if totalClozes != 45 {
+		t.Fatalf("total clozes = %d, want 45", totalClozes)
+	}
+}
+
 func materialKeys(materials []*model.Material) map[string]bool {
 	keys := make(map[string]bool, len(materials))
 	for _, material := range materials {
