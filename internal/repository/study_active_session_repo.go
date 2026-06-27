@@ -292,18 +292,20 @@ func flushUserMaterialProgress(ctx context.Context, tx *sqlx.Tx, state *model.St
 			user_id, material_id, ease_factor, interval_days, repetitions,
 			next_review_at, last_studied_at, times_studied
 		)
-		SELECT $1, v.material_id::int, 2.5, 1, 1, NOW() + INTERVAL '1 day', NOW(), 1
+		-- 첫 복습 간격 3일: 1일이면 하루 2회 push 환경에서 학습한 material이
+		-- 다음날 곧장 due로 재등장한다. 3→6→ease 시퀀스로 매일 재출제를 끊는다.
+		SELECT $1, v.material_id::int, 2.5, 3, 1, NOW() + INTERVAL '3 day', NOW(), 1
 		FROM (VALUES %s) AS v(material_id)
 		ON CONFLICT (user_id, material_id) DO UPDATE SET
 			interval_days = CASE
-				WHEN user_material_progress.repetitions = 0 THEN 1
+				WHEN user_material_progress.repetitions = 0 THEN 3
 				WHEN user_material_progress.repetitions = 1 THEN 6
 				ELSE GREATEST(1, ROUND(user_material_progress.interval_days * user_material_progress.ease_factor)::int)
 			END,
 			repetitions = user_material_progress.repetitions + 1,
 			next_review_at = NOW() + (
 				CASE
-					WHEN user_material_progress.repetitions = 0 THEN 1
+					WHEN user_material_progress.repetitions = 0 THEN 3
 					WHEN user_material_progress.repetitions = 1 THEN 6
 					ELSE GREATEST(1, ROUND(user_material_progress.interval_days * user_material_progress.ease_factor)::int)
 				END * INTERVAL '1 day'

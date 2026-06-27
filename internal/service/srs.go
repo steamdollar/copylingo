@@ -57,7 +57,9 @@ func (s *SRSService) updateSchedule(q *model.Question, quality int) {
 	if quality >= 3 { // Correct answer
 		switch q.Repetitions {
 		case 0:
-			q.IntervalDays = 1
+			// 첫 복습 간격: 1일이면 하루 2회 push 환경에서 학습한 항목이
+			// 다음날 곧장 due로 재등장한다. 3일로 늘려 매일 재출제를 끊는다.
+			q.IntervalDays = 3
 		case 1:
 			q.IntervalDays = 6
 		default:

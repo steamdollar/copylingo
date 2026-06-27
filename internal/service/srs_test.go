@@ -44,7 +44,7 @@ func TestProcessAnswer(t *testing.T) {
 			initialEase:   2.5,
 			isCorrect:     true,
 			expectRep:     1,
-			expectInt:     1,
+			expectInt:     3,
 			expectEaseGte: 1.3,
 		},
 		{
