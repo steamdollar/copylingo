@@ -28,21 +28,19 @@
 
 - [ ] 학습 팁 AI 생성 (scheduler 통합) — (lang, level) 잔고 < 50 일 때 세션 빌드마다 2-3개 LLM 으로 생성. see [docs/todos/tip_scheduler_generation.md](docs/todos/tip_scheduler_generation.md)
 
-- [ ] LLM 채점 반환값 구조체화 — `bool, string, error` tuple 대신 `(GradeResult, error)`로 의미 명확화. see [docs/todos/llm_grade_result_return_refactor.md](docs/todos/llm_grade_result_return_refactor.md)
+- [ ] 손글씨 client/server rebuild 정합성 검증 — 검증 **도구**(`cmd/dev/handwriting_renderer` CLI + Mini App `?debug=1` export + 단위 테스트) 구현 완료. **사용자 수동 시각 비교만 남음** (Mini App에서 직접 그려 client.png/strokes.json export → 서버 PNG와 대조). see [docs/todos/handwriting_rebuild_parity_verification.md](docs/todos/handwriting_rebuild_parity_verification.md)
 
-- [ ] 손글씨 client/server rebuild 정합성 검증 — 동일 stroke JSON 기준 Mini App canvas와 서버 PNG 비교. see [docs/todos/handwriting_rebuild_parity_verification.md](docs/todos/handwriting_rebuild_parity_verification.md)
-
-- [ ] Future Gemini CLI Invocation Stabilization — Gemini CLI wrapper로 provider retry와 Tool Call 오류 탐지를 표준화. see [docs/todos/future_gemini_cli_invocation_stabilization.md](docs/todos/future_gemini_cli_invocation_stabilization.md)
-
-- [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
-
-- [ ] ScheduleConfig cron custom type 전환 — cron expression 전용 타입과 config validation 도입. see [docs/todos/schedule_cronexpr_config_type.md](docs/todos/schedule_cronexpr_config_type.md)
+- [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. **(Case A 선결: preset 비율/변경 UX/SRS 충돌 우선순위/vocab fallback 미결)** see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
 
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-30 | LLM 채점 반환값 구조체화: `(bool, string, error)` → `(GradeResult, error)` 경계 정리 | `2606/2606302226_llm_grade_result_return_refactor.md` |
+| 2026-06-30 | ScheduleConfig cron 필드 `CronExpr` 커스텀 타입 전환 + Load 단계 fail-fast 검증 | `2606/2606302221_schedule_cronexpr_config_type.md` |
+| 2026-06-30 | Gemini CLI executor 래퍼 스크립트(provider retry/Tool Call 탐지 표준화) + 자체 테스트 32케이스 | `2606/2606302227_gemini_cli_invocation_stabilization.md` |
+| 2026-06-30 | 손글씨 rebuild 정합성 검증 **도구** 구현(cmd/dev CLI + Mini App debug export + 테스트) — 수동 시각검증 대기 | `2606/2606302221_handwriting_rebuild_parity_tooling.md` |
 | 2026-06-30 | Grammar 예문 읽기(furigana) 보강: `example_reading` 전문 かな 필드 80개 + `읽기:` 줄 렌더 (ADR-030) | `2606/2606301402_grammar_example_reading.md` |
 | 2026-06-28 | Quiz 결과에 문제 원문 보존 + `🤖 이 문제 질문` 버튼(문제 컨텍스트 LLM 질문, owner-only) | `2606/2606281536_quiz_inquiry_llm_ask.md` |
 | 2026-06-27 | 단어 문맥규정(vocab_context) 문항 도입: 예문 보유 15단어 × 3 cloze = 45문항, grammar cloze 미러(정적 N문항) | `2606/2606272150_vocab_context_question_type.md` |
