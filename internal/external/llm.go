@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 )
 
@@ -30,11 +32,20 @@ type GradeResult struct {
 	Feedback  string `json:"feedback"`
 }
 
+// GeneratedTip is a single LLM-generated tip body. The eyebrow label is filled
+// in by code via TipCategory.DisplayName(), so the model only returns the body.
+type GeneratedTip struct {
+	Body string `json:"body"`
+}
+
 const (
 	handwritingMaxCompletionTokens = 80
 	learningQuestionMaxTokens      = 700
 	// go-openai omits zero-valued temperature, so use a near-zero value to force low-variance decoding.
 	handwritingTemperature = 0.01
+	// tipGenerationTemperature keeps some variety across tips while staying on-topic.
+	tipGenerationTemperature = 0.7
+	tipGenerationMaxTokens   = 800
 )
 
 type DefaultLLMClient struct {
@@ -306,4 +317,93 @@ func buildHandwritingUserPrompt(questionPrompt, correctAnswer string) string {
 Expected Text: %s
 
 Evaluate whether the handwriting image matches the Expected Text and output JSON.`, questionPrompt, correctAnswer)
+}
+
+// GenerateTips asks the LLM for n short Korean learning tips for the given
+// (language, level, category). The model returns a JSON array of {"body": "..."}
+// objects; the eyebrow label is added by the caller via category.DisplayName().
+//
+// This is exposed only on the concrete client (not the LLMClient interface) so
+// that grading mocks elsewhere stay unaffected; the tip pipeline depends on a
+// narrow service-layer interface instead.
+func (c *DefaultLLMClient) GenerateTips(
+	ctx context.Context,
+	language, level string,
+	category model.TipCategory,
+	n int,
+) ([]GeneratedTip, error) {
+	if c.client == nil || c.model == "" {
+		return nil, ErrAIConfigMissing
+	}
+	if n <= 0 {
+		return nil, nil
+	}
+
+	systemPrompt := `당신은 외국어 학습 팁 작성자입니다. JSON 배열로만 응답하세요.`
+	userPrompt := buildTipGenerationUserPrompt(language, level, category, n)
+
+	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model:               c.model,
+		MaxCompletionTokens: tipGenerationMaxTokens,
+		Temperature:         tipGenerationTemperature,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: systemPrompt,
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: userPrompt,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("llm tip generation request failed (language=%s level=%s category=%s): %w",
+			language, level, category, err)
+	}
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("empty llm tip generation response (language=%s level=%s category=%s)",
+			language, level, category)
+	}
+
+	rawContent := extractJSONArray(resp.Choices[0].Message.Content)
+
+	var tips []GeneratedTip
+	if err := json.Unmarshal([]byte(rawContent), &tips); err != nil {
+		return nil, fmt.Errorf("failed to parse llm tip output (%s): %w", rawContent, err)
+	}
+	return tips, nil
+}
+
+func buildTipGenerationUserPrompt(language, level string, category model.TipCategory, n int) string {
+	return fmt.Sprintf(`대상 언어: %s
+학습 레벨: %s
+카테고리: %s (%s)
+
+위 카테고리에 대한 외국어 학습 팁을 정확히 %d개 작성하세요.
+- 각 팁의 body 는 한국어로 1~2 문장, 최대 200자.
+- 학습자에게 짧고 명확한 어조로 작성하세요.
+- 한 카테고리 안에서 서로 다른 각도(예시·주의점·구분법 등)로 작성해 중복을 피하세요.
+- 마크다운이나 코드 펜스 없이 JSON 배열만 출력하세요.
+
+출력 스키마:
+[{"body": "..."}, {"body": "..."}]`,
+		language, level, category.DisplayName(), category, n)
+}
+
+// extractJSONArray trims optional markdown code fences and isolates the JSON
+// array payload so json.Unmarshal can parse defensively against fenced output.
+func extractJSONArray(raw string) string {
+	s := strings.TrimSpace(raw)
+	s = strings.TrimPrefix(s, "```json")
+	s = strings.TrimPrefix(s, "```")
+	s = strings.TrimSuffix(s, "```")
+	s = strings.TrimSpace(s)
+
+	start := strings.Index(s, "[")
+	end := strings.LastIndex(s, "]")
+	if start != -1 && end != -1 && end > start {
+		return s[start : end+1]
+	}
+	return s
 }

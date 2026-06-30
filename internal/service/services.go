@@ -20,12 +20,22 @@ type Services struct {
 	Handwriting        *HandwritingService
 	Analyzer           *AnalyzerService
 	Tip                *TipService
+	TipGenerator       *TipGenerator
 	LLM                *LLMService
 }
 
 // NewServices creates all services with the given dependencies.
 func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.Cmdable) *Services {
-	llm := NewLLMService(external.NewLLMClient(cfg))
+	// Share one LLM client between grading (LLMService) and tip generation.
+	// GenerateTips lives on the concrete *DefaultLLMClient (not the LLMClient
+	// interface), so assert to reach it.
+	llmClient := external.NewLLMClient(cfg)
+	llm := NewLLMService(llmClient)
+
+	// Build the tip generator only when the concrete client is available; a typed
+	// nil would defeat TopUpBucket's nil guard, so leave the field nil otherwise
+	// (the scheduler already tolerates a nil TipGenerator).
+	tipGenerator := newTipGeneratorFromClient(repos.Tip, llmClient, cfg.LLM.Model)
 
 	srsService := NewSRSService(repos.Question)
 	activeSessionService := NewActiveSessionService(repos.ActiveSession, rdb, srsService)
@@ -43,6 +53,7 @@ func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.C
 		Handwriting:        NewHandwritingService(activeSessionService, graderService, nil),
 		Analyzer:           NewAnalyzerService(repos.User, repos.SessionQuestion),
 		Tip:                NewTipService(repos.Tip),
+		TipGenerator:       tipGenerator,
 		LLM:                llm,
 	}
 }

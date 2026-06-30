@@ -279,10 +279,58 @@ func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.
 			)
 		}
 	}
+
+	// Tip top-up runs after session push and is intentionally decoupled: one LLM
+	// call per distinct (language, level) pair, and any failure here is logged
+	// and skipped so it never affects the session-push result above.
+	s.topUpTips(ctx, users)
+
 	if failures > 0 {
 		return fmt.Errorf("%d session operations failed", failures)
 	}
 	return nil
+}
+
+// langLevelPair identifies a distinct (language, proficiency level) bucket.
+type langLevelPair struct {
+	Language string
+	Level    string
+}
+
+// distinctLangLevelPairs collapses the user slice into the unique set of
+// (language, level) pairs in a single pass, so tip top-up makes at most one LLM
+// call per pair regardless of how many users share it.
+func distinctLangLevelPairs(users []model.User) []langLevelPair {
+	seen := make(map[langLevelPair]struct{}, len(users))
+	pairs := make([]langLevelPair, 0, len(users))
+	for _, user := range users {
+		p := langLevelPair{Language: user.Language, Level: user.ProficiencyLevel}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		pairs = append(pairs, p)
+	}
+	return pairs
+}
+
+// topUpTips fills each distinct (language, level) tip bucket toward the target.
+// A failure for one pair is logged and the loop continues with the next pair.
+func (s *Scheduler) topUpTips(ctx context.Context, users []model.User) {
+	if s.services.TipGenerator == nil {
+		return
+	}
+	for _, p := range distinctLangLevelPairs(users) {
+		if err := s.services.TipGenerator.TopUpBucket(ctx, p.Language, p.Level); err != nil {
+			slog.WarnContext(ctx, "Tip top-up failed",
+				"event", "scheduler.tip.topup_failed",
+				"language", p.Language,
+				"level", p.Level,
+				"error", err,
+			)
+			continue
+		}
+	}
 }
 
 func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
