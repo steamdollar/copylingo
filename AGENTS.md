@@ -79,8 +79,8 @@ A user request falls into one of these, and the deliverable and procedure differ
   2. **Plan**: for non-trivial work, agree the plan with the user before implementing.
   3. **Implement**: follow the `internal/` layer structure and coding conventions (§5).
   4. **Verify**: `make test` is **required** for code/migration/config changes. For docs-only work, record the skip reason in the workthrough.
-     - For changes that must take effect in the local runtime (Go server, Mini App static assets, config), after verifying, restart the App instance with `make restart-app` and confirm `http://localhost:8080/health`.
-     - Restart DB/Redis/Tunnel only when you changed that component directly.
+     - For changes that must take effect in the local runtime (Go server, Mini App static assets, config), after verifying, **consult the [`Makefile`](Makefile) target manifest (header comment) to pick the right restart target** and restart the relevant instance — e.g. App with `make restart-app`, then confirm `http://localhost:8080/health`.
+     - Restart DB/Redis/Tunnel only when you changed that component directly (`make restart-db` / `make restart-redis`).
   5. **Close**:
      - Update `STATUS.md` — move "in progress" → "📝 recently done" **only when the current request completes the in-progress item itself**. A side task unrelated to the in-progress item (e.g. doc cleanup, handling an incidental finding) either leaves STATUS.md alone or adds a single line under "📝 recently done".
      - For non-trivial work, create `docs/workthrough/YYMMDDhhmm_<job>.md` — changed files, decisions, verification results.
@@ -173,4 +173,4 @@ Cases often change mid-work. Handle all of these explicitly (no implicit case ch
 - [docs/NATIVE_SUBAGENT_DELEGATION.md](docs/NATIVE_SUBAGENT_DELEGATION.md) — runtime native child-agent spawn protocol
 - [docs/GEMINI_CLI_DELEGATION.md](docs/GEMINI_CLI_DELEGATION.md) — Gemini CLI external delegation, retry, recovery protocol
 - [docs/GEMINI_CLI_EXECUTION.md](docs/GEMINI_CLI_EXECUTION.md) — minimal execution contract read by an invoked Gemini CLI executor
-- [Makefile](Makefile) — dev commands (`make test`, `make infra`, `make migrate`, `make build`, etc.); also tabulated in README.md's "Makefile" section
+- [Makefile](Makefile) — dev commands (`make test`, `make infra`, `make migrate`, `make build`, etc.); its **header comment is a target manifest** — read that instead of the whole file, and consult it to pick a restart target after a runtime-affecting change. Also tabulated in README.md's "Makefile" section

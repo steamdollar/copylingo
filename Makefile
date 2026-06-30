@@ -1,3 +1,45 @@
+# ============================================================================
+# CopyLingo Makefile — target manifest
+#   Read THIS header instead of the whole file. After a change takes effect in
+#   the local runtime, consult the "Restart instances" group below and restart
+#   the relevant one (AGENTS.md §3 Case B step 4).
+# ----------------------------------------------------------------------------
+#   Restart instances
+#     restart-app     rebuild+restart the app pane in tmux, then health-check :8080
+#                       use after Go server / Mini App static / config changes
+#     restart-db      docker compose restart postgres
+#     restart-redis   docker compose restart redis
+#
+#   Build / run / test
+#     build           build bin/copylingo
+#     run             go run ./cmd/server
+#     dev             infra + hot reload (air, falls back to go run)
+#     test            go test ./... -v        (required before close)
+#     test-cover      coverage.out + coverage.html
+#     clean           remove build artifacts
+#
+#   Docker / infra
+#     infra           start DB + Redis only
+#     docker-up       full stack up -d
+#     docker-down     full stack down
+#     docker-build    full stack up -d --build
+#     app-up          rebuild+restart only the app container
+#     app-logs        tail app logs
+#
+#   tmux dashboard
+#     tmux            all-in-one detached session (tunnel + app + db + redis)
+#     tmux-stop       kill the tmux session
+#     tunnel          start Cloudflare quick tunnel, write public URL to .env
+#
+#   DB / tooling
+#     migrate         apply migrations/NNN_*.sql in order (psql)
+#     lint            golangci-lint run
+#     fmt             golangci-lint fmt + run --fix
+#     lint-install    install golangci-lint v2
+#     hooks           enable pre-commit format hook
+#     deps            go mod tidy + download
+# ============================================================================
+
 .PHONY: build run test clean docker-up docker-down migrate dev app-up app-logs restart-app restart-db restart-redis infra tunnel tmux tmux-stop
 
 # Build the application
