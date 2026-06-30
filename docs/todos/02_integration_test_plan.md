@@ -13,6 +13,8 @@ repository 패키지는 `sqlx` + `lib/pq` raw SQL이다. 현재 테스트된 것
 
 대상 스키마: [migrations/001_init.sql](../../migrations/001_init.sql) (users, contents, questions, sessions, session_questions, ...).
 
+> **01(unit) 이관 잔여 1건**: `external.FetchArticleList`는 목적지가 하드코딩 상수 `nhkListURL`이라 httptest 리다이렉트로 unit 테스트 불가. 여기(integration) 또는 별도 HTTP 경계 테스트로 커버 권장. (출처: 2606302311 unit test 커버리지 보강 workthrough)
+
 ---
 
 ## 1. 인프라 결정: testcontainers-go 로 ephemeral Postgres 기동

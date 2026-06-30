@@ -26,8 +26,6 @@
 
 > 각 항목은 `docs/todos/<file>.md`에 자기완결적 문서로 분리되어 있다. 작성/실행/완료 처리 규칙은 `AGENTS.md`의 "TODO 문서 프로토콜" 참조.
 
-- [ ] 학습 팁 AI 생성 (scheduler 통합) — (lang, level) 잔고 < 50 일 때 세션 빌드마다 2-3개 LLM 으로 생성. see [docs/todos/tip_scheduler_generation.md](docs/todos/tip_scheduler_generation.md)
-
 - [ ] 손글씨 client/server rebuild 정합성 검증 — 검증 **도구**(`cmd/dev/handwriting_renderer` CLI + Mini App `?debug=1` export + 단위 테스트) 구현 완료. **사용자 수동 시각 비교만 남음** (Mini App에서 직접 그려 client.png/strokes.json export → 서버 PNG와 대조). see [docs/todos/handwriting_rebuild_parity_verification.md](docs/todos/handwriting_rebuild_parity_verification.md)
 
 - [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. **(Case A 선결: preset 비율/변경 UX/SRS 충돌 우선순위/vocab fallback 미결)** see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
@@ -37,6 +35,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-30 | 학습 팁 AI 생성 파이프라인: scheduler 세션 빌드 후 (lang,level)별 잔고<50 점진 채움 (`GenerateTips`) | `2606/2606302309_tip_scheduler_generation.md` |
+| 2026-06-30 | Unit test 커버리지 공백 보강(01_unit_test_plan): model 0→100%, external→79.8%, service→83.2% (운영코드 무수정) | `2606/2606302311_unit_test_coverage_gap_fill.md` |
 | 2026-06-30 | LLM 채점 반환값 구조체화: `(bool, string, error)` → `(GradeResult, error)` 경계 정리 | `2606/2606302226_llm_grade_result_return_refactor.md` |
 | 2026-06-30 | ScheduleConfig cron 필드 `CronExpr` 커스텀 타입 전환 + Load 단계 fail-fast 검증 | `2606/2606302221_schedule_cronexpr_config_type.md` |
 | 2026-06-30 | Gemini CLI executor 래퍼 스크립트(provider retry/Tool Call 탐지 표준화) + 자체 테스트 32케이스 | `2606/2606302227_gemini_cli_invocation_stabilization.md` |
