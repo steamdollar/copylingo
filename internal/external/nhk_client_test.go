@@ -134,6 +134,41 @@ func TestNHKClient_FetchArticleBody(t *testing.T) {
 	}
 }
 
+func TestNHKClient_FetchArticleBody_TransportError(t *testing.T) {
+	// Start a server only to obtain a now-unreachable URL, then close it so the
+	// HTTP request fails at the transport layer (exercises the fetch error path).
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	closedURL := server.URL
+	server.Close()
+
+	client := NewNHKClient()
+	client.baseURL = closedURL
+
+	_, err := client.FetchArticleBody(context.Background(), "k123456")
+	if err == nil || !strings.Contains(err.Error(), "fetch article body") {
+		t.Fatalf("err = %v, want fetch article body transport error", err)
+	}
+}
+
+func TestNHKClient_FetchArticleBody_NoArticleBodyReturnsEmpty(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body><div id="other">no body here</div></body></html>`))
+	}))
+	defer server.Close()
+
+	client := NewNHKClient(WithHTTPClient(server.Client()))
+	client.baseURL = server.URL
+
+	body, err := client.FetchArticleBody(context.Background(), "k123456")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if body != "" {
+		t.Fatalf("body = %q, want empty when no article-body div present", body)
+	}
+}
+
 func TestExtractArticleBody(t *testing.T) {
 	tests := []struct {
 		name     string

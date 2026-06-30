@@ -368,6 +368,172 @@ func TestActiveSessionFlushRejectsIncomplete(t *testing.T) {
 	}
 }
 
+func TestActiveSessionSetCurrentIndex(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	rdb := newFakeActiveSessionRedis()
+	svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+	if err := svc.save(ctx, activeSessionTestState(sessionID, 123, false)); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	t.Run("valid index persists", func(t *testing.T) {
+		if err := svc.SetCurrentIndex(ctx, sessionID, 1); err != nil {
+			t.Fatalf("SetCurrentIndex failed: %v", err)
+		}
+		got, err := svc.Get(ctx, sessionID)
+		if err != nil {
+			t.Fatalf("Get failed: %v", err)
+		}
+		if got.CurrentIndex != 1 {
+			t.Fatalf("CurrentIndex = %d, want 1", got.CurrentIndex)
+		}
+	})
+
+	t.Run("negative index rejected", func(t *testing.T) {
+		err := svc.SetCurrentIndex(ctx, sessionID, -1)
+		if !errors.Is(err, ErrActiveSessionQuestionNotFound) {
+			t.Fatalf("SetCurrentIndex(-1) error = %v, want ErrActiveSessionQuestionNotFound", err)
+		}
+	})
+
+	t.Run("index past length rejected", func(t *testing.T) {
+		// state has 1 item; len(items)=1 is allowed (boundary), 2 is not.
+		err := svc.SetCurrentIndex(ctx, sessionID, 2)
+		if !errors.Is(err, ErrActiveSessionQuestionNotFound) {
+			t.Fatalf("SetCurrentIndex(2) error = %v, want ErrActiveSessionQuestionNotFound", err)
+		}
+	})
+
+	t.Run("propagates Get error when state missing", func(t *testing.T) {
+		emptySvc := NewActiveSessionService(nil, newFakeActiveSessionRedis(), nil)
+		err := emptySvc.SetCurrentIndex(ctx, 999, 0)
+		if !errors.Is(err, ErrActiveSessionNotFound) {
+			t.Fatalf("SetCurrentIndex on missing = %v, want ErrActiveSessionNotFound", err)
+		}
+	})
+}
+
+func TestActiveSessionFlushRejectsUserMismatch(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	rdb := newFakeActiveSessionRedis()
+	svc := NewActiveSessionService(&fakeActiveSessionRepo{}, rdb, NewSRSService(nil))
+	if err := svc.save(ctx, activeSessionTestState(sessionID, 123, true)); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	// Flush with a different user must be rejected before touching the repo.
+	_, err := svc.Flush(ctx, sessionID, 999)
+	if !errors.Is(err, ErrActiveSessionUserMismatch) {
+		t.Fatalf("Flush user mismatch = %v, want ErrActiveSessionUserMismatch", err)
+	}
+}
+
+func TestActiveSessionFlushRejectsNilRepo(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis()
+	// repo nil but state already in Redis (complete) — dependency missing at flush time.
+	svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+	if err := svc.save(ctx, activeSessionTestState(sessionID, userID, true)); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	_, err := svc.Flush(ctx, sessionID, userID)
+	if !errors.Is(err, ErrActiveSessionDependencyMissing) {
+		t.Fatalf("Flush nil repo = %v, want ErrActiveSessionDependencyMissing", err)
+	}
+}
+
+func TestActiveSessionFlushRepoError(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	userID := int64(123)
+	flushErr := errors.New("db flush failed")
+	rdb := newFakeActiveSessionRedis()
+	repo := &fakeActiveSessionRepo{
+		flushFn: func(ctx context.Context, state *model.ActiveSessionState) error {
+			return flushErr
+		},
+	}
+	svc := NewActiveSessionService(repo, rdb, NewSRSService(nil))
+	if err := svc.save(ctx, activeSessionTestState(sessionID, userID, true)); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	_, err := svc.Flush(ctx, sessionID, userID)
+	if !errors.Is(err, flushErr) {
+		t.Fatalf("Flush repo error = %v, want %v in chain", err, flushErr)
+	}
+}
+
+func TestActiveSessionDelete(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	key := config.ActiveSessionWorkingSetRedisKey.Format(sessionID)
+
+	t.Run("removes the working set key", func(t *testing.T) {
+		rdb := newFakeActiveSessionRedis()
+		svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+		if err := svc.save(ctx, activeSessionTestState(sessionID, 123, true)); err != nil {
+			t.Fatalf("save failed: %v", err)
+		}
+		if _, ok := rdb.values[key]; !ok {
+			t.Fatal("precondition: key should exist before delete")
+		}
+		if err := svc.Delete(ctx, sessionID); err != nil {
+			t.Fatalf("Delete failed: %v", err)
+		}
+		if _, ok := rdb.values[key]; ok {
+			t.Fatal("expected key removed after Delete")
+		}
+	})
+
+	t.Run("wraps redis delete error", func(t *testing.T) {
+		delErr := errors.New("redis del failed")
+		rdb := newFakeActiveSessionRedis()
+		rdb.delErr = delErr
+		svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+		err := svc.Delete(ctx, sessionID)
+		if !errors.Is(err, delErr) {
+			t.Fatalf("Delete error = %v, want %v in chain", err, delErr)
+		}
+	})
+}
+
+func TestActiveSessionSaveError(t *testing.T) {
+	ctx := context.Background()
+	setErr := errors.New("redis set failed")
+	rdb := newFakeActiveSessionRedis()
+	rdb.setErr = setErr
+	svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+
+	err := svc.save(ctx, activeSessionTestState(10, 123, false))
+	if !errors.Is(err, setErr) {
+		t.Fatalf("save error = %v, want %v in chain", err, setErr)
+	}
+}
+
+func TestValidateActiveSessionStateVersionMismatch(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 10
+	rdb := newFakeActiveSessionRedis()
+	// Persist a state with a stale Version directly, then read it back.
+	state := activeSessionTestState(sessionID, 123, false)
+	state.Version = model.ActiveSessionStateVersion + 99
+	svc := NewActiveSessionService(nil, rdb, NewSRSService(nil))
+	if err := svc.store.save(ctx, sessionID, state); err != nil {
+		t.Fatalf("store.save failed: %v", err)
+	}
+
+	_, err := svc.Get(ctx, sessionID)
+	if !errors.Is(err, ErrActiveSessionCorrupt) {
+		t.Fatalf("Get with version mismatch = %v, want ErrActiveSessionCorrupt", err)
+	}
+}
+
 func activeSessionTestState(sessionID int, userID int64, answered bool) *model.ActiveSessionState {
 	state := activeStateForQuestion(sessionID, model.Question{
 		ID:            1,

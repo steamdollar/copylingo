@@ -149,6 +149,232 @@ func TestStudyActiveSessionCompleteRejectsIncomplete(t *testing.T) {
 	}
 }
 
+func TestStudyActiveSessionStartReturnsCompletedEarly(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis()
+	starter := &fakeStudySessionStarter{}
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.StudyActiveSessionState, error) {
+			return studyActiveState(sessionID, userID, model.SessionCompleted), nil
+		},
+	}
+	svc := NewStudyActiveSessionService(repo, starter, rdb)
+
+	state, err := svc.Start(ctx, sessionID, userID)
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	if state.Session.Status != model.SessionCompleted {
+		t.Fatalf("status = %s, want completed", state.Session.Status)
+	}
+	// Completed sessions must not be (re)started.
+	if len(starter.started) != 0 {
+		t.Fatalf("started = %+v, want empty for completed session", starter.started)
+	}
+}
+
+func TestStudyActiveSessionStartPendingWithoutStarterFails(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis()
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.StudyActiveSessionState, error) {
+			return studyActiveState(sessionID, userID, model.SessionPending), nil
+		},
+	}
+	// sessionRepo nil while session is pending -> dependency missing.
+	svc := NewStudyActiveSessionService(repo, nil, rdb)
+
+	_, err := svc.Start(ctx, sessionID, userID)
+	if !errors.Is(err, ErrStudyActiveSessionDependencyMissing) {
+		t.Fatalf("Start pending without starter = %v, want ErrStudyActiveSessionDependencyMissing", err)
+	}
+}
+
+func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	rdb := newFakeActiveSessionRedis()
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.StudyActiveSessionState, error) {
+			return studyActiveState(sessionID, 123, model.SessionInProgress), nil
+		},
+	}
+	svc := NewStudyActiveSessionService(repo, &fakeStudySessionStarter{}, rdb)
+
+	_, err := svc.Start(ctx, sessionID, 999)
+	if !errors.Is(err, ErrStudyActiveSessionUserMismatch) {
+		t.Fatalf("Start user mismatch = %v, want ErrStudyActiveSessionUserMismatch", err)
+	}
+}
+
+func TestStudyActiveSessionStartDependencyMissingRepo(t *testing.T) {
+	ctx := context.Background()
+	// repo nil -> loadFromDB returns dependency missing.
+	svc := NewStudyActiveSessionService(nil, nil, newFakeActiveSessionRedis())
+	_, err := svc.Start(ctx, 77, 123)
+	if !errors.Is(err, ErrStudyActiveSessionDependencyMissing) {
+		t.Fatalf("Start nil repo = %v, want ErrStudyActiveSessionDependencyMissing", err)
+	}
+}
+
+func TestStudyActiveSessionCreateFromDB(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis()
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.StudyActiveSessionState, error) {
+			return studyActiveState(sessionID, userID, model.SessionInProgress), nil
+		},
+	}
+	svc := NewStudyActiveSessionService(repo, nil, rdb)
+
+	state, err := svc.CreateFromDB(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("CreateFromDB failed: %v", err)
+	}
+	if state.Session.ID != sessionID {
+		t.Fatalf("session id = %d, want %d", state.Session.ID, sessionID)
+	}
+	// Must be persisted to Redis.
+	if _, err := rdb.Get(ctx, config.StudySessionWorkingSetRedisKey.Format(sessionID)).Result(); err != nil {
+		t.Fatalf("working set missing after CreateFromDB: %v", err)
+	}
+}
+
+func TestStudyActiveSessionCreateFromDBPropagatesLoadError(t *testing.T) {
+	ctx := context.Background()
+	loadErr := errors.New("db load failed")
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.StudyActiveSessionState, error) {
+			return nil, loadErr
+		},
+	}
+	svc := NewStudyActiveSessionService(repo, nil, newFakeActiveSessionRedis())
+
+	if _, err := svc.CreateFromDB(ctx, 77); !errors.Is(err, loadErr) {
+		t.Fatalf("CreateFromDB load error = %v, want %v in chain", err, loadErr)
+	}
+}
+
+func TestStudyActiveSessionGetRecoversFromDB(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis() // empty -> not found -> recover
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.StudyActiveSessionState, error) {
+			return studyActiveState(sessionID, userID, model.SessionInProgress), nil
+		},
+	}
+	svc := NewStudyActiveSessionService(repo, nil, rdb)
+
+	state, err := svc.Get(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("Get auto-recover failed: %v", err)
+	}
+	if state.Session.ID != sessionID {
+		t.Fatalf("session id = %d, want %d", state.Session.ID, sessionID)
+	}
+}
+
+func TestStudyActiveSessionGetOwnedLoadsFromDBOnMiss(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis() // empty -> GetOwned loads from DB
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.StudyActiveSessionState, error) {
+			return studyActiveState(sessionID, userID, model.SessionInProgress), nil
+		},
+	}
+	svc := NewStudyActiveSessionService(repo, nil, rdb)
+
+	state, err := svc.GetOwned(ctx, sessionID, userID)
+	if err != nil {
+		t.Fatalf("GetOwned failed: %v", err)
+	}
+	if state.Session.ID != sessionID {
+		t.Fatalf("session id = %d, want %d", state.Session.ID, sessionID)
+	}
+	// GetOwned persists the loaded state back to Redis.
+	if _, err := rdb.Get(ctx, config.StudySessionWorkingSetRedisKey.Format(sessionID)).Result(); err != nil {
+		t.Fatalf("working set missing after GetOwned: %v", err)
+	}
+}
+
+func TestStudyActiveSessionGetOwnedRejectsUserMismatch(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	rdb := newFakeActiveSessionRedis()
+	svc := NewStudyActiveSessionService(&fakeStudyActiveRepo{}, nil, rdb)
+	if err := svc.save(ctx, studyActiveState(sessionID, 123, model.SessionInProgress)); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	_, err := svc.GetOwned(ctx, sessionID, 999)
+	if !errors.Is(err, ErrStudyActiveSessionUserMismatch) {
+		t.Fatalf("GetOwned user mismatch = %v, want ErrStudyActiveSessionUserMismatch", err)
+	}
+}
+
+func TestStudyActiveSessionGetOwnedRejectsModeMismatch(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis()
+	svc := NewStudyActiveSessionService(&fakeStudyActiveRepo{}, nil, rdb)
+
+	state := studyActiveState(sessionID, userID, model.SessionInProgress)
+	state.Session.Mode = model.SessionModeQuiz // wrong mode for a study session
+	if err := svc.save(ctx, state); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	_, err := svc.GetOwned(ctx, sessionID, userID)
+	if !errors.Is(err, ErrStudyActiveSessionModeMismatch) {
+		t.Fatalf("GetOwned mode mismatch = %v, want ErrStudyActiveSessionModeMismatch", err)
+	}
+}
+
+func TestStudyActiveSessionMarkStudiedRejectsUnknownOrder(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis()
+	svc := NewStudyActiveSessionService(nil, nil, rdb)
+	if err := svc.save(ctx, studyActiveState(sessionID, userID, model.SessionInProgress)); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	_, err := svc.MarkStudied(ctx, sessionID, userID, 99)
+	if !errors.Is(err, ErrStudyActiveSessionMaterialNotFound) {
+		t.Fatalf("MarkStudied unknown order = %v, want ErrStudyActiveSessionMaterialNotFound", err)
+	}
+}
+
+func TestStudyActiveSessionDelete(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	key := config.StudySessionWorkingSetRedisKey.Format(sessionID)
+	rdb := newFakeActiveSessionRedis()
+	svc := NewStudyActiveSessionService(nil, nil, rdb)
+	if err := svc.save(ctx, studyActiveState(sessionID, 123, model.SessionInProgress)); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	if err := svc.Delete(ctx, sessionID); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+	if _, ok := rdb.values[key]; ok {
+		t.Fatal("expected key removed after Delete")
+	}
+}
+
 func studyActiveState(sessionID int, userID int64, status model.SessionStatus) *model.StudyActiveSessionState {
 	state := &model.StudyActiveSessionState{
 		Version: model.StudyActiveSessionStateVersion,
