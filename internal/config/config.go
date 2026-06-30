@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/viper"
 )
 
@@ -73,14 +74,61 @@ type TTSConfig struct {
 	VoiceName    string `mapstructure:"voice_name"`    // ja-JP-Neural2-B
 }
 
+// CronExpr는 cron expression을 표현하는 도메인 타입.
+// config 계층에서 값의 의미를 드러내고, Validate로 실제 scheduler library와
+// 동일한 문법(cron.ParseStandard)으로 invalid expression을 fail-fast 검증한다.
+type CronExpr string
+
+func (c CronExpr) String() string {
+	return string(c)
+}
+
+func (c CronExpr) IsZero() bool {
+	return strings.TrimSpace(string(c)) == ""
+}
+
+// Validate는 non-empty cron expression만 검증한다.
+// 빈 값은 통과시켜 기존 backward compatibility(빈 cron이면 job 등록 skip)를 유지한다.
+func (c CronExpr) Validate(name string) error {
+	if c.IsZero() {
+		return nil
+	}
+	if _, err := cron.ParseStandard(c.String()); err != nil {
+		return fmt.Errorf("%s is invalid cron expression %q: %w", name, c.String(), err)
+	}
+	return nil
+}
+
 type ScheduleConfig struct {
-	ContentCollectCron     string `mapstructure:"content_collect_cron"`      // 콘텐츠 수집 크론
-	MorningBuildCron       string `mapstructure:"morning_build_cron"`        // 오전 세션 빌드 크론
-	MorningPushCron        string `mapstructure:"morning_push_cron"`         // 오전 세션 푸시 크론
-	StudyPushCron          string `mapstructure:"study_push_cron"`           // 정오 Study 세션 푸시 크론
-	AfternoonStudyPushCron string `mapstructure:"afternoon_study_push_cron"` // 오후 Study 세션 푸시 크론
-	EveningBuildCron       string `mapstructure:"evening_build_cron"`        // 오후 세션 빌드 크론
-	EveningPushCron        string `mapstructure:"evening_push_cron"`         // 오후 세션 푸시 크론
+	ContentCollectCron     CronExpr `mapstructure:"content_collect_cron"`      // 콘텐츠 수집 크론
+	MorningBuildCron       CronExpr `mapstructure:"morning_build_cron"`        // 오전 세션 빌드 크론
+	MorningPushCron        CronExpr `mapstructure:"morning_push_cron"`         // 오전 세션 푸시 크론
+	StudyPushCron          CronExpr `mapstructure:"study_push_cron"`           // 정오 Study 세션 푸시 크론
+	AfternoonStudyPushCron CronExpr `mapstructure:"afternoon_study_push_cron"` // 오후 Study 세션 푸시 크론
+	EveningBuildCron       CronExpr `mapstructure:"evening_build_cron"`        // 오후 세션 빌드 크론
+	EveningPushCron        CronExpr `mapstructure:"evening_push_cron"`         // 오후 세션 푸시 크론
+}
+
+// validate는 모든 cron expression 필드를 fail-fast 검증한다.
+func (s *ScheduleConfig) validate() error {
+	checks := []struct {
+		name string
+		expr CronExpr
+	}{
+		{name: "schedule.content_collect_cron", expr: s.ContentCollectCron},
+		{name: "schedule.morning_build_cron", expr: s.MorningBuildCron},
+		{name: "schedule.morning_push_cron", expr: s.MorningPushCron},
+		{name: "schedule.study_push_cron", expr: s.StudyPushCron},
+		{name: "schedule.afternoon_study_push_cron", expr: s.AfternoonStudyPushCron},
+		{name: "schedule.evening_build_cron", expr: s.EveningBuildCron},
+		{name: "schedule.evening_push_cron", expr: s.EveningPushCron},
+	}
+	for _, check := range checks {
+		if err := check.expr.Validate(check.name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type LoggingConfig struct {
@@ -241,6 +289,9 @@ func (c *Config) validate() error {
 	}
 	if _, err := time.LoadLocation(c.Logging.Timezone); err != nil {
 		return fmt.Errorf("logging.timezone is invalid: %w", err)
+	}
+	if err := c.Schedule.validate(); err != nil {
+		return err
 	}
 	return nil
 }

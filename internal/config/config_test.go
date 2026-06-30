@@ -77,11 +77,14 @@ func TestLoadScheduleDefaults(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if got, want := cfg.Schedule.StudyPushCron, "0 12 * * *"; got != want {
+	if got, want := cfg.Schedule.StudyPushCron.String(), "0 12 * * *"; got != want {
 		t.Fatalf("Schedule.StudyPushCron = %q, want %q", got, want)
 	}
-	if got, want := cfg.Schedule.AfternoonStudyPushCron, "30 16 * * *"; got != want {
+	if got, want := cfg.Schedule.AfternoonStudyPushCron.String(), "30 16 * * *"; got != want {
 		t.Fatalf("Schedule.AfternoonStudyPushCron = %q, want %q", got, want)
+	}
+	if cfg.Schedule.StudyPushCron.IsZero() {
+		t.Fatal("Schedule.StudyPushCron IsZero() = true, want false")
 	}
 }
 
@@ -95,8 +98,33 @@ func TestLoadScheduleEnvOverrides(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if got, want := cfg.Schedule.AfternoonStudyPushCron, "0 17 * * *"; got != want {
+	if got, want := cfg.Schedule.AfternoonStudyPushCron.String(), "0 17 * * *"; got != want {
 		t.Fatalf("Schedule.AfternoonStudyPushCron = %q, want %q", got, want)
+	}
+}
+
+func TestLoadRejectsInvalidScheduleCron(t *testing.T) {
+	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
+	t.Setenv("COPYLINGO_SCHEDULE_STUDY_PUSH_CRON", "not-a-cron")
+	t.Chdir(t.TempDir())
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() error = nil, want validation error")
+	}
+}
+
+func TestCronExprAllowsEmpty(t *testing.T) {
+	if err := CronExpr(" ").Validate("schedule.content_collect_cron"); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+	if !CronExpr(" ").IsZero() {
+		t.Fatal("CronExpr(\" \").IsZero() = false, want true")
+	}
+}
+
+func TestCronExprValidateRejectsInvalid(t *testing.T) {
+	if err := CronExpr("not-a-cron").Validate("schedule.study_push_cron"); err == nil {
+		t.Fatal("Validate() error = nil, want error for invalid cron")
 	}
 }
 
