@@ -57,6 +57,27 @@ gemini --skip-trust --approval-mode yolo \
 
 The main agent must not trust the report alone. Inspect the scoped diff and rerun the project-level checks required by `AGENTS.md`.
 
+### Dispatch Via Wrapper (preferred)
+
+`scripts/run_gemini_executor.sh` wraps the two commands above and enforces this document's retry / recovery policy automatically:
+
+```bash
+scripts/run_gemini_executor.sh docs/todos/<task>.md
+```
+
+The wrapper:
+
+- Rejects a missing or unreadable TODO path before invoking Gemini CLI.
+- Retries only temporary provider errors (`429` / `MODEL_CAPACITY_EXHAUSTED` / `503` / `UNAVAILABLE`): 5s, then 10s, then switches to the fallback model; exits non-zero if both models exhaust the sequence.
+- On a response-level Tool Call error (`Invalid stream`, `malformed tool call`, `required property`, `could not find the string to replace`) it does **not** auto-retry. It exits non-zero, prints the recovery prompt below, and tells the main agent to inspect the scoped `git status --short` and diff first, because a previous run may have left valid partial edits.
+- Preserves Gemini CLI stdout/stderr and removes its own temporary files on exit.
+
+Distinct exit codes: `2` usage (bad TODO path), `3` provider retries exhausted, `4` Tool Call error (manual recovery required), `5` plain Gemini CLI failure.
+
+Override retry waits in tests with `SUBAGENT_RETRY_SLEEP_SCALE=0`. Self-test: `scripts/run_gemini_executor_test.sh` (uses a fake `gemini`; never calls the real CLI).
+
+The wrapper automates only the safe retries. Recovery after a Tool Call error stays manual, per "Response Or Tool Call Errors" below.
+
 ## Error Handling
 
 ### Temporary Provider Errors: `429`, `503`
