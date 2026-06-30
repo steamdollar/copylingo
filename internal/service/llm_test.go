@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/lsj/copylingo/internal/external"
 )
 
 type mockLLMClient struct {
@@ -14,16 +16,16 @@ type mockLLMClient struct {
 func (m *mockLLMClient) GradeAnswer(
 	ctx context.Context,
 	questionPrompt, correctAnswer, userAnswer string,
-) (bool, string, error) {
-	return true, "", nil
+) (external.GradeResult, error) {
+	return external.GradeResult{IsCorrect: true}, nil
 }
 
 func (m *mockLLMClient) GradeHandwriting(
 	ctx context.Context,
 	questionPrompt, correctAnswer string,
 	pngImage []byte,
-) (bool, string, error) {
-	return true, "", nil
+) (external.GradeResult, error) {
+	return external.GradeResult{IsCorrect: true}, nil
 }
 
 func (m *mockLLMClient) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {

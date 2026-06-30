@@ -13,8 +13,12 @@ import (
 )
 
 type graderLLM interface {
-	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error)
-	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error)
+	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (external.GradeResult, error)
+	GradeHandwriting(
+		ctx context.Context,
+		questionPrompt, correctAnswer string,
+		pngImage []byte,
+	) (external.GradeResult, error)
 }
 
 type graderUserRepo interface {
@@ -80,10 +84,13 @@ func (g *GraderService) GradeAnswerWithQuestion(
 	// QuestionSubjective is the only text-answer path that uses LLM semantic grading.
 	// FillBlank and MultipleChoice remain exact-match to avoid unnecessary latency and nondeterminism.
 	if question.Type == model.QuestionSubjective {
-		isCorrect, feedback, err = g.llm.GradeAnswer(ctx, question.Prompt, question.CorrectAnswer, userAnswer)
+		var result external.GradeResult
+		result, err = g.llm.GradeAnswer(ctx, question.Prompt, question.CorrectAnswer, userAnswer)
 		if err != nil {
 			return false, "", mapAIUnavailableError(err)
 		}
+		isCorrect = result.IsCorrect
+		feedback = result.Feedback
 	} else {
 		isCorrect = userAnswer == question.CorrectAnswer
 	}
@@ -131,10 +138,12 @@ func (g *GraderService) GradeHandwritingWithQuestion(
 		return false, "", ErrHandwritingInvalidQuestion
 	}
 
-	isCorrect, feedback, err := g.llm.GradeHandwriting(ctx, question.Prompt, question.CorrectAnswer, renderedImage)
+	result, err := g.llm.GradeHandwriting(ctx, question.Prompt, question.CorrectAnswer, renderedImage)
 	if err != nil {
 		return false, "", mapAIUnavailableError(err)
 	}
+	isCorrect := result.IsCorrect
+	feedback := result.Feedback
 	gradedAt := time.Now()
 
 	userAnswer := "handwriting:submitted"

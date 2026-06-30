@@ -17,9 +17,9 @@ import (
 // LLMClient defines AI-backed grading paths that cannot be handled by exact string matching.
 type LLMClient interface {
 	// GradeAnswer is for QuestionSubjective only: free-text semantic grading such as translated meaning or paraphrased answers.
-	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (bool, string, error)
+	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (GradeResult, error)
 	// GradeHandwriting is for QuestionKanaHandwriting only: binary visual verification of a rendered handwriting PNG.
-	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (bool, string, error)
+	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (GradeResult, error)
 	// AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
 	AnswerLearningQuestion(ctx context.Context, question string) (string, error)
 }
@@ -60,9 +60,9 @@ func NewLLMClient(cfg *config.Config) LLMClient {
 func (c *DefaultLLMClient) GradeAnswer(
 	ctx context.Context,
 	questionPrompt, correctAnswer, userAnswer string,
-) (bool, string, error) {
+) (GradeResult, error) {
 	if c.client == nil || c.model == "" {
-		return false, "", ErrAIConfigMissing
+		return GradeResult{}, ErrAIConfigMissing
 	}
 
 	systemPrompt := `You are an expert language teacher grading a student's answer.
@@ -103,21 +103,21 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 	})
 
 	if err != nil {
-		return false, "", fmt.Errorf("llm grading request failed: %w", err)
+		return GradeResult{}, fmt.Errorf("llm grading request failed: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		return false, "", fmt.Errorf("empty llm response")
+		return GradeResult{}, fmt.Errorf("empty llm response")
 	}
 
 	rawContent := resp.Choices[0].Message.Content
 
 	var result GradeResult
 	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
-		return false, "", fmt.Errorf("failed to parse llm output (%s): %w", rawContent, err)
+		return GradeResult{}, fmt.Errorf("failed to parse llm output (%s): %w", rawContent, err)
 	}
 
-	return result.IsCorrect, result.Feedback, nil
+	return result, nil
 }
 
 func (c *DefaultLLMClient) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
@@ -158,12 +158,12 @@ func (c *DefaultLLMClient) GradeHandwriting(
 	ctx context.Context,
 	questionPrompt, correctAnswer string,
 	pngImage []byte,
-) (bool, string, error) {
+) (GradeResult, error) {
 	startedAt := time.Now()
 	ctx = observability.WithAttrs(ctx, slog.String("source", "external.llm"))
 
 	if c.client == nil || c.model == "" {
-		return false, "", ErrAIConfigMissing
+		return GradeResult{}, ErrAIConfigMissing
 	}
 
 	systemPrompt := buildHandwritingSystemPrompt()
@@ -173,16 +173,16 @@ func (c *DefaultLLMClient) GradeHandwriting(
 	req := buildHandwritingChatCompletionRequest(c.model, systemPrompt, userPrompt, imageURL)
 	resp, err := c.client.CreateChatCompletion(ctx, req)
 	if err != nil {
-		return false, "", fmt.Errorf("llm handwriting grading request failed: %w", err)
+		return GradeResult{}, fmt.Errorf("llm handwriting grading request failed: %w", err)
 	}
 	if len(resp.Choices) == 0 {
-		return false, "", fmt.Errorf("empty llm handwriting response")
+		return GradeResult{}, fmt.Errorf("empty llm handwriting response")
 	}
 
 	rawContent := resp.Choices[0].Message.Content
 	var result GradeResult
 	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
-		return false, "", fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
+		return GradeResult{}, fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
 	}
 	slog.InfoContext(ctx, "Handwriting LLM grading completed",
 		"event", "handwriting.llm.completed",
@@ -192,7 +192,7 @@ func (c *DefaultLLMClient) GradeHandwriting(
 		"is_correct", result.IsCorrect,
 	)
 
-	return result.IsCorrect, result.Feedback, nil
+	return result, nil
 }
 
 func buildHandwritingChatCompletionRequest(

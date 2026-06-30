@@ -8,6 +8,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -88,23 +89,26 @@ func (m *mockSRS) ScheduleAnswer(q *model.Question, isCorrect bool) {}
 func (m *mockSRS) GetDueCount(ctx context.Context) (int, error)     { return 0, nil }
 
 type mockLLM struct {
-	gradeFn  func(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error)
+	gradeFn  func(ctx context.Context, prompt, correctAnswer, userAnswer string) (external.GradeResult, error)
 	answerFn func(ctx context.Context, question string) (string, error)
 }
 
-func (m *mockLLM) GradeAnswer(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error) {
+func (m *mockLLM) GradeAnswer(
+	ctx context.Context,
+	prompt, correctAnswer, userAnswer string,
+) (external.GradeResult, error) {
 	if m.gradeFn != nil {
 		return m.gradeFn(ctx, prompt, correctAnswer, userAnswer)
 	}
-	return true, "", nil
+	return external.GradeResult{IsCorrect: true}, nil
 }
 
 func (m *mockLLM) GradeHandwriting(
 	ctx context.Context,
 	prompt, correctAnswer string,
 	image []byte,
-) (bool, string, error) {
-	return false, "", nil
+) (external.GradeResult, error) {
+	return external.GradeResult{}, nil
 }
 func (m *mockLLM) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
 	if m.answerFn != nil {

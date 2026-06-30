@@ -18,9 +18,9 @@ func NewLLMService(client external.LLMClient) *LLMService {
 func (s *LLMService) GradeAnswer(
 	ctx context.Context,
 	questionPrompt, correctAnswer, userAnswer string,
-) (bool, string, error) {
+) (external.GradeResult, error) {
 	if s == nil || s.client == nil {
-		return false, "", external.ErrAIConfigMissing
+		return external.GradeResult{}, external.ErrAIConfigMissing
 	}
 	return s.client.GradeAnswer(ctx, questionPrompt, correctAnswer, userAnswer)
 }
@@ -29,9 +29,9 @@ func (s *LLMService) GradeHandwriting(
 	ctx context.Context,
 	questionPrompt, correctAnswer string,
 	pngImage []byte,
-) (bool, string, error) {
+) (external.GradeResult, error) {
 	if s == nil || s.client == nil {
-		return false, "", external.ErrAIConfigMissing
+		return external.GradeResult{}, external.ErrAIConfigMissing
 	}
 	return s.client.GradeHandwriting(ctx, questionPrompt, correctAnswer, pngImage)
 }

@@ -253,15 +253,15 @@ func TestGradeHandwritingReturnsProviderFeedback(t *testing.T) {
 		model:  "test-model",
 	}
 
-	isCorrect, feedback, err := client.GradeHandwriting(context.Background(), "prompt", "オ", []byte("png"))
+	result, err := client.GradeHandwriting(context.Background(), "prompt", "オ", []byte("png"))
 	if err != nil {
 		t.Fatalf("GradeHandwriting() error = %v", err)
 	}
-	if isCorrect {
+	if result.IsCorrect {
 		t.Fatal("GradeHandwriting() isCorrect = true, want false")
 	}
-	if feedback != "탁점이 빠졌습니다." {
-		t.Fatalf("GradeHandwriting() feedback = %q, want correction note", feedback)
+	if result.Feedback != "탁점이 빠졌습니다." {
+		t.Fatalf("GradeHandwriting() feedback = %q, want correction note", result.Feedback)
 	}
 }
 
@@ -287,15 +287,15 @@ func TestGradeAnswer_Success(t *testing.T) {
 		model:  "test-model",
 	}
 
-	isCorrect, feedback, err := client.GradeAnswer(context.Background(), "prompt", "apple", "apple")
+	result, err := client.GradeAnswer(context.Background(), "prompt", "apple", "apple")
 	if err != nil {
 		t.Fatalf("GradeAnswer() error = %v", err)
 	}
-	if !isCorrect {
+	if !result.IsCorrect {
 		t.Fatal("GradeAnswer() isCorrect = false, want true")
 	}
-	if !strings.Contains(feedback, "잘 하셨습니다") {
-		t.Fatalf("GradeAnswer() feedback = %q", feedback)
+	if !strings.Contains(result.Feedback, "잘 하셨습니다") {
+		t.Fatalf("GradeAnswer() feedback = %q", result.Feedback)
 	}
 }
 
@@ -348,7 +348,7 @@ func TestDefaultLLMClient_Errors(t *testing.T) {
 
 	t.Run("Missing config", func(t *testing.T) {
 		client := &DefaultLLMClient{}
-		_, _, err := client.GradeAnswer(context.Background(), "p", "a", "u")
+		_, err := client.GradeAnswer(context.Background(), "p", "a", "u")
 		if !strings.Contains(err.Error(), "ai system is not configured") {
 			t.Errorf("expected ErrAIConfigMissing, got %v", err)
 		}
@@ -367,7 +367,7 @@ func TestDefaultLLMClient_Errors(t *testing.T) {
 			model:  "test-model",
 		}
 
-		_, _, err := client.GradeAnswer(context.Background(), "p", "a", "u")
+		_, err := client.GradeAnswer(context.Background(), "p", "a", "u")
 		if err == nil || !strings.Contains(err.Error(), "llm grading request failed") {
 			t.Errorf("expected HTTP error, got %v", err)
 		}
@@ -393,7 +393,7 @@ func TestDefaultLLMClient_Errors(t *testing.T) {
 			model:  "test-model",
 		}
 
-		_, _, err := client.GradeAnswer(context.Background(), "p", "a", "u")
+		_, err := client.GradeAnswer(context.Background(), "p", "a", "u")
 		if err == nil || !strings.Contains(err.Error(), "failed to parse llm output") {
 			t.Errorf("expected parsing error, got %v", err)
 		}

@@ -62,11 +62,14 @@ func (m *mockSRS) ProcessAnswer(ctx context.Context, q *model.Question, correct 
 }
 
 type mockLLM struct {
-	gradeAnswerFn      func(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error)
-	gradeHandwritingFn func(ctx context.Context, prompt, correctAnswer string, image []byte) (bool, string, error)
+	gradeAnswerFn      func(ctx context.Context, prompt, correctAnswer, userAnswer string) (external.GradeResult, error)
+	gradeHandwritingFn func(ctx context.Context, prompt, correctAnswer string, image []byte) (external.GradeResult, error)
 }
 
-func (m *mockLLM) GradeAnswer(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error) {
+func (m *mockLLM) GradeAnswer(
+	ctx context.Context,
+	prompt, correctAnswer, userAnswer string,
+) (external.GradeResult, error) {
 	return m.gradeAnswerFn(ctx, prompt, correctAnswer, userAnswer)
 }
 
@@ -74,7 +77,7 @@ func (m *mockLLM) GradeHandwriting(
 	ctx context.Context,
 	prompt, correctAnswer string,
 	image []byte,
-) (bool, string, error) {
+) (external.GradeResult, error) {
 	return m.gradeHandwritingFn(ctx, prompt, correctAnswer, image)
 }
 func (m *mockLLM) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
@@ -168,8 +171,8 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 		},
 	}
 	llm := &mockLLM{
-		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (bool, string, error) {
-			return true, "Good job", nil
+		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (external.GradeResult, error) {
+			return external.GradeResult{IsCorrect: true, Feedback: "Good job"}, nil
 		},
 	}
 
@@ -202,8 +205,8 @@ func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
 		},
 	}
 	llm := &mockLLM{
-		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (bool, string, error) {
-			return false, "", external.ErrAIConfigMissing
+		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (external.GradeResult, error) {
+			return external.GradeResult{}, external.ErrAIConfigMissing
 		},
 	}
 
@@ -233,8 +236,8 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 		},
 	}
 	llm := &mockLLM{
-		gradeHandwritingFn: func(ctx context.Context, prompt, correctAnswer string, image []byte) (bool, string, error) {
-			return false, "", external.ErrAIConfigMissing
+		gradeHandwritingFn: func(ctx context.Context, prompt, correctAnswer string, image []byte) (external.GradeResult, error) {
+			return external.GradeResult{}, external.ErrAIConfigMissing
 		},
 	}
 

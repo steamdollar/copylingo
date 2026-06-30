@@ -9,6 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -420,9 +421,11 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	active := service.NewActiveSessionService(&activeRepoStub{}, rdb, &mockSRS{})
 	// LLM returns AI-unavailable error
-	llm := &mockLLM{gradeFn: func(ctx context.Context, prompt, correctAnswer, userAnswer string) (bool, string, error) {
-		return false, "", service.ErrAIUnavailable
-	}}
+	llm := &mockLLM{
+		gradeFn: func(ctx context.Context, prompt, correctAnswer, userAnswer string) (external.GradeResult, error) {
+			return external.GradeResult{}, service.ErrAIUnavailable
+		},
+	}
 	grader := service.NewGraderService(&graderUserRepoStub{}, active, llm)
 	b := &Bot{
 		api: mAPI, rdb: rdb, cfg: &config.Config{},
