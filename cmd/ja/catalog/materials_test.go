@@ -89,6 +89,7 @@ func TestBuildGrammarMaterialsPayload(t *testing.T) {
 		if payload.Pattern != "があります" ||
 			payload.MeaningKo != "사물의 존재" ||
 			payload.Example != "机の上に本があります。" ||
+			payload.ExampleReading != "つくえのうえにほんがあります。" ||
 			payload.TranslationKo != "책상 위에 책이 있습니다." {
 			t.Fatalf("payload = %+v", payload)
 		}

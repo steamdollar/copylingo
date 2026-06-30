@@ -298,3 +298,25 @@
   - `LLMClient`에 `AnswerQuestionInContext` 전용 메서드 추가: 의미는 더 명확하나 인터페이스 변경으로 mock/test가 광범위하게 깨져 현 범위엔 과해 기각.
   - editMessage 폐기(문제 메시지 보존 후 결과를 새 메시지로): 채팅 정리를 위한 edit-in-place 설계(SessionFlow editMessageID, ADR 기록)를 뒤집어야 해 기각.
 
+## ADR-030: Grammar 예문 읽기는 정적 catalog에 미리 계산된 전문 かな 필드로 보강
+
+- **날짜**: 2026-06-30
+- **상태**: 채택됨
+- **맥락**:
+  - Grammar Study Material의 예문(`example`: 私は学生です。)·cloze(`cloze_prompt`)은 한자 포함인데 읽기(furigana)가 없어 N5 학습자가 문장을 못 읽는다. Vocabulary는 이미 `kana` 필드가 `읽기:`로 렌더돼 동일 문제가 없다.
+  - Telegram Bot API HTML 허용 태그에 `<ruby>`가 없어 한자 위 첨자형 진짜 후리가나는 불가 — 별도 줄이나 인라인 괄호만 가능.
+  - 한자 읽기는 정적 catalog(grammar 80 / vocab_context cloze)과 동적 AI 콘텐츠(Phase 2.4 아티클)라는 성격이 다른 두 모집단에 걸쳐 있다.
+- **결정**:
+  - Grammar 예문 읽기를 **전문 ひらがな(가타카나·문장부호는 원형 유지) 단일 필드 `example_reading`** 으로 표현한다. 인라인 괄호 furigana(B안)·런타임 형태소 분석(C안)을 기각하고 vocab의 `읽기:` 줄과 동일한 별도 줄 패턴을 따른다.
+  - 정적 catalog는 **읽기를 시드 타임에 미리 계산해 `Material.Payload`(JSONB)에 박는다.** 별도 DB 칼럼/마이그레이션 없이 catalog JSON(`n5_grammar.json`) → `GrammarPoint`/`GrammarMaterialPayload` 필드 추가로 흐른다. 렌더는 `renderGrammarPayload`에서 예문 바로 아래 `읽기:` 줄을 비-bold로 추가한다.
+  - 읽기 생성은 LLM 1회 배치(80문장, 외부 위임 임계 50k 토큰 미만 → 본 세션 처리)이되 오독은 틀린 읽기를 가르치므로 검증 후 확정. 데이터 무결성은 `datasets_test`의 필수 필드 검사에 `ExampleReading`을 추가해 80개 전수 강제.
+  - **범위 한정**: 이번엔 grammar 예문(study material)만. quiz `cloze_prompt`·vocab_context cloze 읽기는 별도 과제로 남긴다.
+- **장점**:
+  - 수만 유저 가정(§4)에서 정답: 고정 catalog는 렌더마다 분석기를 돌리는 대신 1회 계산 후 싸게 서빙. 무거운 형태소 사전 의존성(kagome 수십 MB) 회피.
+  - vocab `읽기:`와 동일 UX·렌더 패턴으로 일관성, 최소 변경(struct 3곳 + 렌더 1줄 + JSON 80필드).
+- **단점 / 트레이드오프**:
+  - 전문 かな 줄은 한자↔かな 정렬 정보를 잃는다(어느 한자가 어느 읽기인지 비명시). N5 단문에선 허용 가능, 정렬이 중요해지면 인라인 furigana로 승급 여지.
+  - 읽기는 수기/LLM 생성이라 오독 리스크가 상존 → 무결성 테스트는 존재만 강제하고 정확성은 보장 못 함(리뷰 의존).
+- **대안 / 향후**:
+  - 동적 AI 콘텐츠(아티클)는 본 결정과 분리: 런타임 furigana가 필요하므로 LLM 생성 파이프라인이 읽기를 함께 출력하게 하는 별도 설계가 맞다(현 범위 밖).
+  - quiz cloze·vocab_context cloze 읽기 보강은 동일 `example_reading` 패턴 확장으로 후속 처리.

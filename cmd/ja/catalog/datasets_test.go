@@ -14,7 +14,7 @@ func TestN5Grammar_Integrity(t *testing.T) {
 	seen := make(map[string]bool, len(N5GrammarPoints))
 	for i, p := range N5GrammarPoints {
 		if p.ID == "" || p.Pattern == "" || p.MeaningKo == "" ||
-			p.Example == "" || p.ClozePrompt == "" || p.CorrectAnswer == "" {
+			p.Example == "" || p.ExampleReading == "" || p.ClozePrompt == "" || p.CorrectAnswer == "" {
 			t.Errorf("point %d (%q) has an empty required field", i, p.ID)
 		}
 		if seen[p.ID] {

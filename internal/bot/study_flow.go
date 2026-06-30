@@ -278,11 +278,12 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 }
 
 type grammarStudyPayload struct {
-	Pattern       string `json:"pattern"`
-	MeaningKo     string `json:"meaning_ko"`
-	ExplanationKo string `json:"explanation_ko"`
-	Example       string `json:"example"`
-	TranslationKo string `json:"translation_ko"`
+	Pattern        string `json:"pattern"`
+	MeaningKo      string `json:"meaning_ko"`
+	ExplanationKo  string `json:"explanation_ko"`
+	Example        string `json:"example"`
+	ExampleReading string `json:"example_reading"`
+	TranslationKo  string `json:"translation_ko"`
 }
 
 func renderGrammarPayload(payload json.RawMessage) string {
@@ -300,6 +301,9 @@ func renderGrammarPayload(payload json.RawMessage) string {
 	}
 	if strings.TrimSpace(grammar.Example) != "" {
 		lines = append(lines, fmt.Sprintf("예문: <b>%s</b>", escapeHTML(grammar.Example)))
+	}
+	if strings.TrimSpace(grammar.ExampleReading) != "" {
+		lines = append(lines, fmt.Sprintf("읽기: %s", escapeHTML(grammar.ExampleReading)))
 	}
 	if strings.TrimSpace(grammar.TranslationKo) != "" {
 		lines = append(lines, fmt.Sprintf("해석: %s", escapeHTML(grammar.TranslationKo)))

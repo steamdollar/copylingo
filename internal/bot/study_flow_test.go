@@ -191,13 +191,14 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 			Status: model.SessionPending,
 		},
 	}
-	grammarPayload := func(pattern, meaningKo, explanationKo, example, translationKo string) json.RawMessage {
+	grammarPayload := func(pattern, meaningKo, explanationKo, example, exampleReading, translationKo string) json.RawMessage {
 		payload, err := json.Marshal(map[string]string{
-			"pattern":        pattern,
-			"meaning_ko":     meaningKo,
-			"explanation_ko": explanationKo,
-			"example":        example,
-			"translation_ko": translationKo,
+			"pattern":         pattern,
+			"meaning_ko":      meaningKo,
+			"explanation_ko":  explanationKo,
+			"example":         example,
+			"example_reading": exampleReading,
+			"translation_ko":  translationKo,
 		})
 		if err != nil {
 			panic(err)
@@ -217,7 +218,7 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 				Language:         "ja",
 				ProficiencyLevel: "N5",
 				Title:            "は",
-				Payload:          grammarPayload("は", "주제 표시", "이미 알고 있는 주제", "私は学生です。", "저는 학생입니다."),
+				Payload:          grammarPayload("は", "주제 표시", "이미 알고 있는 주제", "私は学生です。", "わたしはがくせいです。", "저는 학생입니다."),
 			},
 		},
 	}
@@ -244,7 +245,7 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 	flow.HandleCallback(ctx, studyCallback(config.FormatStudyStart, sessionID, 0, userID))
 	edit := lastEditMessage(t, api)
 	if !strings.Contains(edit.Text, "Grammar") || !strings.Contains(edit.Text, "주제 표시") ||
-		!strings.Contains(edit.Text, "이미 알고 있는 주제") {
+		!strings.Contains(edit.Text, "이미 알고 있는 주제") || !strings.Contains(edit.Text, "わたしはがくせいです。") {
 		t.Fatalf("grammar start edit text = %q", edit.Text)
 	}
 }

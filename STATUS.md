@@ -43,6 +43,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-06-30 | Grammar 예문 읽기(furigana) 보강: `example_reading` 전문 かな 필드 80개 + `읽기:` 줄 렌더 (ADR-030) | `2606/2606301402_grammar_example_reading.md` |
 | 2026-06-28 | Quiz 결과에 문제 원문 보존 + `🤖 이 문제 질문` 버튼(문제 컨텍스트 LLM 질문, owner-only) | `2606/2606281536_quiz_inquiry_llm_ask.md` |
 | 2026-06-27 | 단어 문맥규정(vocab_context) 문항 도입: 예문 보유 15단어 × 3 cloze = 45문항, grammar cloze 미러(정적 N문항) | `2606/2606272150_vocab_context_question_type.md` |
 | 2026-06-26 | SRS 첫 복습 간격 1→3일 상향 (study material + quiz question): 매일 재등장 체감 해소 | `2606261451_study_srs_first_interval.md` |

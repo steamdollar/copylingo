@@ -38,15 +38,19 @@ type VocabWord struct {
 }
 
 type GrammarPoint struct {
-	ID            string   `json:"id"`
-	Pattern       string   `json:"pattern"`
-	MeaningKo     string   `json:"meaning_ko"`
-	ExplanationKo string   `json:"explanation_ko"`
-	Example       string   `json:"example"`
-	TranslationKo string   `json:"translation_ko"`
-	ClozePrompt   string   `json:"cloze_prompt"`
-	CorrectAnswer string   `json:"correct_answer"`
-	FormOptions   []string `json:"form_options"`
+	ID            string `json:"id"`
+	Pattern       string `json:"pattern"`
+	MeaningKo     string `json:"meaning_ko"`
+	ExplanationKo string `json:"explanation_ko"`
+	Example       string `json:"example"`
+	// ExampleReading is the full-hiragana reading of Example (katakana kept as-is),
+	// so learners can read kanji-heavy example sentences. Seeded into the grammar
+	// material payload and shown as a 읽기 line under the 예문.
+	ExampleReading string   `json:"example_reading"`
+	TranslationKo  string   `json:"translation_ko"`
+	ClozePrompt    string   `json:"cloze_prompt"`
+	CorrectAnswer  string   `json:"correct_answer"`
+	FormOptions    []string `json:"form_options"`
 }
 
 // VocabContext carries the cloze data for a single word's 文脈規定 questions.

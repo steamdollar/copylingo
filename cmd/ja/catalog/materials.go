@@ -22,11 +22,12 @@ type VocabularyMaterialPayload struct {
 }
 
 type GrammarMaterialPayload struct {
-	Pattern       string `json:"pattern"`
-	MeaningKo     string `json:"meaning_ko"`
-	ExplanationKo string `json:"explanation_ko"`
-	Example       string `json:"example"`
-	TranslationKo string `json:"translation_ko"`
+	Pattern        string `json:"pattern"`
+	MeaningKo      string `json:"meaning_ko"`
+	ExplanationKo  string `json:"explanation_ko"`
+	Example        string `json:"example"`
+	ExampleReading string `json:"example_reading"`
+	TranslationKo  string `json:"translation_ko"`
 }
 
 func BuildAllMaterials() []*model.Material {
@@ -92,11 +93,12 @@ func BuildGrammarMaterials(points []GrammarPoint) []*model.Material {
 			ProficiencyLevel: VocabProficiencyLevel,
 			Title:            point.Pattern,
 			Payload: mustMaterialJSON(GrammarMaterialPayload{
-				Pattern:       point.Pattern,
-				MeaningKo:     point.MeaningKo,
-				ExplanationKo: point.ExplanationKo,
-				Example:       point.Example,
-				TranslationKo: point.TranslationKo,
+				Pattern:        point.Pattern,
+				MeaningKo:      point.MeaningKo,
+				ExplanationKo:  point.ExplanationKo,
+				Example:        point.Example,
+				ExampleReading: point.ExampleReading,
+				TranslationKo:  point.TranslationKo,
 			}),
 			Difficulty: GrammarDifficulty,
 		})
