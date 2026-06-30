@@ -42,6 +42,17 @@ func (s *ActiveSessionState) CurrentItemByQuestionID(questionID int) (*ActiveSes
 	return item, s.CurrentIndex, true
 }
 
+// ItemByQuestionID finds the session item for a question regardless of CurrentIndex.
+// Used after answering when the current index may have advanced (e.g. in-quiz LLM "ask" flow).
+func (s *ActiveSessionState) ItemByQuestionID(questionID int) (*ActiveSessionQuestion, bool) {
+	for i := range s.Items {
+		if s.Items[i].SessionQuestion.QuestionID == questionID {
+			return &s.Items[i], true
+		}
+	}
+	return nil, false
+}
+
 func (s *ActiveSessionState) ItemAt(idx int) (*ActiveSessionQuestion, bool) {
 	if idx < 0 || idx >= len(s.Items) {
 		return nil, false

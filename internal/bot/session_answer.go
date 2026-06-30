@@ -9,13 +9,19 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
 
-func (sf *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, questionID int, optionIdx int) {
+func (sf *SessionFlow) processAnswer(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	sessionID, questionID int,
+	optionIdx int,
+) {
 	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		return
@@ -33,7 +39,7 @@ func (sf *SessionFlow) processAnswer(ctx context.Context, cb *tgbotapi.CallbackQ
 
 	selectedAnswer := options[optionIdx]
 	editMessageID := cb.Message.MessageID
-	sf.processAnswerText(ctx, cb.Message.Chat.ID, sessionID, questionID, selectedAnswer, &editMessageID)
+	sf.processAnswerText(ctx, cb.Message.Chat.ID, cb.From, sessionID, questionID, selectedAnswer, &editMessageID)
 }
 
 // HandleTextInput intercepts text messages if there is an active text question.
@@ -59,11 +65,18 @@ func (sf *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Messag
 	}
 	questionID := state.Items[questionIdx].SessionQuestion.QuestionID
 
-	sf.processAnswerText(ctx, msg.Chat.ID, sessionID, questionID, strings.TrimSpace(msg.Text), nil)
+	sf.processAnswerText(ctx, msg.Chat.ID, msg.From, sessionID, questionID, strings.TrimSpace(msg.Text), nil)
 	return true
 }
 
-func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sessionID, questionID int, selectedAnswer string, editMessageID *int) {
+func (sf *SessionFlow) processAnswerText(
+	ctx context.Context,
+	chatID int64,
+	from *tgbotapi.User,
+	sessionID, questionID int,
+	selectedAnswer string,
+	editMessageID *int,
+) {
 	ctx = observability.WithAttrs(ctx,
 		slog.Int("session_id", sessionID),
 		slog.Int("question_id", questionID),
@@ -99,13 +112,25 @@ func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sess
 		sf.bot.api.Request(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
 	}
 
-	isCorrect, feedback, err := sf.bot.services.Grader.GradeAnswerWithQuestion(ctx, sessionID, questionID, &question, selectedAnswer)
+	isCorrect, feedback, err := sf.bot.services.Grader.GradeAnswerWithQuestion(
+		ctx,
+		sessionID,
+		questionID,
+		&question,
+		selectedAnswer,
+	)
 	if err != nil {
 		if errors.Is(err, service.ErrAIUnavailable) {
 			errMsg := tgbotapi.NewMessage(chatID, "⚠️ 시스템 설정 문제로 현재 AI 주관식 채점이 불가능합니다. 임시로 오답 처리하고 넘어갑니다.")
 			sf.bot.api.Send(errMsg)
 			isCorrect = false
-			if recordErr := sf.bot.services.ActiveSession.RecordAnswer(ctx, sessionID, questionID, selectedAnswer, false); recordErr != nil {
+			if recordErr := sf.bot.services.ActiveSession.RecordAnswer(
+				ctx,
+				sessionID,
+				questionID,
+				selectedAnswer,
+				false,
+			); recordErr != nil {
 				slog.ErrorContext(ctx, "Failed to record fallback wrong answer",
 					"event", "telegram.answer.fallback_record_failed",
 					"error", recordErr,
@@ -124,11 +149,13 @@ func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sess
 		}
 	}
 
+	// 원본 문제 메시지는 editMessage로 덮어써지므로, 결과에 문제 원문을 다시 실어 맥락을 보존한다.
+	promptLine := fmt.Sprintf("📝 %s\n\n", question.Prompt)
 	var text string
 	if isCorrect {
-		text = fmt.Sprintf("✅ <b>정답!</b>\n\n%s", question.Explanation)
+		text = promptLine + fmt.Sprintf("✅ <b>정답!</b>\n\n%s", question.Explanation)
 	} else {
-		text = fmt.Sprintf("❌ <b>오답</b>\n\n입력/선택: %s\n정답: <b>%s</b>\n\n%s",
+		text = promptLine + fmt.Sprintf("❌ <b>오답</b>\n\n입력/선택: %s\n정답: <b>%s</b>\n\n%s",
 			selectedAnswer, question.CorrectAnswer, question.Explanation)
 	}
 
@@ -148,11 +175,16 @@ func (sf *SessionFlow) processAnswerText(ctx context.Context, chatID int64, sess
 		nextData = fmt.Sprintf(config.FormatQuestionNext, sessionID, currentIdx)
 	}
 
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(nextLabel, nextData),
-		),
+	// "다음/결과" 버튼과 owner 전용 "질문" 버튼을 한 row에 나란히 둔다.
+	row := tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData(nextLabel, nextData),
 	)
+	// owner에게만 "이 문제 질문" 버튼을 노출한다 (LLM 비용/abuse gate, ADR-028·029).
+	if sf.bot.isLLMAllowed(from) {
+		row = append(row, tgbotapi.NewInlineKeyboardButtonData("🤖 질문",
+			fmt.Sprintf(config.FormatQuestionAskLLM, sessionID, questionID)))
+	}
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(row)
 
 	if editMessageID != nil {
 		sf.bot.EditMessage(chatID, *editMessageID, text, &keyboard)

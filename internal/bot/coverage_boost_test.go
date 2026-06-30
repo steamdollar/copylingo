@@ -403,7 +403,7 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 	}
 	storeActiveState(t, rdb, sessionID, state)
 
-	sf.processAnswerText(ctx, 123, sessionID, questionID, "banana", nil)
+	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "banana", nil)
 
 	text := collectText(mAPI.sentMessages)
 	if !strings.Contains(text, "오답") {
@@ -448,7 +448,7 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 	}
 	storeActiveState(t, rdb, sessionID, state)
 
-	sf.processAnswerText(ctx, 123, sessionID, questionID, "answer", nil)
+	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "answer", nil)
 
 	text := collectText(mAPI.sentMessages)
 	if !strings.Contains(text, "AI 주관식 채점이 불가능") {

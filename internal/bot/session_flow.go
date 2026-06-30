@@ -235,6 +235,11 @@ func (sf *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Ca
 		return
 	}
 
+	if parts[2] == "ask" {
+		sf.handleAskLLMQuestion(ctx, cb, sessionID, parts[3])
+		return
+	}
+
 	questionID, err := strconv.Atoi(parts[2])
 	if err != nil {
 		return
@@ -243,6 +248,46 @@ func (sf *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Ca
 	fmt.Sscanf(parts[3], "%d", &optionIdx)
 
 	sf.processAnswer(ctx, cb, sessionID, questionID, optionIdx)
+}
+
+// handleAskLLMQuestion arms one-shot LLM mode scoped to a just-answered question.
+// The next plain-text message is answered with that question's context (see handleLLMQuestion).
+func (sf *SessionFlow) handleAskLLMQuestion(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	sessionID int,
+	questionIDStr string,
+) {
+	if cb.Message == nil {
+		return
+	}
+	// owner gate를 callback에서도 재검증한다 (버튼은 owner에게만 렌더되지만 callback은 위조 가능).
+	if !sf.bot.isLLMAllowed(cb.From) {
+		return
+	}
+	questionID, err := strconv.Atoi(questionIDStr)
+	if err != nil {
+		return
+	}
+	if sf.bot.rdb == nil {
+		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
+		return
+	}
+
+	key := config.UserLLMPendingRedisKey.Format(cb.From.ID)
+	val := fmt.Sprintf("q:%d:%d", sessionID, questionID)
+	if err := sf.bot.rdb.Set(ctx, key, val, llmModeTTL).Err(); err != nil {
+		slog.ErrorContext(ctx, "Failed to activate in-quiz LLM mode",
+			"event", "telegram.llm.quiz_activate_failed",
+			"session_id", sessionID,
+			"question_id", questionID,
+			"error", err,
+		)
+		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
+		return
+	}
+	sf.bot.SendMessage(cb.Message.Chat.ID,
+		"🤖 이 문제에 대해 궁금한 점을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.")
 }
 
 func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {

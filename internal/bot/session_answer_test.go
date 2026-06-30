@@ -115,7 +115,7 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 	raw, _ := json.Marshal(state)
 	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
 
-	sf.processAnswerText(ctx, 123, sessionID, questionID, "apple", nil)
+	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "apple", nil)
 
 	if len(mAPI.sentMessages) != 1 {
 		t.Fatalf("expected 1 message, got %d", len(mAPI.sentMessages))
@@ -156,7 +156,7 @@ func TestProcessAnswerText_AlreadyAnswered(t *testing.T) {
 	raw, _ := json.Marshal(state)
 	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
 
-	sf.processAnswerText(ctx, 123, sessionID, questionID, "apple", nil)
+	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "apple", nil)
 
 	msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !strings.Contains(msg.Text, "이미 답변한 문제입니다") {

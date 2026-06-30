@@ -268,3 +268,33 @@
   - env allowlist: 설정 기반으로 더 유연하지만, 현재 단일 owner 기능에는 config/parsing/test 코드가 과해 기각.
   - `tips`에 바로 저장: raw 질문/답변과 curated tip이 섞여 Mini App 노출 품질을 해쳐 기각.
   - DB flag 기반 권한: 다중 admin 관리에는 좋지만 현재 범위에서는 schema/운영 절차가 커져 기각.
+
+---
+
+## ADR-029: Quiz 결과 메시지에 문제 원문 보존 + 문제 컨텍스트 LLM 질문 버튼
+
+- **날짜**: 2026-06-28
+- **상태**: 채택됨
+- **맥락**:
+  - Quiz 답변 시 원본 문제 메시지를 `editMessage`로 덮어써 결과(정답/해설)를 보여주는데, 결과 텍스트에 문제 원문(`prompt`)이 빠져 있어 사용자가 "무슨 문제였는지"를 다시 볼 수 없다.
+  - 그 자리에서 바로 LLM에게 그 문제를 물어보고 싶지만, 기존 `/llm`(ADR-028)은 quiz context를 몰라 owner가 문제 원문을 직접 재입력해야 한다.
+  - 모든 답변마다 자동 LLM 호출은 비용/UX상 과하다 — "필요할 때만" 호출돼야 한다.
+- **결정**:
+  - 결과 메시지(`processAnswerText`)에 문제 원문 `📝 {prompt}`를 정답/오답 공통으로 prepend한다. 해설은 이미 `question.Explanation`으로 표시 중이므로 별도 저장/변경 없음.
+  - 결과 메시지에 `🤖 이 문제 질문` inline button을 추가한다. callback은 기존 `q:` prefix의 sub-action `q:{sessionID}:ask:{questionID}`(`config.FormatQuestionAskLLM`)을 쓴다 (`next` sub-action과 동일 패턴).
+  - 버튼은 ADR-028과 동일하게 `config.LLMAllowedTelegramUserIDs` owner에게만 렌더하고, callback 처리 시에도 재검증한다 (비용/abuse gate).
+  - 버튼을 누르면 기존 `/llm` pending 메커니즘을 재사용하되, `UserLLMPendingRedisKey` 값에 `q:{sessionID}:{questionID}` 컨텍스트 토큰을 저장한다 (plain `/llm`은 기존처럼 `"1"`). 다음 plain text 1개를 Redis active session에서 그 문제(원문/정답/해설/사용자 답)로 로드해 LLM 프롬프트에 실어 답한다.
+  - `external.LLMClient` 인터페이스/`AnswerLearningQuestion` 시그니처는 바꾸지 않는다. 컨텍스트 프롬프트는 bot 레이어에서 조립해 기존 메서드로 전달한다 (mock/test 영향 0).
+- **장점**:
+  - 원문 소실 문제를 한 줄로 해결, 해설은 이미 있던 것을 그대로 활용.
+  - "이어지는 flow" 버튼은 누를 때만 LLM을 호출 → "필요할 때만"을 정확히 충족.
+  - 기존 `llm_pending` 라우팅·owner gate·tip candidate 수집을 재사용해 새 machinery 최소(콜백 sub-action 1종 + pending 값 확장).
+- **단점 / 트레이드오프**:
+  - pending 값이 `"1"` 외에 `q:sid:qid` 형식을 가지면서 값 파싱 분기가 생긴다 (단순 prefix 검사로 처리).
+  - active session이 Redis에서 만료되면(pending TTL 10분 내라 드묾) context 로드가 실패 → context 없이 일반 답변으로 graceful fallback.
+  - 문제별 LLM 질문도 owner gate에 의존하므로, 다중 사용자 확장 시 per-user rate-limit/비용 통제가 별도로 필요하다 (현 범위 밖, 향후 과제).
+- **대안**:
+  - 새 callback prefix(`llmq:`) 도입: handler dispatch/로깅 분기를 추가해야 해 기각, 기존 `q:` sub-action 재사용이 더 일관적.
+  - `LLMClient`에 `AnswerQuestionInContext` 전용 메서드 추가: 의미는 더 명확하나 인터페이스 변경으로 mock/test가 광범위하게 깨져 현 범위엔 과해 기각.
+  - editMessage 폐기(문제 메시지 보존 후 결과를 새 메시지로): 채팅 정리를 위한 edit-in-place 설계(SessionFlow editMessageID, ADR 기록)를 뒤집어야 해 기각.
+
