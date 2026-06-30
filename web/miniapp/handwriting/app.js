@@ -22,7 +22,8 @@ const tipBody = document.getElementById("tipBody");
 const params = new URLSearchParams(window.location.search);
 
 // 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
-const PAD_CELL_CSS_PX = 280;
+// 셀 1칸은 가로:세로 = 4:5 비율(정사각형보다 가로를 살짝 좁힘) — 글자가 세로로 살짝 길게 보이도록.
+const PAD_CELL_CSS_PX = 224; // = 280 * 4/5
 const PAD_HEIGHT_CSS_PX = 280;
 const PAD_SCALE = 2;
 const PAD_CELL_PX = PAD_CELL_CSS_PX * PAD_SCALE;
@@ -69,7 +70,7 @@ renderQuestionPrompt();
 updatePadScrollRange();
 loadTips();
 
-// 답안 글자 수만큼 캔버스 폭(=정사각형 셀 개수)을 잡고 격자를 글자 단위로 맞춘다.
+// 답안 글자 수만큼 캔버스 폭(=셀 개수, 셀당 4:5 비율)을 잡고 격자를 글자 단위로 맞춘다.
 // canvas.width/height 재설정은 2D context 상태를 초기화하므로 stroke 속성은 그 뒤에 다시 적용한다.
 function configurePad() {
 	const parsed = Number.parseInt(params.get("cells") || "1", 10);

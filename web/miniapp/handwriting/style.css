@@ -100,7 +100,11 @@ h1 {
 }
 
 .pad-viewport {
-  width: 100%;
+  /* 폭은 캔버스(셀 개수)에 맞춰 줄이고 가운데 정렬해 좌우 여백을 동일하게 둔다.
+     셀이 많아 화면을 넘치면 max-width(100%)에서 멈추고 overflow-x로 스크롤한다. */
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
   overflow-x: auto;
   border: 2px solid rgba(31, 122, 82, 0.24);
   border-radius: 22px;
@@ -114,13 +118,13 @@ h1 {
 /* 실제 width/height/background-size 는 글자 수에 맞춰 app.js(configurePad)가 인라인으로 설정한다. */
 #pad {
   display: block;
-  width: 280px;
+  width: 224px;
   height: 280px;
   background:
     linear-gradient(rgba(31, 122, 82, 0.12) 1px, transparent 1px),
     linear-gradient(90deg, rgba(31, 122, 82, 0.12) 1px, transparent 1px),
     var(--field);
-  background-size: 280px 280px;
+  background-size: 224px 280px;
   touch-action: none;
 }
 
