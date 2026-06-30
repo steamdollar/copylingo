@@ -69,6 +69,7 @@ configurePad();
 renderQuestionPrompt();
 updatePadScrollRange();
 loadTips();
+setupDebugExport();
 
 // 답안 글자 수만큼 캔버스 폭(=셀 개수, 셀당 4:5 비율)을 잡고 격자를 글자 단위로 맞춘다.
 // canvas.width/height 재설정은 2D context 상태를 초기화하므로 stroke 속성은 그 뒤에 다시 적용한다.
@@ -433,6 +434,58 @@ function setToolsDisabled(disabled) {
   clearButton.disabled = disabled;
   undoButton.disabled = disabled;
   eraserButton.disabled = disabled;
+}
+
+// ?debug=1 일 때만: 서버 RenderPNG()와 정합성을 비교하기 위한 개발용 export 버튼을 단다.
+// client.png(현재 canvas) + strokes.json(서버 입력과 동일한 stroke 배열)을 내보낸다.
+// 운영 UI에는 노출하지 않는다. docs/todos/handwriting_rebuild_parity_verification.md 참고.
+function setupDebugExport() {
+  if (params.get("debug") !== "1") return;
+
+  const bar = document.createElement("div");
+  bar.style.cssText = "display:flex;gap:8px;margin-top:8px";
+
+  const pngButton = document.createElement("button");
+  pngButton.type = "button";
+  pngButton.textContent = "debug: client.png";
+  pngButton.addEventListener("click", exportClientPNG);
+
+  const jsonButton = document.createElement("button");
+  jsonButton.type = "button";
+  jsonButton.textContent = "debug: strokes.json";
+  jsonButton.addEventListener("click", exportStrokesJSON);
+
+  bar.append(pngButton, jsonButton);
+  document.body.append(bar);
+}
+
+function exportClientPNG() {
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    downloadBlob(blob, "client.png");
+  }, "image/png");
+}
+
+function exportStrokesJSON() {
+  // 서버 RenderPNG()에 들어가는 stroke 배열을 그대로 직렬화한다.
+  // canvas_width/height/line_width 는 사람이 정합성 맥락을 읽기 위한 메타데이터.
+  const payload = {
+    canvas_width: canvas.width,
+    canvas_height: canvas.height,
+    line_width: 10 * PAD_SCALE,
+    strokes: state.strokes,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  downloadBlob(blob, "strokes.json");
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 canvas.addEventListener("pointerdown", (event) => {

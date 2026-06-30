@@ -140,6 +140,49 @@ func TestPNGStrokeRendererPreservesSeparatedMark(t *testing.T) {
 	}
 }
 
+func TestPNGStrokeRendererKeepsBentStrokeConnected(t *testing.T) {
+	renderer := NewPNGStrokeRenderer(512, 1536, 48)
+
+	// 한 stroke 안에서 급하게 꺾이는 연속 경로(ㄱ 모양). 꺾인 지점에서도 끊기면 안 된다.
+	img := renderTestPNG(t, renderer, []Stroke{
+		{
+			Points: []StrokePoint{
+				{X: 0, Y: 0},
+				{X: 200, Y: 0},
+				{X: 200, Y: 200},
+			},
+		},
+	})
+
+	if got := blackPixelComponentCount(img); got != 1 {
+		t.Fatalf("black pixel component count = %d, want 1 (bent stroke must stay connected)", got)
+	}
+}
+
+func TestPNGStrokeRendererDoesNotConnectSeparateStrokes(t *testing.T) {
+	renderer := NewPNGStrokeRenderer(512, 1536, 48)
+
+	// 서로 떨어진 두 multi-point stroke. 서버가 획 사이를 임의로 잇지 않아야 한다.
+	img := renderTestPNG(t, renderer, []Stroke{
+		{
+			Points: []StrokePoint{
+				{X: 0, Y: 0},
+				{X: 0, Y: 200},
+			},
+		},
+		{
+			Points: []StrokePoint{
+				{X: 200, Y: 0},
+				{X: 200, Y: 200},
+			},
+		},
+	})
+
+	if got := blackPixelComponentCount(img); got != 2 {
+		t.Fatalf("black pixel component count = %d, want 2 (separate strokes must not connect)", got)
+	}
+}
+
 func renderTestPNG(t *testing.T, renderer *PNGStrokeRenderer, strokes []Stroke) image.Image {
 	t.Helper()
 
