@@ -13,7 +13,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /copylingo ./cmd/server
 # Runtime stage
 FROM alpine:3.19
 
-RUN apk add --no-cache ca-certificates tzdata
+# ffmpeg: transcodes Gemini TTS raw PCM into Telegram-ready OGG/Opus (ADR-031).
+RUN apk add --no-cache ca-certificates tzdata ffmpeg
 
 WORKDIR /app
 COPY --from=builder /copylingo .

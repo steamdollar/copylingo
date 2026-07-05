@@ -21,6 +21,7 @@ type Services struct {
 	Analyzer           *AnalyzerService
 	Tip                *TipService
 	TipGenerator       *TipGenerator
+	Audio              *AudioService
 	LLM                *LLMService
 }
 
@@ -36,6 +37,18 @@ func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.C
 	// nil would defeat TopUpBucket's nil guard, so leave the field nil otherwise
 	// (the scheduler already tolerates a nil TipGenerator).
 	tipGenerator := newTipGeneratorFromClient(repos.Tip, llmClient, cfg.LLM.Model)
+
+	// Listening audio: build only when TTS is enabled and an API key is present.
+	// Left nil otherwise — the scheduler and bot render both tolerate a nil Audio.
+	var audioService *AudioService
+	if cfg.TTS.Enabled && cfg.LLM.APIKey != "" {
+		audioService = NewAudioService(
+			repos.Question,
+			external.NewTTSClient(cfg),
+			external.NewS3AudioStore(cfg),
+			cfg.TTS.VoiceName,
+		)
+	}
 
 	srsService := NewSRSService(repos.Question)
 	activeSessionService := NewActiveSessionService(repos.ActiveSession, rdb, srsService)
@@ -54,6 +67,7 @@ func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.C
 		Analyzer:           NewAnalyzerService(repos.User, repos.SessionQuestion),
 		Tip:                NewTipService(repos.Tip),
 		TipGenerator:       tipGenerator,
+		Audio:              audioService,
 		LLM:                llm,
 	}
 }

@@ -66,6 +66,15 @@ func (sf *StudyFlow) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQu
 			return
 		}
 		sf.nextMaterial(ctx, cb, sessionID, currentOrder)
+	case "prev":
+		if len(parts) < 4 {
+			return
+		}
+		currentOrder, err := strconv.Atoi(parts[3])
+		if err != nil {
+			return
+		}
+		sf.prevMaterial(ctx, cb, sessionID, currentOrder)
 	case "finish":
 		if len(parts) < 4 {
 			return
@@ -118,6 +127,23 @@ func (sf *StudyFlow) nextMaterial(ctx context.Context, cb *tgbotapi.CallbackQuer
 	}
 
 	sf.showMaterial(ctx, cb.Message.Chat.ID, &cb.Message.MessageID, state, currentOrder+1)
+}
+
+// prevMaterial re-shows an already-seen card; it never mutates studied state.
+func (sf *StudyFlow) prevMaterial(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, currentOrder int) {
+	state, err := sf.bot.services.StudyActiveSession.GetOwned(ctx, sessionID, cb.From.ID)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to load study session for prev material",
+			"event", "telegram.study.material_prev_failed",
+			"session_id", sessionID,
+			"material_order", currentOrder,
+			"error", err,
+		)
+		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ Study 진행 상태를 불러오지 못했습니다.")
+		return
+	}
+
+	sf.showMaterial(ctx, cb.Message.Chat.ID, &cb.Message.MessageID, state, currentOrder-1)
 }
 
 func (sf *StudyFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, currentOrder int) {
@@ -186,7 +212,12 @@ func (sf *StudyFlow) showMaterial(
 
 	item := items[idx]
 	text := renderStudyMaterial(item.Material, idx, len(items))
-	keyboard := studyMaterialKeyboard(state.Session.ID, item.SessionMaterial.MaterialOrder, idx == len(items)-1)
+	keyboard := studyMaterialKeyboard(
+		state.Session.ID,
+		item.SessionMaterial.MaterialOrder,
+		idx == 0,
+		idx == len(items)-1,
+	)
 
 	if editMessageID != nil {
 		sf.bot.EditMessage(chatID, *editMessageID, text, &keyboard)
@@ -195,22 +226,26 @@ func (sf *StudyFlow) showMaterial(
 	sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
 }
 
-func studyMaterialKeyboard(sessionID, materialOrder int, isLast bool) tgbotapi.InlineKeyboardMarkup {
-	if isLast {
-		return tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData(
-					"✅ 완료",
-					fmt.Sprintf(config.FormatStudyFinish, sessionID, materialOrder),
-				),
-			),
-		)
+func studyMaterialKeyboard(sessionID, materialOrder int, isFirst, isLast bool) tgbotapi.InlineKeyboardMarkup {
+	buttons := make([]tgbotapi.InlineKeyboardButton, 0, 2)
+	if !isFirst {
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
+			"← 이전",
+			fmt.Sprintf(config.FormatStudyPrev, sessionID, materialOrder),
+		))
 	}
-	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("다음 →", fmt.Sprintf(config.FormatStudyNext, sessionID, materialOrder)),
-		),
-	)
+	if isLast {
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
+			"✅ 완료",
+			fmt.Sprintf(config.FormatStudyFinish, sessionID, materialOrder),
+		))
+	} else {
+		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
+			"다음 →",
+			fmt.Sprintf(config.FormatStudyNext, sessionID, materialOrder),
+		))
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(buttons...))
 }
 
 func studyMaterialIndexByOrder(items []model.StudySessionMaterial, materialOrder int) int {

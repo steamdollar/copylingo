@@ -143,6 +143,27 @@ func (b *Bot) SendMessageWithReplyMarkup(chatID int64, text string, replyMarkup 
 	return sent.MessageID, nil
 }
 
+// SendVoiceFileID sends a voice message by reusing a cached Telegram file_id.
+func (b *Bot) SendVoiceFileID(chatID int64, fileID string) error {
+	voice := tgbotapi.NewVoice(chatID, tgbotapi.FileID(fileID))
+	_, err := b.api.Send(voice)
+	return err
+}
+
+// SendVoiceBytes uploads raw OGG/Opus bytes as a voice message and returns the
+// Telegram file_id assigned to it, so callers can cache it for later re-sends.
+func (b *Bot) SendVoiceBytes(chatID int64, data []byte) (string, error) {
+	voice := tgbotapi.NewVoice(chatID, tgbotapi.FileBytes{Name: "listening.ogg", Bytes: data})
+	sent, err := b.api.Send(voice)
+	if err != nil {
+		return "", err
+	}
+	if sent.Voice != nil {
+		return sent.Voice.FileID, nil
+	}
+	return "", nil
+}
+
 // EditMessageReplyMarkup updates the inline keyboard of an existing message.
 func (b *Bot) EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotapi.InlineKeyboardMarkup) error {
 	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, markup)

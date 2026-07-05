@@ -18,6 +18,7 @@ type Config struct {
 	Telegram TelegramConfig `mapstructure:"telegram"`
 	LLM      LLMConfig      `mapstructure:"llm"`
 	TTS      TTSConfig      `mapstructure:"tts"`
+	Storage  StorageConfig  `mapstructure:"storage"`
 	Schedule ScheduleConfig `mapstructure:"schedule"`
 	Logging  LoggingConfig  `mapstructure:"logging"`
 }
@@ -68,10 +69,24 @@ type LLMConfig struct {
 
 type TTSConfig struct {
 	Enabled      bool   `mapstructure:"enabled"`
-	CredPath     string `mapstructure:"cred_path"` // Google Cloud credentials JSON path
-	AudioDir     string `mapstructure:"audio_dir"`
+	Model        string `mapstructure:"model"`         // Gemini native TTS model, e.g. gemini-2.5-flash-preview-tts (ADR-031). Swappable; a gemini-3.1-flash-tts-preview also exists.
+	CredPath     string `mapstructure:"cred_path"`     // (legacy GCP) credentials JSON path; unused by the Gemini native path.
+	AudioDir     string `mapstructure:"audio_dir"`     // (legacy local FS) superseded by object storage (ADR-032); kept for backward compatibility.
 	LanguageCode string `mapstructure:"language_code"` // ja-JP
-	VoiceName    string `mapstructure:"voice_name"`    // ja-JP-Neural2-B
+	VoiceName    string `mapstructure:"voice_name"`    // Gemini prebuilt voice, e.g. Kore / Puck / Zephyr. Part of the content-addressed key.
+}
+
+// StorageConfig configures the S3-compatible object store that holds TTS audio
+// (ADR-032). "S3" here is the API standard, not the AWS vendor: only Endpoint
+// changes between local MinIO and prod AWS S3. Endpoint empty => default AWS
+// endpoint for Region.
+type StorageConfig struct {
+	Endpoint     string `mapstructure:"endpoint"`       // e.g. http://localhost:9000 (MinIO); empty for AWS S3.
+	Region       string `mapstructure:"region"`         // e.g. ap-northeast-2 (Seoul).
+	Bucket       string `mapstructure:"bucket"`         // e.g. copylingo-audio.
+	AccessKey    string `mapstructure:"access_key"`     // static credentials; env-injected in prod.
+	SecretKey    string `mapstructure:"secret_key"`     // static credentials; env-injected in prod.
+	UsePathStyle bool   `mapstructure:"use_path_style"` // true for MinIO (path-style addressing); false for AWS S3 virtual-hosted style.
 }
 
 // CronExpr는 cron expression을 표현하는 도메인 타입.
@@ -183,9 +198,18 @@ func Load() (*Config, error) {
 	) // LLM compatibility layer
 	// tts
 	viper.SetDefault("tts.enabled", true)
+	viper.SetDefault("tts.model", "gemini-2.5-flash-preview-tts") // ADR-031; swap via env if the preview id changes.
 	viper.SetDefault("tts.audio_dir", "./data/audio")
 	viper.SetDefault("tts.language_code", "ja-JP")
-	viper.SetDefault("tts.voice_name", "ja-JP-Neural2-B")
+	viper.SetDefault("tts.voice_name", "Kore") // Gemini prebuilt voice (ADR-031).
+
+	// storage (S3-compatible object store; local defaults target the MinIO container)
+	viper.SetDefault("storage.endpoint", "http://localhost:9000")
+	viper.SetDefault("storage.region", "ap-northeast-2")
+	viper.SetDefault("storage.bucket", "copylingo-audio")
+	viper.SetDefault("storage.access_key", "minioadmin")
+	viper.SetDefault("storage.secret_key", "minioadmin")
+	viper.SetDefault("storage.use_path_style", true)
 
 	// session schedule
 	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *")        // 매일 03:00
@@ -245,10 +269,17 @@ func bindEnv() error {
 		"llm.model",
 		"llm.base_url",
 		"tts.enabled",
+		"tts.model",
 		"tts.cred_path",
 		"tts.audio_dir",
 		"tts.language_code",
 		"tts.voice_name",
+		"storage.endpoint",
+		"storage.region",
+		"storage.bucket",
+		"storage.access_key",
+		"storage.secret_key",
+		"storage.use_path_style",
 		"schedule.content_collect_cron",
 		"schedule.morning_build_cron",
 		"schedule.morning_push_cron",

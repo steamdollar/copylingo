@@ -25,7 +25,7 @@ Each per-agent file is a **thin overlay on top of this document**; shared rules 
 | actor | entry | responsibility |
 |---|---|---|
 | **User** | start of every session | **Final decision-maker.** Final approval on every decision (design, implementation direction, ADR adoption, TODO delegation, etc.). Agents propose, execute, and review, but **must get user confirmation on any non-trivial decision**. |
-| **Claude Code / Codex** (main agent) | user starts the session directly | Carries one task end to end — **design · implement · verify · review**. The two are **chosen by user preference** (record any meaningful capability difference in this doc). Escalates non-trivial judgment to the user. |
+| **Claude Code / Codex** (main agent) | user starts the session directly | Carries one task end to end — **design · implement · verify · review**. The two are **chosen by user preference**. Capability differences both agents should know about are recorded **here (§2)**; agent-specific usage patterns go to that agent's overlay file (`CLAUDE.md` / `GEMINI.md`). Escalates non-trivial judgment to the user. |
 | **native subagent** | native-spawned by the main agent | **Default delegation mechanism.** Runs bounded, parallelizable subtasks. Bulk mechanical work (large reads/classification/summarization) is **overridden down to the Haiku tier**. The main agent re-verifies results. |
 | **external executor** (Gemini=agy) | main agent dispatches via a self-contained TODO doc | **Special quota-isolation executor.** For high-volume generation batches only (estimated tokens > threshold). Executes to spec; stops and asks at decision points. |
 
@@ -66,6 +66,7 @@ A user request falls into one of these, and the deliverable and procedure differ
 - **Procedure**:
   1. Discuss with the user thoroughly. State tradeoffs at the assumed scale (see §4).
   2. **Once the decision settles, the agent immediately adds an entry to the latest ADR file under `docs/adr/` (currently `ADR_from_21_to_40.md`) without waiting to be asked** (background / decision / consequences). The user often forgets to update ADRs, so do it proactively.
+     - **Separate-file rule**: if the entry chunk is large or the decision is significant to the project, put it in a **separate file** (keeping the series numbering, e.g. `ADR-031_032_listening_audio_pipeline.md`) and leave a **pointer stub** (number + one-line summary + link) in the range file.
   3. If code changes follow, continue into Case B.
 - **Note**: don't default to "it's fine, single user" or "YAGNI" — rationale and application are in §4.
 
@@ -83,7 +84,7 @@ A user request falls into one of these, and the deliverable and procedure differ
      - Restart DB/Redis/Tunnel only when you changed that component directly (`make restart-db` / `make restart-redis`).
   5. **Close**:
      - Update `STATUS.md` — move "in progress" → "📝 recently done" **only when the current request completes the in-progress item itself**. A side task unrelated to the in-progress item (e.g. doc cleanup, handling an incidental finding) either leaves STATUS.md alone or adds a single line under "📝 recently done".
-     - For non-trivial work, create `docs/workthrough/YYMMDDhhmm_<job>.md` — changed files, decisions, verification results.
+     - For non-trivial work, create `docs/workthrough/YYMM/YYMMDDhhmm_<job>.md` (monthly subdirectory) — changed files, decisions, verification results.
      - If a decision was made, update the latest ADR file under `docs/adr/`.
      - Update `ROADMAP.md` only on milestone completion.
 - **Language**: implementation plans and workthroughs are written in **Korean**.
@@ -150,7 +151,7 @@ Cases often change mid-work. Handle all of these explicitly (no implicit case ch
 1. **Single-user optimization applies only to feature scope** — no social features, no monetization nudges (hearts, etc.). **Never apply it to architecture/performance decisions.**
 2. **Push-based learning** — the bot sends sessions first; the user doesn't come to it.
 3. **Heavy AI use** — problem generation, article conversations, and feedback are all AI-based.
-4. **AI model operation** — Gemini in OpenAI-compatible mode (within the free 1,500 RPD/month).
+4. **AI model operation** — Gemini within the free tier (1,500 RPD). Chat goes through the **OpenAI-compatible layer**; TTS uses **native `generateContent`** because the compat layer doesn't support it (ADR-031).
 
 ---
 
@@ -166,7 +167,7 @@ Cases often change mid-work. Handle all of these explicitly (no implicit case ch
 - [STATUS.md](STATUS.md) — current work state (🚨 read before working)
 - [ROADMAP.md](ROADMAP.md) — overall Phase/Subphase progress
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system structure, data flow, callback convention
-- [docs/adr/](docs/adr/) — technical decision records (split by range: `ADR_from_01_to_20.md`, `ADR_from_21_to_40.md`)
+- [docs/adr/](docs/adr/) — technical decision records (split by range: `ADR_from_01_to_20.md`, `ADR_from_21_to_40.md`; large/significant decisions live in separate files with a pointer stub in the range file, e.g. `ADR-031_032_listening_audio_pipeline.md`)
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — coding conventions (Go / Telegram bot / DB / config)
 - [docs/workthrough/](docs/workthrough/) — detailed records of completed work
 - [docs/todos/](docs/todos/) — self-contained plan docs for TODOs executed in a separate session

@@ -71,6 +71,7 @@ const (
 	FormatQuestionAskLLM = "q:%d:ask:%d"
 	FormatStudyStart     = "study:%d:start"
 	FormatStudyNext      = "study:%d:next:%d"
+	FormatStudyPrev      = "study:%d:prev:%d"
 	FormatStudyFinish    = "study:%d:finish:%d"
 )
 

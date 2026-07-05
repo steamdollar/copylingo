@@ -19,6 +19,10 @@ var defaultCategoryOrder = []model.QuestionCategory{
 	model.CategoryHandwriting,
 	model.CategoryVocabulary,
 	model.CategoryGrammar,
+	// Listening joins the relay; GetNewQuestions only returns listening items
+	// whose audio is already generated (audio_path IS NOT NULL), so audio-less
+	// questions are never scheduled (ADR-031/032).
+	model.CategoryListening,
 }
 
 type questionFetcher interface {

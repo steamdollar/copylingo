@@ -320,3 +320,12 @@
 - **대안 / 향후**:
   - 동적 AI 콘텐츠(아티클)는 본 결정과 분리: 런타임 furigana가 필요하므로 LLM 생성 파이프라인이 읽기를 함께 출력하게 하는 별도 설계가 맞다(현 범위 밖).
   - quiz cloze·vocab_context cloze 읽기 보강은 동일 `example_reading` 패턴 확장으로 후속 처리.
+
+## ADR-031 · ADR-032 → 별도 파일
+
+청해(Listening) 음성 생성·저장·전송 아키텍처는 결정 범위가 커서 range 파일에 인라인하지 않고 별도 파일로 분리했다.
+
+- **ADR-031**: 청해 TTS = Gemini 2.5 native TTS 사전 생성 (OpenAI-compat 미지원 → native `generateContent`, PCM→OGG transcode)
+- **ADR-032**: 청해 음성 = S3 호환 object storage(content-addressed dedup) + Telegram `file_id` 재전송 (MinIO 로컬 / S3-서울 prod, R2 기각)
+
+→ [ADR-031_032_listening_audio_pipeline.md](ADR-031_032_listening_audio_pipeline.md)

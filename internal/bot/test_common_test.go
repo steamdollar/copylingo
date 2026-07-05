@@ -16,12 +16,18 @@ import (
 type mockBotAPI struct {
 	sentMessages []tgbotapi.Chattable
 	sendErr      error
+	// returnVoiceFileID, when set, is echoed back as the file_id of a sent voice
+	// message so file_id-caching paths can be exercised.
+	returnVoiceFileID string
 }
 
 func (m *mockBotAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
 	m.sentMessages = append(m.sentMessages, c)
 	if m.sendErr != nil {
 		return tgbotapi.Message{}, m.sendErr
+	}
+	if _, ok := c.(tgbotapi.VoiceConfig); ok && m.returnVoiceFileID != "" {
+		return tgbotapi.Message{MessageID: 1001, Voice: &tgbotapi.Voice{FileID: m.returnVoiceFileID}}, nil
 	}
 	return tgbotapi.Message{MessageID: 1001}, nil
 }

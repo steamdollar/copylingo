@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -162,6 +163,128 @@ func TestRenderByType(t *testing.T) {
 		}
 		if len(mAPI.sentMessages) != 1 {
 			t.Fatalf("expected 1 message sent, got %d", len(mAPI.sentMessages))
+		}
+	})
+}
+
+// --- listening render fakes (structurally satisfy service.NewAudioService deps) ---
+
+type fakeAudioRepo struct {
+	setFileID  int
+	setFileVal string
+}
+
+func (f *fakeAudioRepo) GetListeningNeedingAudio(_ context.Context, _, _ string, _ int) ([]model.Question, error) {
+	return nil, nil
+}
+func (f *fakeAudioRepo) SetAudioPath(_ context.Context, _ int, _ string) error { return nil }
+func (f *fakeAudioRepo) SetAudioFileID(_ context.Context, id int, fileID string) error {
+	f.setFileID = id
+	f.setFileVal = fileID
+	return nil
+}
+
+type fakeSynth struct{}
+
+func (fakeSynth) Synthesize(_ context.Context, _ string) ([]byte, error) { return []byte("ogg"), nil }
+
+type fakeStore struct {
+	getCalls int
+	bytes    []byte
+}
+
+func (f *fakeStore) Exists(_ context.Context, _ string) (bool, error)          { return true, nil }
+func (f *fakeStore) Put(_ context.Context, _ string, _ []byte, _ string) error { return nil }
+func (f *fakeStore) Get(_ context.Context, _ string) ([]byte, error) {
+	f.getCalls++
+	return f.bytes, nil
+}
+
+func strPtr(s string) *string { return &s }
+
+func TestRenderByType_Listening(t *testing.T) {
+	ctx := context.Background()
+	repo := &fakeAudioRepo{}
+	store := &fakeStore{bytes: []byte("ogg-bytes")}
+	audio := service.NewAudioService(repo, fakeSynth{}, store, "Kore")
+
+	t.Run("cached file_id fast path", func(t *testing.T) {
+		mAPI := &mockBotAPI{}
+		b := &Bot{api: mAPI, rdb: &testRedis{values: map[string]string{}}, services: &service.Services{Audio: audio}}
+		sf := NewSessionFlow(b)
+		q := model.Question{
+			ID:          5,
+			Type:        model.QuestionListening,
+			Prompt:      "何をしますか?",
+			Options:     json.RawMessage(`["A","B"]`),
+			AudioPath:   strPtr("tts/ja/kore/abc.ogg"),
+			AudioFileID: strPtr("cached-fid"),
+		}
+		text, kb, done := sf.renderByType(ctx, 1, nil, 10, 0, 5, q, false)
+		if done {
+			t.Fatal("expected not done")
+		}
+		if kb == nil || len(kb.InlineKeyboard) != 1 {
+			t.Fatalf("expected 1 option row, got %v", kb)
+		}
+		if !strings.Contains(text, "🎧") {
+			t.Errorf("missing listen hint: %s", text)
+		}
+		if store.getCalls != 0 {
+			t.Errorf("cached file_id path must not fetch store, got %d gets", store.getCalls)
+		}
+		if len(mAPI.sentMessages) != 1 {
+			t.Fatalf("expected 1 voice message, got %d", len(mAPI.sentMessages))
+		}
+		if _, ok := mAPI.sentMessages[0].(tgbotapi.VoiceConfig); !ok {
+			t.Errorf("expected a VoiceConfig, got %T", mAPI.sentMessages[0])
+		}
+	})
+
+	t.Run("no file_id fetches store, uploads, caches file_id", func(t *testing.T) {
+		store.getCalls = 0
+		mAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
+		b := &Bot{api: mAPI, rdb: &testRedis{values: map[string]string{}}, services: &service.Services{Audio: audio}}
+		sf := NewSessionFlow(b)
+		q := model.Question{
+			ID:        9,
+			Type:      model.QuestionListening,
+			Prompt:    "?",
+			Options:   json.RawMessage(`["A","B"]`),
+			AudioPath: strPtr("tts/ja/kore/def.ogg"),
+		}
+		_, _, done := sf.renderByType(ctx, 1, nil, 10, 0, 5, q, false)
+		if done {
+			t.Fatal("expected not done")
+		}
+		if store.getCalls != 1 {
+			t.Errorf("expected 1 store fetch, got %d", store.getCalls)
+		}
+		if repo.setFileID != 9 || repo.setFileVal != "new-fid" {
+			t.Errorf("expected file_id cached for q9=new-fid, got id=%d val=%q", repo.setFileID, repo.setFileVal)
+		}
+	})
+
+	t.Run("no audio available degrades softly", func(t *testing.T) {
+		mAPI := &mockBotAPI{}
+		b := &Bot{api: mAPI, rdb: &testRedis{values: map[string]string{}}, services: &service.Services{Audio: audio}}
+		sf := NewSessionFlow(b)
+		q := model.Question{
+			ID:      1,
+			Type:    model.QuestionListening,
+			Prompt:  "?",
+			Options: json.RawMessage(`["A","B"]`),
+			// AudioPath nil => unavailable
+		}
+		text, kb, done := sf.renderByType(ctx, 1, nil, 10, 0, 5, q, false)
+		if done {
+			t.Fatal("expected not done (soft degrade still returns text)")
+		}
+		if kb != nil {
+			t.Error("expected no keyboard when audio is unavailable")
+		}
+		if !strings.Contains(text, "준비하지 못했") {
+			t.Errorf("expected soft-degrade text, got %s", text)
 		}
 	})
 }

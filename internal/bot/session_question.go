@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
@@ -105,7 +106,14 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 	case model.QuestionKanaHandwriting:
 		// cells = answer 글자 수. 정답 문자열 자체는 cheat 방지를 위해 client로 보내지 않고, 길이만 전달해 캔버스 폭을 글자 수에 비례시킨다.
 		cells := len([]rune(question.CorrectAnswer))
-		miniAppURL, err := sf.handwritingMiniAppURL(sessionID, question.ID, question.Language, question.ProficiencyLevel, question.Prompt, cells)
+		miniAppURL, err := sf.handwritingMiniAppURL(
+			sessionID,
+			question.ID,
+			question.Language,
+			question.ProficiencyLevel,
+			question.Prompt,
+			cells,
+		)
 		if err != nil {
 			text += "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요."
 			return text, nil, false
@@ -146,6 +154,21 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		}
 		return "", nil, true
 
+	case model.QuestionListening:
+		// Deliver the audio as a separate voice message, then render the
+		// comprehension question + options through the shared MCQ path (grading
+		// reuses the exact-match option flow — no new grader, ADR-031).
+		if !sf.sendListeningAudio(ctx, chatID, &question) {
+			text += "\n\n⚠️ 이 청해 문항의 음성을 준비하지 못했습니다."
+			return text, nil, false
+		}
+		text += "\n\n🎧 위 음성을 듣고 정답을 선택하세요."
+		options, err := question.GetOptions()
+		if err != nil || len(options) == 0 {
+			return "", nil, true
+		}
+		return text, buildMCQKeyboard(sessionID, question.ID, options), false
+
 	case model.QuestionFillBlank, model.QuestionSubjective:
 		sf.bot.rdb.Set(ctx, config.UserActiveQuestionRedisKey.Format(chatID),
 			fmt.Sprintf("%d:%d", sessionID, questionIdx), 1*time.Hour)
@@ -161,23 +184,84 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		if err != nil || len(options) == 0 {
 			return "", nil, true
 		}
-		var rows [][]tgbotapi.InlineKeyboardButton
-		for i := 0; i < len(options); i += 2 {
-			var row []tgbotapi.InlineKeyboardButton
-			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
-				options[i],
-				fmt.Sprintf(config.FormatQuestionAnswer, sessionID, question.ID, i),
-			))
-			if i+1 < len(options) {
-				row = append(row, tgbotapi.NewInlineKeyboardButtonData(
-					options[i+1],
-					fmt.Sprintf(config.FormatQuestionAnswer, sessionID, question.ID, i+1),
-				))
-			}
-			rows = append(rows, row)
-		}
-		return text, &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}, false
+		return text, buildMCQKeyboard(sessionID, question.ID, options), false
 	}
+}
+
+// buildMCQKeyboard lays out option buttons two per row, each carrying the
+// answer callback. Shared by plain multiple-choice and listening comprehension.
+func buildMCQKeyboard(sessionID, questionID int, options []string) *tgbotapi.InlineKeyboardMarkup {
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for i := 0; i < len(options); i += 2 {
+		var row []tgbotapi.InlineKeyboardButton
+		row = append(row, tgbotapi.NewInlineKeyboardButtonData(
+			options[i],
+			fmt.Sprintf(config.FormatQuestionAnswer, sessionID, questionID, i),
+		))
+		if i+1 < len(options) {
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
+				options[i+1],
+				fmt.Sprintf(config.FormatQuestionAnswer, sessionID, questionID, i+1),
+			))
+		}
+		rows = append(rows, row)
+	}
+	return &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+// sendListeningAudio delivers a listening question's clip as a Telegram voice
+// message. It prefers the cached file_id and falls back to fetching the object
+// from the store and uploading it, caching the returned file_id (ADR-032).
+// Returns false when audio is unavailable so the caller can degrade gracefully.
+func (sf *SessionFlow) sendListeningAudio(ctx context.Context, chatID int64, q *model.Question) bool {
+	audio := sf.bot.services.Audio
+	if audio == nil || q.AudioPath == nil || *q.AudioPath == "" {
+		return false
+	}
+
+	// Fast path: re-send by cached file_id (no store fetch, no re-upload).
+	if q.AudioFileID != nil && *q.AudioFileID != "" {
+		if err := sf.bot.SendVoiceFileID(chatID, *q.AudioFileID); err == nil {
+			return true
+		}
+		// A purged/invalid file_id falls through to a fresh upload (ADR-032).
+		slog.WarnContext(ctx, "Cached voice file_id failed; re-uploading from store",
+			"event", "telegram.listening.file_id_stale",
+			"question_id", q.ID,
+		)
+	}
+
+	clip, err := audio.GetClip(ctx, *q.AudioPath)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to fetch listening clip from store",
+			"event", "telegram.listening.fetch_failed",
+			"question_id", q.ID,
+			"key", *q.AudioPath,
+			"error", err,
+		)
+		return false
+	}
+
+	fileID, err := sf.bot.SendVoiceBytes(chatID, clip)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to send listening voice",
+			"event", "telegram.listening.send_failed",
+			"question_id", q.ID,
+			"error", err,
+		)
+		return false
+	}
+
+	if fileID != "" {
+		if err := audio.CacheFileID(ctx, q.ID, fileID); err != nil {
+			slog.WarnContext(ctx, "Failed to cache listening voice file_id",
+				"event", "telegram.listening.cache_failed",
+				"question_id", q.ID,
+				"error", err,
+			)
+		}
+	}
+	return true
 }
 
 func (sf *SessionFlow) isQuestionAnswered(ctx context.Context, sessionID, questionIdx int) bool {
@@ -198,7 +282,11 @@ func (sf *SessionFlow) nextUnansweredQuestionIndex(ctx context.Context, sessionI
 }
 
 // TODO: 이 함수 굳이 이렇게 복잡하게 짜야 함?
-func (sf *SessionFlow) handwritingMiniAppURL(sessionID, questionID int, language, level, prompt string, cells int) (string, error) {
+func (sf *SessionFlow) handwritingMiniAppURL(
+	sessionID, questionID int,
+	language, level, prompt string,
+	cells int,
+) (string, error) {
 	baseURL := strings.TrimRight(sf.bot.cfg.Server.PublicBaseURL, "/")
 	if baseURL == "" {
 		return "", fmt.Errorf("server public base url is empty")

@@ -159,8 +159,9 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 	if !strings.Contains(edit.Text, "2/2") || !strings.Contains(edit.Text, "ひと") || !strings.Contains(edit.Text, "사람") {
 		t.Fatalf("next edit text = %q", edit.Text)
 	}
-	if got := onlyCallbackData(t, edit); got != "study:77:finish:1" {
-		t.Fatalf("finish callback = %q", got)
+	if got := rowCallbackData(t, edit); len(got) != 2 ||
+		got[0] != "study:77:prev:1" || got[1] != "study:77:finish:1" {
+		t.Fatalf("last card callbacks = %v, want [study:77:prev:1 study:77:finish:1]", got)
 	}
 
 	flow.HandleCallback(ctx, studyCallback(config.FormatStudyFinish, sessionID, 1, userID))
@@ -174,6 +175,73 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 	edit = lastEditMessage(t, api)
 	if !strings.Contains(edit.Text, "완료") {
 		t.Fatalf("finish edit text = %q", edit.Text)
+	}
+}
+
+func TestStudyFlowPrevNavigation(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 79
+	userID := int64(123)
+	api := &mockBotAPI{}
+	sessionStore := &botStudySessionStore{
+		session: &model.Session{
+			ID:     sessionID,
+			UserID: userID,
+			Type:   model.SessionStudy,
+			Mode:   model.SessionModeStudy,
+			Status: model.SessionPending,
+		},
+	}
+	items := []model.StudySessionMaterial{
+		studyItem(sessionID, 10, 0, "みず", vocabularyPayload("みず", "水", "물", "noun")),
+		studyItem(sessionID, 11, 1, "ひと", vocabularyPayload("ひと", "人", "사람", "noun")),
+	}
+	activeRepo := &botStudyActiveRepo{
+		session: sessionStore.session,
+		items:   items,
+	}
+	rdb := &testRedis{values: map[string]string{}}
+	studyActiveService := service.NewStudyActiveSessionService(activeRepo, sessionStore, rdb)
+	b := &Bot{
+		api: api,
+		services: &service.Services{
+			StudyActiveSession: studyActiveService,
+		},
+	}
+	flow := NewStudyFlow(b)
+
+	flow.HandleCallback(ctx, studyCallback(config.FormatStudyStart, sessionID, 0, userID))
+	flow.HandleCallback(ctx, studyCallback(config.FormatStudyNext, sessionID, 0, userID))
+
+	// 마지막 카드(2/2)에서 이전으로 돌아가면 첫 카드가 다시 보인다.
+	flow.HandleCallback(ctx, studyCallback(config.FormatStudyPrev, sessionID, 1, userID))
+	edit := lastEditMessage(t, api)
+	if !strings.Contains(edit.Text, "1/2") || !strings.Contains(edit.Text, "みず") {
+		t.Fatalf("prev edit text = %q", edit.Text)
+	}
+	// 첫 카드에는 이전 버튼이 없다.
+	if got := onlyCallbackData(t, edit); got != "study:79:next:0" {
+		t.Fatalf("first card callback = %q", got)
+	}
+
+	// 뒤로 가기는 studied 상태를 되돌리지 않는다.
+	state, err := studyActiveService.Get(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("Get active study state after prev failed: %v", err)
+	}
+	if state.Items[0].SessionMaterial.StudiedAt == nil {
+		t.Fatal("first material should stay studied after prev")
+	}
+
+	// 이미 studied인 카드에서 다시 앞으로 이동한 뒤 완료까지 정상 진행된다.
+	flow.HandleCallback(ctx, studyCallback(config.FormatStudyNext, sessionID, 0, userID))
+	edit = lastEditMessage(t, api)
+	if !strings.Contains(edit.Text, "2/2") || !strings.Contains(edit.Text, "ひと") {
+		t.Fatalf("re-next edit text = %q", edit.Text)
+	}
+	flow.HandleCallback(ctx, studyCallback(config.FormatStudyFinish, sessionID, 1, userID))
+	if activeRepo.flushedState == nil {
+		t.Fatal("expected study active session to flush on finish after prev round-trip")
 	}
 }
 
@@ -292,6 +360,8 @@ func studyCallback(format string, sessionID, order int, userID int64) *tgbotapi.
 		data = "study:" + intString(sessionID) + ":start"
 	case config.FormatStudyNext:
 		data = "study:" + intString(sessionID) + ":next:" + intString(order)
+	case config.FormatStudyPrev:
+		data = "study:" + intString(sessionID) + ":prev:" + intString(order)
 	case config.FormatStudyFinish:
 		data = "study:" + intString(sessionID) + ":finish:" + intString(order)
 	}
@@ -323,13 +393,25 @@ func lastEditMessage(t *testing.T, api *mockBotAPI) tgbotapi.EditMessageTextConf
 
 func onlyCallbackData(t *testing.T, edit tgbotapi.EditMessageTextConfig) string {
 	t.Helper()
-	if edit.ReplyMarkup == nil || len(edit.ReplyMarkup.InlineKeyboard) != 1 ||
-		len(edit.ReplyMarkup.InlineKeyboard[0]) != 1 {
+	datas := rowCallbackData(t, edit)
+	if len(datas) != 1 {
+		t.Fatalf("keyboard row buttons = %v, want exactly 1", datas)
+	}
+	return datas[0]
+}
+
+func rowCallbackData(t *testing.T, edit tgbotapi.EditMessageTextConfig) []string {
+	t.Helper()
+	if edit.ReplyMarkup == nil || len(edit.ReplyMarkup.InlineKeyboard) != 1 {
 		t.Fatalf("unexpected reply markup: %+v", edit.ReplyMarkup)
 	}
-	data := edit.ReplyMarkup.InlineKeyboard[0][0].CallbackData
-	if data == nil {
-		t.Fatal("callback data is nil")
+	row := edit.ReplyMarkup.InlineKeyboard[0]
+	datas := make([]string, 0, len(row))
+	for _, button := range row {
+		if button.CallbackData == nil {
+			t.Fatal("callback data is nil")
+		}
+		datas = append(datas, *button.CallbackData)
 	}
-	return *data
+	return datas
 }

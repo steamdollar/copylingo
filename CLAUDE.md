@@ -10,11 +10,11 @@
 
 1. Read [`AGENTS.md`](AGENTS.md) thoroughly — entry rules / role matrix / 3-case work protocol / decision criteria / coding rules
 2. Check [`STATUS.md`](STATUS.md) — assess how the current "🔨 In progress" items relate to the user's request
-3. Classify the user's request into **one of the 3 cases** in AGENTS.md §3, then start the corresponding procedure
+3. Classify the user's request per the **Case classification in AGENTS.md §3** (default **Case 0**; escalate explicitly to A/B/C), then start the corresponding procedure
 
 ---
 
 ## Claude Code-specific items
 
 - Claude Code and Codex are currently **equal main agents** (AGENTS.md §2). **There are no Claude-only procedures or exceptions** — follow AGENTS.md as-is.
-- Accumulate any meaningful capability differences or usage-pattern differences in this file as they are identified.
+- Accumulate **Claude-specific usage patterns** in this file as they are identified. Capability differences that both main agents should know about belong in AGENTS.md §2, not here.

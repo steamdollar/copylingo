@@ -26,10 +26,19 @@ llm:
 
 tts:
   enabled: true
-  cred_path: ""  # Google Cloud credentials JSON path
-  audio_dir: ./data/audio
+  model: gemini-2.5-flash-preview-tts  # Gemini native TTS (ADR-031); reuses llm.api_key
+  cred_path: ""        # (legacy GCP) unused by the Gemini native path
+  audio_dir: ./data/audio  # (legacy local FS) superseded by object storage (ADR-032)
   language_code: ja-JP
-  voice_name: ja-JP-Neural2-B
+  voice_name: Kore     # Gemini prebuilt voice (Kore/Puck/Zephyr/...)
+
+storage:               # S3-compatible object store for TTS audio (ADR-032)
+  endpoint: http://localhost:9000  # MinIO; empty => AWS S3 default endpoint
+  region: ap-northeast-2           # Seoul
+  bucket: copylingo-audio
+  access_key: minioadmin           # override via env in prod
+  secret_key: minioadmin           # override via env in prod
+  use_path_style: true             # true for MinIO, false for AWS S3
 
 schedule:
   content_collect_cron: "0 3 * * *"    # 매일 03:00 - 콘텐츠 수집

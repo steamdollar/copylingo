@@ -52,17 +52,20 @@ func TestBuildQuestionBatchInsertQuery(t *testing.T) {
 	if !strings.Contains(query, "material_id") {
 		t.Fatalf("query = %q, want material_id column", query)
 	}
-	if !strings.Contains(query, "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)") {
+	if !strings.Contains(query, "audio_script") {
+		t.Fatalf("query = %q, want audio_script column", query)
+	}
+	if !strings.Contains(query, "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)") {
 		t.Fatalf("query = %q, want first placeholder group", query)
 	}
-	if !strings.Contains(query, "($15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)") {
+	if !strings.Contains(query, "($16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)") {
 		t.Fatalf("query = %q, want second placeholder group", query)
 	}
 	if strings.Contains(query, "RETURNING id") {
 		t.Fatalf("query = %q, did not expect returning id clause", query)
 	}
-	if len(args) != 28 {
-		t.Fatalf("len(args) = %d, want 28", len(args))
+	if len(args) != 30 {
+		t.Fatalf("len(args) = %d, want 30", len(args))
 	}
 	gotQuestionKey, ok := args[0].(*string)
 	if !ok || gotQuestionKey == nil || *gotQuestionKey != questionKey {
@@ -114,12 +117,17 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 		"correct_answer",
 		"explanation",
 		"audio_path",
+		"audio_script",
 		"difficulty",
 	} {
 		want := column + " = EXCLUDED." + column
 		if !strings.Contains(query, want) {
 			t.Fatalf("query = %q, want update %q", query, want)
 		}
+	}
+	// audio_file_id is set post-hoc (SetAudioFileID), never via the seed upsert.
+	if strings.Contains(query, "audio_file_id = EXCLUDED.audio_file_id") {
+		t.Fatalf("query = %q, did not expect audio_file_id in upsert", query)
 	}
 	for _, runtimeColumn := range []string{
 		"times_served",
@@ -134,8 +142,8 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 			t.Fatalf("query = %q, did not expect runtime column update %q", query, runtimeColumn)
 		}
 	}
-	if len(args) != 14 {
-		t.Fatalf("len(args) = %d, want 14", len(args))
+	if len(args) != 15 {
+		t.Fatalf("len(args) = %d, want 15", len(args))
 	}
 }
 
@@ -147,6 +155,8 @@ func TestNewQuestionsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) 
 		"ump.times_studied > 0",
 		"q.next_review_at IS NULL",
 		"CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END",
+		// Listening questions must not be scheduled before their audio exists.
+		"q.category <> 'listening' OR q.audio_path IS NOT NULL",
 	} {
 		if !strings.Contains(newQuestionsForStudiedMaterialsQuery, want) {
 			t.Fatalf("query = %q, want %q", newQuestionsForStudiedMaterialsQuery, want)

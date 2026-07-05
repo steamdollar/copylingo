@@ -285,6 +285,11 @@ func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.
 	// and skipped so it never affects the session-push result above.
 	s.topUpTips(ctx, users)
 
+	// Listening-audio pre-generation is likewise decoupled and best-effort: it
+	// fills a bounded batch of missing clips per (language, level) each cycle so
+	// audio is ready before the next session that serves a listening question.
+	s.topUpAudio(ctx, users)
+
 	if failures > 0 {
 		return fmt.Errorf("%d session operations failed", failures)
 	}
@@ -324,6 +329,26 @@ func (s *Scheduler) topUpTips(ctx context.Context, users []model.User) {
 		if err := s.services.TipGenerator.TopUpBucket(ctx, p.Language, p.Level); err != nil {
 			slog.WarnContext(ctx, "Tip top-up failed",
 				"event", "scheduler.tip.topup_failed",
+				"language", p.Language,
+				"level", p.Level,
+				"error", err,
+			)
+			continue
+		}
+	}
+}
+
+// topUpAudio fills each distinct (language, level) bucket's missing listening
+// clips toward availability. A failure for one pair is logged and the loop
+// continues with the next pair.
+func (s *Scheduler) topUpAudio(ctx context.Context, users []model.User) {
+	if s.services.Audio == nil {
+		return
+	}
+	for _, p := range distinctLangLevelPairs(users) {
+		if err := s.services.Audio.TopUpAudio(ctx, p.Language, p.Level); err != nil {
+			slog.WarnContext(ctx, "Listening audio top-up failed",
+				"event", "scheduler.audio.topup_failed",
 				"language", p.Language,
 				"level", p.Level,
 				"error", err,

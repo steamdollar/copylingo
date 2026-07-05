@@ -94,12 +94,51 @@ const newQuestionsForStudiedMaterialsQuery = `
 		AND ($4 = '' OR q.category = $4)
 		AND NOT (q.id = ANY(COALESCE($5::int[], '{}')))
 		AND q.next_review_at IS NULL
+		-- Listening questions are only servable once their audio has been generated.
+		AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
 		ORDER BY
 			CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
 			q.difficulty ASC,
 			RANDOM()
 		LIMIT $6
 	`
+
+// GetListeningNeedingAudio returns listening questions that have a script but no
+// generated audio yet, oldest first, so the pre-generation pipeline can fill them
+// in bounded batches (ADR-031 push model). audio_file_id is ignored here — the
+// gate is audio_path (the object-store SSOT pointer).
+func (r *QuestionRepository) GetListeningNeedingAudio(
+	ctx context.Context,
+	language, level string,
+	limit int,
+) ([]model.Question, error) {
+	var questions []model.Question
+	err := r.db.SelectContext(ctx, &questions, `
+		SELECT * FROM questions
+		WHERE category = 'listening'
+		  AND language = $1 AND proficiency_level = $2
+		  AND audio_script IS NOT NULL AND audio_script <> ''
+		  AND audio_path IS NULL
+		ORDER BY created_at ASC
+		LIMIT $3
+	`, language, level, limit)
+	return questions, err
+}
+
+// SetAudioPath stores the object-store key produced for a question's audio.
+func (r *QuestionRepository) SetAudioPath(ctx context.Context, id int, audioPath string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE questions SET audio_path = $2 WHERE id = $1`, id, audioPath)
+	return err
+}
+
+// SetAudioFileID caches the Telegram file_id returned after the first upload so
+// later sends can reuse it (ADR-032). The object store remains the SSOT.
+func (r *QuestionRepository) SetAudioFileID(ctx context.Context, id int, fileID string) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE questions SET audio_file_id = $2 WHERE id = $1`, id, fileID)
+	return err
+}
 
 // GetDueReviews returns questions due for SRS review.
 func (r *QuestionRepository) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
@@ -176,19 +215,20 @@ func buildQuestionBatchUpsertQuery(questions []*model.Question) (string, []any) 
 			correct_answer = EXCLUDED.correct_answer,
 			explanation = EXCLUDED.explanation,
 			audio_path = EXCLUDED.audio_path,
+			audio_script = EXCLUDED.audio_script,
 			difficulty = EXCLUDED.difficulty
 	`
 	return query, args
 }
 
 func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
-	const columnCount = 14
+	const columnCount = 15
 
 	var query strings.Builder
 	query.WriteString(`
 		INSERT INTO questions (
 			question_key, content_id, material_id, type, item_type, language, proficiency_level,
-			category, prompt, options, correct_answer, explanation, audio_path, difficulty
+			category, prompt, options, correct_answer, explanation, audio_path, audio_script, difficulty
 		)
 		VALUES
 	`)
@@ -201,9 +241,9 @@ func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
 
 		base := i * columnCount
 		query.WriteString(fmt.Sprintf(
-			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7,
-			base+8, base+9, base+10, base+11, base+12, base+13, base+14,
+			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
+			base+9, base+10, base+11, base+12, base+13, base+14, base+15,
 		))
 
 		args = append(args,
@@ -220,6 +260,7 @@ func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
 			q.CorrectAnswer,
 			q.Explanation,
 			q.AudioPath,
+			q.AudioScript,
 			q.Difficulty,
 		)
 	}

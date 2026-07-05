@@ -88,7 +88,9 @@ CREATE TABLE IF NOT EXISTS questions (
     options         JSONB,                                      -- Array of option strings (for multiple choice)
     correct_answer  TEXT NOT NULL,
     explanation     TEXT NOT NULL DEFAULT '',
-    audio_path      TEXT,                                       -- Path to TTS audio file
+    audio_path      TEXT,                                       -- Object key in the S3-compatible store (ADR-032); NULL until TTS audio is generated
+    audio_script    TEXT,                                       -- Listening: the text synthesized into audio; sha256(audio_script) drives audio_path (ADR-031/032)
+    audio_file_id   TEXT,                                       -- Listening: cached Telegram file_id for re-sends; object store is SSOT, this is a cache (ADR-032)
     difficulty      INT NOT NULL DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 10),
     times_served    INT NOT NULL DEFAULT 0,
     times_correct   INT NOT NULL DEFAULT 0,
@@ -101,11 +103,20 @@ CREATE TABLE IF NOT EXISTS questions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Idempotent backfill of the listening-audio columns for databases created
+-- before ADR-031/032 (the CREATE TABLE above only applies on a fresh install).
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS audio_script  TEXT;
+ALTER TABLE questions ADD COLUMN IF NOT EXISTS audio_file_id TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_questions_next_review ON questions(next_review_at)
     WHERE next_review_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_questions_language_level ON questions(language, proficiency_level);
 CREATE INDEX IF NOT EXISTS idx_questions_material_id ON questions(material_id)
     WHERE material_id IS NOT NULL;
+-- Listening: cheap lookup of questions whose audio still needs generating.
+CREATE INDEX IF NOT EXISTS idx_questions_listening_pending_audio
+    ON questions(language, proficiency_level)
+    WHERE category = 'listening' AND audio_path IS NULL AND audio_script IS NOT NULL;
 
 -----------------------------------------------------------
 -- sessions (learning sessions)

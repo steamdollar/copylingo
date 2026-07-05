@@ -19,7 +19,7 @@
 #     clean           remove build artifacts
 #
 #   Docker / infra
-#     infra           start DB + Redis only
+#     infra           start DB + Redis + MinIO (object store for TTS audio)
 #     docker-up       full stack up -d
 #     docker-down     full stack down
 #     docker-build    full stack up -d --build
@@ -183,9 +183,10 @@ migrate:
 		psql -h localhost -U copylingo -d copylingo -v ON_ERROR_STOP=1 -f $$f || exit 1; \
 	done
 
-# Development: start infra only (DB + Redis)
+# Development: start infra only (DB + Redis + MinIO object store).
+# minio-createbucket is a one-shot that creates the audio bucket, then exits.
 infra:
-	docker compose up -d postgres redis
+	docker compose up -d postgres redis minio minio-createbucket
 
 # Development: start Cloudflare Quick Tunnel and update .env public base URL
 tunnel:
