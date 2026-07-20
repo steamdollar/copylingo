@@ -35,6 +35,18 @@ The project is designed around two goals:
 
 That means the project intentionally focuses on backend concerns such as data modeling, idempotent seeders, external API boundaries, logging, configuration, local infrastructure, and deployment reproducibility.
 
+## Engineering highlights
+
+- SQL-first PostgreSQL data access with sqlx, explicit queries, and versioned migrations
+- Idempotent seeders for reproducible learning-content generation
+- SRS-based session building and scheduled review flows
+- Gemini-powered exercise generation and native speech synthesis
+- PCM-to-OGG/Opus transcoding for Telegram voice delivery
+- Content-addressed audio caching in S3-compatible object storage
+- Telegram file ID reuse to avoid redundant audio uploads
+- Telegram Mini App validation, session ownership checks, and server-side handwriting grading
+- Structured JSON logging with interaction IDs across HTTP, Telegram updates, and scheduled jobs
+
 ## Architecture
 
 ```text
@@ -59,7 +71,7 @@ The Go server owns question generation orchestration, Telegram interaction handl
 | Language | Go 1.25 | Main backend application |
 | HTTP framework | Gin | Health checks, admin/API endpoints, Mini App endpoints |
 | Telegram | go-telegram-bot-api/v5 | Bot interactions and inline keyboard flows |
-| Database | PostgreSQL 16 | sqlx, raw SQL, ORM-free approach |
+| Database | PostgreSQL 16 | SQL-first access with sqlx, explicit queries, and versioned migrations |
 | Cache/runtime state | Redis 7 | Session/cache handling and runtime state |
 | Configuration | Viper | YAML + environment variable override |
 | Scheduler | robfig/cron/v3 | Batch jobs and scheduled learning flows |
@@ -70,21 +82,22 @@ The Go server owns question generation orchestration, Telegram interaction handl
 
 ## Local development
 
-The recommended local setup runs PostgreSQL and Redis through Docker, while the Go server runs directly on the host machine.
+The recommended local setup runs PostgreSQL, Redis, and MinIO through Docker while the Go server runs directly on the host machine. Host-based execution requires Go 1.25, the PostgreSQL client, and ffmpeg. The full Docker image already includes ffmpeg.
 
 ```bash
-# 1. Start local infrastructure
+# 1. Start PostgreSQL, Redis, MinIO, and the audio bucket initializer
 make infra
 
 # 2. Apply database migrations
 make migrate
 
-# 3. Seed study materials and questions
+# 3. Seed the current study materials and questions
+# The current seed package contains Japanese learning content.
 go run ./cmd/ja/seeder
 
 # 4. Run the Go server
 COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>" \
-COPYLINGO_LLM_API_KEY="<llm-api-key>" \
+COPYLINGO_LLM_API_KEY="<gemini-api-key>" \
 go run ./cmd/server
 ```
 
@@ -94,21 +107,38 @@ Or use:
 make run
 ```
 
-`config.yaml` defaults to local PostgreSQL and Redis endpoints:
+`config.yaml` provides local defaults for the infrastructure started by `make infra`:
 
 ```text
-localhost:5432
-localhost:6379
+PostgreSQL  localhost:5432
+Redis       localhost:6379
+MinIO       http://localhost:9000
+Bucket      copylingo-audio
 ```
 
-## Required environment variables
+## Runtime configuration
+
+Core variables:
 
 | Variable | Purpose |
 |---|---|
 | `COPYLINGO_TELEGRAM_TOKEN` | Telegram bot token |
-| `COPYLINGO_LLM_API_KEY` | LLM provider API key |
-| `COPYLINGO_LLM_MODEL` | LLM model name override |
-| `COPYLINGO_SERVER_PUBLIC_BASE_URL` | Public HTTPS base URL for Telegram Mini App flows |
+| `COPYLINGO_LLM_API_KEY` | Gemini API key used for exercise generation and native TTS |
+| `COPYLINGO_LLM_MODEL` | Exercise-generation model override |
+| `COPYLINGO_SERVER_PUBLIC_BASE_URL` | Public HTTPS base URL required for Telegram Mini App flows |
+
+Object storage can use the local MinIO defaults from `config.yaml` or be overridden for another S3-compatible service:
+
+| Variable | Purpose |
+|---|---|
+| `COPYLINGO_STORAGE_ENDPOINT` | S3-compatible endpoint; leave empty for the AWS S3 default |
+| `COPYLINGO_STORAGE_REGION` | Object-storage region |
+| `COPYLINGO_STORAGE_BUCKET` | Speech-audio bucket name |
+| `COPYLINGO_STORAGE_ACCESS_KEY` | Object-storage access key |
+| `COPYLINGO_STORAGE_SECRET_KEY` | Object-storage secret key |
+| `COPYLINGO_STORAGE_USE_PATH_STYLE` | Enables path-style addressing for MinIO-compatible services |
+
+Gemini native TTS reuses `COPYLINGO_LLM_API_KEY`; it does not require separate Google Cloud TTS credentials.
 
 For local Mini App testing, `COPYLINGO_SERVER_PUBLIC_BASE_URL` must point to a public HTTPS URL because mobile Telegram cannot access your machine's `localhost`.
 
@@ -125,7 +155,7 @@ Local test flow:
 
 ```bash
 export COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>"
-export COPYLINGO_LLM_API_KEY="<llm-api-key>"
+export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
 
 make infra
 make migrate
@@ -161,19 +191,20 @@ Example deployment setup:
 ```bash
 cat > .env <<'EOF'
 COPYLINGO_TELEGRAM_TOKEN=<telegram-bot-token>
-COPYLINGO_LLM_API_KEY=<llm-api-key>
+COPYLINGO_LLM_API_KEY=<gemini-api-key>
 COPYLINGO_SERVER_PUBLIC_BASE_URL=https://copylingo.example.com
 EOF
 
 docker compose up -d
 ```
 
-Compose startup order is guarded by health checks:
+Compose startup is guarded by health checks for the stateful dependencies, and a one-shot MinIO job creates the audio bucket:
 
 ```text
 PostgreSQL (healthy) ──┐
-                       ├──▶ Go server
-Redis      (healthy) ──┘
+Redis      (healthy) ──┼──▶ Go server
+MinIO      (healthy) ──┘
+          └──────────────▶ minio-createbucket (one-shot)
 ```
 
 ## Logging
@@ -212,7 +243,7 @@ Security note: tokens, Telegram `init_data`, raw user answers, and handwriting s
 
 | Command | Description |
 |---|---|
-| `make infra` | Start PostgreSQL and Redis containers only |
+| `make infra` | Start PostgreSQL, Redis, MinIO, and the audio bucket initializer |
 | `make run` | Run the Go server locally |
 | `make build` | Build binary to `bin/copylingo` |
 | `make migrate` | Apply database migrations |
