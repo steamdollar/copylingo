@@ -1,8 +1,8 @@
 # CopyLingo
 
-CopyLingo is a personal Japanese learning automation app built around Telegram.
+CopyLingo is a personal language-learning automation app built around Telegram.
 
-It is being built to manage Japanese study materials, generate practice exercises, deliver them through Telegram, grade user answers, and schedule review sessions with an SRS-style workflow. The project is both a real tool I use for my own study and a backend portfolio project focused on practical automation, data modeling, and service integration.
+It manages study materials, generates practice exercises, delivers them through Telegram, grades user answers, and schedules review sessions with an SRS-style workflow. I use the current deployment for Japanese study, while the study model, content pipeline, and delivery flow are designed to support additional target languages. The project is both a real tool and a backend portfolio project focused on practical automation, data modeling, and service integration.
 
 ## What it does
 
@@ -14,21 +14,23 @@ Study material → exercise generation → Telegram delivery → answer submissi
 
 Main capabilities:
 
-- Manages seeded Japanese study materials and generated practice questions
-- Generates Japanese practice exercises for vocabulary, kana, reading, and handwriting flows
+- Manages seeded language-learning materials and generated practice questions
+- Generates exercises for vocabulary, script recognition, reading, handwriting, and listening
 - Delivers questions through a Telegram bot with inline interactions
 - Supports Telegram Mini App based handwriting submissions
+- Generates listening audio with Gemini native TTS and transcodes raw PCM into Telegram-ready OGG/Opus
+- Caches speech audio in S3-compatible object storage and reuses Telegram file IDs
 - Stores learning materials, questions, sessions, and review state in PostgreSQL
 - Uses Redis for session/cache-related runtime state
 - Produces structured application logs with interaction IDs for debugging
 
-Planned content ingestion from external reading/JLPT sources is tracked separately in the roadmap and project documents.
+Planned content ingestion from external reading and language-proficiency sources is tracked separately in the roadmap and project documents.
 
 ## Why this project exists
 
 The project is designed around two goals:
 
-1. **Real personal use** — I use it as part of my Japanese study workflow.
+1. **Real personal use** — I use the current Japanese content as part of my daily study workflow, while the application model is not tied to a single target language.
 2. **Backend engineering portfolio** — implementation choices are evaluated as if the product could grow beyond a single-user tool.
 
 That means the project intentionally focuses on backend concerns such as data modeling, idempotent seeders, external API boundaries, logging, configuration, local infrastructure, and deployment reproducibility.
@@ -42,10 +44,13 @@ That means the project intentionally focuses on backend concerns such as data mo
           ├── PostgreSQL :5432
           ├── Redis :6379
           ├── Gemini API
-          └── Google Cloud TTS
+          │     ├── exercise generation
+          │     └── native TTS
+          ├── ffmpeg (PCM → OGG/Opus)
+          └── MinIO / S3-compatible object storage
 ```
 
-The Go server owns question generation orchestration, Telegram interaction handling, grading, review scheduling, Mini App endpoints, and supporting API calls.
+The Go server owns question generation orchestration, Telegram interaction handling, grading, review scheduling, Mini App endpoints, and supporting API calls. For listening exercises, it generates speech with Gemini native TTS, transcodes the audio with ffmpeg, stores it in S3-compatible object storage, and reuses cached Telegram file IDs.
 
 ## Tech stack
 
@@ -58,9 +63,10 @@ The Go server owns question generation orchestration, Telegram interaction handl
 | Cache/runtime state | Redis 7 | Session/cache handling and runtime state |
 | Configuration | Viper | YAML + environment variable override |
 | Scheduler | robfig/cron/v3 | Batch jobs and scheduled learning flows |
-| LLM runtime | Gemini | Exercise generation through an OpenAI-compatible endpoint |
-| TTS | Google Cloud TTS | Pre-generated and cached speech audio |
-| Infrastructure | Docker + Docker Compose | PostgreSQL, Redis, and app runtime |
+| LLM runtime | Gemini | Exercise generation through an OpenAI-compatible chat endpoint |
+| TTS | Gemini native TTS + ffmpeg | Pre-generated speech transcoded to OGG/Opus for Telegram |
+| Object storage | MinIO / S3-compatible storage | Content-addressed speech audio cache |
+| Infrastructure | Docker + Docker Compose | PostgreSQL, Redis, MinIO, and app runtime |
 
 ## Local development
 
