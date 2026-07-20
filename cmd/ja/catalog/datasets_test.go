@@ -1,6 +1,11 @@
 package catalog
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+
+	"github.com/lsj/copylingo/internal/model"
+)
 
 // Integrity regressions for the embedded datasets. The JSON files under data/
 // are the source of truth, so these checks catch a malformed or regressed file
@@ -61,6 +66,65 @@ func TestKana_Integrity(t *testing.T) {
 	for k, romaji := range KanaMap {
 		if k == "" || romaji == "" {
 			t.Errorf("kana entry %q→%q has an empty key or value", k, romaji)
+		}
+	}
+}
+
+func TestN5Listening_Integrity(t *testing.T) {
+	if len(N5ListeningQuestions) != 50 {
+		t.Fatalf("expected 50 listening questions, got %d", len(N5ListeningQuestions))
+	}
+
+	allowedSkills := map[model.Skill]bool{
+		model.SkillListeningTask:     true,
+		model.SkillListeningKeyPoint: true,
+		model.SkillListeningOutline:  true,
+	}
+	seenIDs := make(map[string]bool, len(N5ListeningQuestions))
+	seenScripts := make(map[string]bool, len(N5ListeningQuestions))
+	seenPrompts := make(map[string]bool, len(N5ListeningQuestions))
+	for i, question := range N5ListeningQuestions {
+		if wantID := fmt.Sprintf("n5_listening_%04d", i+1); question.ID != wantID {
+			t.Errorf("listening question %d ID = %q, want %q", i, question.ID, wantID)
+		}
+		if question.ID == "" || question.Script == "" || question.Prompt == "" ||
+			question.CorrectAnswer == "" || question.Explanation == "" {
+			t.Errorf("listening question %d (%q) has an empty required field", i, question.ID)
+		}
+		if seenIDs[question.ID] {
+			t.Errorf("duplicate listening ID %q", question.ID)
+		}
+		seenIDs[question.ID] = true
+		if seenScripts[question.Script] {
+			t.Errorf("duplicate listening script for %q", question.ID)
+		}
+		seenScripts[question.Script] = true
+		if seenPrompts[question.Prompt] {
+			t.Errorf("duplicate listening prompt for %q", question.ID)
+		}
+		seenPrompts[question.Prompt] = true
+		if !allowedSkills[question.Skill] {
+			t.Errorf("question %q has unsupported skill %q", question.ID, question.Skill)
+		}
+		if question.Difficulty < 1 || question.Difficulty > 3 {
+			t.Errorf("question %q has difficulty %d, want 1..3", question.ID, question.Difficulty)
+		}
+		if len(question.Options) != 4 {
+			t.Errorf("question %q has %d options, want 4", question.ID, len(question.Options))
+		}
+
+		seenOptions := make(map[string]bool, len(question.Options))
+		for _, option := range question.Options {
+			if option == "" {
+				t.Errorf("question %q has an empty option", question.ID)
+			}
+			if seenOptions[option] {
+				t.Errorf("question %q has duplicate option %q", question.ID, option)
+			}
+			seenOptions[option] = true
+		}
+		if !seenOptions[question.CorrectAnswer] {
+			t.Errorf("question %q correct answer %q is not in options", question.ID, question.CorrectAnswer)
 		}
 	}
 }

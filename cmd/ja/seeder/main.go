@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -28,10 +29,12 @@ const (
 type vocabWord = ja.VocabWord
 type grammarPoint = ja.GrammarPoint
 type vocabContext = ja.VocabContext
+type listeningQuestion = ja.ListeningQuestion
 
 var n5Words = ja.N5Words
 var n5GrammarPoints = ja.N5GrammarPoints
 var n5VocabContext = ja.N5VocabContext
+var n5ListeningQuestions = ja.N5ListeningQuestions
 
 func kanaScriptLabel(kana string) string {
 	return ja.ScriptLabel(kana)
@@ -109,12 +112,27 @@ func main() {
 	vocabularyQuestions := buildVocabularyQuestions(rng, n5Words, materialIDsByWordID)
 	vocabContextQuestions := buildVocabContextQuestions(rng, n5VocabContext, wordsByID(n5Words), materialIDsByWordID)
 	grammarQuestions := buildGrammarQuestions(rng, n5GrammarPoints, materialIDsByGrammarID)
-	questions := make([]*model.Question, 0,
-		len(kanaQuestions)+len(vocabularyQuestions)+len(vocabContextQuestions)+len(grammarQuestions))
+	listeningQuestions := buildListeningQuestions(n5ListeningQuestions)
+	questions := make(
+		[]*model.Question,
+		0,
+		len(
+			kanaQuestions,
+		)+len(
+			vocabularyQuestions,
+		)+len(
+			vocabContextQuestions,
+		)+len(
+			grammarQuestions,
+		)+len(
+			listeningQuestions,
+		),
+	)
 	questions = append(questions, kanaQuestions...)
 	questions = append(questions, vocabularyQuestions...)
 	questions = append(questions, vocabContextQuestions...)
 	questions = append(questions, grammarQuestions...)
+	questions = append(questions, listeningQuestions...)
 
 	if err := repos.Question.UpsertSeedBatch(ctx, questions); err != nil {
 		log.Printf("Failed to upsert Japanese questions batch: %v", err)
@@ -122,13 +140,37 @@ func main() {
 	}
 
 	log.Printf(
-		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d vocab_context=%d grammar=%d",
+		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d vocab_context=%d grammar=%d listening=%d",
 		len(questions),
 		len(kanaQuestions),
 		len(vocabularyQuestions),
 		len(vocabContextQuestions),
 		len(grammarQuestions),
+		len(listeningQuestions),
 	)
+}
+
+func buildListeningQuestions(items []listeningQuestion) []*model.Question {
+	questions := make([]*model.Question, 0, len(items))
+	for _, item := range items {
+		script := item.Script
+		question := &model.Question{
+			Type:             model.QuestionListening,
+			Skill:            model.SkillPtr(item.Skill),
+			Language:         vocabLanguage,
+			ProficiencyLevel: vocabProficiencyLevel,
+			Category:         model.CategoryListening,
+			Prompt:           item.Prompt,
+			Options:          mustJSON(item.Options),
+			CorrectAnswer:    item.CorrectAnswer,
+			Explanation:      item.Explanation,
+			AudioScript:      &script,
+			Difficulty:       item.Difficulty,
+		}
+		setQuestionKey(question, "ja:listening:"+item.ID)
+		questions = append(questions, question)
+	}
+	return questions
 }
 
 func buildKanaQuestions(materialIDsByKana map[string]int) []*model.Question {
@@ -285,7 +327,7 @@ func buildVocabularyQuestions(
 	words []vocabWord,
 	materialIDsByWordID map[string]int,
 ) []*model.Question {
-	questions := make([]*model.Question, 0, len(words)*3)
+	questions := make([]*model.Question, 0, len(words)*4)
 	for _, word := range words {
 		wordQuestions := []*model.Question{
 			buildKanaToMeaningQuestion(rng, word, words),
@@ -295,6 +337,11 @@ func buildVocabularyQuestions(
 		setQuestionKey(wordQuestions[0], vocabularyQuestionKey(word, "meaning"))
 		setQuestionKey(wordQuestions[1], vocabularyQuestionKey(word, "recall"))
 		setQuestionKey(wordQuestions[2], vocabularyQuestionKey(word, "handwriting"))
+		if shouldBuildKanjiRecallQuestion(word) {
+			kanjiRecall := buildKanjiRecallQuestion(word)
+			setQuestionKey(kanjiRecall, vocabularyQuestionKey(word, "kanji_recall"))
+			wordQuestions = append(wordQuestions, kanjiRecall)
+		}
 		if materialID, ok := materialIDsByWordID[word.ID]; ok {
 			for _, question := range wordQuestions {
 				question.MaterialID = &materialID
@@ -303,6 +350,37 @@ func buildVocabularyQuestions(
 		questions = append(questions, wordQuestions...)
 	}
 	return questions
+}
+
+func shouldBuildKanjiRecallQuestion(word vocabWord) bool {
+	if word.Kanji == word.Kana {
+		return false
+	}
+	for _, r := range word.Kanji {
+		if unicode.Is(unicode.Han, r) {
+			return true
+		}
+	}
+	return false
+}
+
+func buildKanjiRecallQuestion(word vocabWord) *model.Question {
+	return &model.Question{
+		Type:             model.QuestionFillBlank,
+		Skill:            model.SkillPtr(model.SkillVocabKanjiRecall),
+		Language:         vocabLanguage,
+		ProficiencyLevel: vocabProficiencyLevel,
+		Category:         model.CategoryVocabulary,
+		Prompt: fmt.Sprintf(
+			"뜻 <b>'%s'</b>, 읽기 <b>%s</b>에 해당하는 일본어 단어를 한자로 입력하세요",
+			word.MeaningKo,
+			word.Kana,
+		),
+		Options:       []byte("[]"),
+		CorrectAnswer: word.Kanji,
+		Explanation:   formatExplanation(word),
+		Difficulty:    vocabDifficulty,
+	}
 }
 
 // wordsByID indexes the vocabulary catalog by word ID for context-question lookups.

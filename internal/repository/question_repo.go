@@ -66,7 +66,7 @@ func (r *QuestionRepository) GetNewQuestions(
 	userID int64,
 	language, level, category string,
 	excludeIDs []int,
-	limit int,
+	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
 	err := r.db.SelectContext(
@@ -79,27 +79,48 @@ func (r *QuestionRepository) GetNewQuestions(
 		category,
 		pq.Array(excludeIDs),
 		limit,
+		kanjiRecallLimit,
 	)
 	return questions, err
 }
 
 const newQuestionsForStudiedMaterialsQuery = `
+		WITH candidates AS (
+			SELECT
+				q.id,
+				CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END AS material_priority,
+				q.difficulty,
+				RANDOM() AS random_order,
+				CASE WHEN q.item_type = 'vocab_kanji_recall' THEN
+					ROW_NUMBER() OVER (
+						PARTITION BY q.item_type
+						ORDER BY
+							CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
+							q.difficulty ASC,
+							RANDOM()
+					)
+				ELSE 1 END AS kanji_recall_rank
+			FROM questions q
+			LEFT JOIN user_material_progress ump
+				ON ump.material_id = q.material_id
+				AND ump.user_id = $1
+				AND ump.times_studied > 0
+			WHERE q.language = $2 AND q.proficiency_level = $3
+			AND ($4 = '' OR q.category = $4)
+			AND NOT (q.id = ANY(COALESCE($5::int[], '{}')))
+			AND q.next_review_at IS NULL
+			-- Listening questions are only servable once their audio has been generated.
+			AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
+		)
 		SELECT q.*
 		FROM questions q
-		LEFT JOIN user_material_progress ump
-			ON ump.material_id = q.material_id
-			AND ump.user_id = $1
-			AND ump.times_studied > 0
-		WHERE q.language = $2 AND q.proficiency_level = $3
-		AND ($4 = '' OR q.category = $4)
-		AND NOT (q.id = ANY(COALESCE($5::int[], '{}')))
-		AND q.next_review_at IS NULL
-		-- Listening questions are only servable once their audio has been generated.
-		AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
+		JOIN candidates candidate ON candidate.id = q.id
+		WHERE q.item_type IS DISTINCT FROM 'vocab_kanji_recall'
+			OR candidate.kanji_recall_rank <= $7
 		ORDER BY
-			CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
-			q.difficulty ASC,
-			RANDOM()
+			candidate.material_priority,
+			candidate.difficulty ASC,
+			candidate.random_order
 		LIMIT $6
 	`
 
@@ -141,23 +162,45 @@ func (r *QuestionRepository) SetAudioFileID(ctx context.Context, id int, fileID 
 }
 
 // GetDueReviews returns questions due for SRS review.
-func (r *QuestionRepository) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
+func (r *QuestionRepository) GetDueReviews(
+	ctx context.Context,
+	userID int64,
+	limit, kanjiRecallLimit int,
+) ([]model.Question, error) {
 	var questions []model.Question
-	err := r.db.SelectContext(ctx, &questions, dueReviewsForStudiedMaterialsQuery, userID, limit)
+	err := r.db.SelectContext(ctx, &questions, dueReviewsForStudiedMaterialsQuery, userID, limit, kanjiRecallLimit)
 	return questions, err
 }
 
 const dueReviewsForStudiedMaterialsQuery = `
+		WITH candidates AS (
+			SELECT
+				q.id,
+				CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END AS material_priority,
+				q.next_review_at,
+				CASE WHEN q.item_type = 'vocab_kanji_recall' THEN
+					ROW_NUMBER() OVER (
+						PARTITION BY q.item_type
+						ORDER BY
+							CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
+							q.next_review_at ASC
+					)
+				ELSE 1 END AS kanji_recall_rank
+			FROM questions q
+			LEFT JOIN user_material_progress ump
+				ON ump.material_id = q.material_id
+				AND ump.user_id = $1
+				AND ump.times_studied > 0
+			WHERE q.next_review_at IS NOT NULL AND q.next_review_at <= NOW()
+		)
 		SELECT q.*
 		FROM questions q
-		LEFT JOIN user_material_progress ump
-			ON ump.material_id = q.material_id
-			AND ump.user_id = $1
-			AND ump.times_studied > 0
-		WHERE q.next_review_at IS NOT NULL AND q.next_review_at <= NOW()
+		JOIN candidates candidate ON candidate.id = q.id
+		WHERE q.item_type IS DISTINCT FROM 'vocab_kanji_recall'
+			OR candidate.kanji_recall_rank <= $3
 		ORDER BY
-			CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
-			q.next_review_at ASC
+			candidate.material_priority,
+			candidate.next_review_at ASC
 		LIMIT $2
 	`
 

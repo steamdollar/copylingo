@@ -38,6 +38,7 @@ const (
 	SkillKanaHandwriting  Skill = "kana_handwriting"
 	SkillVocabMeaning     Skill = "vocab_meaning"
 	SkillVocabRecall      Skill = "vocab_recall"
+	SkillVocabKanjiRecall Skill = "vocab_kanji_recall"
 	SkillVocabHandwriting Skill = "vocab_handwriting"
 
 	// JLPT official-style taxonomy.

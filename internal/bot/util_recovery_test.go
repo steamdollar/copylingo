@@ -61,7 +61,7 @@ func (e *emptyQuestionFetcher) GetNewQuestions(
 	userID int64,
 	language, level, category string,
 	excludeIDs []int,
-	limit int,
+	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	return nil, nil
 }

@@ -544,14 +544,18 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 	}
 
 	questions := buildVocabularyQuestions(rand.New(rand.NewSource(1)), n5Words, materialIDsByWordID)
-	if len(questions) != 1620 {
-		t.Fatalf("len(questions) = %d, want 1620", len(questions))
+	if len(questions) != 2051 {
+		t.Fatalf("len(questions) = %d, want 2051", len(questions))
 	}
 
 	countByType := map[model.QuestionType]int{}
+	countBySkill := map[model.Skill]int{}
 	seenKeys := make(map[string]bool, len(questions))
 	for _, q := range questions {
 		countByType[q.Type]++
+		if q.Skill != nil {
+			countBySkill[*q.Skill]++
+		}
 		if q.Language != vocabLanguage || q.ProficiencyLevel != vocabProficiencyLevel ||
 			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
 			t.Fatalf("unexpected question metadata: %+v", q)
@@ -571,20 +575,74 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 	if countByType[model.QuestionMultipleChoice] != 540 {
 		t.Fatalf("multiple_choice count = %d, want 540", countByType[model.QuestionMultipleChoice])
 	}
-	if countByType[model.QuestionFillBlank] != 540 {
-		t.Fatalf("fill_blank count = %d, want 540", countByType[model.QuestionFillBlank])
+	if countByType[model.QuestionFillBlank] != 971 {
+		t.Fatalf("fill_blank count = %d, want 971", countByType[model.QuestionFillBlank])
 	}
 	if countByType[model.QuestionKanaHandwriting] != 540 {
 		t.Fatalf("kana_handwriting count = %d, want 540", countByType[model.QuestionKanaHandwriting])
 	}
+	if countBySkill[model.SkillVocabKanjiRecall] != 431 {
+		t.Fatalf("vocab_kanji_recall count = %d, want 431", countBySkill[model.SkillVocabKanjiRecall])
+	}
 	for _, key := range []string{
-		"ja:vocab:word_001:meaning",
-		"ja:vocab:word_001:recall",
-		"ja:vocab:word_001:handwriting",
+		"ja:vocab:n5_word_001:meaning",
+		"ja:vocab:n5_word_001:recall",
+		"ja:vocab:n5_word_001:handwriting",
+		"ja:vocab:n5_word_001:kanji_recall",
 	} {
 		if !seenKeys[key] {
 			t.Fatalf("question_key %q not found", key)
 		}
+	}
+}
+
+func TestBuildKanjiRecallQuestion(t *testing.T) {
+	t.Parallel()
+
+	word := vocabWord{
+		ID:        "n5_word_001",
+		Kana:      "わたし",
+		Kanji:     "私",
+		MeaningKo: "나",
+	}
+	question := buildKanjiRecallQuestion(word)
+
+	if question.Type != model.QuestionFillBlank || question.Skill == nil ||
+		*question.Skill != model.SkillVocabKanjiRecall || question.Category != model.CategoryVocabulary {
+		t.Fatalf("unexpected question metadata: %+v", question)
+	}
+	if question.CorrectAnswer != word.Kanji {
+		t.Fatalf("correct_answer = %q, want %q", question.CorrectAnswer, word.Kanji)
+	}
+	for _, want := range []string{word.MeaningKo, word.Kana, "한자"} {
+		if !strings.Contains(question.Prompt, want) {
+			t.Fatalf("prompt %q does not contain %q", question.Prompt, want)
+		}
+	}
+}
+
+func TestShouldBuildKanjiRecallQuestion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		word vocabWord
+		want bool
+	}{
+		{name: "single kanji", word: vocabWord{Kana: "わたし", Kanji: "私"}, want: true},
+		{name: "mixed okurigana", word: vocabWord{Kana: "たべる", Kanji: "食べる"}, want: true},
+		{name: "kana only", word: vocabWord{Kana: "テレビ", Kanji: "テレビ"}, want: false},
+		{name: "different without han", word: vocabWord{Kana: "すみません", Kanji: "スミマセン"}, want: false},
+		{name: "empty kanji", word: vocabWord{Kana: "ある"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldBuildKanjiRecallQuestion(tt.word); got != tt.want {
+				t.Fatalf("shouldBuildKanjiRecallQuestion(%+v) = %t, want %t", tt.word, got, tt.want)
+			}
+		})
 	}
 }
 
@@ -625,10 +683,10 @@ func TestBuildGrammarQuestions(t *testing.T) {
 		t.Fatalf("multiple_choice count = %d, want 160", countByType[model.QuestionMultipleChoice])
 	}
 	for _, key := range []string{
-		"ja:grammar:001:meaning",
-		"ja:grammar:001:form",
-		"ja:grammar:060:meaning",
-		"ja:grammar:060:form",
+		"ja:grammar:n5_grammar_001:meaning",
+		"ja:grammar:n5_grammar_001:form",
+		"ja:grammar:n5_grammar_060:meaning",
+		"ja:grammar:n5_grammar_060:form",
 	} {
 		if !seenKeys[key] {
 			t.Fatalf("question_key %q not found", key)
@@ -696,12 +754,61 @@ func TestBuildVocabContextQuestions(t *testing.T) {
 	}
 
 	for _, key := range []string{
-		"ja:vocab:word_024:context:1",
-		"ja:vocab:word_024:context:3",
-		"ja:vocab:word_092:context:1",
+		"ja:vocab:n5_word_024:context:1",
+		"ja:vocab:n5_word_024:context:3",
+		"ja:vocab:n5_word_092:context:1",
 	} {
 		if !seenKeys[key] {
 			t.Fatalf("question_key %q not found", key)
+		}
+	}
+}
+
+func TestBuildListeningQuestions(t *testing.T) {
+	t.Parallel()
+
+	questions := buildListeningQuestions(n5ListeningQuestions)
+	if len(questions) != 50 {
+		t.Fatalf("len(questions) = %d, want 50", len(questions))
+	}
+
+	seenKeys := make(map[string]bool, len(questions))
+	for i, question := range questions {
+		item := n5ListeningQuestions[i]
+		if question.Type != model.QuestionListening || question.Category != model.CategoryListening ||
+			question.Language != vocabLanguage || question.ProficiencyLevel != vocabProficiencyLevel {
+			t.Fatalf("question %d has unexpected metadata: %+v", i, question)
+		}
+		if question.Skill == nil || *question.Skill != item.Skill {
+			t.Fatalf("question %d skill = %v, want %q", i, question.Skill, item.Skill)
+		}
+		if question.AudioScript == nil || *question.AudioScript != item.Script {
+			t.Fatalf("question %d audio_script = %v, want %q", i, question.AudioScript, item.Script)
+		}
+		if question.AudioPath != nil || question.AudioFileID != nil || question.MaterialID != nil {
+			t.Fatalf("question %d has unexpected generated/cache/material fields: %+v", i, question)
+		}
+		if question.CorrectAnswer != item.CorrectAnswer || question.Difficulty != item.Difficulty {
+			t.Fatalf("question %d content mapping mismatch: %+v", i, question)
+		}
+		if question.QuestionKey == nil {
+			t.Fatalf("question %d question_key is nil", i)
+		}
+		wantKey := "ja:listening:" + item.ID
+		if *question.QuestionKey != wantKey {
+			t.Fatalf("question %d question_key = %q, want %q", i, *question.QuestionKey, wantKey)
+		}
+		if seenKeys[*question.QuestionKey] {
+			t.Fatalf("duplicate question_key %q", *question.QuestionKey)
+		}
+		seenKeys[*question.QuestionKey] = true
+
+		options, err := question.GetOptions()
+		if err != nil {
+			t.Fatalf("question %d options: %v", i, err)
+		}
+		if len(options) != len(item.Options) {
+			t.Fatalf("question %d options len = %d, want %d", i, len(options), len(item.Options))
 		}
 	}
 }
@@ -710,7 +817,7 @@ func TestVocabularyMaterialKey(t *testing.T) {
 	t.Parallel()
 
 	word := vocabWord{ID: "n5_word_024"}
-	if got, want := vocabularyMaterialKey(word), "ja:vocab:word_024"; got != want {
+	if got, want := vocabularyMaterialKey(word), "ja:vocab:n5_word_024"; got != want {
 		t.Fatalf("vocabularyMaterialKey = %q, want %q", got, want)
 	}
 }
@@ -719,7 +826,7 @@ func TestGrammarMaterialKey(t *testing.T) {
 	t.Parallel()
 
 	point := grammarPoint{ID: "n5_grammar_009"}
-	if got, want := grammarMaterialKey(point), "ja:grammar:009"; got != want {
+	if got, want := grammarMaterialKey(point), "ja:grammar:n5_grammar_009"; got != want {
 		t.Fatalf("grammarMaterialKey = %q, want %q", got, want)
 	}
 }
@@ -733,8 +840,8 @@ func TestLoadVocabularyMaterialIDs(t *testing.T) {
 	}
 	store := fakeVocabularyMaterialStore{
 		materials: []model.Material{
-			{ID: 10, MaterialKey: "ja:vocab:word_001"},
-			{ID: 24, MaterialKey: "ja:vocab:word_024"},
+			{ID: 10, MaterialKey: "ja:vocab:n5_word_001"},
+			{ID: 24, MaterialKey: "ja:vocab:n5_word_024"},
 		},
 	}
 
@@ -759,7 +866,7 @@ func TestLoadVocabularyMaterialIDsMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("loadVocabularyMaterialIDs error = nil, want missing material error")
 	}
-	if !strings.Contains(err.Error(), "ja:vocab:word_024") {
+	if !strings.Contains(err.Error(), "ja:vocab:n5_word_024") {
 		t.Fatalf("error = %q, want missing material key", err)
 	}
 }
@@ -773,8 +880,8 @@ func TestLoadGrammarMaterialIDs(t *testing.T) {
 	}
 	store := fakeGrammarMaterialStore{
 		materials: []model.Material{
-			{ID: 10, MaterialKey: "ja:grammar:001"},
-			{ID: 90, MaterialKey: "ja:grammar:009"},
+			{ID: 10, MaterialKey: "ja:grammar:n5_grammar_001"},
+			{ID: 90, MaterialKey: "ja:grammar:n5_grammar_009"},
 		},
 	}
 
@@ -799,7 +906,7 @@ func TestLoadGrammarMaterialIDsMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("loadGrammarMaterialIDs error = nil, want missing material error")
 	}
-	if !strings.Contains(err.Error(), "ja:grammar:009") {
+	if !strings.Contains(err.Error(), "ja:grammar:n5_grammar_009") {
 		t.Fatalf("error = %q, want missing material key", err)
 	}
 }

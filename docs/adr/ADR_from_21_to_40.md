@@ -329,3 +329,55 @@
 - **ADR-032**: 청해 음성 = S3 호환 object storage(content-addressed dedup) + Telegram `file_id` 재전송 (MinIO 로컬 / S3-서울 prod, R2 기각)
 
 → [ADR-031_032_listening_audio_pipeline.md](ADR-031_032_listening_audio_pipeline.md)
+
+---
+
+## ADR-033: Vocabulary Kanji Recall은 FillBlank Skill로 추가하고 세션당 3개로 제한
+
+- **날짜**: 2026-07-18
+- **상태**: 채택됨
+- **맥락**:
+  - N5 Vocabulary Material은 `kana`, `kanji`, `meaning_ko`를 이미 가지지만, Quiz는 뜻→かな recall만 요구해 한자 표기를 직접 회상하는 문항이 없다.
+  - `questions.type`은 rendering/grading mode, `item_type`은 측정 skill이라는 ADR-026 계약을 유지해야 한다.
+  - 한자 직접 입력을 한 세션에 많이 노출하면 오답 밀집으로 학습 UX가 악화되므로 세션당 상한이 필요하다.
+- **결정**:
+  - 새 rendering/grading `QuestionType`은 추가하지 않고 exact-match text input인 `fill_blank`를 재사용한다.
+  - 새 skill `vocab_kanji_recall`을 추가하고 category는 기존 Material과 같은 `vocabulary`로 유지한다.
+  - 생성 대상은 `kanji != kana`이면서 Unicode Han 문자를 1개 이상 포함한 Vocabulary catalog row로 한정한다. Prompt에 한국어 뜻과 かな 읽기를 함께 보여 동음이의어 모호성을 줄이고, 정답은 catalog `kanji`로 한다.
+  - Question key는 `ja:vocab:<dataset_id>:kanji_recall`로 고정하고, 기존 `UpsertSeedBatch` conflict update로 재실행 멱등성을 보장한다.
+  - `vocab_kanji_recall`은 morning/evening/review 세션 전체에서 최대 3개다. Repository query가 남은 budget만큼만 candidate를 eligible로 만들어 non-kanji로 backfill하고, Session Builder admission gate가 최종 invariant를 다시 검증한다.
+- **장점**:
+  - 기존 Material SSOT·text input·exact grader·seed upsert를 재사용해 schema와 bot flow 변경 없이 학습 축을 확장한다.
+  - Query-side budget이 `LIMIT` 앞에 적용되므로 많은 overdue 한자 문항이 non-kanji review를 밀어내는 starvation을 피한다.
+  - Skill 단위 cap이라 기존 vocabulary 최소 1/3 예약 정책과 broad category analytics를 유지한다.
+- **단점 / 트레이드오프**:
+  - Repository·SRS·Session Builder 계약에 kanji budget parameter가 추가된다. 현재는 하나의 UX 상한만 있어 generic policy abstraction은 도입하지 않는다.
+  - Exact match는 이체자·복수 표기·Unicode normalization을 허용하지 않는다. 현재는 catalog의 단일 SSOT 정답을 학습하는 문항이라 수용한다.
+- **대안**:
+  - 새 `QuestionType`: 풀이 방식은 기존 `fill_blank`와 동일해 ADR-026의 축 분리를 깨므로 기각.
+  - `kanji_reading` skill 재사용: 한자→읽기와 뜻/읽기→한자는 측정 방향이 달라 analytics를 오염시키므로 기각.
+  - Session Builder에서만 사후 filtering: repository `LIMIT` 결과가 한자 문항으로 채워지면 세션 부족과 overdue starvation이 발생해 기각.
+
+---
+
+## ADR-034: 초기 Listening 콘텐츠는 Question-only Quiz Seed로 검증하고 Material-first Study는 후속 결정으로 둔다
+
+- **날짜**: 2026-07-20
+- **상태**: 채택됨
+- **맥락**:
+  - ADR-031/032로 Gemini native TTS→S3/MinIO→Telegram voice 파이프라인은 구현됐지만 실제 listening 문항이 0건이라 live e2e가 미검증이었다.
+  - Listening을 Study Material SSOT로 먼저 모델링하면 학습→Quiz 연결은 자연스럽지만, `materials` audio metadata와 Study renderer/lifecycle까지 새로 설계해야 해 샘플 5문항 검증 범위를 크게 넘는다.
+- **결정**:
+  - 초기 5문항은 `material_id = NULL`인 Question-only original N5 comprehension MCQ로 seed한다. 기출/교재를 복제하지 않고 가격·시간·장소·행동·순서 정보를 다룬다.
+  - `type=listening`, `category=listening`, `audio_script`, 4개 options, exact-match `correct_answer`, listening skill을 정적 JSON에서 멱등 `question_key`로 upsert한다.
+  - 이번 단계의 완료 기준은 5개 TTS 생성·object path 저장과 Telegram voice/MCQ/채점/`audio_file_id` cache의 live smoke다.
+  - Listening Study Material SSOT와 Quiz `material_id` 연결은 이번 결정에 포함하지 않는다. 해당 기능을 추진할 때 audio asset 소유권과 Study 공개 UX를 별도 Case A로 결정한다.
+- **장점**:
+  - 기존 audio/render/grader pipeline을 그대로 검증해 신규 schema나 hot-path 변경 없이 end-to-end 공백을 닫는다.
+  - original seed라 저작권 위험이 없고, JSON integrity test로 필수 필드·skill·난이도·4지선다·정답 포함을 고정한다.
+- **단점 / 트레이드오프**:
+  - 현재 5문항은 Study 이력 우선순위를 받지 못하며 Quiz에서 바로 출제된다.
+  - 향후 Material-first 도입 시 content SSOT와 audio metadata 위치를 다시 정하고 seed를 연결해야 한다.
+- **대안**:
+  - Material-first를 즉시 구현: 장기 학습 흐름은 좋지만 이번 smoke에 Study domain/schema/renderer 변경까지 결합해 기각.
+  - 기존 pipeline 단위 테스트만 유지: 실제 Gemini/ffmpeg/MinIO/Telegram 경계를 검증하지 못해 기각.

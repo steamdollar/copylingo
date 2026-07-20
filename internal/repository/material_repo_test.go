@@ -19,7 +19,7 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 			Difficulty:       1,
 		},
 		{
-			MaterialKey:      "ja:vocab:word_024",
+			MaterialKey:      "ja:vocab:n5_word_024",
 			Category:         model.MaterialCategoryVocabulary,
 			Language:         "ja",
 			ProficiencyLevel: "N5",

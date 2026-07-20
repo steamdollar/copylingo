@@ -46,13 +46,17 @@ func (m *mockGraderActiveSession) Delete(ctx context.Context, sessionID int) err
 }
 
 type mockSRS struct {
-	getDueReviewsFn func(ctx context.Context, userID int64, limit int) ([]model.Question, error)
+	getDueReviewsFn func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
 	getDueCountFn   func(ctx context.Context) (int, error)
 	processAnswerFn func(ctx context.Context, q *model.Question, isCorrect bool) error
 }
 
-func (m *mockSRS) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, userID, limit)
+func (m *mockSRS) GetDueReviews(
+	ctx context.Context,
+	userID int64,
+	limit, kanjiRecallLimit int,
+) ([]model.Question, error) {
+	return m.getDueReviewsFn(ctx, userID, limit, kanjiRecallLimit)
 }
 func (m *mockSRS) GetDueCount(ctx context.Context) (int, error) {
 	return m.getDueCountFn(ctx)

@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+
+	"github.com/lsj/copylingo/internal/model"
 )
 
 // The JSON files under data/ are the content source of truth; question- and
@@ -20,6 +22,9 @@ var n5GrammarJSON []byte
 
 //go:embed data/n5_vocab_context.json
 var n5VocabContextJSON []byte
+
+//go:embed data/n5_listening.json
+var n5ListeningJSON []byte
 
 const (
 	VocabLanguage         = "ja"
@@ -64,6 +69,19 @@ type VocabContext struct {
 	Clozes        []string `json:"clozes"`
 }
 
+// ListeningQuestion is an original N5 listening-comprehension MCQ. Script is
+// synthesized into audio and is intentionally separate from the visible prompt.
+type ListeningQuestion struct {
+	ID            string      `json:"id"`
+	Skill         model.Skill `json:"skill"`
+	Script        string      `json:"script"`
+	Prompt        string      `json:"prompt"`
+	Options       []string    `json:"options"`
+	CorrectAnswer string      `json:"correct_answer"`
+	Explanation   string      `json:"explanation"`
+	Difficulty    int         `json:"difficulty"`
+}
+
 // KanaMap maps each kana to its romaji. Script-label and hint logic lives in Go.
 var KanaMap = mustLoadJSON[map[string]string]("kana", kanaJSON)
 
@@ -75,6 +93,9 @@ var N5GrammarPoints = mustLoadJSON[[]GrammarPoint]("n5_grammar", n5GrammarJSON)
 
 // N5VocabContext is the N5 vocabulary 文脈規定 catalog (partial coverage).
 var N5VocabContext = mustLoadJSON[[]VocabContext]("n5_vocab_context", n5VocabContextJSON)
+
+// N5ListeningQuestions is the original N5 listening-comprehension catalog.
+var N5ListeningQuestions = mustLoadJSON[[]ListeningQuestion]("n5_listening", n5ListeningJSON)
 
 // loadJSON decodes an embedded dataset into T.
 func loadJSON[T any](name string, data []byte) (T, error) {

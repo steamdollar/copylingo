@@ -11,6 +11,7 @@ import (
 
 const (
 	maxPerCategory                = 6
+	maxKanjiRecallPerSession      = 3
 	minVocabularyRatioDenominator = 3
 )
 
@@ -31,7 +32,7 @@ type questionFetcher interface {
 		userID int64,
 		language, level, category string,
 		excludeIDs []int,
-		limit int,
+		limit, kanjiRecallLimit int,
 	) ([]model.Question, error)
 	GetByID(ctx context.Context, id int) (*model.Question, error)
 }
@@ -115,6 +116,7 @@ func (s *SessionBuilderService) buildSession(
 	selectedQuestionIDs := make(map[int]struct{}, totalQuestions)
 	excludeIDs := make([]int, 0, totalQuestions)
 	order := 0
+	kanjiRecallCount := 0
 	reservedVocabularyCount := 0
 	if language != "" && level != "" {
 		reservedVocabularyCount = divideRoundingUp(totalQuestions, minVocabularyRatioDenominator)
@@ -123,17 +125,23 @@ func (s *SessionBuilderService) buildSession(
 		}
 	}
 
-	appendQuestion := func(questionID int, isReview bool) bool {
-		if _, exists := selectedQuestionIDs[questionID]; exists {
+	appendQuestion := func(question model.Question, isReview bool) bool {
+		if _, exists := selectedQuestionIDs[question.ID]; exists {
 			return false
 		}
-		selectedQuestionIDs[questionID] = struct{}{}
-		excludeIDs = append(excludeIDs, questionID)
+		if isKanjiRecallQuestion(question) && kanjiRecallCount >= maxKanjiRecallPerSession {
+			return false
+		}
+		selectedQuestionIDs[question.ID] = struct{}{}
+		excludeIDs = append(excludeIDs, question.ID)
 		sessionQuestions = append(sessionQuestions, model.SessionQuestion{
-			QuestionID:    questionID,
+			QuestionID:    question.ID,
 			QuestionOrder: order,
 			IsReview:      isReview,
 		})
+		if isKanjiRecallQuestion(question) {
+			kanjiRecallCount++
+		}
 		order++
 		return true
 	}
@@ -141,12 +149,12 @@ func (s *SessionBuilderService) buildSession(
 	// 1. Get review questions from SRS (due reviews)
 	// TODO: language 별로 가져와야 하는거 아닌가?
 	if reviewCount > 0 {
-		reviews, err := s.srs.GetDueReviews(ctx, userID, reviewCount)
+		reviews, err := s.srs.GetDueReviews(ctx, userID, reviewCount, maxKanjiRecallPerSession)
 		if err != nil {
 			log.Printf("Error getting due reviews: %v", err)
 		} else {
 			for _, q := range reviews {
-				appendQuestion(q.ID, true)
+				appendQuestion(q, true)
 			}
 		}
 	}
@@ -155,13 +163,20 @@ func (s *SessionBuilderService) buildSession(
 	// If vocabulary inventory is short, the relay below fills the remaining slots.
 	if reservedVocabularyCount > 0 {
 		newQs, err := s.questionRepo.GetNewQuestions(
-			ctx, userID, language, level, string(model.CategoryVocabulary), excludeIDs, reservedVocabularyCount,
+			ctx,
+			userID,
+			language,
+			level,
+			string(model.CategoryVocabulary),
+			excludeIDs,
+			reservedVocabularyCount,
+			maxKanjiRecallPerSession-kanjiRecallCount,
 		)
 		if err != nil {
 			log.Printf("Error getting reserved vocabulary questions: %v", err)
 		} else {
 			for _, q := range newQs {
-				appendQuestion(q.ID, false)
+				appendQuestion(q, false)
 			}
 		}
 	}
@@ -197,7 +212,16 @@ func (s *SessionBuilderService) buildSession(
 			}
 
 			if alloc > 0 {
-				newQs, err := s.questionRepo.GetNewQuestions(ctx, userID, language, level, cat, excludeIDs, alloc)
+				newQs, err := s.questionRepo.GetNewQuestions(
+					ctx,
+					userID,
+					language,
+					level,
+					cat,
+					excludeIDs,
+					alloc,
+					maxKanjiRecallPerSession-kanjiRecallCount,
+				)
 				if err != nil {
 					log.Printf("Error getting new questions for category %s: %v", cat, err)
 					continue
@@ -205,7 +229,7 @@ func (s *SessionBuilderService) buildSession(
 
 				added := 0
 				for _, q := range newQs {
-					if appendQuestion(q.ID, false) {
+					if appendQuestion(q, false) {
 						added++
 					}
 				}
@@ -241,6 +265,10 @@ func (s *SessionBuilderService) buildSession(
 	}
 
 	return session, nil
+}
+
+func isKanjiRecallQuestion(question model.Question) bool {
+	return question.Skill != nil && *question.Skill == model.SkillVocabKanjiRecall
 }
 
 func divideRoundingUp(dividend, divisor int) int {

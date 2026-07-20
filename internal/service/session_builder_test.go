@@ -10,7 +10,7 @@ import (
 )
 
 type mockQuestionFetcher struct {
-	getNewQuestionsFn func(ctx context.Context, userID int64, language, level, category string, excludeIDs []int, limit int) ([]model.Question, error)
+	getNewQuestionsFn func(ctx context.Context, userID int64, language, level, category string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error)
 	getByIDFn         func(ctx context.Context, id int) (*model.Question, error)
 }
 
@@ -19,9 +19,9 @@ func (m *mockQuestionFetcher) GetNewQuestions(
 	userID int64,
 	lang, level, cat string,
 	excludeIDs []int,
-	limit int,
+	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return m.getNewQuestionsFn(ctx, userID, lang, level, cat, excludeIDs, limit)
+	return m.getNewQuestionsFn(ctx, userID, lang, level, cat, excludeIDs, limit, kanjiRecallLimit)
 }
 func (m *mockQuestionFetcher) GetByID(ctx context.Context, id int) (*model.Question, error) {
 	return m.getByIDFn(ctx, id)
@@ -76,7 +76,7 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 	userID := int64(123)
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
@@ -90,7 +90,7 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 	collectedNewCount := 0
 	getNewQuestionsCalls := 0
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
@@ -164,7 +164,7 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 	userID := int64(123)
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
@@ -175,7 +175,7 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
@@ -227,12 +227,12 @@ func TestBuildEveningSession_FillsVocabularyShortageWithRelay(t *testing.T) {
 	vocabularyCalls := 0
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return []model.Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if cat == string(model.CategoryVocabulary) {
 				vocabularyCalls++
 				if vocabularyCalls == 1 {
@@ -275,7 +275,7 @@ func TestBuildReviewSession_OnlySRS(t *testing.T) {
 	userID := int64(123)
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
@@ -306,18 +306,153 @@ func TestBuildReviewSession_OnlySRS(t *testing.T) {
 	}
 }
 
+func TestBuildReviewSession_CapsKanjiRecallAdmissionAtThree(t *testing.T) {
+	ctx := context.Background()
+	kanjiSkill := model.SkillVocabKanjiRecall
+	due := []model.Question{
+		{ID: 1, Skill: &kanjiSkill},
+		{ID: 2, Skill: &kanjiSkill},
+		{ID: 3, Skill: &kanjiSkill},
+		{ID: 4, Skill: &kanjiSkill},
+		{ID: 5, Skill: &kanjiSkill},
+		{ID: 6},
+		{ID: 7},
+	}
+
+	srsMock := &mockSRS{
+		getDueReviewsFn: func(
+			ctx context.Context,
+			userID int64,
+			limit, kanjiRecallLimit int,
+		) ([]model.Question, error) {
+			if limit != 10 || kanjiRecallLimit != maxKanjiRecallPerSession {
+				t.Fatalf(
+					"GetDueReviews limit=%d kanjiRecallLimit=%d, want 10,%d",
+					limit,
+					kanjiRecallLimit,
+					maxKanjiRecallPerSession,
+				)
+			}
+			return due, nil
+		},
+	}
+	sStore := &mockSessionStore{
+		createSessionFn: func(ctx context.Context, session *model.Session) error {
+			session.ID = 10
+			return nil
+		},
+	}
+	sqStore := &mockSessionQuestionStore{
+		createSessionQuestionsFn: func(ctx context.Context, questions []model.SessionQuestion) error {
+			wantIDs := []int{1, 2, 3, 6, 7}
+			if len(questions) != len(wantIDs) {
+				t.Fatalf("len(questions) = %d, want %d", len(questions), len(wantIDs))
+			}
+			for i, wantID := range wantIDs {
+				if questions[i].QuestionID != wantID {
+					t.Fatalf("questions[%d].QuestionID = %d, want %d", i, questions[i].QuestionID, wantID)
+				}
+			}
+			return nil
+		},
+	}
+
+	builder := NewSessionBuilderService(nil, sStore, sqStore, srsMock)
+	session, err := builder.BuildReviewSession(ctx, 123, 10)
+	if err != nil {
+		t.Fatalf("BuildReviewSession failed: %v", err)
+	}
+	if session.TotalQuestions != 5 {
+		t.Fatalf("TotalQuestions = %d, want 5", session.TotalQuestions)
+	}
+}
+
+func TestBuildMorningSession_PassesRemainingKanjiRecallBudgetToNewFetches(t *testing.T) {
+	ctx := context.Background()
+	kanjiSkill := model.SkillVocabKanjiRecall
+	newFetchCalls := 0
+
+	srsMock := &mockSRS{
+		getDueReviewsFn: func(
+			ctx context.Context,
+			userID int64,
+			limit, kanjiRecallLimit int,
+		) ([]model.Question, error) {
+			return []model.Question{
+				{ID: 1, Skill: &kanjiSkill},
+				{ID: 2, Skill: &kanjiSkill},
+				{ID: 3},
+				{ID: 4},
+				{ID: 5},
+				{ID: 6},
+			}, nil
+		},
+	}
+	qFetcher := &mockQuestionFetcher{
+		getNewQuestionsFn: func(
+			ctx context.Context,
+			userID int64,
+			language, level, category string,
+			excludeIDs []int,
+			limit, kanjiRecallLimit int,
+		) ([]model.Question, error) {
+			newFetchCalls++
+			if newFetchCalls == 1 {
+				if category != string(model.CategoryVocabulary) || kanjiRecallLimit != 1 {
+					t.Fatalf(
+						"first new fetch category=%q kanjiRecallLimit=%d, want vocabulary,1",
+						category,
+						kanjiRecallLimit,
+					)
+				}
+				return []model.Question{
+					{ID: 101, Skill: &kanjiSkill},
+					{ID: 102},
+					{ID: 103},
+					{ID: 104},
+					{ID: 105},
+				}, nil
+			}
+			if kanjiRecallLimit != 0 {
+				t.Fatalf("later new fetch kanjiRecallLimit = %d, want 0", kanjiRecallLimit)
+			}
+			return nil, nil
+		},
+	}
+	sStore := &mockSessionStore{
+		createSessionFn: func(ctx context.Context, session *model.Session) error {
+			session.ID = 10
+			return nil
+		},
+	}
+	sqStore := &mockSessionQuestionStore{
+		createSessionQuestionsFn: func(ctx context.Context, questions []model.SessionQuestion) error {
+			return nil
+		},
+	}
+
+	builder := NewSessionBuilderService(qFetcher, sStore, sqStore, srsMock)
+	session, err := builder.BuildMorningSession(ctx, 123, "ja", "N5")
+	if err != nil {
+		t.Fatalf("BuildMorningSession failed: %v", err)
+	}
+	if session == nil || session.TotalQuestions != 11 {
+		t.Fatalf("session = %+v, want 11 questions", session)
+	}
+}
+
 func TestBuildSession_NoQuestions(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return nil, nil
 		},
 	}
 
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return nil, nil
 		},
 	}
@@ -338,7 +473,7 @@ func TestBuildSession_CreateFails(t *testing.T) {
 	userID := int64(123)
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return []model.Question{{ID: 1}}, nil
 		},
 	}
@@ -363,7 +498,7 @@ func TestBuildSession_CreateSessionQuestionsFails(t *testing.T) {
 	expectedErr := errors.New("create session questions failed")
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return []model.Question{{ID: 1}, {ID: 2}}, nil
 		},
 	}
@@ -400,12 +535,12 @@ func TestBuildSession_DeduplicatesQuestionIDs(t *testing.T) {
 	userID := int64(123)
 
 	srsMock := &mockSRS{
-		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return []model.Question{{ID: 1}, {ID: 1}}, nil
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return []model.Question{{ID: 1}, {ID: 2}, {ID: 2}}, nil
 		},
 	}

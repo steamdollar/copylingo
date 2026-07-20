@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS contents (
 -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS materials (
     id                SERIAL PRIMARY KEY,
-    material_key      VARCHAR(255) NOT NULL UNIQUE,              -- '{language}:{domain}:{stable_slug}'
+    material_key      VARCHAR(255) NOT NULL UNIQUE,              -- '{language}:{domain}:{dataset_id}' e.g. 'ja:vocab:n5_word_024' (dataset ID verbatim, level included)
     content_id        INT REFERENCES contents(id) ON DELETE SET NULL,
     category          VARCHAR(30) NOT NULL,                      -- model.MaterialCategory whitelist
     language          VARCHAR(10) NOT NULL,                      -- ISO 639-1

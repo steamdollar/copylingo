@@ -1,0 +1,502 @@
+[
+  {
+    "id": "n5_listening_0001",
+    "skill": "listening_key_point",
+    "script": "このりんごは一つ百円です。三つください。",
+    "prompt": "음성을 듣고 답하세요. 사과 세 개는 모두 얼마입니까?",
+    "options": ["100円", "200円", "300円", "400円"],
+    "correct_answer": "300円",
+    "explanation": "사과 한 개가 100엔이고 세 개를 사므로 모두 300엔입니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0002",
+    "skill": "listening_key_point",
+    "script": "明日の授業は九時からです。でも、教室には八時五十分までに来てください。",
+    "prompt": "음성을 듣고 답하세요. 교실에는 몇 시까지 가야 합니까?",
+    "options": ["8時30分", "8時50分", "9時", "9時10分"],
+    "correct_answer": "8時50分",
+    "explanation": "수업은 9시에 시작하지만 교실에는 8시 50분까지 오라고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0003",
+    "skill": "listening_task",
+    "script": "田中さんは今、図書館にいます。三時に駅で山田さんに会います。",
+    "prompt": "음성을 듣고 답하세요. 다나카 씨는 야마다 씨를 어디에서 만납니까?",
+    "options": ["図書館", "駅", "学校", "公園"],
+    "correct_answer": "駅",
+    "explanation": "다나카 씨는 지금 도서관에 있지만 야마다 씨는 역에서 만납니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0004",
+    "skill": "listening_task",
+    "script": "今日は雨ですから、公園へ行きません。家で映画を見ます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 오늘 무엇을 합니까?",
+    "options": ["公園へ行きます", "家で映画を見ます", "図書館で勉強します", "友だちと買い物をします"],
+    "correct_answer": "家で映画を見ます",
+    "explanation": "비가 와서 공원에는 가지 않고 집에서 영화를 본다고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0005",
+    "skill": "listening_outline",
+    "script": "土曜日はスーパーで買い物をしてから、母の家へ行きます。日曜日は家で休みます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 토요일에 장을 본 다음 어디에 갑니까?",
+    "options": ["駅", "学校", "母の家", "自分の家"],
+    "correct_answer": "母の家",
+    "explanation": "토요일에는 슈퍼에서 장을 본 뒤 어머니 집에 간다고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0006",
+    "skill": "listening_key_point",
+    "script": "昼ごはんに、うどんを一つとお茶を一つお願いします。ラーメンは食べません。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 점심으로 무엇을 주문합니까?",
+    "options": ["うどんとお茶", "ラーメンとお茶", "うどんと水", "パンとお茶"],
+    "correct_answer": "うどんとお茶",
+    "explanation": "점심으로 우동 하나와 차 하나를 주문한다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0007",
+    "skill": "listening_task",
+    "script": "日曜日の午前、図書館で本を借ります。そのあと、友だちの家へ行きます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 도서관에 간 후 어디에 갑니까?",
+    "options": ["学校", "友だちの家", "駅", "スーパー"],
+    "correct_answer": "友だちの家",
+    "explanation": "도서관에서 책을 빌린 후 친구 집에 갑니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0008",
+    "skill": "listening_task",
+    "script": "教科書はかばんの中です。かばんは机の上にあります。ノートは机の下にあります。",
+    "prompt": "음성을 듣고 답하세요. 교과서는 어디에 있습니까?",
+    "options": ["机の上", "机の下", "かばんの中", "いすの上"],
+    "correct_answer": "かばんの中",
+    "explanation": "교과서는 가방 안에 있다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0009",
+    "skill": "listening_key_point",
+    "script": "病院へ行く日は火曜日です。水曜日ではありません。朝十時に行きます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 무슨 요일에 병원에 갑니까?",
+    "options": ["月曜日", "火曜日", "水曜日", "木曜日"],
+    "correct_answer": "火曜日",
+    "explanation": "병원에 가는 날은 화요일입니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0010",
+    "skill": "listening_outline",
+    "script": "家族は四人です。母は料理をします。父はテレビを見ます。弟は宿題をします。",
+    "prompt": "음성을 듣고 답하세요. 어머니는 무엇을 합니까?",
+    "options": ["料理をします", "テレビを見ます", "宿題をします", "本を読みます"],
+    "correct_answer": "料理をします",
+    "explanation": "어머니는 요리를 합니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0011",
+    "skill": "listening_task",
+    "script": "出かける前に、窓を閉めてください。夜、雨が降ります。",
+    "prompt": "음성을 듣고 답하세요. 외출하기 전에 무엇을 해야 합니까?",
+    "options": ["窓を閉めます", "電気をつけます", "テレビを見ます", "花に水をあげます"],
+    "correct_answer": "窓を閉めます",
+    "explanation": "외출하기 전에 창문을 닫으라고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0012",
+    "skill": "listening_key_point",
+    "script": "明日の授業で、赤い鉛筆を使います。黒い鉛筆は使いません。",
+    "prompt": "음성을 듣고 답하세요. 내일 수업에서 어떤 연필을 사용합니까?",
+    "options": ["赤い鉛筆", "黒い鉛筆", "青い鉛筆", "大きい鉛筆"],
+    "correct_answer": "赤い鉛筆",
+    "explanation": "내일 수업에서는 빨간 연필을 사용한다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0013",
+    "skill": "listening_outline",
+    "script": "毎朝、顔を洗ってから朝ごはんを食べます。食べたあとで、学校へ行きます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 아침을 먹기 전에 무엇을 합니까?",
+    "options": ["顔を洗います", "学校へ行きます", "本を読みます", "昼寝をします"],
+    "correct_answer": "顔を洗います",
+    "explanation": "매일 아침 세수를 한 뒤 아침 식사를 한다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0014",
+    "skill": "listening_task",
+    "script": "玄関のかぎは、白い箱の中にあります。赤い箱には何もありません。",
+    "prompt": "음성을 듣고 답하세요. 현관 열쇠는 어디에 있습니까?",
+    "options": ["白い箱の中", "赤い箱の中", "机の上", "かばんの中"],
+    "correct_answer": "白い箱の中",
+    "explanation": "현관 열쇠는 흰 상자 안에 있다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0015",
+    "skill": "listening_key_point",
+    "script": "今日は白いシャツを着ます。青いシャツは洗濯中です。",
+    "prompt": "음성을 듣고 답하세요. 오늘 무엇을 입습니까?",
+    "options": ["白いシャツ", "青いシャツ", "黒いズボン", "赤い帽子"],
+    "correct_answer": "白いシャツ",
+    "explanation": "오늘은 흰 셔츠를 입는다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0016",
+    "skill": "listening_task",
+    "script": "この部屋では、写真を撮らないでください。静かに見てください。",
+    "prompt": "음성을 듣고 답하세요. 이 방에서 하면 안 되는 것은 무엇입니까?",
+    "options": ["写真を撮ること", "静かに見ること", "歩くこと", "座ること"],
+    "correct_answer": "写真を撮ること",
+    "explanation": "이 방에서는 사진을 찍지 말라고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0017",
+    "skill": "listening_outline",
+    "script": "母は買い物に行きます。私は家にいて、部屋を掃除します。そのあと、音楽を聞きます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 집에서 무엇을 합니까?",
+    "options": ["部屋を掃除します", "買い物をします", "料理をします", "散歩します"],
+    "correct_answer": "部屋を掃除します",
+    "explanation": "어머니가 장을 보는 동안 방을 청소한다고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0018",
+    "skill": "listening_key_point",
+    "script": "今日の三時間目は音楽です。体育は明日の三時間目です。",
+    "prompt": "음성을 듣고 답하세요. 오늘 세 번째 수업은 무엇입니까?",
+    "options": ["音楽", "体育", "数学", "英語"],
+    "correct_answer": "音楽",
+    "explanation": "오늘 세 번째 수업은 음악이라고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0019",
+    "skill": "listening_outline",
+    "script": "仕事が終わってから、駅の近くの店で夕ごはんを食べます。そのあと、まっすぐ家へ帰ります。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 일을 마친 후 무엇을 먼저 합니까?",
+    "options": ["店で夕ごはんを食べます", "家で寝ます", "駅で友だちを待ちます", "スーパーで働きます"],
+    "correct_answer": "店で夕ごはんを食べます",
+    "explanation": "일이 끝난 후 역 근처 가게에서 먼저 저녁을 먹는다고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0020",
+    "skill": "listening_task",
+    "script": "このはさみで紙を切ります。髪は切りません。",
+    "prompt": "음성을 듣고 답하세요. 이 가위는 무엇을 자르는 데 사용합니까?",
+    "options": ["紙", "髪", "布団", "木"],
+    "correct_answer": "紙",
+    "explanation": "이 가위는 종이를 자르기 위한 것이라고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0021",
+    "skill": "listening_key_point",
+    "script": "外は寒いですから、コートを着てください。サンダルはやめましょう。",
+    "prompt": "음성을 듣고 답하세요. 밖에 나갈 때 무엇을 입어야 합니까?",
+    "options": ["コート", "サンダル", "半袖のシャツ", "水着"],
+    "correct_answer": "コート",
+    "explanation": "밖이 추우므로 코트를 입으라고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0022",
+    "skill": "listening_task",
+    "script": "トイレのあとで、石けんで手を洗ってください。タオルで手をふきます。",
+    "prompt": "음성을 듣고 답하세요. 화장실에 다녀온 후 무엇을 해야 합니까?",
+    "options": ["石けんで手を洗います", "すぐ寝ます", "水を飲みます", "靴をみがきます"],
+    "correct_answer": "石けんで手を洗います",
+    "explanation": "화장실 후에는 비누로 손을 씻으라고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0023",
+    "skill": "listening_outline",
+    "script": "夕方、父は犬と近所を散歩します。私はその間に晩ごはんを作ります。",
+    "prompt": "음성을 듣고 답하세요. 저녁에 아버지는 무엇을 합니까?",
+    "options": ["犬と散歩します", "晩ごはんを作ります", "テレビを買います", "庭で寝ます"],
+    "correct_answer": "犬と散歩します",
+    "explanation": "저녁에 아버지는 개와 동네를 산책한다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0024",
+    "skill": "listening_key_point",
+    "script": "授業が終わったら、このノートを先生の机に置いてください。自分のかばんには入れないでください。",
+    "prompt": "음성을 듣고 답하세요. 수업이 끝난 후 공책을 어디에 놓아야 합니까?",
+    "options": ["先生の机", "自分のかばん", "教室の窓", "図書館の本棚"],
+    "correct_answer": "先生の机",
+    "explanation": "수업 후 공책을 선생님의 책상에 놓으라고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0025",
+    "skill": "listening_task",
+    "script": "店で青い帽子を見つけました。黒い帽子ではなく、青い帽子を買います。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 어떤 모자를 삽니까?",
+    "options": ["白い帽子", "黒い帽子", "青い帽子", "赤い帽子"],
+    "correct_answer": "青い帽子",
+    "explanation": "검은 모자가 아니라 파란 모자를 산다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0026",
+    "skill": "listening_key_point",
+    "script": "文房具店でノートを二冊見ます。鉛筆は買いません。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 무엇을 사지 않습니까?",
+    "options": ["ノート", "鉛筆", "消しゴム", "本"],
+    "correct_answer": "鉛筆",
+    "explanation": "연필은 사지 않는다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0027",
+    "skill": "listening_key_point",
+    "script": "昼ごはんはカレーにします。スパゲッティは食べません。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 점심으로 무엇을 먹습니까?",
+    "options": ["カレー", "スパゲッティ", "サラダ", "すし"],
+    "correct_answer": "カレー",
+    "explanation": "점심으로 카레를 먹고 스파게티는 먹지 않는다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0028",
+    "skill": "listening_task",
+    "script": "喫茶店でサンドイッチとコーヒーをお願いします。紅茶は飲みません。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 무엇을 마십니까?",
+    "options": ["水", "コーヒー", "紅茶", "ジュース"],
+    "correct_answer": "コーヒー",
+    "explanation": "커피를 주문하고 홍차는 마시지 않는다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0029",
+    "skill": "listening_outline",
+    "script": "郵便局で手紙を出します。先に紙に名前と住所を書きます。",
+    "prompt": "음성을 듣고 답하세요. 우체국에서 먼저 무엇을 합니까?",
+    "options": ["切手を買います", "名前と住所を書きます", "荷物を受け取ります", "電話をします"],
+    "correct_answer": "名前と住所を書きます",
+    "explanation": "편지를 부치기 전에 종이에 이름과 주소를 쓴다고 했습니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0030",
+    "skill": "listening_task",
+    "script": "図書館で本を返します。そのあと、新しい雑誌を借ります。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 책을 반납한 후 무엇을 빌립니까?",
+    "options": ["新聞", "辞書", "新しい雑誌", "ＣＤ"],
+    "correct_answer": "新しい雑誌",
+    "explanation": "책을 반납한 뒤 새 잡지를 빌린다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0031",
+    "skill": "listening_key_point",
+    "script": "駅の案内所でホテルの場所を聞きます。係の人が地図を見せます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 안내소에서 무엇을 묻습니까?",
+    "options": ["銀行の時間", "ホテルの場所", "電車の値段", "店の名前"],
+    "correct_answer": "ホテルの場所",
+    "explanation": "호텔의 위치를 묻는다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0032",
+    "skill": "listening_task",
+    "script": "博物館へ行くバスに乗ります。三つ目のバス停で降ります。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 몇 번째 정류장에서 내립니까?",
+    "options": ["一つ目のバス停", "二つ目のバス停", "三つ目のバス停", "四つ目のバス停"],
+    "correct_answer": "三つ目のバス停",
+    "explanation": "세 번째 버스 정류장에서 내린다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0033",
+    "skill": "listening_outline",
+    "script": "電車で新宿へ行きます。東京駅で電車を乗り換えます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 어디에서 전철을 갈아탑니까?",
+    "options": ["新宿駅", "東京駅", "上野駅", "大阪駅"],
+    "correct_answer": "東京駅",
+    "explanation": "도쿄역에서 전철을 갈아탄다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0034",
+    "skill": "listening_key_point",
+    "script": "会社で会議の紙をコピーします。昼ごはんの前に終わらせます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 회사에서 무엇을 합니까?",
+    "options": ["会議の紙をコピーします", "窓を開けます", "電話をします", "昼ごはんを作ります"],
+    "correct_answer": "会議の紙をコピーします",
+    "explanation": "회사에서 회의 자료를 복사한다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0035",
+    "skill": "listening_outline",
+    "script": "会議の前に会議室を掃除します。それから、お茶を用意します。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 먼저 무엇을 합니까?",
+    "options": ["お茶を飲みます", "会議室を掃除します", "資料を読みます", "窓を閉めます"],
+    "correct_answer": "会議室を掃除します",
+    "explanation": "회의 전에 먼저 회의실을 청소하고, 그다음 차를 준비합니다.",
+    "difficulty": 2
+  },
+  {
+    "id": "n5_listening_0036",
+    "skill": "listening_task",
+    "script": "靴の店で白い靴を試します。黒い靴は大きいです。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 어떤 신발을 신어 봅니까?",
+    "options": ["青い靴", "白い靴", "黒い靴", "赤い靴"],
+    "correct_answer": "白い靴",
+    "explanation": "가게에서 흰 신발을 신어 본다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0037",
+    "skill": "listening_key_point",
+    "script": "レストランで野菜のランチを選びます。魚の料理は選びません。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 어떤 점심을 고릅니까?",
+    "options": ["肉のランチ", "魚の料理", "野菜のランチ", "パンだけ"],
+    "correct_answer": "野菜のランチ",
+    "explanation": "생선 요리는 고르지 않고 채소 런치를 고른다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0038",
+    "skill": "listening_task",
+    "script": "昨日から頭が痛いです。今日は学校を休んで、病院へ行きます。",
+    "prompt": "음성을 듣고 답하세요. 머리가 아픈 이 사람은 오늘 어디에 갑니까?",
+    "options": ["学校へ行きます", "病院へ行きます", "映画を見ます", "買い物をします"],
+    "correct_answer": "病院へ行きます",
+    "explanation": "머리가 아파서 학교를 쉬고 병원에 간다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0039",
+    "skill": "listening_key_point",
+    "script": "私の趣味は写真です。日曜日に公園で花の写真を撮ります。",
+    "prompt": "음성을 듣고 답하세요. 이 사람의 취미는 무엇입니까?",
+    "options": ["料理", "写真", "音楽", "スポーツ"],
+    "correct_answer": "写真",
+    "explanation": "자신의 취미가 사진이라고 말했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0040",
+    "skill": "listening_outline",
+    "script": "土曜日の朝、部屋を掃除します。午後は友だちとテニスをします。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 토요일 오후에 무엇을 합니까?",
+    "options": ["部屋を掃除します", "テニスをします", "本を読みます", "料理をします"],
+    "correct_answer": "テニスをします",
+    "explanation": "토요일 오후에는 친구와 테니스를 친다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0041",
+    "skill": "listening_task",
+    "script": "来週の日曜日、友だちと動物園へ行きます。図書館へは行きません。",
+    "prompt": "음성을 듣고 답하세요. 두 사람은 어디에 갑니까?",
+    "options": ["動物園", "図書館", "病院", "学校"],
+    "correct_answer": "動物園",
+    "explanation": "다음 주 일요일에 친구와 동물원에 간다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0042",
+    "skill": "listening_key_point",
+    "script": "月曜日に日本語のテストがあります。火曜日はありません。",
+    "prompt": "음성을 듣고 답하세요. 일본어 시험은 무슨 요일에 있습니까?",
+    "options": ["月曜日", "火曜日", "水曜日", "金曜日"],
+    "correct_answer": "月曜日",
+    "explanation": "일본어 시험은 월요일에 있다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0043",
+    "skill": "listening_outline",
+    "script": "まず野菜を洗います。それから小さく切って、鍋に入れます。",
+    "prompt": "음성을 듣고 답하세요. 먼저 무엇을 합니까?",
+    "options": ["野菜を洗います", "野菜を切ります", "鍋を洗います", "ご飯を食べます"],
+    "correct_answer": "野菜を洗います",
+    "explanation": "먼저 채소를 씻은 다음 작게 자른다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0044",
+    "skill": "listening_task",
+    "script": "パンにバターをぬって、卵をのせます。最後に塩を少しかけます。",
+    "prompt": "음성을 듣고 답하세요. 빵에 먼저 무엇을 바릅니까?",
+    "options": ["卵", "塩", "バター", "チーズ"],
+    "correct_answer": "バター",
+    "explanation": "빵에 먼저 버터를 바른다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0045",
+    "skill": "listening_key_point",
+    "script": "薬は毎朝ご飯のあとで飲みます。夜は飲みません。",
+    "prompt": "음성을 듣고 답하세요. 약은 언제 먹습니까?",
+    "options": ["毎朝ご飯のあと", "毎朝ご飯のまえ", "毎晩寝るまえ", "昼ごはんのあと"],
+    "correct_answer": "毎朝ご飯のあと",
+    "explanation": "매일 아침 식사 후에 약을 먹는다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0046",
+    "skill": "listening_task",
+    "script": "休みの日はギターを弾きます。歌はあまり歌いません。",
+    "prompt": "음성을 듣고 답하세요. 쉬는 날에 무엇을 합니까?",
+    "options": ["ギターを弾きます", "歌を歌います", "絵を描きます", "泳ぎます"],
+    "correct_answer": "ギターを弾きます",
+    "explanation": "쉬는 날에는 기타를 연주한다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0047",
+    "skill": "listening_outline",
+    "script": "日曜日は朝九時に起きます。午前中は洗濯をして、午後は本を読みます。",
+    "prompt": "음성을 듣고 답하세요. 이 사람은 일요일 오후에 무엇을 합니까?",
+    "options": ["洗濯をします", "本を読みます", "買い物をします", "料理をします"],
+    "correct_answer": "本を読みます",
+    "explanation": "일요일 오후에는 책을 읽는다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0048",
+    "skill": "listening_task",
+    "script": "土曜日に誕生日パーティーがあります。友だちも来ます。",
+    "prompt": "음성을 듣고 답하세요. 토요일에는 무엇이 있습니까?",
+    "options": ["誕生日パーティー", "学校のテスト", "サッカーの試合", "家族の旅行"],
+    "correct_answer": "誕生日パーティー",
+    "explanation": "토요일에 생일 파티가 있다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0049",
+    "skill": "listening_key_point",
+    "script": "駅に着いたら、まず切符を買います。それから電車に乗ります。",
+    "prompt": "음성을 듣고 답하세요. 역에 도착하면 먼저 무엇을 합니까?",
+    "options": ["電車に乗ります", "切符を買います", "友だちを待ちます", "本を読みます"],
+    "correct_answer": "切符を買います",
+    "explanation": "역에 도착하면 먼저 표를 산 뒤 전철을 탄다고 했습니다.",
+    "difficulty": 1
+  },
+  {
+    "id": "n5_listening_0050",
+    "skill": "listening_outline",
+    "script": "今日は家族みんなで夕食を作ります。姉はサラダ、私はスープを作ります。",
+    "prompt": "음성을 듣고 답하세요. 누나는 무엇을 만듭니까?",
+    "options": ["スープ", "サラダ", "ご飯", "ケーキ"],
+    "correct_answer": "サラダ",
+    "explanation": "누나는 샐러드를 만들고, 말하는 사람은 수프를 만든다고 했습니다.",
+    "difficulty": 1
+  }
+]

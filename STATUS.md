@@ -26,8 +26,6 @@
 
 > 각 항목은 `docs/todos/<file>.md`에 자기완결적 문서로 분리되어 있다. 작성/실행/완료 처리 규칙은 `AGENTS.md` §3 Case C 참조.
 
-- [ ] 청해(Listening) 문항 시드 작성 — 음성 파이프라인은 구현·검증 완료, **문항 콘텐츠(스크립트·질문·보기·정답) 시드만 남음**. e2e 스모크 전 ffmpeg 설치 선행. see [docs/todos/listening_question_seed.md](docs/todos/listening_question_seed.md)
-
 - [ ] 손글씨 client/server rebuild 정합성 검증 — 검증 **도구**(`cmd/dev/handwriting_renderer` CLI + Mini App `?debug=1` export + 단위 테스트) 구현 완료. **사용자 수동 시각 비교만 남음** (Mini App에서 직접 그려 client.png/strokes.json export → 서버 PNG와 대조). see [docs/todos/handwriting_rebuild_parity_verification.md](docs/todos/handwriting_rebuild_parity_verification.md)
 
 - [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. **(Case A 선결: preset 비율/변경 UX/SRS 충돌 우선순위/vocab fallback 미결)** see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
@@ -39,6 +37,10 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-07-20 | Luna 3-way 위임으로 N5 Listening seed 10→50문항 확장 + DB/TTS 50/50 생성 | `2607/2607201548_listening_seed_50_tts.md` |
+| 2026-07-20 | Luna 초안+main 검수로 N5 Listening original seed 5→10문항 확장 | `2607/2607201527_listening_seed_luna_expansion.md` |
+| 2026-07-20 | N5 Listening original MCQ 5문항 멱등 seed + Gemini TTS/MinIO/Telegram live smoke (ADR-034) | `2607/2607201520_listening_question_seed_smoke.md` |
+| 2026-07-18 | Vocabulary 한자 recall 431문항 멱등 seed + morning/evening/review 세션당 최대 3개 query/admission cap (ADR-033) | `2607/2607182024_vocab_kanji_recall.md` |
 | 2026-07-05 | Study Session `← 이전` 버튼: 이미 본 카드 재열람 (prev는 studied 상태 불변, 첫 카드 제외) | `2607/2607051110_study_prev_button.md` |
 | 2026-07-03 | Agent 문서 정합성 수정: Case 분류/workthrough 경로/ADR 분리 파일 규칙/§4.4 TTS native 경로/capability 기록처 SSOT/dead ref 6건 | `2607/2607031640_agent_docs_consistency_fix.md` |
 | 2026-07-01 | 청해 음성 파이프라인: Gemini native TTS→OGG(ffmpeg)→MinIO/S3 content-addressed 캐싱→Telegram sendVoice(file_id 캐시), scheduler 사전생성·SessionBuilder 편입 (ADR-031/032) | `2607/2607011825_listening_audio_pipeline.md` |

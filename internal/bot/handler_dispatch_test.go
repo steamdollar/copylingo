@@ -24,7 +24,11 @@ func (m *mockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error) { 
 
 type mockSRSRepo struct{}
 
-func (m *mockSRSRepo) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
+func (m *mockSRSRepo) GetDueReviews(
+	ctx context.Context,
+	userID int64,
+	limit, kanjiRecallLimit int,
+) ([]model.Question, error) {
 	return nil, nil
 }
 func (m *mockSRSRepo) GetDueReviewCount(ctx context.Context) (int, error) {

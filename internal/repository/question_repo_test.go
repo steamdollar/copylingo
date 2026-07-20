@@ -157,6 +157,9 @@ func TestNewQuestionsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) 
 		"CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END",
 		// Listening questions must not be scheduled before their audio exists.
 		"q.category <> 'listening' OR q.audio_path IS NOT NULL",
+		"q.item_type IS DISTINCT FROM 'vocab_kanji_recall'",
+		"candidate.kanji_recall_rank <= $7",
+		"LIMIT $6",
 	} {
 		if !strings.Contains(newQuestionsForStudiedMaterialsQuery, want) {
 			t.Fatalf("query = %q, want %q", newQuestionsForStudiedMaterialsQuery, want)
@@ -172,6 +175,9 @@ func TestDueReviewsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) {
 		"ump.times_studied > 0",
 		"q.next_review_at IS NOT NULL",
 		"CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END",
+		"q.item_type IS DISTINCT FROM 'vocab_kanji_recall'",
+		"candidate.kanji_recall_rank <= $3",
+		"LIMIT $2",
 	} {
 		if !strings.Contains(dueReviewsForStudiedMaterialsQuery, want) {
 			t.Fatalf("query = %q, want %q", dueReviewsForStudiedMaterialsQuery, want)

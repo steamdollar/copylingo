@@ -59,6 +59,7 @@ func TestSkillPtr(t *testing.T) {
 func TestSkillTaxonomyIncludesN1Types(t *testing.T) {
 	tests := []Skill{
 		SkillKanjiReading,
+		SkillVocabKanjiRecall,
 		SkillVocabContext,
 		SkillVocabParaphrase,
 		SkillVocabUsage,

@@ -9,13 +9,17 @@ import (
 )
 
 type mockQuestionQuerier struct {
-	getDueReviewsFn     func(ctx context.Context, userID int64, limit int) ([]model.Question, error)
+	getDueReviewsFn     func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
 	getDueReviewCountFn func(ctx context.Context) (int, error)
 	updateSRSFn         func(ctx context.Context, q *model.Question) error
 }
 
-func (m *mockQuestionQuerier) GetDueReviews(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, userID, limit)
+func (m *mockQuestionQuerier) GetDueReviews(
+	ctx context.Context,
+	userID int64,
+	limit, kanjiRecallLimit int,
+) ([]model.Question, error) {
+	return m.getDueReviewsFn(ctx, userID, limit, kanjiRecallLimit)
 }
 
 func (m *mockQuestionQuerier) GetDueReviewCount(ctx context.Context) (int, error) {
@@ -149,16 +153,21 @@ func TestEaseFactorFloorAt1_3(t *testing.T) {
 func TestSRSService_GetDueReviews(t *testing.T) {
 	want := []model.Question{{ID: 1}, {ID: 2}}
 	mockRepo := &mockQuestionQuerier{
-		getDueReviewsFn: func(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
-			if userID != 42 || limit != 10 {
-				t.Fatalf("GetDueReviews called with userID=%d limit=%d, want 42,10", userID, limit)
+		getDueReviewsFn: func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
+			if userID != 42 || limit != 10 || kanjiRecallLimit != 3 {
+				t.Fatalf(
+					"GetDueReviews called with userID=%d limit=%d kanjiRecallLimit=%d, want 42,10,3",
+					userID,
+					limit,
+					kanjiRecallLimit,
+				)
 			}
 			return want, nil
 		},
 	}
 	srs := NewSRSService(mockRepo)
 
-	got, err := srs.GetDueReviews(context.Background(), 42, 10)
+	got, err := srs.GetDueReviews(context.Background(), 42, 10, 3)
 	if err != nil {
 		t.Fatalf("GetDueReviews() error = %v", err)
 	}
@@ -170,13 +179,13 @@ func TestSRSService_GetDueReviews(t *testing.T) {
 func TestSRSService_GetDueReviews_PropagatesError(t *testing.T) {
 	expectedErr := errors.New("query failed")
 	mockRepo := &mockQuestionQuerier{
-		getDueReviewsFn: func(ctx context.Context, userID int64, limit int) ([]model.Question, error) {
+		getDueReviewsFn: func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return nil, expectedErr
 		},
 	}
 	srs := NewSRSService(mockRepo)
 
-	if _, err := srs.GetDueReviews(context.Background(), 1, 1); !errors.Is(err, expectedErr) {
+	if _, err := srs.GetDueReviews(context.Background(), 1, 1, 0); !errors.Is(err, expectedErr) {
 		t.Fatalf("GetDueReviews() error = %v, want %v", err, expectedErr)
 	}
 }

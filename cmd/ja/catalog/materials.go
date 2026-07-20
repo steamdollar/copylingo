@@ -114,12 +114,14 @@ func MaterialKeyForKana(kana string) string {
 	return "ja:kana:" + strings.Join(parts, "_")
 }
 
+// Material keys embed the dataset ID verbatim so the proficiency level stays
+// part of the key; trimming a level prefix here would collide IDs across levels.
 func MaterialKeyForVocab(word VocabWord) string {
-	return "ja:vocab:" + strings.TrimPrefix(word.ID, "n5_")
+	return "ja:vocab:" + word.ID
 }
 
 func MaterialKeyForGrammar(point GrammarPoint) string {
-	return "ja:grammar:" + strings.TrimPrefix(point.ID, "n5_grammar_")
+	return "ja:grammar:" + point.ID
 }
 
 func ScriptLabel(kana string) string {

@@ -17,10 +17,10 @@ func TestBuildVocabularyMaterials(t *testing.T) {
 	}
 
 	keys := materialKeys(materials)
-	if !keys["ja:vocab:word_024"] {
+	if !keys["ja:vocab:n5_word_024"] {
 		t.Fatal("missing vocabulary word_024 material key")
 	}
-	if !keys["ja:vocab:word_500"] {
+	if !keys["ja:vocab:n5_word_500"] {
 		t.Fatal("missing vocabulary word_500 material key")
 	}
 }
@@ -29,7 +29,7 @@ func TestBuildVocabularyMaterialsPayload(t *testing.T) {
 	t.Parallel()
 
 	for _, material := range BuildVocabularyMaterials(N5Words) {
-		if material.MaterialKey != "ja:vocab:word_024" {
+		if material.MaterialKey != "ja:vocab:n5_word_024" {
 			continue
 		}
 
@@ -57,10 +57,10 @@ func TestBuildGrammarMaterials(t *testing.T) {
 	}
 
 	keys := materialKeys(materials)
-	if !keys["ja:grammar:001"] {
+	if !keys["ja:grammar:n5_grammar_001"] {
 		t.Fatal("missing grammar 001 material key")
 	}
-	if !keys["ja:grammar:060"] {
+	if !keys["ja:grammar:n5_grammar_060"] {
 		t.Fatal("missing grammar 060 material key")
 	}
 
@@ -78,7 +78,7 @@ func TestBuildGrammarMaterialsPayload(t *testing.T) {
 	t.Parallel()
 
 	for _, material := range BuildGrammarMaterials(N5GrammarPoints) {
-		if material.MaterialKey != "ja:grammar:009" {
+		if material.MaterialKey != "ja:grammar:n5_grammar_009" {
 			continue
 		}
 
@@ -134,7 +134,7 @@ func TestBuildAllMaterialsIncludesGrammar(t *testing.T) {
 	}
 
 	keys := materialKeys(materials)
-	for _, key := range []string{"ja:kana:u3042", "ja:vocab:word_024", "ja:grammar:001"} {
+	for _, key := range []string{"ja:kana:u3042", "ja:vocab:n5_word_024", "ja:grammar:n5_grammar_001"} {
 		if !keys[key] {
 			t.Fatalf("missing material key %q", key)
 		}
