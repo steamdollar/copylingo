@@ -73,6 +73,7 @@ const (
 	FormatStudyNext      = "study:%d:next:%d"
 	FormatStudyPrev      = "study:%d:prev:%d"
 	FormatStudyFinish    = "study:%d:finish:%d"
+	FormatStudyAskLLM    = "study:%d:ask:%d"
 )
 
 type RedisKeyFormat string
@@ -102,8 +103,8 @@ const (
 	UserActiveQuestionRedisKey RedisKeyFormat = "user:%d:active_question"
 
 	// UserLLMPendingRedisKey tracks that the next plain-text message should be routed to LLM question mode.
-	// Value: "1" for a plain /llm question, or "q:{session_id}:{question_id}" to answer in the context
-	// of a just-answered quiz question. Used by the /llm one-shot chat flow and the in-quiz "ask" button.
+	// Value: "1" for a plain /llm question, "q:{session_id}:{question_id}" for a quiz question, or
+	// "study:{session_id}:{material_order}" for a study material. Used by one-shot contextual LLM questions.
 	UserLLMPendingRedisKey RedisKeyFormat = "user:%d:llm_pending"
 
 	// HandwritingMessageRedisKey stores the Telegram message that contains a handwriting Mini App button.

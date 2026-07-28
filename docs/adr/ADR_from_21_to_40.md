@@ -422,3 +422,22 @@
   - Study 완료 직후 자동 Quiz chaining: session schema 변경·중복 callback 방지가 필요해 MVP 범위 밖으로 기각.
   - runtime LLM 지문 생성: 품질·비용·재현성 통제가 어려워 정적 original seed 우선으로 기각.
 - **후속 (2026-07-23)**: 품질 검증 루프의 다음 단계로 corpus를 10개 → **40개**(`n5_reading_0001`~`0040`)로 확장했다. Sonnet subagent 3배치(장르 풀 분할: 엽서/안내/학교행사/게시판/생활문 등) 생성 + Opus 전수 검수(reading 전문 かな 전사·정답 유일성·N5 범위) 방식. skill은 여전히 `reading_short`만, 지문당 MCQ 1개, 세션당 1개 cap 등 위 결정은 불변이며 데이터 개수만 증가했다. `reading_mid`·`information_retrieval` 및 50개 초과 확장은 여전히 별도 분포 검증 선결 과제로 남는다.
+
+---
+
+## ADR-037: Study Material 질문은 기존 one-shot LLM flow를 사용자 소유 context로 확장한다
+
+- **날짜**: 2026-07-28
+- **상태**: 채택됨
+- **맥락**:
+  - Quiz 결과에는 카드별 `🤖 질문`이 있지만, Study card는 학습 중 생긴 질문을 AI에 전달할 때 제목·본문을 사용자가 다시 입력해야 했다.
+  - Study Material은 `session_materials`의 순서와 Redis Working Set에서만 현재 노출 맥락을 복원할 수 있다.
+- **결정**:
+  - Study card에 owner-only `🤖 질문` 버튼을 추가하고 callback은 `study:{session_id}:ask:{material_order}` 형식을 사용한다.
+  - 클릭 시 기존 `UserLLMPendingRedisKey`에 10분 TTL의 `study:{session_id}:{material_order}` token을 저장한다. 다음 plain text 1개만 LLM으로 전달한다.
+  - callback을 받을 때와 LLM context를 만들 때 모두 `StudyActiveSession.GetOwned`로 session owner·mode를 검증하고, Material order membership 및 completed session을 거부한다.
+  - LLM에는 해당 card의 category, title, Telegram에 표시한 학습 내용만 전달한다. `LLMService`와 external client interface는 변경하지 않는다.
+- **결과**:
+  - Quiz와 Study 모두 같은 one-shot 입력·owner 비용 gate·Tip Candidate 수집 경로를 사용한다.
+  - Redis state가 만료되거나 세션이 종료되면 card context 없이 기존 plain LLM 질문으로 graceful fallback한다.
+  - multi-user 공개 전환 시에는 owner allowlist 대신 per-user rate limit·비용 정책이 필요하다.

@@ -36,6 +36,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-07-28 | Study Session card별 owner-only AI 질문: 10분 one-shot context, session owner·Material membership 재검증 (ADR-037) | `2607/2607282230_study_ai_question.md` |
 | 2026-07-24 | Listening audio path 10→50 복구: seed 재실행 시 동일 script의 runtime `audio_path` 보존 + session push 없는 일괄 TTS 복구 CLI 추가 | `2607/2607241702_listening_audio_backfill.md` |
 | 2026-07-23 | N5 독해 seed 10→40 확장(0011~0040): Sonnet subagent 3배치 생성 + Opus 전수 검수(reading 전사·정답 유일성·N5 범위) + 4건 수정. integrity 40 통과, seeder 멱등 reading=40/material NULL 0. Telegram 수동 검수 잔여 | `2607/2607231015_n5_reading_study_quiz.md` |
 | 2026-07-23 | N5 독해 Study·Quiz MVP: original 지문 10개 Material-first seed + Study 완료 후 Quiz admission + 세션당 1개 cap (ADR-036). Telegram 수동 검수 잔여 | `2607/2607231015_n5_reading_study_quiz.md` |

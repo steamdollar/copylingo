@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -413,6 +414,35 @@ func TestRenderReadingPayloadFallbacks(t *testing.T) {
 	// Malformed payloads fall back to the generic <pre> renderer.
 	if got := renderReadingPayload(json.RawMessage(`{"passage": 1}`)); !strings.Contains(got, "<pre>") {
 		t.Fatalf("malformed reading payload = %q, want generic fallback", got)
+	}
+}
+
+func TestStudyMaterialKeyboardAskLLMGate(t *testing.T) {
+	t.Parallel()
+
+	askData := fmt.Sprintf(config.FormatStudyAskLLM, 99, 3)
+	for _, tc := range []struct {
+		name    string
+		showAsk bool
+		wantAsk bool
+	}{
+		{name: "owner sees ask button", showAsk: true, wantAsk: true},
+		{name: "non-owner has no ask button", showAsk: false, wantAsk: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			keyboard := studyMaterialKeyboard(99, 3, false, false, tc.showAsk)
+			found := false
+			for _, row := range keyboard.InlineKeyboard {
+				for _, button := range row {
+					if button.CallbackData != nil && *button.CallbackData == askData {
+						found = true
+					}
+				}
+			}
+			if found != tc.wantAsk {
+				t.Errorf("ask button present = %t, want %t", found, tc.wantAsk)
+			}
+		})
 	}
 }
 

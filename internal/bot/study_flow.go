@@ -57,6 +57,11 @@ func (sf *StudyFlow) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQu
 	switch parts[2] {
 	case "start":
 		sf.startSession(ctx, cb, sessionID)
+	case "ask":
+		if len(parts) < 4 {
+			return
+		}
+		sf.handleAskLLMQuestion(ctx, cb, sessionID, parts[3])
 	case "next":
 		if len(parts) < 4 {
 			return
@@ -217,6 +222,7 @@ func (sf *StudyFlow) showMaterial(
 		item.SessionMaterial.MaterialOrder,
 		idx == 0,
 		idx == len(items)-1,
+		sf.bot.isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
 	)
 
 	if editMessageID != nil {
@@ -226,7 +232,10 @@ func (sf *StudyFlow) showMaterial(
 	sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
 }
 
-func studyMaterialKeyboard(sessionID, materialOrder int, isFirst, isLast bool) tgbotapi.InlineKeyboardMarkup {
+func studyMaterialKeyboard(
+	sessionID, materialOrder int,
+	isFirst, isLast, showAskLLM bool,
+) tgbotapi.InlineKeyboardMarkup {
 	buttons := make([]tgbotapi.InlineKeyboardButton, 0, 2)
 	if !isFirst {
 		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
@@ -245,7 +254,69 @@ func studyMaterialKeyboard(sessionID, materialOrder int, isFirst, isLast bool) t
 			fmt.Sprintf(config.FormatStudyNext, sessionID, materialOrder),
 		))
 	}
-	return tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(buttons...))
+	rows := [][]tgbotapi.InlineKeyboardButton{
+		tgbotapi.NewInlineKeyboardRow(buttons...),
+	}
+	if showAskLLM {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("🤖 질문",
+				fmt.Sprintf(config.FormatStudyAskLLM, sessionID, materialOrder)),
+		))
+	}
+	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+}
+
+// handleAskLLMQuestion arms one contextual LLM question for a Study material.
+// Ownership and material membership are checked before accepting the callback;
+// they are checked again when resolving the context after the text reply.
+func (sf *StudyFlow) handleAskLLMQuestion(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	sessionID int,
+	materialOrderStr string,
+) {
+	if cb.Message == nil || !sf.bot.isLLMAllowed(cb.From) {
+		return
+	}
+	materialOrder, err := strconv.Atoi(materialOrderStr)
+	if err != nil {
+		return
+	}
+	if sf.bot.rdb == nil || sf.bot.services == nil || sf.bot.services.StudyActiveSession == nil {
+		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
+		return
+	}
+
+	state, err := sf.bot.services.StudyActiveSession.GetOwned(ctx, sessionID, cb.From.ID)
+	if err != nil || state.Session.Status == model.SessionCompleted {
+		slog.WarnContext(ctx, "Rejected study LLM question activation",
+			"event", "telegram.llm.study_activate_rejected",
+			"session_id", sessionID,
+			"material_order", materialOrder,
+			"error", err,
+		)
+		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ 현재 Study Material의 질문을 준비할 수 없습니다.")
+		return
+	}
+	if _, _, ok := state.ItemByOrder(materialOrder); !ok {
+		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ Study Material을 찾을 수 없습니다.")
+		return
+	}
+
+	key := config.UserLLMPendingRedisKey.Format(cb.From.ID)
+	val := fmt.Sprintf("study:%d:%d", sessionID, materialOrder)
+	if err := sf.bot.rdb.Set(ctx, key, val, llmModeTTL).Err(); err != nil {
+		slog.ErrorContext(ctx, "Failed to activate in-study LLM mode",
+			"event", "telegram.llm.study_activate_failed",
+			"session_id", sessionID,
+			"material_order", materialOrder,
+			"error", err,
+		)
+		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
+		return
+	}
+	sf.bot.SendMessage(cb.Message.Chat.ID,
+		"🤖 이 Study Material에 대해 궁금한 점을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.")
 }
 
 func studyMaterialIndexByOrder(items []model.StudySessionMaterial, materialOrder int) int {

@@ -88,6 +88,8 @@ func (b *Bot) handleLLMQuestion(ctx context.Context, msg *tgbotapi.Message) bool
 	llmPrompt := question
 	if quizContext := b.loadQuizQuestionContext(ctx, pendingVal); quizContext != "" {
 		llmPrompt = quizContext + "\n\n위 문제에 대한 사용자의 질문에 답해 주세요.\n[질문] " + question
+	} else if studyContext := b.loadStudyMaterialContext(ctx, pendingVal, msg.From.ID); studyContext != "" {
+		llmPrompt = studyContext + "\n\n위 Study Material에 대한 사용자의 질문에 답해 주세요.\n[질문] " + question
 	}
 	answer, err := b.services.LLM.AnswerLearningQuestion(ctx, llmPrompt)
 	if err != nil {
@@ -141,6 +143,35 @@ func (b *Bot) loadQuizQuestionContext(ctx context.Context, pendingVal string) st
 [사용자가 제출한 답] %s`,
 		stripHTML(q.Prompt), q.CorrectAnswer, q.Explanation,
 		formatSessionAnswer(item.SessionQuestion.UserAnswer))
+}
+
+// loadStudyMaterialContext resolves a pending Study Material token into a
+// user-owned active-session card. Invalid, stale, or completed session tokens
+// intentionally fall back to a plain LLM question.
+func (b *Bot) loadStudyMaterialContext(ctx context.Context, pendingVal string, userID int64) string {
+	parts := strings.Split(pendingVal, ":")
+	if len(parts) != 3 || parts[0] != "study" {
+		return ""
+	}
+	sessionID, err1 := strconv.Atoi(parts[1])
+	materialOrder, err2 := strconv.Atoi(parts[2])
+	if err1 != nil || err2 != nil || b.services == nil || b.services.StudyActiveSession == nil {
+		return ""
+	}
+
+	state, err := b.services.StudyActiveSession.GetOwned(ctx, sessionID, userID)
+	if err != nil || state.Session.Status == model.SessionCompleted {
+		return ""
+	}
+	item, idx, ok := state.ItemByOrder(materialOrder)
+	if !ok {
+		return ""
+	}
+	materialText := stripHTML(renderStudyMaterial(item.Material, idx, len(state.Items)))
+	return fmt.Sprintf(`다음은 사용자가 방금 보고 있는 일본어 Study Material입니다.
+[카테고리] %s
+[제목] %s
+[학습 내용] %s`, item.Material.Category, item.Material.Title, materialText)
 }
 
 func (b *Bot) createTipCandidate(ctx context.Context, user *model.User, username, question, answer string) {
