@@ -116,7 +116,6 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 		"options",
 		"correct_answer",
 		"explanation",
-		"audio_path",
 		"audio_script",
 		"difficulty",
 	} {
@@ -124,6 +123,12 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 		if !strings.Contains(query, want) {
 			t.Fatalf("query = %q, want update %q", query, want)
 		}
+	}
+	if !strings.Contains(query, "WHEN questions.audio_script IS NOT DISTINCT FROM EXCLUDED.audio_script") {
+		t.Fatalf("query = %q, want audio script-aware path preservation", query)
+	}
+	if !strings.Contains(query, "THEN COALESCE(EXCLUDED.audio_path, questions.audio_path)") {
+		t.Fatalf("query = %q, want existing audio path preserved for unchanged script", query)
 	}
 	// audio_file_id is set post-hoc (SetAudioFileID), never via the seed upsert.
 	if strings.Contains(query, "audio_file_id = EXCLUDED.audio_file_id") {
@@ -153,7 +158,9 @@ func TestNewQuestionsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) 
 		"ump.material_id = q.material_id",
 		"ump.user_id = $1",
 		"ump.times_studied > 0",
-		"q.next_review_at IS NULL",
+		"LEFT JOIN user_question_progress uqp",
+		"uqp.user_id = $1",
+		"uqp.question_id IS NULL",
 		"CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END",
 		// Listening questions must not be scheduled before their audio exists.
 		"q.category <> 'listening' OR q.audio_path IS NOT NULL",
@@ -167,17 +174,32 @@ func TestNewQuestionsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) 
 	}
 }
 
+// Reading questions have no unstudied-material fallback: they only become new
+// candidates once their passage material was studied (ADR-036).
+func TestNewQuestionsQueryGatesReadingOnStudiedMaterial(t *testing.T) {
+	if !strings.Contains(
+		newQuestionsForStudiedMaterialsQuery,
+		"q.category <> 'reading' OR ump.material_id IS NOT NULL",
+	) {
+		t.Fatalf("query = %q, want reading studied-material admission gate", newQuestionsForStudiedMaterialsQuery)
+	}
+}
+
 func TestDueReviewsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) {
 	for _, want := range []string{
 		"LEFT JOIN user_material_progress ump",
 		"ump.material_id = q.material_id",
 		"ump.user_id = $1",
 		"ump.times_studied > 0",
-		"q.next_review_at IS NOT NULL",
+		"FROM user_question_progress uqp",
+		"uqp.user_id = $1",
+		"uqp.next_review_at IS NOT NULL",
+		"q.language = $2",
+		"q.proficiency_level = $3",
 		"CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END",
 		"q.item_type IS DISTINCT FROM 'vocab_kanji_recall'",
-		"candidate.kanji_recall_rank <= $3",
-		"LIMIT $2",
+		"candidate.kanji_recall_rank <= $5",
+		"LIMIT $4",
 	} {
 		if !strings.Contains(dueReviewsForStudiedMaterialsQuery, want) {
 			t.Fatalf("query = %q, want %q", dueReviewsForStudiedMaterialsQuery, want)

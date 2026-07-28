@@ -144,7 +144,13 @@ func (sf *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQue
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
 
-	count, _ := sf.bot.services.SRS.GetDueCount(ctx)
+	user, err := sf.bot.services.User.GetUser(ctx, userID, cb.From.UserName)
+	if err != nil {
+		sf.bot.SendMessage(chatID, "❌ 사용자 정보를 불러오는 데 실패했습니다.")
+		return
+	}
+
+	count, _ := sf.bot.services.SRS.GetDueCount(ctx, userID, user.Language, user.ProficiencyLevel)
 	if count == 0 {
 		sf.bot.EditMessage(chatID, cb.Message.MessageID, "✅ 복습할 문제가 없습니다! 훌륭합니다 🎉", mainMenuKeyboard())
 		return
@@ -155,7 +161,13 @@ func (sf *SessionFlow) StartReview(ctx context.Context, cb *tgbotapi.CallbackQue
 		limit = 15
 	}
 
-	session, err := sf.bot.services.SessionBuilder.BuildReviewSession(ctx, userID, limit)
+	session, err := sf.bot.services.SessionBuilder.BuildReviewSession(
+		ctx,
+		userID,
+		user.Language,
+		user.ProficiencyLevel,
+		limit,
+	)
 	if err != nil || session == nil {
 		sf.bot.SendMessage(chatID, "❌ 복습 세션 생성에 실패했습니다.")
 		return

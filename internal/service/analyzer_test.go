@@ -17,15 +17,15 @@ func (m *mockAnalyzerUserRepo) GetByID(ctx context.Context, id int64) (*model.Us
 }
 
 type mockSessionStatRepo struct {
-	getTodayStatsFn       func(ctx context.Context) (int, int, error)
-	getCategoryAccuracyFn func(ctx context.Context) (map[string]float64, error)
+	getTodayStatsFn       func(ctx context.Context, userID int64) (int, int, error)
+	getCategoryAccuracyFn func(ctx context.Context, userID int64) (map[string]float64, error)
 }
 
-func (m *mockSessionStatRepo) GetTodayStats(ctx context.Context) (int, int, error) {
-	return m.getTodayStatsFn(ctx)
+func (m *mockSessionStatRepo) GetTodayStats(ctx context.Context, userID int64) (int, int, error) {
+	return m.getTodayStatsFn(ctx, userID)
 }
-func (m *mockSessionStatRepo) GetCategoryAccuracy(ctx context.Context) (map[string]float64, error) {
-	return m.getCategoryAccuracyFn(ctx)
+func (m *mockSessionStatRepo) GetCategoryAccuracy(ctx context.Context, userID int64) (map[string]float64, error) {
+	return m.getCategoryAccuracyFn(ctx, userID)
 }
 
 func TestGetUserStats_MapsFieldsCorrectly(t *testing.T) {
@@ -39,10 +39,16 @@ func TestGetUserStats_MapsFieldsCorrectly(t *testing.T) {
 	}
 
 	sRepo := &mockSessionStatRepo{
-		getTodayStatsFn: func(ctx context.Context) (int, int, error) {
+		getTodayStatsFn: func(ctx context.Context, gotUserID int64) (int, int, error) {
+			if gotUserID != userID {
+				t.Fatalf("userID = %d, want %d", gotUserID, userID)
+			}
 			return 10, 7, nil
 		},
-		getCategoryAccuracyFn: func(ctx context.Context) (map[string]float64, error) {
+		getCategoryAccuracyFn: func(ctx context.Context, gotUserID int64) (map[string]float64, error) {
+			if gotUserID != userID {
+				t.Fatalf("userID = %d, want %d", gotUserID, userID)
+			}
 			return map[string]float64{
 				string(model.CategoryVocabulary): 80.0,
 			}, nil
@@ -77,10 +83,10 @@ func TestGetUserStats_ZeroDivision(t *testing.T) {
 	}
 
 	sRepo := &mockSessionStatRepo{
-		getTodayStatsFn: func(ctx context.Context) (int, int, error) {
+		getTodayStatsFn: func(ctx context.Context, userID int64) (int, int, error) {
 			return 0, 0, nil
 		},
-		getCategoryAccuracyFn: func(ctx context.Context) (map[string]float64, error) {
+		getCategoryAccuracyFn: func(ctx context.Context, userID int64) (map[string]float64, error) {
 			return map[string]float64{}, nil
 		},
 	}
@@ -100,7 +106,7 @@ func TestGetWeakAreas_FiltersBelow60(t *testing.T) {
 	ctx := context.Background()
 
 	sRepo := &mockSessionStatRepo{
-		getCategoryAccuracyFn: func(ctx context.Context) (map[string]float64, error) {
+		getCategoryAccuracyFn: func(ctx context.Context, userID int64) (map[string]float64, error) {
 			return map[string]float64{
 				"vocabulary": 59.9,
 				"grammar":    60.0,
@@ -110,7 +116,7 @@ func TestGetWeakAreas_FiltersBelow60(t *testing.T) {
 	}
 
 	analyzer := NewAnalyzerService(nil, sRepo)
-	weakAreas, err := analyzer.GetWeakAreas(ctx)
+	weakAreas, err := analyzer.GetWeakAreas(ctx, 123)
 
 	if err != nil {
 		t.Fatalf("GetWeakAreas failed: %v", err)

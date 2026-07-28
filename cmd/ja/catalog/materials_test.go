@@ -128,15 +128,100 @@ func TestBuildAllMaterialsIncludesGrammar(t *testing.T) {
 	t.Parallel()
 
 	materials := BuildAllMaterials()
-	want := len(KanaMap) + len(N5Words) + len(N5GrammarPoints)
+	want := len(KanaMap) + len(N5Words) + len(N5GrammarPoints) + len(N5ReadingPassages)
 	if len(materials) != want {
 		t.Fatalf("len(materials) = %d, want %d", len(materials), want)
 	}
 
 	keys := materialKeys(materials)
-	for _, key := range []string{"ja:kana:u3042", "ja:vocab:n5_word_024", "ja:grammar:n5_grammar_001"} {
+	for _, key := range []string{
+		"ja:kana:u3042",
+		"ja:vocab:n5_word_024",
+		"ja:grammar:n5_grammar_001",
+		"ja:reading:n5_reading_0001",
+	} {
 		if !keys[key] {
 			t.Fatalf("missing material key %q", key)
+		}
+	}
+}
+
+func TestBuildReadingMaterials(t *testing.T) {
+	t.Parallel()
+
+	passages := []ReadingPassage{
+		{
+			ID:      "n5_reading_0001",
+			Skill:   model.SkillReadingShort,
+			Title:   "図書館のお知らせ",
+			Passage: "図書館は毎週月曜日が休みです。",
+			Reading: "としょかんはまいしゅうげつようびがやすみです。",
+			KeyVocabulary: []ReadingVocabulary{
+				{Surface: "図書館", Reading: "としょかん", MeaningKo: "도서관"},
+			},
+			Difficulty: 2,
+		},
+	}
+
+	materials := BuildReadingMaterials(passages)
+	if len(materials) != 1 {
+		t.Fatalf("len(materials) = %d, want 1", len(materials))
+	}
+
+	material := materials[0]
+	if material.MaterialKey != "ja:reading:n5_reading_0001" ||
+		material.Category != model.MaterialCategoryReading ||
+		material.Language != VocabLanguage ||
+		material.ProficiencyLevel != VocabProficiencyLevel ||
+		material.Title != "図書館のお知らせ" ||
+		material.Difficulty != 2 {
+		t.Fatalf("unexpected reading material metadata: %+v", material)
+	}
+}
+
+func TestBuildReadingMaterialsPayload(t *testing.T) {
+	t.Parallel()
+
+	passages := []ReadingPassage{
+		{
+			ID:      "n5_reading_0002",
+			Skill:   model.SkillReadingShort,
+			Title:   "田中さんの朝",
+			Passage: "田中さんは毎朝6時に起きます。",
+			Reading: "たなかさんはまいあさろくじにおきます。",
+			KeyVocabulary: []ReadingVocabulary{
+				{Surface: "起きる", Reading: "おきる", MeaningKo: "일어나다"},
+			},
+			// Quiz-only fields must never leak into the study payload.
+			Prompt:        "田中さんは何時に起きますか。",
+			Options:       []string{"6時", "7時", "8時", "9時"},
+			CorrectAnswer: "6時",
+			Explanation:   "「毎朝6時に起きます」라고 했습니다.",
+			Difficulty:    1,
+		},
+	}
+
+	materials := BuildReadingMaterials(passages)
+	if len(materials) != 1 {
+		t.Fatalf("len(materials) = %d, want 1", len(materials))
+	}
+
+	var payload ReadingMaterialPayload
+	if err := json.Unmarshal(materials[0].Payload, &payload); err != nil {
+		t.Fatalf("unmarshal reading payload: %v", err)
+	}
+	if payload.Passage != "田中さんは毎朝6時に起きます。" ||
+		payload.Reading != "たなかさんはまいあさろくじにおきます。" ||
+		len(payload.KeyVocabulary) != 1 ||
+		payload.KeyVocabulary[0].Surface != "起きる" {
+		t.Fatalf("unexpected reading payload: %+v", payload)
+	}
+
+	raw := string(materials[0].Payload)
+	// "7時" appears only in the quiz options; "何時に" only in the quiz prompt.
+	for _, leaked := range []string{"prompt", "correct_answer", "explanation", "7時", "何時に"} {
+		if strings.Contains(raw, leaked) {
+			t.Fatalf("reading payload leaks quiz field %q: %s", leaked, raw)
 		}
 	}
 }

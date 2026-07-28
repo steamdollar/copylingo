@@ -225,14 +225,14 @@ func TestActiveSessionRecordAnswerUpdatesProgressAndSRS(t *testing.T) {
 	if item.SessionQuestion.IsCorrect == nil || !*item.SessionQuestion.IsCorrect {
 		t.Fatalf("expected correct answer, got %+v", item.SessionQuestion.IsCorrect)
 	}
-	if item.Question.TimesServed != 1 || item.Question.TimesCorrect != 1 {
+	if item.Progress.TimesServed != 1 || item.Progress.TimesCorrect != 1 {
 		t.Fatalf(
 			"expected stats to increment, got served=%d correct=%d",
-			item.Question.TimesServed,
-			item.Question.TimesCorrect,
+			item.Progress.TimesServed,
+			item.Progress.TimesCorrect,
 		)
 	}
-	if item.Question.NextReviewAt == nil || item.Question.LastReviewedAt == nil {
+	if item.Progress.NextReviewAt == nil || item.Progress.LastReviewedAt == nil {
 		t.Fatal("expected SRS timestamps to be set")
 	}
 }
@@ -265,8 +265,8 @@ func TestActiveSessionRecordAnswerUsesCurrentDuplicateOccurrence(t *testing.T) {
 			ID:            1,
 			Type:          model.QuestionMultipleChoice,
 			CorrectAnswer: "apple",
-			EaseFactor:    2.5,
 		},
+		Progress: model.NewUserQuestionProgress(123, 1),
 	})
 	state.CurrentIndex = 1
 	if err := svc.save(ctx, state); err != nil {
@@ -299,8 +299,8 @@ func TestActiveSessionRecordAnswerRejectsStaleDuplicateCallback(t *testing.T) {
 			ID:            1,
 			Type:          model.QuestionMultipleChoice,
 			CorrectAnswer: "apple",
-			EaseFactor:    2.5,
 		},
+		Progress: model.NewUserQuestionProgress(123, 1),
 	})
 	if err := svc.save(ctx, state); err != nil {
 		t.Fatalf("save failed: %v", err)
@@ -539,9 +539,8 @@ func activeSessionTestState(sessionID int, userID int64, answered bool) *model.A
 		ID:            1,
 		Type:          model.QuestionMultipleChoice,
 		CorrectAnswer: "apple",
-		EaseFactor:    2.5,
 	}, answered)
 	state.Session.UserID = userID
-	state.Items[0].Question.EaseFactor = 2.5
+	state.Items[0].Progress = model.NewUserQuestionProgress(userID, 1)
 	return state
 }

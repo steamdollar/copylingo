@@ -381,3 +381,44 @@
 - **대안**:
   - Material-first를 즉시 구현: 장기 학습 흐름은 좋지만 이번 smoke에 Study domain/schema/renderer 변경까지 결합해 기각.
   - 기존 pipeline 단위 테스트만 유지: 실제 Gemini/ffmpeg/MinIO/Telegram 경계를 검증하지 못해 기각.
+
+---
+
+## ADR-035 → 별도 파일
+
+- **ADR-035**: Question은 language/level별 공유 Catalog로 유지하고 SRS·served/correct는
+  `(user_id, question_id)` 기반 사용자별 Progress로 분리하며, 기존 전역 학습 상태는 현재 owner에게 backfill한다.
+
+→ [ADR-035_user_question_progress.md](ADR-035_user_question_progress.md)
+
+---
+
+## ADR-036: N5 독해는 Material-first Study→Quiz admission으로 도입하고 세션당 1개로 제한한다
+
+- **날짜**: 2026-07-23
+- **상태**: 채택됨
+- **맥락**:
+  - `reading` category Quiz 문항과 독해 학습 이력이 0건이라 N5 합격 가능성 판단에 독해 근거가 없었다.
+  - `CategoryReading`·`SkillReadingShort` taxonomy, generic MCQ renderer, `user_material_progress`/`user_question_progress` SRS가 이미 있어 재사용 가능했다.
+  - 독해 지문은 풀이 시간이 길어 word/grammar 카드와 같은 밀도로 세션에 넣으면 세션 체감 시간이 왜곡된다.
+- **결정**:
+  - `cmd/ja/catalog/data/n5_reading.json`을 원본 SSOT로 두고 original N5 short passage 10개 × 지문당 MCQ 1개를 seed한다. 외부 기사·기출 전문은 복제하지 않으며, 초기 skill은 `reading_short`만 사용한다.
+  - 소유권 사슬은 `n5_reading.json → materials(ja:reading:<id>) → questions(ja:reading:<id>:question:1) → user_question_progress`다. 프로젝트 작성 seed이므로 `contents`는 사용하지 않고 `content_id`는 NULL이다.
+  - Study 카드는 원문·전체 읽기 보조(전문 かな)·핵심 어휘만 공개한다. 한국어 근거는 Quiz `explanation`에서만 공개해 답안 누출을 줄인다.
+  - 독해 Quiz는 **Study 완료한 지문에 대해서만** 신규 후보가 된다(`ump.material_id IS NOT NULL` admission gate — 타 category의 미학습 fallback 예외를 reading에는 주지 않는다).
+  - Study Session·Daily Quiz 모두 **세션당 독해 최대 1개**로 제한한다. Study는 repository ranked CTE의 `category_rank <= 1`로, Quiz는 SessionBuilder admission gate(`maxReadingPerSession`) + relay alloc clamp로 이중 적용한다.
+  - Study 완료 직후 같은 지문 자동 Quiz chaining은 도입하지 않는다. durable session link schema가 필요해 MVP 범위를 넘는다.
+  - 지문 의미가 바뀌면 기존 `question_key`를 재사용하지 않고 새 ID/key를 부여한다(기존 사용자 SRS 오염 방지).
+- **장점**:
+  - 신규 schema/migration 없이 기존 Material SSOT·MCQ renderer·Quiz SRS 경로를 그대로 재사용한다.
+  - Study-first admission이 "학습한 것만 출제" 원칙을 독해에서는 예외 없이 강제해 콘텐츠 품질 검증 루프(10개 수동 검수 → 50개 확장)를 지원한다.
+  - 세션당 1개 cap이 Vocabulary 최소 1/3 예약 정책과 기존 세션 분포를 침범하지 않는다.
+- **단점 / 트레이드오프**:
+  - random relay 특성상 독해가 모든 Daily Quiz에 반드시 나오지는 않는다. 전용 독해 메뉴·노출 보장은 후속 결정이다.
+  - 지문당 MCQ 1개라 한 지문의 다각도 이해(주제/세부/추론)는 측정하지 못한다. corpus 50개 확장 시 재검토한다.
+  - 공식 JLPT 세부 독해 문항 분포 근거가 저장소에 없어 `reading_mid`·`information_retrieval` 분포는 확장 전 별도 검증이 필요하다.
+- **대안**:
+  - Listening처럼 Question-only seed(ADR-034 방식): 독해는 지문 학습 자산이 Study 카드로 그대로 쓰여 Material-first 비용이 낮고, 미학습 지문 즉시 출제는 학습 흐름을 깨므로 기각.
+  - Study 완료 직후 자동 Quiz chaining: session schema 변경·중복 callback 방지가 필요해 MVP 범위 밖으로 기각.
+  - runtime LLM 지문 생성: 품질·비용·재현성 통제가 어려워 정적 original seed 우선으로 기각.
+- **후속 (2026-07-23)**: 품질 검증 루프의 다음 단계로 corpus를 10개 → **40개**(`n5_reading_0001`~`0040`)로 확장했다. Sonnet subagent 3배치(장르 풀 분할: 엽서/안내/학교행사/게시판/생활문 등) 생성 + Opus 전수 검수(reading 전문 かな 전사·정답 유일성·N5 범위) 방식. skill은 여전히 `reading_short`만, 지문당 MCQ 1개, 세션당 1개 cap 등 위 결정은 불변이며 데이터 개수만 증가했다. `reading_mid`·`information_retrieval` 및 50개 초과 확장은 여전히 별도 분포 검증 선결 과제로 남는다.

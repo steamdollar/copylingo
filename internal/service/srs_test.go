@@ -9,28 +9,33 @@ import (
 )
 
 type mockQuestionQuerier struct {
-	getDueReviewsFn     func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
-	getDueReviewCountFn func(ctx context.Context) (int, error)
-	updateSRSFn         func(ctx context.Context, q *model.Question) error
+	getDueReviewsFn func(
+		ctx context.Context,
+		userID int64,
+		language, level string,
+		limit, kanjiRecallLimit int,
+	) ([]model.Question, error)
+	getDueReviewCountFn func(ctx context.Context, userID int64, language, level string) (int, error)
 }
 
 func (m *mockQuestionQuerier) GetDueReviews(
 	ctx context.Context,
 	userID int64,
+	language, level string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, userID, limit, kanjiRecallLimit)
+	return m.getDueReviewsFn(ctx, userID, language, level, limit, kanjiRecallLimit)
 }
 
-func (m *mockQuestionQuerier) GetDueReviewCount(ctx context.Context) (int, error) {
-	return m.getDueReviewCountFn(ctx)
+func (m *mockQuestionQuerier) GetDueReviewCount(
+	ctx context.Context,
+	userID int64,
+	language, level string,
+) (int, error) {
+	return m.getDueReviewCountFn(ctx, userID, language, level)
 }
 
-func (m *mockQuestionQuerier) UpdateSRS(ctx context.Context, q *model.Question) error {
-	return m.updateSRSFn(ctx, q)
-}
-
-func TestProcessAnswer(t *testing.T) {
+func TestScheduleAnswer(t *testing.T) {
 	tests := []struct {
 		name          string
 		initialRep    int
@@ -43,8 +48,6 @@ func TestProcessAnswer(t *testing.T) {
 	}{
 		{
 			name:          "CorrectFirstRepetition",
-			initialRep:    0,
-			initialInt:    0,
 			initialEase:   2.5,
 			isCorrect:     true,
 			expectRep:     1,
@@ -68,7 +71,7 @@ func TestProcessAnswer(t *testing.T) {
 			initialEase:   2.5,
 			isCorrect:     true,
 			expectRep:     3,
-			expectInt:     15, // 6 * 2.5
+			expectInt:     15,
 			expectEaseGte: 1.3,
 		},
 		{
@@ -76,7 +79,6 @@ func TestProcessAnswer(t *testing.T) {
 			initialRep:    3,
 			initialInt:    20,
 			initialEase:   2.5,
-			isCorrect:     false,
 			expectRep:     0,
 			expectInt:     1,
 			expectEaseGte: 1.3,
@@ -85,148 +87,91 @@ func TestProcessAnswer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var capturedQuestion *model.Question
-			mockRepo := &mockQuestionQuerier{
-				updateSRSFn: func(ctx context.Context, q *model.Question) error {
-					capturedQuestion = q
-					return nil
-				},
-			}
-
-			srs := NewSRSService(mockRepo)
-			q := &model.Question{
+			progress := &model.UserQuestionProgress{
 				Repetitions:  tt.initialRep,
 				IntervalDays: tt.initialInt,
 				EaseFactor:   tt.initialEase,
 			}
+			NewSRSService(nil).ScheduleAnswer(progress, tt.isCorrect)
 
-			err := srs.ProcessAnswer(context.Background(), q, tt.isCorrect)
-			if err != nil {
-				t.Fatalf("ProcessAnswer failed: %v", err)
+			if progress.Repetitions != tt.expectRep {
+				t.Errorf("Repetitions = %d, want %d", progress.Repetitions, tt.expectRep)
 			}
-
-			if q.Repetitions != tt.expectRep {
-				t.Errorf("expected Repetitions %d, got %d", tt.expectRep, q.Repetitions)
+			if progress.IntervalDays != tt.expectInt {
+				t.Errorf("IntervalDays = %d, want %d", progress.IntervalDays, tt.expectInt)
 			}
-			if q.IntervalDays != tt.expectInt {
-				t.Errorf("expected IntervalDays %d, got %d", tt.expectInt, q.IntervalDays)
+			if progress.EaseFactor < tt.expectEaseGte {
+				t.Errorf("EaseFactor = %f, want >= %f", progress.EaseFactor, tt.expectEaseGte)
 			}
-			if q.EaseFactor < tt.expectEaseGte {
-				t.Errorf("expected EaseFactor >= %f, got %f", tt.expectEaseGte, q.EaseFactor)
-			}
-			if q.NextReviewAt == nil {
-				t.Error("expected NextReviewAt to be set, got nil")
-			}
-			if q.LastReviewedAt == nil {
-				t.Error("expected LastReviewedAt to be set, got nil")
-			}
-			if capturedQuestion != q {
-				t.Error("UpdateSRS was not called with the correct question")
+			if progress.NextReviewAt == nil || progress.LastReviewedAt == nil {
+				t.Fatal("expected review timestamps")
 			}
 		})
 	}
 }
 
 func TestEaseFactorFloorAt1_3(t *testing.T) {
-	mockRepo := &mockQuestionQuerier{
-		updateSRSFn: func(ctx context.Context, q *model.Question) error {
-			return nil
-		},
-	}
-	srs := NewSRSService(mockRepo)
-
-	q := &model.Question{
-		Repetitions:  1,
-		IntervalDays: 1,
-		EaseFactor:   1.3,
-	}
-
-	// Multiple wrong answers to push EF down
-	for i := 0; i < 5; i++ {
-		_ = srs.ProcessAnswer(context.Background(), q, false)
-		if q.EaseFactor < 1.3 {
-			t.Errorf("EaseFactor dropped below 1.3: %f", q.EaseFactor)
+	srs := NewSRSService(nil)
+	progress := &model.UserQuestionProgress{Repetitions: 1, IntervalDays: 1, EaseFactor: 1.3}
+	for range 5 {
+		srs.ScheduleAnswer(progress, false)
+		if progress.EaseFactor < 1.3 {
+			t.Fatalf("EaseFactor dropped below 1.3: %f", progress.EaseFactor)
 		}
 	}
 }
 
-func TestSRSService_GetDueReviews(t *testing.T) {
+func TestSRSService_GetDueReviewsForwardsUserScope(t *testing.T) {
 	want := []model.Question{{ID: 1}, {ID: 2}}
-	mockRepo := &mockQuestionQuerier{
-		getDueReviewsFn: func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
-			if userID != 42 || limit != 10 || kanjiRecallLimit != 3 {
-				t.Fatalf(
-					"GetDueReviews called with userID=%d limit=%d kanjiRecallLimit=%d, want 42,10,3",
-					userID,
-					limit,
-					kanjiRecallLimit,
-				)
+	repo := &mockQuestionQuerier{
+		getDueReviewsFn: func(
+			_ context.Context,
+			userID int64,
+			language, level string,
+			limit, kanjiRecallLimit int,
+		) ([]model.Question, error) {
+			if userID != 42 || language != "ja" || level != "N5" || limit != 10 || kanjiRecallLimit != 3 {
+				t.Fatalf("unexpected scope: %d %s %s %d %d", userID, language, level, limit, kanjiRecallLimit)
 			}
 			return want, nil
 		},
 	}
-	srs := NewSRSService(mockRepo)
 
-	got, err := srs.GetDueReviews(context.Background(), 42, 10, 3)
-	if err != nil {
-		t.Fatalf("GetDueReviews() error = %v", err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("GetDueReviews() len = %d, want 2", len(got))
+	got, err := NewSRSService(repo).GetDueReviews(context.Background(), 42, "ja", "N5", 10, 3)
+	if err != nil || len(got) != len(want) {
+		t.Fatalf("GetDueReviews() = %v, %v", got, err)
 	}
 }
 
-func TestSRSService_GetDueReviews_PropagatesError(t *testing.T) {
+func TestSRSService_GetDueReviewsPropagatesError(t *testing.T) {
 	expectedErr := errors.New("query failed")
-	mockRepo := &mockQuestionQuerier{
-		getDueReviewsFn: func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
+	repo := &mockQuestionQuerier{
+		getDueReviewsFn: func(
+			context.Context,
+			int64,
+			string, string,
+			int, int,
+		) ([]model.Question, error) {
 			return nil, expectedErr
 		},
 	}
-	srs := NewSRSService(mockRepo)
-
-	if _, err := srs.GetDueReviews(context.Background(), 1, 1, 0); !errors.Is(err, expectedErr) {
+	_, err := NewSRSService(repo).GetDueReviews(context.Background(), 1, "ja", "N5", 1, 0)
+	if !errors.Is(err, expectedErr) {
 		t.Fatalf("GetDueReviews() error = %v, want %v", err, expectedErr)
 	}
 }
 
-func TestSRSService_GetDueCount(t *testing.T) {
-	mockRepo := &mockQuestionQuerier{
-		getDueReviewCountFn: func(ctx context.Context) (int, error) {
+func TestSRSService_GetDueCountForwardsUserScope(t *testing.T) {
+	repo := &mockQuestionQuerier{
+		getDueReviewCountFn: func(_ context.Context, userID int64, language, level string) (int, error) {
+			if userID != 42 || language != "ja" || level != "N5" {
+				t.Fatalf("unexpected scope: %d %s %s", userID, language, level)
+			}
 			return 7, nil
 		},
 	}
-	srs := NewSRSService(mockRepo)
-
-	got, err := srs.GetDueCount(context.Background())
-	if err != nil {
-		t.Fatalf("GetDueCount() error = %v", err)
-	}
-	if got != 7 {
-		t.Fatalf("GetDueCount() = %d, want 7", got)
-	}
-}
-
-func TestProcessAnswer_UpdateSRSFails(t *testing.T) {
-	expectedErr := errors.New("update srs failed")
-	mockRepo := &mockQuestionQuerier{
-		updateSRSFn: func(ctx context.Context, q *model.Question) error {
-			return expectedErr
-		},
-	}
-	srs := NewSRSService(mockRepo)
-
-	q := &model.Question{
-		Repetitions:  0,
-		IntervalDays: 0,
-		EaseFactor:   2.5,
-	}
-
-	err := srs.ProcessAnswer(context.Background(), q, true)
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("expected UpdateSRS error %v, got %v", expectedErr, err)
-	}
-	if q.NextReviewAt == nil {
-		t.Error("expected schedule to be updated before repository failure")
+	got, err := NewSRSService(repo).GetDueCount(context.Background(), 42, "ja", "N5")
+	if err != nil || got != 7 {
+		t.Fatalf("GetDueCount() = %d, %v", got, err)
 	}
 }

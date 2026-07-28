@@ -28,7 +28,7 @@ type activeSessionRepository interface {
 }
 
 type activeSessionScheduler interface {
-	ScheduleAnswer(question *model.Question, isCorrect bool)
+	ScheduleAnswer(progress *model.UserQuestionProgress, isCorrect bool)
 }
 
 // SessionWrongAnswer contains enough data to render a completed wrong-answer summary without DB reads.
@@ -150,14 +150,14 @@ func (s *ActiveSessionService) RecordAnswer(
 	correct := isCorrect
 	state.Items[idx].SessionQuestion.UserAnswer = &answer
 	state.Items[idx].SessionQuestion.IsCorrect = &correct
-	state.Items[idx].Question.TimesServed++
+	state.Items[idx].Progress.TimesServed++
 	if isCorrect {
-		state.Items[idx].Question.TimesCorrect++
+		state.Items[idx].Progress.TimesCorrect++
 	}
 	if s.srs == nil {
 		return ErrActiveSessionDependencyMissing
 	}
-	s.srs.ScheduleAnswer(&state.Items[idx].Question, isCorrect)
+	s.srs.ScheduleAnswer(&state.Items[idx].Progress, isCorrect)
 
 	state.CurrentIndex = idx
 	state.UpdatedAt = time.Now()

@@ -219,6 +219,13 @@ func TestStartReview_NoneDue(t *testing.T) {
 	b := &Bot{
 		api: mAPI,
 		services: &service.Services{
+			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
+				context.Context,
+				int64,
+				string,
+			) (*model.User, error) {
+				return &model.User{ID: 123, Language: "ja", ProficiencyLevel: "N5"}, nil
+			}}),
 			SRS:            srs,
 			SessionBuilder: sb,
 		},
@@ -258,6 +265,7 @@ type mockSRSRepoWithCount struct {
 func (m *mockSRSRepoWithCount) GetDueReviews(
 	ctx context.Context,
 	userID int64,
+	language, level string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	if m.count > 0 {
@@ -266,7 +274,11 @@ func (m *mockSRSRepoWithCount) GetDueReviews(
 	return nil, nil
 }
 
-func (m *mockSRSRepoWithCount) GetDueReviewCount(ctx context.Context) (int, error) {
+func (m *mockSRSRepoWithCount) GetDueReviewCount(
+	ctx context.Context,
+	userID int64,
+	language, level string,
+) (int, error) {
 	return m.count, nil
 }
 
@@ -278,6 +290,13 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 	b := &Bot{
 		api: mAPI,
 		services: &service.Services{
+			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
+				context.Context,
+				int64,
+				string,
+			) (*model.User, error) {
+				return &model.User{ID: 123, Language: "ja", ProficiencyLevel: "N5"}, nil
+			}}),
 			SRS: srs,
 		},
 	}

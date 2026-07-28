@@ -49,20 +49,22 @@ type mockSRS struct {
 	getDueReviewsFn func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
 	getDueCountFn   func(ctx context.Context) (int, error)
 	processAnswerFn func(ctx context.Context, q *model.Question, isCorrect bool) error
+	gotLanguage     string
+	gotLevel        string
 }
 
 func (m *mockSRS) GetDueReviews(
 	ctx context.Context,
 	userID int64,
+	language, level string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
+	m.gotLanguage = language
+	m.gotLevel = level
 	return m.getDueReviewsFn(ctx, userID, limit, kanjiRecallLimit)
 }
-func (m *mockSRS) GetDueCount(ctx context.Context) (int, error) {
+func (m *mockSRS) GetDueCount(ctx context.Context, userID int64, language, level string) (int, error) {
 	return m.getDueCountFn(ctx)
-}
-func (m *mockSRS) ProcessAnswer(ctx context.Context, q *model.Question, correct bool) error {
-	return m.processAnswerFn(ctx, q, correct)
 }
 
 type mockLLM struct {
@@ -371,6 +373,7 @@ func activeStateForQuestion(sessionID int, question model.Question, answered boo
 					IsCorrect:  isCorrect,
 				},
 				Question: question,
+				Progress: model.NewUserQuestionProgress(1, question.ID),
 			},
 		},
 	}

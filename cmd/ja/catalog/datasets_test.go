@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/model"
@@ -125,6 +126,82 @@ func TestN5Listening_Integrity(t *testing.T) {
 		}
 		if !seenOptions[question.CorrectAnswer] {
 			t.Errorf("question %q correct answer %q is not in options", question.ID, question.CorrectAnswer)
+		}
+	}
+}
+
+func TestN5Reading_Integrity(t *testing.T) {
+	if len(N5ReadingPassages) != 40 {
+		t.Fatalf("expected 40 reading passages, got %d", len(N5ReadingPassages))
+	}
+
+	// The seeder inlines passage/prompt/options into an HTML prompt without
+	// escaping, so the dataset itself must stay free of HTML-special characters.
+	assertNoHTMLSpecials := func(id, field, value string) {
+		if strings.ContainsAny(value, "<>&") {
+			t.Errorf("passage %q field %s contains HTML-special characters: %q", id, field, value)
+		}
+	}
+
+	seenIDs := make(map[string]bool, len(N5ReadingPassages))
+	seenPassages := make(map[string]bool, len(N5ReadingPassages))
+	seenPrompts := make(map[string]bool, len(N5ReadingPassages))
+	for i, passage := range N5ReadingPassages {
+		if wantID := fmt.Sprintf("n5_reading_%04d", i+1); passage.ID != wantID {
+			t.Errorf("reading passage %d ID = %q, want %q", i, passage.ID, wantID)
+		}
+		if passage.ID == "" || passage.Title == "" || passage.Passage == "" ||
+			passage.Reading == "" || passage.Prompt == "" ||
+			passage.CorrectAnswer == "" || passage.Explanation == "" {
+			t.Errorf("reading passage %d (%q) has an empty required field", i, passage.ID)
+		}
+		if seenIDs[passage.ID] {
+			t.Errorf("duplicate reading ID %q", passage.ID)
+		}
+		seenIDs[passage.ID] = true
+		if seenPassages[passage.Passage] {
+			t.Errorf("duplicate reading passage text for %q", passage.ID)
+		}
+		seenPassages[passage.Passage] = true
+		if seenPrompts[passage.Prompt] {
+			t.Errorf("duplicate reading prompt for %q", passage.ID)
+		}
+		seenPrompts[passage.Prompt] = true
+		// reading_short only for the initial 10-passage corpus; other reading
+		// skills need a separate distribution decision before the 50 expansion.
+		if passage.Skill != model.SkillReadingShort {
+			t.Errorf("passage %q has unsupported skill %q", passage.ID, passage.Skill)
+		}
+		if passage.Difficulty < 1 || passage.Difficulty > 3 {
+			t.Errorf("passage %q has difficulty %d, want 1..3", passage.ID, passage.Difficulty)
+		}
+		if len(passage.KeyVocabulary) == 0 {
+			t.Errorf("passage %q has no key vocabulary", passage.ID)
+		}
+		for _, vocab := range passage.KeyVocabulary {
+			if vocab.Surface == "" || vocab.Reading == "" || vocab.MeaningKo == "" {
+				t.Errorf("passage %q has an incomplete key vocabulary entry: %+v", passage.ID, vocab)
+			}
+		}
+		assertNoHTMLSpecials(passage.ID, "passage", passage.Passage)
+		assertNoHTMLSpecials(passage.ID, "prompt", passage.Prompt)
+
+		if len(passage.Options) != 4 {
+			t.Errorf("passage %q has %d options, want 4", passage.ID, len(passage.Options))
+		}
+		seenOptions := make(map[string]bool, len(passage.Options))
+		for _, option := range passage.Options {
+			if option == "" {
+				t.Errorf("passage %q has an empty option", passage.ID)
+			}
+			if seenOptions[option] {
+				t.Errorf("passage %q has duplicate option %q", passage.ID, option)
+			}
+			seenOptions[option] = true
+			assertNoHTMLSpecials(passage.ID, "option", option)
+		}
+		if !seenOptions[passage.CorrectAnswer] {
+			t.Errorf("passage %q correct answer %q is not in options", passage.ID, passage.CorrectAnswer)
 		}
 	}
 }

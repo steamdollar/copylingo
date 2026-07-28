@@ -33,6 +33,8 @@
 #
 #   DB / tooling
 #     migrate         apply migrations/NNN_*.sql in order (psql)
+#     backfill-user-question-progress
+#                     copy legacy Question progress to OWNER_ID (required)
 #     lint            golangci-lint run
 #     fmt             golangci-lint fmt + run --fix
 #     lint-install    install golangci-lint v2
@@ -40,7 +42,7 @@
 #     deps            go mod tidy + download
 # ============================================================================
 
-.PHONY: build run test clean docker-up docker-down migrate dev app-up app-logs restart-app restart-db restart-redis infra tunnel tmux tmux-stop
+.PHONY: build run test clean docker-up docker-down migrate backfill-user-question-progress dev app-up app-logs restart-app restart-db restart-redis infra tunnel tmux tmux-stop
 
 # Build the application
 build:
@@ -182,6 +184,11 @@ migrate:
 		echo "==> Applying $$f"; \
 		psql -h localhost -U copylingo -d copylingo -v ON_ERROR_STOP=1 -f $$f || exit 1; \
 	done
+
+backfill-user-question-progress:
+	@test -n "$(OWNER_ID)" || (echo "OWNER_ID is required" >&2; exit 1)
+	psql -h localhost -U copylingo -d copylingo -v ON_ERROR_STOP=1 \
+		-v owner_id="$(OWNER_ID)" -f scripts/backfill_user_question_progress.sql
 
 # Development: start infra only (DB + Redis + MinIO object store).
 # minio-createbucket is a one-shot that creates the audio bucket, then exits.

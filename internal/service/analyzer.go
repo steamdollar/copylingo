@@ -11,8 +11,8 @@ type analyzerUserRepo interface {
 }
 
 type sessionStatRepo interface {
-	GetTodayStats(ctx context.Context) (int, int, error)
-	GetCategoryAccuracy(ctx context.Context) (map[string]float64, error)
+	GetTodayStats(ctx context.Context, userID int64) (int, int, error)
+	GetCategoryAccuracy(ctx context.Context, userID int64) (map[string]float64, error)
 }
 
 // AnalyzerService provides learning analytics and recommendations.
@@ -35,12 +35,12 @@ func (a *AnalyzerService) GetUserStats(ctx context.Context, userID int64) (*mode
 		return nil, err
 	}
 
-	todayTotal, todayCorrect, err := a.sessionQuestionRepo.GetTodayStats(ctx)
+	todayTotal, todayCorrect, err := a.sessionQuestionRepo.GetTodayStats(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(ctx)
+	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +66,8 @@ func (a *AnalyzerService) GetUserStats(ctx context.Context, userID int64) (*mode
 }
 
 // GetWeakAreas returns the user's weakest categories for targeted practice.
-func (a *AnalyzerService) GetWeakAreas(ctx context.Context) ([]model.WeakArea, error) {
-	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(ctx)
+func (a *AnalyzerService) GetWeakAreas(ctx context.Context, userID int64) ([]model.WeakArea, error) {
+	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

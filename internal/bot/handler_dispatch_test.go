@@ -27,14 +27,14 @@ type mockSRSRepo struct{}
 func (m *mockSRSRepo) GetDueReviews(
 	ctx context.Context,
 	userID int64,
+	language, level string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	return nil, nil
 }
-func (m *mockSRSRepo) GetDueReviewCount(ctx context.Context) (int, error) {
+func (m *mockSRSRepo) GetDueReviewCount(ctx context.Context, userID int64, language, level string) (int, error) {
 	return 5, nil // Return 5 for main menu display test
 }
-func (m *mockSRSRepo) UpdateSRS(ctx context.Context, q *model.Question) error { return nil }
 
 type mockStatsRepo struct {
 	getTodayStatsFn func(ctx context.Context, userID int64) (*model.UserStats, error)

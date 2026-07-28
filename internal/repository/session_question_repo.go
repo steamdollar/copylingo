@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
+
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -45,7 +46,12 @@ func (r *SessionQuestionRepository) GetBySession(ctx context.Context, sessionID 
 }
 
 // RecordAnswer updates the user's answer for a session question.
-func (r *SessionQuestionRepository) RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error {
+func (r *SessionQuestionRepository) RecordAnswer(
+	ctx context.Context,
+	sessionID, questionID int,
+	userAnswer string,
+	isCorrect bool,
+) error {
 	if _, err := r.db.ExecContext(ctx, `
 		UPDATE session_questions
 		SET user_answer = $3, is_correct = $4
@@ -58,7 +64,10 @@ func (r *SessionQuestionRepository) RecordAnswer(ctx context.Context, sessionID,
 }
 
 // GetWrongAnswers returns wrong answers for a session.
-func (r *SessionQuestionRepository) GetWrongAnswers(ctx context.Context, sessionID int) ([]model.SessionQuestion, error) {
+func (r *SessionQuestionRepository) GetWrongAnswers(
+	ctx context.Context,
+	sessionID int,
+) ([]model.SessionQuestion, error) {
 	var sqs []model.SessionQuestion
 	if err := r.db.SelectContext(ctx, &sqs, `
 		SELECT * FROM session_questions
@@ -71,7 +80,10 @@ func (r *SessionQuestionRepository) GetWrongAnswers(ctx context.Context, session
 }
 
 // GetCategoryAccuracy returns accuracy rate per category for answered questions.
-func (r *SessionQuestionRepository) GetCategoryAccuracy(ctx context.Context) (map[string]float64, error) {
+func (r *SessionQuestionRepository) GetCategoryAccuracy(
+	ctx context.Context,
+	userID int64,
+) (map[string]float64, error) {
 	type row struct {
 		Category string  `db:"category"`
 		Accuracy float64 `db:"accuracy"`
@@ -83,11 +95,12 @@ func (r *SessionQuestionRepository) GetCategoryAccuracy(ctx context.Context) (ma
 			ELSE ROUND(COUNT(*) FILTER (WHERE sq.is_correct) * 100.0 / COUNT(*), 1)
 			END as accuracy
 		FROM session_questions sq
+		JOIN sessions s ON s.id = sq.session_id
 		JOIN questions q ON q.id = sq.question_id
-		WHERE sq.is_correct IS NOT NULL
+		WHERE sq.is_correct IS NOT NULL AND s.user_id = $1
 		GROUP BY q.category
-	`); err != nil {
-		return nil, fmt.Errorf("get category accuracy: %w", err)
+	`, userID); err != nil {
+		return nil, fmt.Errorf("get category accuracy user_id=%d: %w", userID, err)
 	}
 
 	result := make(map[string]float64)
@@ -98,7 +111,7 @@ func (r *SessionQuestionRepository) GetCategoryAccuracy(ctx context.Context) (ma
 }
 
 // GetTodayStats returns today's answer stats.
-func (r *SessionQuestionRepository) GetTodayStats(ctx context.Context) (int, int, error) {
+func (r *SessionQuestionRepository) GetTodayStats(ctx context.Context, userID int64) (int, int, error) {
 	type stats struct {
 		Total   int `db:"total"`
 		Correct int `db:"correct"`
@@ -108,9 +121,11 @@ func (r *SessionQuestionRepository) GetTodayStats(ctx context.Context) (int, int
 		SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE sq.is_correct) as correct
 		FROM session_questions sq
 		JOIN sessions s ON s.id = sq.session_id
-		WHERE sq.is_correct IS NOT NULL AND s.created_at::date = CURRENT_DATE
-	`); err != nil {
-		return 0, 0, fmt.Errorf("get today session question stats: %w", err)
+		WHERE sq.is_correct IS NOT NULL
+		  AND s.user_id = $1
+		  AND s.created_at::date = CURRENT_DATE
+	`, userID); err != nil {
+		return 0, 0, fmt.Errorf("get today session question stats user_id=%d: %w", userID, err)
 	}
 	return s.Total, s.Correct, nil
 }

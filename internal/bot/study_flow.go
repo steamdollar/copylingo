@@ -282,6 +282,8 @@ func renderStudyMaterial(material model.Material, idx, total int) string {
 		return header + title + renderVocabularyPayload(material.Payload)
 	case model.MaterialCategoryGrammar:
 		return header + title + renderGrammarPayload(material.Payload)
+	case model.MaterialCategoryReading:
+		return header + title + renderReadingPayload(material.Payload)
 	default:
 		return header + title + renderGenericPayload(material.Payload)
 	}
@@ -349,6 +351,57 @@ func renderGrammarPayload(payload json.RawMessage) string {
 	return "\n\n" + strings.Join(lines, "\n")
 }
 
+type readingStudyVocabulary struct {
+	Surface   string `json:"surface"`
+	Reading   string `json:"reading"`
+	MeaningKo string `json:"meaning_ko"`
+}
+
+type readingStudyPayload struct {
+	Passage       string                   `json:"passage"`
+	Reading       string                   `json:"reading"`
+	KeyVocabulary []readingStudyVocabulary `json:"key_vocabulary"`
+}
+
+// renderReadingPayload shows the passage, its full-hiragana reading aid, and
+// key vocabulary. The Korean translation and answer rationale intentionally
+// stay out — they surface only in the quiz explanation (ADR-036).
+func renderReadingPayload(payload json.RawMessage) string {
+	var reading readingStudyPayload
+	if err := json.Unmarshal(payload, &reading); err != nil {
+		return renderGenericPayload(payload)
+	}
+
+	sections := make([]string, 0, 3)
+	if strings.TrimSpace(reading.Passage) != "" {
+		sections = append(sections, fmt.Sprintf("<b>%s</b>", escapeHTML(reading.Passage)))
+	}
+	if strings.TrimSpace(reading.Reading) != "" {
+		sections = append(sections, fmt.Sprintf("읽기: %s", escapeHTML(reading.Reading)))
+	}
+	vocabLines := make([]string, 0, len(reading.KeyVocabulary))
+	for _, vocab := range reading.KeyVocabulary {
+		if strings.TrimSpace(vocab.Surface) == "" {
+			continue
+		}
+		line := fmt.Sprintf("・<b>%s</b>", escapeHTML(vocab.Surface))
+		if strings.TrimSpace(vocab.Reading) != "" && vocab.Reading != vocab.Surface {
+			line += fmt.Sprintf(" (%s)", escapeHTML(vocab.Reading))
+		}
+		if strings.TrimSpace(vocab.MeaningKo) != "" {
+			line += fmt.Sprintf(" — %s", escapeHTML(vocab.MeaningKo))
+		}
+		vocabLines = append(vocabLines, line)
+	}
+	if len(vocabLines) > 0 {
+		sections = append(sections, "핵심 어휘:\n"+strings.Join(vocabLines, "\n"))
+	}
+	if len(sections) == 0 {
+		return ""
+	}
+	return "\n\n" + strings.Join(sections, "\n\n")
+}
+
 func renderGenericPayload(payload json.RawMessage) string {
 	if len(payload) == 0 || string(payload) == "null" {
 		return ""
@@ -368,6 +421,8 @@ func materialCategoryLabel(category model.MaterialCategory) string {
 		return "Vocabulary"
 	case model.MaterialCategoryGrammar:
 		return "Grammar"
+	case model.MaterialCategoryReading:
+		return "Reading"
 	case model.MaterialCategorySentence:
 		return "Sentence"
 	default:

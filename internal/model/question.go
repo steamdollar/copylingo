@@ -79,7 +79,7 @@ const (
 	CategoryListening   QuestionCategory = "listening"
 )
 
-// Question represents a single learning question with embedded SRS state.
+// Question represents a reusable learning-question catalog entry.
 type Question struct {
 	ID               int              `db:"id"                json:"id"`
 	QuestionKey      *string          `db:"question_key"      json:"question_key,omitempty"`
@@ -98,15 +98,7 @@ type Question struct {
 	AudioScript      *string          `db:"audio_script"      json:"audio_script,omitempty"`  // listening: text synthesized into audio (ADR-031)
 	AudioFileID      *string          `db:"audio_file_id"     json:"audio_file_id,omitempty"` // listening: cached Telegram file_id (ADR-032)
 	Difficulty       int              `db:"difficulty"        json:"difficulty"`
-	TimesServed      int              `db:"times_served"      json:"times_served"`
-	TimesCorrect     int              `db:"times_correct"     json:"times_correct"`
-	// SRS (SM-2) state
-	EaseFactor     float64    `db:"ease_factor"      json:"ease_factor"`
-	IntervalDays   int        `db:"interval_days"    json:"interval_days"`
-	Repetitions    int        `db:"repetitions"      json:"repetitions"`
-	NextReviewAt   *time.Time `db:"next_review_at"   json:"next_review_at"`
-	LastReviewedAt *time.Time `db:"last_reviewed_at" json:"last_reviewed_at"`
-	CreatedAt      time.Time  `db:"created_at"       json:"created_at"`
+	CreatedAt        time.Time        `db:"created_at"        json:"created_at"`
 }
 
 // GetOptions parses the JSONB options field into a string slice.

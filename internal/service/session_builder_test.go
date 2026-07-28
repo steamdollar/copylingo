@@ -296,13 +296,16 @@ func TestBuildReviewSession_OnlySRS(t *testing.T) {
 	}
 
 	builder := NewSessionBuilderService(nil, sStore, sqStore, srsMock)
-	session, err := builder.BuildReviewSession(ctx, userID, 5)
+	session, err := builder.BuildReviewSession(ctx, userID, "ja", "N5", 5)
 
 	if err != nil {
 		t.Fatalf("BuildReviewSession failed: %v", err)
 	}
 	if session.TotalQuestions != 2 {
 		t.Errorf("expected 2 questions, got %d", session.TotalQuestions)
+	}
+	if srsMock.gotLanguage != "ja" || srsMock.gotLevel != "N5" {
+		t.Fatalf("due scope = %s/%s, want ja/N5", srsMock.gotLanguage, srsMock.gotLevel)
 	}
 }
 
@@ -358,7 +361,7 @@ func TestBuildReviewSession_CapsKanjiRecallAdmissionAtThree(t *testing.T) {
 	}
 
 	builder := NewSessionBuilderService(nil, sStore, sqStore, srsMock)
-	session, err := builder.BuildReviewSession(ctx, 123, 10)
+	session, err := builder.BuildReviewSession(ctx, 123, "ja", "N5", 10)
 	if err != nil {
 		t.Fatalf("BuildReviewSession failed: %v", err)
 	}
@@ -485,7 +488,7 @@ func TestBuildSession_CreateFails(t *testing.T) {
 	}
 
 	builder := NewSessionBuilderService(nil, sStore, nil, srsMock)
-	_, err := builder.BuildReviewSession(ctx, userID, 5)
+	_, err := builder.BuildReviewSession(ctx, userID, "ja", "N5", 5)
 
 	if err == nil {
 		t.Error("expected error when session creation fails")
@@ -523,7 +526,7 @@ func TestBuildSession_CreateSessionQuestionsFails(t *testing.T) {
 	}
 
 	builder := NewSessionBuilderService(nil, sStore, sqStore, srsMock)
-	_, err := builder.BuildReviewSession(ctx, userID, 5)
+	_, err := builder.BuildReviewSession(ctx, userID, "ja", "N5", 5)
 
 	if !errors.Is(err, expectedErr) {
 		t.Fatalf("expected CreateSessionQuestions error %v, got %v", expectedErr, err)
@@ -560,6 +563,81 @@ func TestBuildSession_DeduplicatesQuestionIDs(t *testing.T) {
 			}
 			if sqs[0].QuestionID != 1 || sqs[1].QuestionID != 2 {
 				t.Fatalf("unexpected question ids: %+v", sqs)
+			}
+			return nil
+		},
+	}
+
+	builder := NewSessionBuilderService(qFetcher, sStore, sqStore, srsMock)
+	session, err := builder.BuildMorningSession(ctx, userID, "ja", "N5")
+	if err != nil {
+		t.Fatalf("BuildMorningSession failed: %v", err)
+	}
+	if session == nil {
+		t.Fatal("expected session")
+	}
+}
+
+// Reading is capped at one question per session across every admission path:
+// due reviews, the relay, and the final fallback (ADR-036).
+func TestBuildSession_CapsReadingAtOne(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(123)
+
+	readingQuestion := func(id int) model.Question {
+		return model.Question{ID: id, Category: model.CategoryReading}
+	}
+	isReadingID := func(id int) bool {
+		return id == 1 || id == 2 || id == 100 || id == 101
+	}
+
+	srsMock := &mockSRS{
+		getDueReviewsFn: func(ctx context.Context, gotUserID int64, limit, kanjiRecallLimit int) ([]model.Question, error) {
+			// Two due reading reviews: only the first may enter the session.
+			return []model.Question{readingQuestion(1), readingQuestion(2)}, nil
+		},
+	}
+	qFetcher := &mockQuestionFetcher{
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
+			switch cat {
+			case string(model.CategoryReading):
+				// The review already consumed the reading budget, so the relay
+				// must clamp the reading allocation to zero and never fetch.
+				t.Errorf("relay fetched reading questions with limit %d despite exhausted cap", limit)
+				return nil, nil
+			case "":
+				// The generic fallback may still return reading rows; appendQuestion
+				// must reject them while admitting other categories.
+				return []model.Question{
+					readingQuestion(100),
+					readingQuestion(101),
+					{ID: 200, Category: model.CategoryVocabulary},
+					{ID: 201, Category: model.CategoryVocabulary},
+				}, nil
+			default:
+				return nil, nil
+			}
+		},
+	}
+	sStore := &mockSessionStore{
+		createSessionFn: func(ctx context.Context, s *model.Session) error {
+			s.ID = 10
+			return nil
+		},
+	}
+	sqStore := &mockSessionQuestionStore{
+		createSessionQuestionsFn: func(ctx context.Context, sqs []model.SessionQuestion) error {
+			readingCount := 0
+			for _, sq := range sqs {
+				if isReadingID(sq.QuestionID) {
+					readingCount++
+				}
+			}
+			if readingCount != 1 {
+				t.Fatalf("session admitted %d reading questions, want 1: %+v", readingCount, sqs)
+			}
+			if len(sqs) != 3 { // 1 reading review + 2 fallback vocabulary
+				t.Fatalf("expected 3 session questions, got %d: %+v", len(sqs), sqs)
 			}
 			return nil
 		},

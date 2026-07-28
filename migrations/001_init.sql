@@ -72,7 +72,7 @@ CREATE INDEX IF NOT EXISTS idx_user_material_progress_due
     WHERE next_review_at IS NOT NULL;
 
 -----------------------------------------------------------
--- questions (generated learning questions + SRS state)
+-- questions (shared generated learning-question catalog)
 -----------------------------------------------------------
 CREATE TABLE IF NOT EXISTS questions (
     id              SERIAL PRIMARY KEY,
@@ -92,9 +92,10 @@ CREATE TABLE IF NOT EXISTS questions (
     audio_script    TEXT,                                       -- Listening: the text synthesized into audio; sha256(audio_script) drives audio_path (ADR-031/032)
     audio_file_id   TEXT,                                       -- Listening: cached Telegram file_id for re-sends; object store is SSOT, this is a cache (ADR-032)
     difficulty      INT NOT NULL DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 10),
+    -- Deprecated rollback snapshot. ADR-035 read/write SSOT is
+    -- user_question_progress; remove these columns after stabilization.
     times_served    INT NOT NULL DEFAULT 0,
     times_correct   INT NOT NULL DEFAULT 0,
-    -- SRS (SM-2) state
     ease_factor     DOUBLE PRECISION NOT NULL DEFAULT 2.5,
     interval_days   INT NOT NULL DEFAULT 0,
     repetitions     INT NOT NULL DEFAULT 0,
@@ -117,6 +118,28 @@ CREATE INDEX IF NOT EXISTS idx_questions_material_id ON questions(material_id)
 CREATE INDEX IF NOT EXISTS idx_questions_listening_pending_audio
     ON questions(language, proficiency_level)
     WHERE category = 'listening' AND audio_path IS NULL AND audio_script IS NOT NULL;
+
+-----------------------------------------------------------
+-- user_question_progress (per-user Quiz SRS + statistics)
+-----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_question_progress (
+    user_id          BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    question_id      INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    ease_factor      DOUBLE PRECISION NOT NULL DEFAULT 2.5,
+    interval_days    INT NOT NULL DEFAULT 0,
+    repetitions      INT NOT NULL DEFAULT 0,
+    next_review_at   TIMESTAMPTZ,
+    last_reviewed_at TIMESTAMPTZ,
+    times_served     INT NOT NULL DEFAULT 0,
+    times_correct    INT NOT NULL DEFAULT 0,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, question_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_question_progress_due
+    ON user_question_progress(user_id, next_review_at)
+    WHERE next_review_at IS NOT NULL;
 
 -----------------------------------------------------------
 -- sessions (learning sessions)

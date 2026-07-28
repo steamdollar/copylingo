@@ -318,6 +318,104 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 	}
 }
 
+func TestStudyFlowReadingRendering(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 79
+	userID := int64(123)
+	api := &mockBotAPI{}
+	sessionStore := &botStudySessionStore{
+		session: &model.Session{
+			ID:     sessionID,
+			UserID: userID,
+			Type:   model.SessionStudy,
+			Mode:   model.SessionModeStudy,
+			Status: model.SessionPending,
+		},
+	}
+	readingPayload, err := json.Marshal(map[string]any{
+		// The "<b>" literal must come out HTML-escaped, not parsed as a tag.
+		"passage": "図書館は毎週月曜日が休みです。<b>テスト&検証</b>",
+		"reading": "としょかんはまいしゅうげつようびがやすみです。",
+		"key_vocabulary": []map[string]string{
+			{"surface": "図書館", "reading": "としょかん", "meaning_ko": "도서관"},
+			{"surface": "くだもの", "reading": "くだもの", "meaning_ko": "과일"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := []model.StudySessionMaterial{
+		{
+			SessionMaterial: model.SessionMaterial{
+				SessionID:     sessionID,
+				MaterialID:    30,
+				MaterialOrder: 0,
+			},
+			Material: model.Material{
+				ID:               30,
+				Category:         model.MaterialCategoryReading,
+				Language:         "ja",
+				ProficiencyLevel: "N5",
+				Title:            "図書館のお知らせ",
+				Payload:          readingPayload,
+			},
+		},
+	}
+	activeRepo := &botStudyActiveRepo{
+		session: sessionStore.session,
+		items:   items,
+	}
+	rdb := &testRedis{values: map[string]string{}}
+	studyActiveService := service.NewStudyActiveSessionService(activeRepo, sessionStore, rdb)
+	studyService := service.NewStudySessionService(
+		&botStudyMaterialStore{},
+		sessionStore,
+		&botStudySessionMaterialStore{items: items},
+	)
+	b := &Bot{
+		api: api,
+		services: &service.Services{
+			StudySession:       studyService,
+			StudyActiveSession: studyActiveService,
+		},
+	}
+	flow := NewStudyFlow(b)
+
+	flow.HandleCallback(ctx, studyCallback(config.FormatStudyStart, sessionID, 0, userID))
+	edit := lastEditMessage(t, api)
+	for _, want := range []string{
+		"Reading",
+		"図書館のお知らせ",
+		"図書館は毎週月曜日が休みです。",
+		"읽기: としょかんはまいしゅうげつようびがやすみです。",
+		"핵심 어휘:",
+		"도서관",
+	} {
+		if !strings.Contains(edit.Text, want) {
+			t.Fatalf("reading start edit text missing %q: %q", want, edit.Text)
+		}
+	}
+	if !strings.Contains(edit.Text, "&lt;b&gt;テスト&amp;検証&lt;/b&gt;") {
+		t.Fatalf("reading passage is not HTML-escaped: %q", edit.Text)
+	}
+	// Same-as-surface readings (e.g. kana-only words) must not render "(くだもの)" twice.
+	if strings.Contains(edit.Text, "くだもの (くだもの)") {
+		t.Fatalf("kana-only vocabulary repeats its reading: %q", edit.Text)
+	}
+}
+
+func TestRenderReadingPayloadFallbacks(t *testing.T) {
+	t.Parallel()
+
+	if got := renderReadingPayload(json.RawMessage(`{}`)); got != "" {
+		t.Fatalf("empty reading payload = %q, want empty string", got)
+	}
+	// Malformed payloads fall back to the generic <pre> renderer.
+	if got := renderReadingPayload(json.RawMessage(`{"passage": 1}`)); !strings.Contains(got, "<pre>") {
+		t.Fatalf("malformed reading payload = %q, want generic fallback", got)
+	}
+}
+
 func timeNowForTest() time.Time {
 	return time.Now()
 }

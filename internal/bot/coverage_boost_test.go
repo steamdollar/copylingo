@@ -469,8 +469,10 @@ func (a *analyzerUserRepoStub) GetByID(ctx context.Context, id int64) (*model.Us
 
 type statRepoStub struct{}
 
-func (s *statRepoStub) GetTodayStats(ctx context.Context) (int, int, error) { return 10, 7, nil }
-func (s *statRepoStub) GetCategoryAccuracy(ctx context.Context) (map[string]float64, error) {
+func (s *statRepoStub) GetTodayStats(ctx context.Context, userID int64) (int, int, error) {
+	return 10, 7, nil
+}
+func (s *statRepoStub) GetCategoryAccuracy(ctx context.Context, userID int64) (map[string]float64, error) {
 	return map[string]float64{"vocabulary": 80, "grammar": 60}, nil
 }
 

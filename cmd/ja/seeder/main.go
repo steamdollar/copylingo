@@ -30,11 +30,13 @@ type vocabWord = ja.VocabWord
 type grammarPoint = ja.GrammarPoint
 type vocabContext = ja.VocabContext
 type listeningQuestion = ja.ListeningQuestion
+type readingPassage = ja.ReadingPassage
 
 var n5Words = ja.N5Words
 var n5GrammarPoints = ja.N5GrammarPoints
 var n5VocabContext = ja.N5VocabContext
 var n5ListeningQuestions = ja.N5ListeningQuestions
+var n5ReadingPassages = ja.N5ReadingPassages
 
 func kanaScriptLabel(kana string) string {
 	return ja.ScriptLabel(kana)
@@ -105,6 +107,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load grammar materials: %v", err)
 	}
+	materialIDsByReadingID, err := loadReadingMaterialIDs(ctx, repos.Material, n5ReadingPassages)
+	if err != nil {
+		log.Fatalf("Failed to load reading materials: %v", err)
+	}
 
 	rng := rand.New(rand.NewSource(1))
 
@@ -113,6 +119,7 @@ func main() {
 	vocabContextQuestions := buildVocabContextQuestions(rng, n5VocabContext, wordsByID(n5Words), materialIDsByWordID)
 	grammarQuestions := buildGrammarQuestions(rng, n5GrammarPoints, materialIDsByGrammarID)
 	listeningQuestions := buildListeningQuestions(n5ListeningQuestions)
+	readingQuestions := buildReadingQuestions(n5ReadingPassages, materialIDsByReadingID)
 	questions := make(
 		[]*model.Question,
 		0,
@@ -126,6 +133,8 @@ func main() {
 			grammarQuestions,
 		)+len(
 			listeningQuestions,
+		)+len(
+			readingQuestions,
 		),
 	)
 	questions = append(questions, kanaQuestions...)
@@ -133,6 +142,7 @@ func main() {
 	questions = append(questions, vocabContextQuestions...)
 	questions = append(questions, grammarQuestions...)
 	questions = append(questions, listeningQuestions...)
+	questions = append(questions, readingQuestions...)
 
 	if err := repos.Question.UpsertSeedBatch(ctx, questions); err != nil {
 		log.Printf("Failed to upsert Japanese questions batch: %v", err)
@@ -140,14 +150,102 @@ func main() {
 	}
 
 	log.Printf(
-		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d vocab_context=%d grammar=%d listening=%d",
+		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d vocab_context=%d grammar=%d listening=%d reading=%d",
 		len(questions),
 		len(kanaQuestions),
 		len(vocabularyQuestions),
 		len(vocabContextQuestions),
 		len(grammarQuestions),
 		len(listeningQuestions),
+		len(readingQuestions),
 	)
+}
+
+type readingMaterialStore interface {
+	GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error)
+}
+
+func loadReadingMaterialIDs(
+	ctx context.Context,
+	store readingMaterialStore,
+	passages []readingPassage,
+) (map[string]int, error) {
+	keys := make([]string, 0, len(passages))
+	keyByReadingID := make(map[string]string, len(passages))
+	for _, passage := range passages {
+		key := ja.MaterialKeyForReading(passage)
+		keys = append(keys, key)
+		keyByReadingID[passage.ID] = key
+	}
+
+	materials, err := store.GetByMaterialKeys(ctx, keys)
+	if err != nil {
+		return nil, fmt.Errorf("load reading material ids: %w", err)
+	}
+
+	idByKey := make(map[string]int, len(materials))
+	for _, material := range materials {
+		idByKey[material.MaterialKey] = material.ID
+	}
+
+	materialIDsByReadingID := make(map[string]int, len(passages))
+	missing := make([]string, 0)
+	for _, passage := range passages {
+		key := keyByReadingID[passage.ID]
+		id, ok := idByKey[key]
+		if !ok {
+			missing = append(missing, key)
+			continue
+		}
+		materialIDsByReadingID[passage.ID] = id
+	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing reading materials: %s", strings.Join(missing, ", "))
+	}
+
+	return materialIDsByReadingID, nil
+}
+
+func readingQuestionKey(passage readingPassage) string {
+	return ja.MaterialKeyForReading(passage) + ":question:1"
+}
+
+// buildReadingQuestions builds one MCQ per reading passage. The prompt carries
+// only the passage and the question — the study card's reading aid and the
+// Korean rationale stay out of it; the rationale surfaces via Explanation after
+// answering (ADR-036). The material link is mandatory because quiz admission
+// gates reading questions on studied materials.
+func buildReadingQuestions(
+	passages []readingPassage,
+	materialIDsByReadingID map[string]int,
+) []*model.Question {
+	questions := make([]*model.Question, 0, len(passages))
+	for _, passage := range passages {
+		materialID, ok := materialIDsByReadingID[passage.ID]
+		if !ok {
+			log.Fatalf("reading: missing material for passage %q", passage.ID)
+		}
+		question := &model.Question{
+			Type:             model.QuestionMultipleChoice,
+			Skill:            model.SkillPtr(passage.Skill),
+			Language:         vocabLanguage,
+			ProficiencyLevel: vocabProficiencyLevel,
+			Category:         model.CategoryReading,
+			Prompt: fmt.Sprintf(
+				"다음 글을 읽고 질문에 답하세요.<br><br>%s<br><br><b>%s</b>",
+				passage.Passage,
+				passage.Prompt,
+			),
+			Options:       mustJSON(passage.Options),
+			CorrectAnswer: passage.CorrectAnswer,
+			Explanation:   passage.Explanation,
+			Difficulty:    passage.Difficulty,
+		}
+		setQuestionMaterial(question, materialID)
+		setQuestionKey(question, readingQuestionKey(passage))
+		questions = append(questions, question)
+	}
+	return questions
 }
 
 func buildListeningQuestions(items []listeningQuestion) []*model.Question {

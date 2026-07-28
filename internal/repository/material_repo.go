@@ -49,13 +49,21 @@ func (r *MaterialRepository) GetForStudySession(
 	}
 
 	var materials []model.Material
-	categories := []string{string(model.MaterialCategoryVocabulary), string(model.MaterialCategoryGrammar)}
 	if err := r.db.SelectContext(ctx, &materials, studySessionMaterialsQuery,
-		userID, language, level, pq.Array(categories), limit); err != nil {
+		userID, language, level, pq.Array(studySessionMaterialCategories), limit); err != nil {
 		return nil, fmt.Errorf("MaterialRepository.GetForStudySession user_id=%d language=%s level=%s limit=%d: %w",
 			userID, language, level, limit, err)
 	}
 	return materials, nil
+}
+
+// studySessionMaterialCategories are the material categories a study session
+// draws from. Reading is additionally capped to one card per session in the
+// query below (ADR-036) — passages take longer to read than word/grammar cards.
+var studySessionMaterialCategories = []string{
+	string(model.MaterialCategoryVocabulary),
+	string(model.MaterialCategoryGrammar),
+	string(model.MaterialCategoryReading),
 }
 
 const studySessionMaterialsQuery = `
@@ -73,7 +81,8 @@ const studySessionMaterialsQuery = `
 				CASE m.category
 					WHEN 'vocabulary' THEN 0
 					WHEN 'grammar' THEN 1
-					ELSE 2
+					WHEN 'reading' THEN 2
+					ELSE 3
 				END AS category_order
 			FROM materials m
 			LEFT JOIN user_material_progress ump
@@ -105,6 +114,7 @@ const studySessionMaterialsQuery = `
 			difficulty,
 			created_at
 		FROM candidates
+		WHERE category <> 'reading' OR category_rank <= 1
 		ORDER BY category_rank ASC, category_order ASC
 		LIMIT $5
 	`

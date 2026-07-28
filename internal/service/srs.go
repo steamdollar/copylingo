@@ -8,22 +8,29 @@ import (
 )
 
 type questionQuerier interface {
-	GetDueReviews(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
-	GetDueReviewCount(ctx context.Context) (int, error)
-	UpdateSRS(ctx context.Context, q *model.Question) error
+	GetDueReviews(
+		ctx context.Context,
+		userID int64,
+		language, level string,
+		limit, kanjiRecallLimit int,
+	) ([]model.Question, error)
+	GetDueReviewCount(ctx context.Context, userID int64, language, level string) (int, error)
 }
 
 // srs: Spaced Repetition System
 // srsScheduler는 GraderService와 SessionBuilderService가 SRSService에 의존할 때 쓰는 계약.
 // *SRSService가 암묵적으로 만족한다.
 type srsScheduler interface {
-	GetDueReviews(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
-	GetDueCount(ctx context.Context) (int, error)
-	ProcessAnswer(ctx context.Context, q *model.Question, isCorrect bool) error
+	GetDueReviews(
+		ctx context.Context,
+		userID int64,
+		language, level string,
+		limit, kanjiRecallLimit int,
+	) ([]model.Question, error)
+	GetDueCount(ctx context.Context, userID int64, language, level string) (int, error)
 }
 
-// SRSService implements the SM-2 Spaced Repetition algorithm.
-// SRS state is stored directly on the questions table.
+// SRSService implements the SM-2 Spaced Repetition algorithm for per-user progress.
 type SRSService struct {
 	questionRepo questionQuerier
 }
@@ -32,25 +39,18 @@ func NewSRSService(questionRepo questionQuerier) *SRSService {
 	return &SRSService{questionRepo: questionRepo}
 }
 
-// ProcessAnswer updates the SRS schedule on the question based on correctness.
-func (s *SRSService) ProcessAnswer(ctx context.Context, question *model.Question, isCorrect bool) error {
-	s.ScheduleAnswer(question, isCorrect)
-
-	return s.questionRepo.UpdateSRS(ctx, question)
-}
-
 // ScheduleAnswer applies SRS changes in memory without writing to the DB.
-func (s *SRSService) ScheduleAnswer(question *model.Question, isCorrect bool) {
+func (s *SRSService) ScheduleAnswer(progress *model.UserQuestionProgress, isCorrect bool) {
 	quality := 1 // wrong
 	if isCorrect {
 		quality = 4 // correct with some hesitation
 	}
 
-	s.updateSchedule(question, quality)
+	s.updateSchedule(progress, quality)
 }
 
-// updateSchedule applies the SM-2 algorithm to update the question's SRS state.
-func (s *SRSService) updateSchedule(q *model.Question, quality int) {
+// updateSchedule applies the SM-2 algorithm to update the user's Question progress.
+func (s *SRSService) updateSchedule(q *model.UserQuestionProgress, quality int) {
 	now := time.Now()
 	q.LastReviewedAt = &now
 
@@ -86,12 +86,17 @@ func (s *SRSService) updateSchedule(q *model.Question, quality int) {
 func (s *SRSService) GetDueReviews(
 	ctx context.Context,
 	userID int64,
+	language, level string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return s.questionRepo.GetDueReviews(ctx, userID, limit, kanjiRecallLimit)
+	return s.questionRepo.GetDueReviews(ctx, userID, language, level, limit, kanjiRecallLimit)
 }
 
 // GetDueCount returns the number of questions due for review.
-func (s *SRSService) GetDueCount(ctx context.Context) (int, error) {
-	return s.questionRepo.GetDueReviewCount(ctx)
+func (s *SRSService) GetDueCount(
+	ctx context.Context,
+	userID int64,
+	language, level string,
+) (int, error) {
+	return s.questionRepo.GetDueReviewCount(ctx, userID, language, level)
 }

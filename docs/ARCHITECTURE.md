@@ -101,7 +101,7 @@ Bot은 세션 진행을 유지하고, Mini App은 canvas stroke data를 HTTP로 
   → session ownership / question membership / duplicate answer 검증
   → stroke data PNG 렌더링
   → LLM Binary Grading
-  → session_questions, question stats, SRS 업데이트
+  → session_questions, user_question_progress 통계/SRS 업데이트
 ```
 
 외부 HTTPS ingress와 Cloudflare Tunnel 운영 메모는 [`HANDWRITING_MINIAPP_INGRESS.md`](HANDWRITING_MINIAPP_INGRESS.md)를 기준으로 한다.
@@ -127,7 +127,8 @@ menu:settings                     → 설정
 | `users` | Telegram ID (BIGINT) | 사용자 프로필, 스트릭, XP |
 | `contents` | SERIAL | 외부에서 수집한 원문 |
 | `materials` | SERIAL | Study Session에서 노출할 학습 단위 SSOT |
-| `questions` | SERIAL | Quiz 문항 + 통계 + 현재 전역 SRS 상태 |
+| `questions` | SERIAL | language/level별 공유 Quiz 문항 Catalog |
+| `user_question_progress` | (user_id, question_id) | 사용자별 Quiz 통계 + 현재 SRS 상태 |
 | `sessions` | SERIAL | Quiz 학습 세션 상태 |
 | `session_questions` | SERIAL | Session별 문항 순서와 답안 |
 | `tips` | SERIAL | 손글씨 채점 대기 중 노출할 학습 팁 |
@@ -136,7 +137,7 @@ menu:settings                     → 설정
 
 ```
 정답 (quality >= 3):
-  repetitions == 0 → interval = 1일
+  repetitions == 0 → interval = 3일
   repetitions == 1 → interval = 6일
   그 외             → interval = interval × ease_factor
   repetitions++

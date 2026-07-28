@@ -386,8 +386,6 @@ func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.Use
 		)
 	}
 
-	reviewCount, _ := b.services.SRS.GetDueCount(ctx)
-
 	streakEmoji := "🔥"
 	if user != nil && user.StreakDays == 0 {
 		streakEmoji = "💤"
@@ -401,6 +399,7 @@ func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.Use
 		lang = user.Language
 		level = user.ProficiencyLevel
 	}
+	reviewCount, _ := b.services.SRS.GetDueCount(ctx, from.ID, lang, level)
 
 	langName := languageDisplayName(lang)
 	text := fmt.Sprintf(`🎌 <b>CopyLingo</b>

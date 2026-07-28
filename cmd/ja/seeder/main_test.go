@@ -941,6 +941,110 @@ func (s fakeGrammarMaterialStore) GetByMaterialKeys(
 	return s.materials, nil
 }
 
+func TestBuildReadingQuestions(t *testing.T) {
+	t.Parallel()
+
+	passages := []readingPassage{
+		{
+			ID:            "n5_reading_0001",
+			Skill:         model.SkillReadingShort,
+			Title:         "図書館のお知らせ",
+			Passage:       "図書館は毎週月曜日が休みです。",
+			Reading:       "としょかんはまいしゅうげつようびがやすみです。",
+			Prompt:        "図書館はいつ休みですか。",
+			Options:       []string{"毎週月曜日", "毎週火曜日", "毎週日曜日", "毎日"},
+			CorrectAnswer: "毎週月曜日",
+			Explanation:   "첫 문장에서 월요일이 휴일이라고 했습니다.",
+			Difficulty:    2,
+		},
+	}
+	materialIDs := map[string]int{"n5_reading_0001": 77}
+
+	questions := buildReadingQuestions(passages, materialIDs)
+	if len(questions) != 1 {
+		t.Fatalf("len(questions) = %d, want 1", len(questions))
+	}
+
+	question := questions[0]
+	if question.Type != model.QuestionMultipleChoice ||
+		question.Skill == nil || *question.Skill != model.SkillReadingShort ||
+		question.Category != model.CategoryReading ||
+		question.Language != vocabLanguage ||
+		question.ProficiencyLevel != vocabProficiencyLevel ||
+		question.Difficulty != 2 {
+		t.Fatalf("unexpected reading question metadata: %+v", question)
+	}
+	if question.QuestionKey == nil || *question.QuestionKey != "ja:reading:n5_reading_0001:question:1" {
+		t.Fatalf("question key = %v, want ja:reading:n5_reading_0001:question:1", question.QuestionKey)
+	}
+	if question.MaterialID == nil || *question.MaterialID != 77 {
+		t.Fatalf("material id = %v, want 77", question.MaterialID)
+	}
+	assertContainsAll(t, question.Prompt, "図書館は毎週月曜日が休みです。", "図書館はいつ休みですか。")
+	// The full-hiragana reading aid is study-card-only; it must not leak into the quiz prompt.
+	if strings.Contains(question.Prompt, "としょかん") {
+		t.Fatalf("prompt leaks the reading aid: %q", question.Prompt)
+	}
+	if question.CorrectAnswer != "毎週月曜日" {
+		t.Fatalf("correct answer = %q, want 毎週月曜日", question.CorrectAnswer)
+	}
+	assertContainsAll(t, string(question.Options), "毎週月曜日", "毎日")
+}
+
+func TestLoadReadingMaterialIDs(t *testing.T) {
+	t.Parallel()
+
+	passages := []readingPassage{
+		{ID: "n5_reading_0001"},
+		{ID: "n5_reading_0002"},
+	}
+	store := fakeReadingMaterialStore{
+		materials: []model.Material{
+			{ID: 11, MaterialKey: "ja:reading:n5_reading_0001"},
+			{ID: 22, MaterialKey: "ja:reading:n5_reading_0002"},
+		},
+	}
+
+	got, err := loadReadingMaterialIDs(context.Background(), store, passages)
+	if err != nil {
+		t.Fatalf("loadReadingMaterialIDs: %v", err)
+	}
+	if got["n5_reading_0001"] != 11 || got["n5_reading_0002"] != 22 {
+		t.Fatalf("material ids = %#v, want reading_0001=11 and reading_0002=22", got)
+	}
+}
+
+func TestLoadReadingMaterialIDsMissing(t *testing.T) {
+	t.Parallel()
+
+	_, err := loadReadingMaterialIDs(
+		context.Background(),
+		fakeReadingMaterialStore{},
+		[]readingPassage{{ID: "n5_reading_0003"}},
+	)
+	if err == nil {
+		t.Fatal("loadReadingMaterialIDs error = nil, want missing material error")
+	}
+	if !strings.Contains(err.Error(), "ja:reading:n5_reading_0003") {
+		t.Fatalf("error = %q, want missing material key", err)
+	}
+}
+
+type fakeReadingMaterialStore struct {
+	materials []model.Material
+	err       error
+}
+
+func (s fakeReadingMaterialStore) GetByMaterialKeys(
+	ctx context.Context,
+	keys []string,
+) ([]model.Material, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.materials, nil
+}
+
 func assertContainsAll(t *testing.T, s string, wants ...string) {
 	t.Helper()
 	for _, want := range wants {

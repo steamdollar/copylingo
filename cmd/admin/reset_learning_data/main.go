@@ -17,6 +17,7 @@ var learningDataTables = []string{
 	"session_materials",
 	"sessions",
 	"user_material_progress",
+	"user_question_progress",
 	"questions",
 	"materials",
 	"contents",

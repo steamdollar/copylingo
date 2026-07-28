@@ -12,6 +12,7 @@ import (
 const (
 	maxPerCategory                = 6
 	maxKanjiRecallPerSession      = 3
+	maxReadingPerSession          = 1
 	minVocabularyRatioDenominator = 3
 )
 
@@ -24,6 +25,10 @@ var defaultCategoryOrder = []model.QuestionCategory{
 	// whose audio is already generated (audio_path IS NOT NULL), so audio-less
 	// questions are never scheduled (ADR-031/032).
 	model.CategoryListening,
+	// Reading joins the relay; GetNewQuestions only returns reading items whose
+	// passage material the user already studied, and every session caps reading
+	// at one question — passages take longer to solve (ADR-036).
+	model.CategoryReading,
 }
 
 type questionFetcher interface {
@@ -100,9 +105,10 @@ func (s *SessionBuilderService) BuildEveningSession(
 func (s *SessionBuilderService) BuildReviewSession(
 	ctx context.Context,
 	userID int64,
+	language, level string,
 	limit int,
 ) (*model.Session, error) {
-	return s.buildSession(ctx, userID, "", "", model.SessionReview, limit, limit)
+	return s.buildSession(ctx, userID, language, level, model.SessionReview, limit, limit)
 }
 
 func (s *SessionBuilderService) buildSession(
@@ -118,18 +124,22 @@ func (s *SessionBuilderService) buildSession(
 	order := 0
 	kanjiRecallCount := 0
 	reservedVocabularyCount := 0
-	if language != "" && level != "" {
+	if sessionType != model.SessionReview && language != "" && level != "" {
 		reservedVocabularyCount = divideRoundingUp(totalQuestions, minVocabularyRatioDenominator)
 		if maxReviewCount := totalQuestions - reservedVocabularyCount; reviewCount > maxReviewCount {
 			reviewCount = maxReviewCount
 		}
 	}
 
+	readingCount := 0
 	appendQuestion := func(question model.Question, isReview bool) bool {
 		if _, exists := selectedQuestionIDs[question.ID]; exists {
 			return false
 		}
 		if isKanjiRecallQuestion(question) && kanjiRecallCount >= maxKanjiRecallPerSession {
+			return false
+		}
+		if question.Category == model.CategoryReading && readingCount >= maxReadingPerSession {
 			return false
 		}
 		selectedQuestionIDs[question.ID] = struct{}{}
@@ -142,14 +152,23 @@ func (s *SessionBuilderService) buildSession(
 		if isKanjiRecallQuestion(question) {
 			kanjiRecallCount++
 		}
+		if question.Category == model.CategoryReading {
+			readingCount++
+		}
 		order++
 		return true
 	}
 
 	// 1. Get review questions from SRS (due reviews)
-	// TODO: language 별로 가져와야 하는거 아닌가?
 	if reviewCount > 0 {
-		reviews, err := s.srs.GetDueReviews(ctx, userID, reviewCount, maxKanjiRecallPerSession)
+		reviews, err := s.srs.GetDueReviews(
+			ctx,
+			userID,
+			language,
+			level,
+			reviewCount,
+			maxKanjiRecallPerSession,
+		)
 		if err != nil {
 			log.Printf("Error getting due reviews: %v", err)
 		} else {
@@ -184,7 +203,7 @@ func (s *SessionBuilderService) buildSession(
 	// 3. Fill remaining with new questions (Random Slot Relay)
 	remainingNew := totalQuestions - len(sessionQuestions)
 
-	if remainingNew > 0 && language != "" && level != "" {
+	if sessionType != model.SessionReview && remainingNew > 0 && language != "" && level != "" {
 		// Prepare categories for relay. The last empty category acts as a general fallback.
 		categories := make([]string, 0, len(defaultCategoryOrder)+1)
 		for _, cat := range defaultCategoryOrder {
@@ -209,6 +228,12 @@ func (s *SessionBuilderService) buildSession(
 				}
 				// rand.Intn(max+1) returns a value in [0, max]
 				alloc = rand.Intn(max + 1)
+			}
+			// Never fetch more reading questions than the per-session cap admits.
+			if cat == string(model.CategoryReading) {
+				if remaining := maxReadingPerSession - readingCount; alloc > remaining {
+					alloc = remaining
+				}
 			}
 
 			if alloc > 0 {

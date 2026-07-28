@@ -23,42 +23,42 @@ func NewActiveSessionRepository(db *sqlx.DB) *ActiveSessionRepository {
 }
 
 type questionSessionWithStateRow struct {
-	SessionID         int                    `db:"session_id"`
-	UserID            int64                  `db:"user_id"`
-	SessionType       model.SessionType      `db:"session_type"`
-	SessionMode       model.SessionMode      `db:"session_mode"`
-	SessionStatus     model.SessionStatus    `db:"session_status"`
-	TotalQuestions    int                    `db:"total_questions"`
-	CorrectCount      int                    `db:"correct_count"`
-	StartedAt         *time.Time             `db:"started_at"`
-	CompletedAt       *time.Time             `db:"completed_at"`
-	SessionCreatedAt  time.Time              `db:"session_created_at"`
-	SessionQuestionID int                    `db:"session_question_id"`
-	QuestionOrder     int                    `db:"question_order"`
-	IsReview          bool                   `db:"is_review"`
-	UserAnswer        *string                `db:"user_answer"`
-	IsCorrect         *bool                  `db:"is_correct"`
-	QuestionID        int                    `db:"question_id"`
-	ContentID         *int                   `db:"content_id"`
-	MaterialID        *int                   `db:"material_id"`
-	QuestionType      model.QuestionType     `db:"question_type"`
-	Language          string                 `db:"language"`
-	ProficiencyLevel  string                 `db:"proficiency_level"`
-	Category          model.QuestionCategory `db:"category"`
-	Prompt            string                 `db:"prompt"`
-	Options           json.RawMessage        `db:"options"`
-	CorrectAnswer     string                 `db:"correct_answer"`
-	Explanation       string                 `db:"explanation"`
-	AudioPath         *string                `db:"audio_path"`
-	Difficulty        int                    `db:"difficulty"`
-	TimesServed       int                    `db:"times_served"`
-	TimesCorrect      int                    `db:"times_correct"`
-	EaseFactor        float64                `db:"ease_factor"`
-	IntervalDays      int                    `db:"interval_days"`
-	Repetitions       int                    `db:"repetitions"`
-	NextReviewAt      *time.Time             `db:"next_review_at"`
-	LastReviewedAt    *time.Time             `db:"last_reviewed_at"`
-	QuestionCreatedAt time.Time              `db:"question_created_at"`
+	SessionID              int                    `db:"session_id"`
+	UserID                 int64                  `db:"user_id"`
+	SessionType            model.SessionType      `db:"session_type"`
+	SessionMode            model.SessionMode      `db:"session_mode"`
+	SessionStatus          model.SessionStatus    `db:"session_status"`
+	TotalQuestions         int                    `db:"total_questions"`
+	CorrectCount           int                    `db:"correct_count"`
+	StartedAt              *time.Time             `db:"started_at"`
+	CompletedAt            *time.Time             `db:"completed_at"`
+	SessionCreatedAt       time.Time              `db:"session_created_at"`
+	SessionQuestionID      int                    `db:"session_question_id"`
+	QuestionOrder          int                    `db:"question_order"`
+	IsReview               bool                   `db:"is_review"`
+	UserAnswer             *string                `db:"user_answer"`
+	IsCorrect              *bool                  `db:"is_correct"`
+	QuestionID             int                    `db:"question_id"`
+	ContentID              *int                   `db:"content_id"`
+	MaterialID             *int                   `db:"material_id"`
+	QuestionType           model.QuestionType     `db:"question_type"`
+	Language               string                 `db:"language"`
+	ProficiencyLevel       string                 `db:"proficiency_level"`
+	Category               model.QuestionCategory `db:"category"`
+	Prompt                 string                 `db:"prompt"`
+	Options                json.RawMessage        `db:"options"`
+	CorrectAnswer          string                 `db:"correct_answer"`
+	Explanation            string                 `db:"explanation"`
+	AudioPath              *string                `db:"audio_path"`
+	Difficulty             int                    `db:"difficulty"`
+	ProgressEaseFactor     float64                `db:"progress_ease_factor"`
+	ProgressIntervalDays   int                    `db:"progress_interval_days"`
+	ProgressRepetitions    int                    `db:"progress_repetitions"`
+	ProgressNextReviewAt   *time.Time             `db:"progress_next_review_at"`
+	ProgressLastReviewedAt *time.Time             `db:"progress_last_reviewed_at"`
+	ProgressTimesServed    int                    `db:"progress_times_served"`
+	ProgressTimesCorrect   int                    `db:"progress_times_correct"`
+	QuestionCreatedAt      time.Time              `db:"question_created_at"`
 }
 
 // LoadQuestionSessionWithStateBySessionID loads the full ordered question session state in one DB round-trip.
@@ -97,17 +97,19 @@ func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 			q.explanation,
 			q.audio_path,
 			q.difficulty,
-			q.times_served,
-			q.times_correct,
-			q.ease_factor,
-			q.interval_days,
-			q.repetitions,
-			q.next_review_at,
-			q.last_reviewed_at,
+			COALESCE(uqp.ease_factor, 2.5) AS progress_ease_factor,
+			COALESCE(uqp.interval_days, 0) AS progress_interval_days,
+			COALESCE(uqp.repetitions, 0) AS progress_repetitions,
+			uqp.next_review_at AS progress_next_review_at,
+			uqp.last_reviewed_at AS progress_last_reviewed_at,
+			COALESCE(uqp.times_served, 0) AS progress_times_served,
+			COALESCE(uqp.times_correct, 0) AS progress_times_correct,
 			q.created_at AS question_created_at
 		FROM sessions s
 		JOIN session_questions sq ON sq.session_id = s.id
 		JOIN questions q ON q.id = sq.question_id
+		LEFT JOIN user_question_progress uqp
+			ON uqp.user_id = s.user_id AND uqp.question_id = q.id
 		WHERE s.id = $1
 		ORDER BY sq.question_order
 	`, sessionID); err != nil {
@@ -170,14 +172,18 @@ func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 				Explanation:      row.Explanation,
 				AudioPath:        row.AudioPath,
 				Difficulty:       row.Difficulty,
-				TimesServed:      row.TimesServed,
-				TimesCorrect:     row.TimesCorrect,
-				EaseFactor:       row.EaseFactor,
-				IntervalDays:     row.IntervalDays,
-				Repetitions:      row.Repetitions,
-				NextReviewAt:     row.NextReviewAt,
-				LastReviewedAt:   row.LastReviewedAt,
 				CreatedAt:        row.QuestionCreatedAt,
+			},
+			Progress: model.UserQuestionProgress{
+				UserID:         row.UserID,
+				QuestionID:     row.QuestionID,
+				EaseFactor:     row.ProgressEaseFactor,
+				IntervalDays:   row.ProgressIntervalDays,
+				Repetitions:    row.ProgressRepetitions,
+				NextReviewAt:   row.ProgressNextReviewAt,
+				LastReviewedAt: row.ProgressLastReviewedAt,
+				TimesServed:    row.ProgressTimesServed,
+				TimesCorrect:   row.ProgressTimesCorrect,
 			},
 		})
 	}
@@ -208,7 +214,7 @@ func (r *ActiveSessionRepository) FlushActiveSession(ctx context.Context, state 
 		if err := flushSessionQuestions(ctx, tx, state.Items); err != nil {
 			return err
 		}
-		if err := flushQuestions(ctx, tx, state.Items); err != nil {
+		if err := flushQuestionProgress(ctx, tx, state.Items); err != nil {
 			return err
 		}
 	}
@@ -275,14 +281,25 @@ func flushSessionQuestions(ctx context.Context, tx *sqlx.Tx, items []model.Activ
 	return nil
 }
 
-type questionFlushRow struct {
-	Question     model.Question
+type questionProgressFlushRow struct {
+	Progress     model.UserQuestionProgress
 	ServedDelta  int
 	CorrectDelta int
 }
 
-func flushQuestions(ctx context.Context, tx *sqlx.Tx, items []model.ActiveSessionQuestion) error {
-	rowsByID := make(map[int]*questionFlushRow)
+func flushQuestionProgress(ctx context.Context, tx *sqlx.Tx, items []model.ActiveSessionQuestion) error {
+	query, args, count := buildQuestionProgressUpsert(items)
+	if count == 0 {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("ActiveSessionRepository.flushQuestionProgress count=%d: %w", count, err)
+	}
+	return nil
+}
+
+func buildQuestionProgressUpsert(items []model.ActiveSessionQuestion) (string, []any, int) {
+	rowsByID := make(map[int]*questionProgressFlushRow)
 	ids := make([]int, 0, len(items))
 	for _, item := range items {
 		if item.SessionQuestion.IsCorrect == nil {
@@ -291,61 +308,60 @@ func flushQuestions(ctx context.Context, tx *sqlx.Tx, items []model.ActiveSessio
 
 		row, ok := rowsByID[item.Question.ID]
 		if !ok {
-			row = &questionFlushRow{Question: item.Question}
+			row = &questionProgressFlushRow{Progress: item.Progress}
 			rowsByID[item.Question.ID] = row
 			ids = append(ids, item.Question.ID)
 		}
-		row.Question = item.Question
+		row.Progress = item.Progress
 		row.ServedDelta++
 		if *item.SessionQuestion.IsCorrect {
 			row.CorrectDelta++
 		}
 	}
 	if len(ids) == 0 {
-		return nil
+		return "", nil, 0
 	}
 
 	var values strings.Builder
-	args := make([]any, 0, len(ids)*8)
+	args := make([]any, 0, len(ids)*9)
 	for i, id := range ids {
 		if i > 0 {
 			values.WriteString(",")
 		}
-		base := i * 8
-		values.WriteString(fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8))
+		base := i * 9
+		values.WriteString(fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9))
 
 		row := rowsByID[id]
-		q := row.Question
+		progress := row.Progress
 		args = append(args,
-			q.ID,
+			progress.UserID,
+			progress.QuestionID,
 			row.ServedDelta,
 			row.CorrectDelta,
-			q.EaseFactor,
-			q.IntervalDays,
-			q.Repetitions,
-			q.NextReviewAt,
-			q.LastReviewedAt,
+			progress.EaseFactor,
+			progress.IntervalDays,
+			progress.Repetitions,
+			progress.NextReviewAt,
+			progress.LastReviewedAt,
 		)
 	}
 
 	query := fmt.Sprintf(`
-		UPDATE questions AS q
-		SET times_served = q.times_served + v.served_delta::int,
-			times_correct = q.times_correct + v.correct_delta::int,
-			ease_factor = v.ease_factor::double precision,
-			interval_days = v.interval_days::int,
-			repetitions = v.repetitions::int,
-			next_review_at = v.next_review_at::timestamptz,
-			last_reviewed_at = v.last_reviewed_at::timestamptz
-		FROM (VALUES %s) AS v(
-			id, served_delta, correct_delta, ease_factor, interval_days,
-			repetitions, next_review_at, last_reviewed_at
+		INSERT INTO user_question_progress (
+			user_id, question_id, times_served, times_correct, ease_factor,
+			interval_days, repetitions, next_review_at, last_reviewed_at
 		)
-		WHERE q.id = v.id::int
+		VALUES %s
+		ON CONFLICT (user_id, question_id) DO UPDATE SET
+			times_served = user_question_progress.times_served + EXCLUDED.times_served,
+			times_correct = user_question_progress.times_correct + EXCLUDED.times_correct,
+			ease_factor = EXCLUDED.ease_factor,
+			interval_days = EXCLUDED.interval_days,
+			repetitions = EXCLUDED.repetitions,
+			next_review_at = EXCLUDED.next_review_at,
+			last_reviewed_at = EXCLUDED.last_reviewed_at,
+			updated_at = NOW()
 	`, values.String())
-	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("ActiveSessionRepository.flushQuestions count=%d: %w", len(ids), err)
-	}
-	return nil
+	return query, args, len(ids)
 }

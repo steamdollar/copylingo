@@ -54,10 +54,35 @@ func TestStudySessionMaterialsQueryIncludesGrammarAndInterleavesCategories(t *te
 		"PARTITION BY m.category",
 		"WHEN 'vocabulary' THEN 0",
 		"WHEN 'grammar' THEN 1",
+		"WHEN 'reading' THEN 2",
 		"ORDER BY category_rank ASC, category_order ASC",
 	} {
 		if !strings.Contains(studySessionMaterialsQuery, want) {
 			t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
 		}
+	}
+}
+
+func TestStudySessionMaterialCategoriesIncludeReading(t *testing.T) {
+	want := []string{
+		string(model.MaterialCategoryVocabulary),
+		string(model.MaterialCategoryGrammar),
+		string(model.MaterialCategoryReading),
+	}
+	if len(studySessionMaterialCategories) != len(want) {
+		t.Fatalf("studySessionMaterialCategories = %v, want %v", studySessionMaterialCategories, want)
+	}
+	for i, category := range want {
+		if studySessionMaterialCategories[i] != category {
+			t.Fatalf("studySessionMaterialCategories = %v, want %v", studySessionMaterialCategories, want)
+		}
+	}
+}
+
+// Reading is capped at one card per study session (ADR-036): the ranked CTE
+// keeps only the top reading candidate while other categories stay unbounded.
+func TestStudySessionMaterialsQueryCapsReadingAtOne(t *testing.T) {
+	if !strings.Contains(studySessionMaterialsQuery, "WHERE category <> 'reading' OR category_rank <= 1") {
+		t.Fatalf("studySessionMaterialsQuery does not cap reading candidates:\n%s", studySessionMaterialsQuery)
 	}
 }

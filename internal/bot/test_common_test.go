@@ -91,8 +91,10 @@ type mockSRS struct {
 	service.SRSService
 }
 
-func (m *mockSRS) ScheduleAnswer(q *model.Question, isCorrect bool) {}
-func (m *mockSRS) GetDueCount(ctx context.Context) (int, error)     { return 0, nil }
+func (m *mockSRS) ScheduleAnswer(q *model.UserQuestionProgress, isCorrect bool) {}
+func (m *mockSRS) GetDueCount(ctx context.Context, userID int64, language, level string) (int, error) {
+	return 0, nil
+}
 
 type mockLLM struct {
 	gradeFn  func(ctx context.Context, prompt, correctAnswer, userAnswer string) (external.GradeResult, error)

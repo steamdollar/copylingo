@@ -30,15 +30,27 @@ type GrammarMaterialPayload struct {
 	TranslationKo  string `json:"translation_ko"`
 }
 
+type ReadingMaterialPayload struct {
+	Passage       string              `json:"passage"`
+	Reading       string              `json:"reading"`
+	KeyVocabulary []ReadingVocabulary `json:"key_vocabulary"`
+}
+
 func BuildAllMaterials() []*model.Material {
 	kanaMaterials := BuildKanaMaterials(KanaMap)
 	vocabMaterials := BuildVocabularyMaterials(N5Words)
 	grammarMaterials := BuildGrammarMaterials(N5GrammarPoints)
+	readingMaterials := BuildReadingMaterials(N5ReadingPassages)
 
-	materials := make([]*model.Material, 0, len(kanaMaterials)+len(vocabMaterials)+len(grammarMaterials))
+	materials := make(
+		[]*model.Material,
+		0,
+		len(kanaMaterials)+len(vocabMaterials)+len(grammarMaterials)+len(readingMaterials),
+	)
 	materials = append(materials, kanaMaterials...)
 	materials = append(materials, vocabMaterials...)
 	materials = append(materials, grammarMaterials...)
+	materials = append(materials, readingMaterials...)
 	return materials
 }
 
@@ -106,6 +118,29 @@ func BuildGrammarMaterials(points []GrammarPoint) []*model.Material {
 	return materials
 }
 
+// BuildReadingMaterials maps each reading passage to a study material. The
+// quiz-only fields (Prompt/Options/CorrectAnswer/Explanation) stay out of the
+// payload so the study card never leaks the answer rationale (ADR-036).
+func BuildReadingMaterials(passages []ReadingPassage) []*model.Material {
+	materials := make([]*model.Material, 0, len(passages))
+	for _, passage := range passages {
+		materials = append(materials, &model.Material{
+			MaterialKey:      MaterialKeyForReading(passage),
+			Category:         model.MaterialCategoryReading,
+			Language:         VocabLanguage,
+			ProficiencyLevel: VocabProficiencyLevel,
+			Title:            passage.Title,
+			Payload: mustMaterialJSON(ReadingMaterialPayload{
+				Passage:       passage.Passage,
+				Reading:       passage.Reading,
+				KeyVocabulary: passage.KeyVocabulary,
+			}),
+			Difficulty: passage.Difficulty,
+		})
+	}
+	return materials
+}
+
 func MaterialKeyForKana(kana string) string {
 	parts := make([]string, 0, len([]rune(kana)))
 	for _, r := range kana {
@@ -122,6 +157,10 @@ func MaterialKeyForVocab(word VocabWord) string {
 
 func MaterialKeyForGrammar(point GrammarPoint) string {
 	return "ja:grammar:" + point.ID
+}
+
+func MaterialKeyForReading(passage ReadingPassage) string {
+	return "ja:reading:" + passage.ID
 }
 
 func ScriptLabel(kana string) string {

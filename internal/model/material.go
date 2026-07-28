@@ -12,6 +12,7 @@ const (
 	MaterialCategoryKana       MaterialCategory = "kana"
 	MaterialCategoryVocabulary MaterialCategory = "vocabulary"
 	MaterialCategoryGrammar    MaterialCategory = "grammar"
+	MaterialCategoryReading    MaterialCategory = "reading"
 	MaterialCategorySentence   MaterialCategory = "sentence"
 )
 

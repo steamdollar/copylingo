@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-const ActiveSessionStateVersion = 1
+const ActiveSessionStateVersion = 2
 
 // ActiveSessionState is the Redis working state for an in-progress quiz session.
 type ActiveSessionState struct {
@@ -19,8 +19,9 @@ type ActiveSessionState struct {
 
 // ActiveSessionQuestion keeps the ordered session question and its question copy together.
 type ActiveSessionQuestion struct {
-	SessionQuestion SessionQuestion `json:"session_question"`
-	Question        Question        `json:"question"`
+	SessionQuestion SessionQuestion      `json:"session_question"`
+	Question        Question             `json:"question"`
+	Progress        UserQuestionProgress `json:"progress"`
 }
 
 func (s *ActiveSessionState) RecountAnswered() int {

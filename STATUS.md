@@ -32,11 +32,14 @@
 
 - [ ] Cloudflare Tunnel(cloudflared/trycloudflare) Korea-block 노출 대응 — 손글씨 Mini App ingress가 Cloudflare 의존이라 한국 재차단 시 통째 중단 위험(현시점 도달은 정상). **(Case A 선결: 자체 도메인+named tunnel vs 비-CF ingress vs accept+monitor 미결)** see [docs/todos/cloudflare_korea_tunnel_risk.md](docs/todos/cloudflare_korea_tunnel_risk.md)
 
-
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-07-24 | Listening audio path 10→50 복구: seed 재실행 시 동일 script의 runtime `audio_path` 보존 + session push 없는 일괄 TTS 복구 CLI 추가 | `2607/2607241702_listening_audio_backfill.md` |
+| 2026-07-23 | N5 독해 seed 10→40 확장(0011~0040): Sonnet subagent 3배치 생성 + Opus 전수 검수(reading 전사·정답 유일성·N5 범위) + 4건 수정. integrity 40 통과, seeder 멱등 reading=40/material NULL 0. Telegram 수동 검수 잔여 | `2607/2607231015_n5_reading_study_quiz.md` |
+| 2026-07-23 | N5 독해 Study·Quiz MVP: original 지문 10개 Material-first seed + Study 완료 후 Quiz admission + 세션당 1개 cap (ADR-036). Telegram 수동 검수 잔여 | `2607/2607231015_n5_reading_study_quiz.md` |
+| 2026-07-20 | Quiz Question 공유 Catalog 유지 + 사용자별 SRS/served/correct progress 분리 및 owner 429건 backfill (ADR-035) | `2607/2607201728_user_question_progress.md` |
 | 2026-07-20 | Luna 3-way 위임으로 N5 Listening seed 10→50문항 확장 + DB/TTS 50/50 생성 | `2607/2607201548_listening_seed_50_tts.md` |
 | 2026-07-20 | Luna 초안+main 검수로 N5 Listening original seed 5→10문항 확장 | `2607/2607201527_listening_seed_luna_expansion.md` |
 | 2026-07-20 | N5 Listening original MCQ 5문항 멱등 seed + Gemini TTS/MinIO/Telegram live smoke (ADR-034) | `2607/2607201520_listening_question_seed_smoke.md` |

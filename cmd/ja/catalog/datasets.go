@@ -26,6 +26,9 @@ var n5VocabContextJSON []byte
 //go:embed data/n5_listening.json
 var n5ListeningJSON []byte
 
+//go:embed data/n5_reading.json
+var n5ReadingJSON []byte
+
 const (
 	VocabLanguage         = "ja"
 	VocabProficiencyLevel = "N5"
@@ -82,6 +85,30 @@ type ListeningQuestion struct {
 	Difficulty    int         `json:"difficulty"`
 }
 
+// ReadingVocabulary is one key-vocabulary entry surfaced on a reading study card.
+type ReadingVocabulary struct {
+	Surface   string `json:"surface"`
+	Reading   string `json:"reading"`
+	MeaningKo string `json:"meaning_ko"`
+}
+
+// ReadingPassage is an original N5 reading passage plus one MCQ over it.
+// Passage/Reading/KeyVocabulary feed the study material; Prompt/Options/
+// CorrectAnswer/Explanation feed the quiz question (ADR-036).
+type ReadingPassage struct {
+	ID            string              `json:"id"`
+	Skill         model.Skill         `json:"skill"`
+	Title         string              `json:"title"`
+	Passage       string              `json:"passage"`
+	Reading       string              `json:"reading"`
+	KeyVocabulary []ReadingVocabulary `json:"key_vocabulary"`
+	Prompt        string              `json:"prompt"`
+	Options       []string            `json:"options"`
+	CorrectAnswer string              `json:"correct_answer"`
+	Explanation   string              `json:"explanation"`
+	Difficulty    int                 `json:"difficulty"`
+}
+
 // KanaMap maps each kana to its romaji. Script-label and hint logic lives in Go.
 var KanaMap = mustLoadJSON[map[string]string]("kana", kanaJSON)
 
@@ -96,6 +123,9 @@ var N5VocabContext = mustLoadJSON[[]VocabContext]("n5_vocab_context", n5VocabCon
 
 // N5ListeningQuestions is the original N5 listening-comprehension catalog.
 var N5ListeningQuestions = mustLoadJSON[[]ListeningQuestion]("n5_listening", n5ListeningJSON)
+
+// N5ReadingPassages is the original N5 reading-comprehension catalog.
+var N5ReadingPassages = mustLoadJSON[[]ReadingPassage]("n5_reading", n5ReadingJSON)
 
 // loadJSON decodes an embedded dataset into T.
 func loadJSON[T any](name string, data []byte) (T, error) {
