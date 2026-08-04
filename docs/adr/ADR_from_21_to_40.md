@@ -441,3 +441,44 @@
   - Quiz와 Study 모두 같은 one-shot 입력·owner 비용 gate·Tip Candidate 수집 경로를 사용한다.
   - Redis state가 만료되거나 세션이 종료되면 card context 없이 기존 plain LLM 질문으로 graceful fallback한다.
   - multi-user 공개 전환 시에는 owner allowlist 대신 per-user rate limit·비용 정책이 필요하다.
+
+---
+
+## ADR-038: Main LLM을 Gemini 3.5 Flash-Lite로 업그레이드하고 TTS 모델은 분리 유지한다
+
+- **날짜**: 2026-08-04
+- **상태**: 채택됨
+- **맥락**:
+  - 기존 Main LLM은 `gemini-3.1-flash-lite`였고, 손글씨 PNG 이미지 채점·주관식 채점·학습 질문·tip 생성을 모두 같은 chat client로 처리했다.
+  - 손글씨 채점은 image input과 strict JSON output이 필요하며, latency와 API cost도 운영 기준이다.
+  - `tts.model`은 OpenAI-compatible chat 경로와 별도의 native Gemini `generateContent` 경로를 사용한다.
+- **결정**:
+  - Main LLM을 stable `gemini-3.5-flash-lite`로 변경한다.
+  - Gemini 3.x의 sampling parameter 정책에 맞춰 chat request에서 `temperature`를 제거하고, 출력 형식·낮은 variance는 system prompt와 strict JSON schema로 유지한다.
+  - TTS는 이번 변경 범위에서 제외하고 기존 `gemini-2.5-flash-preview-tts`를 유지한다.
+- **장점 / 트레이드오프**:
+  - image input·structured output을 지원하는 low-latency 모델을 유지하면서 3.1 Flash-Lite보다 최신 multimodal 품질을 얻는다.
+  - 3.6 Flash 대비 비용 증가를 제한한다. 대신 최고 수준의 multimodal reasoning이 필요한 경우 별도 benchmark 후 재검토한다.
+  - 기존 OpenAI-compatible client와 model config를 재사용한다. Gemini 3.x migration으로 sampling parameter 호환성은 더 엄격해진다.
+
+---
+
+## ADR-039: 손글씨 채점은 acceptance-first로 판정하고 불확실한 오답 feedback을 비운다
+
+- **날짜**: 2026-08-04
+- **상태**: 채택됨
+- **맥락**:
+  - 손글씨 PNG가 Expected Text와 충분히 유사한데도 `is_correct=false`가 반환되는 false negative가 반복됐다.
+  - Mini App은 false verdict를 `오답입니다. 정답은 ...`으로 표시하고, `feedback`이 비어 있으면 추가 설명 없이 정답만 보여준다. 반대로 추측성 feedback은 학습자에게 잘못된 교정 근거를 제공한다.
+- **결정**:
+  - 손글씨 판정은 open-ended OCR이 아니라 Expected Text에 대한 conditional verification으로 유지한다.
+  - 판정 기본값을 `is_correct=true`로 두고, 저해상도·거친 필기·부분 clipping·문자/diacritic/yoon 구분이 애매한 경우 Expected Text가 plausibly 맞으면 정답으로 허용한다.
+  - `is_correct=false`는 최종 bitmap에서 확인 가능한 구체적 결함 하나를 high confidence로 명명할 수 있을 때만 허용한다. 근거를 추측해야 하면 `true`를 반환한다.
+  - `feedback`은 정답뿐 아니라 기본적으로 빈 문자열이다. 오답이면서 결함이 명확할 때만 짧은 Korean 교정 note를 반환하고, 그렇지 않으면 빈 문자열로 두어 UI가 Expected Text만 보여주게 한다.
+  - stroke order·starting point·writing direction·pen movement 및 대체 문자 추측은 feedback 근거로 사용하지 않는다.
+- **장점 / 트레이드오프**:
+  - 낮은 위험의 초급 연습에서 false negative와 잘못된 교정을 줄이고, 불확실한 오답의 사용자 노출을 안전하게 제한한다.
+  - 일부 false positive를 허용하므로 정밀한 필기 평가가 필요한 단계에서는 별도 benchmark와 더 강한 판정 모드가 필요하다.
+- **검증/후속**:
+  - prompt 문자열과 strict JSON schema 계약 테스트를 추가하고 `make test`를 통과시킨다.
+  - 운영 반영 후 기존 false-negative 이미지 replay와 live sample로 acceptance/feedback 품질을 재측정한다.

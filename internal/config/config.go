@@ -63,7 +63,7 @@ type TelegramConfig struct {
 // 마이그레이션이 필요할 때 로직 코드 수정 전혀 없이 환경변수(BaseURL, API Key)만으로 즉각 교체할 수 있어 유지보수성이 극대화
 type LLMConfig struct {
 	APIKey  string `mapstructure:"api_key"`
-	Model   string `mapstructure:"model"`    // gemini-3.1-flash-lite
+	Model   string `mapstructure:"model"`    // gemini-3.5-flash-lite
 	BaseURL string `mapstructure:"base_url"` // https://generativelanguage.googleapis.com/v1beta/openai/
 }
 
@@ -191,7 +191,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("telegram.debug", false)
 
 	// llm
-	viper.SetDefault("llm.model", "gemini-3.1-flash-lite") // default to LLM model
+	viper.SetDefault("llm.model", "gemini-3.5-flash-lite") // default to LLM model
 	viper.SetDefault(
 		"llm.base_url",
 		"https://generativelanguage.googleapis.com/v1beta/openai/",

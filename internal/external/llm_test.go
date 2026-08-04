@@ -37,11 +37,11 @@ func TestBuildHandwritingSystemPromptDefinesFeedbackPolicy(t *testing.T) {
 
 	for _, want := range []string{
 		"If is_correct is true, feedback must be an empty string",
-		"Return a Korean correction note ONLY for an error you can clearly see in the image, and only when a reliable note exists",
-		"Explain only which expected feature is clearly missing or wrong",
+		"Feedback is empty by default, including for an incorrect result",
+		"set feedback to an empty string. The app will show the Expected Text without an additional correction",
+		"Never write speculative or hedged feedback",
 		"Do not propose, transcribe, or mention an alternative character",
 		"Never mention stroke order, starting point, writing direction, or pen movement",
-		"If you are not sure why it is wrong, return an empty string",
 	} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("system prompt does not contain feedback policy %q: %q", want, prompt)
@@ -56,12 +56,13 @@ func TestBuildHandwritingSystemPromptDefinesConditionalVerificationPolicy(t *tes
 
 	for _, want := range []string{
 		"conditional verification against the provided Expected Text, not open-ended OCR",
-		"Default to true when the Expected Text is a plausible reading",
+		"This is an acceptance-first decision. The default is is_correct=true",
+		"If the image is ambiguous, low-resolution, partially clipped, rough, or plausibly matches the Expected Text, return true",
 		"Do not search for or prefer an alternative transcription",
 		"another kana or kanji",
 		"ambiguous small kana or diacritic marks when plausibly present",
-		"full expected string in order",
-		"Return false ONLY when you are highly confident of a clear, specific error",
+		"compare the full expected string, but do not reject for spacing",
+		"Return false ONLY when you can name one concrete, observable defect in the final bitmap with high confidence",
 		"Apply this principle generally, not only to this example",
 		"Expected Text: オ",
 		"visually similar kanji 才",
@@ -174,9 +175,9 @@ func TestBuildHandwritingResponseFormatUsesStrictJSONSchema(t *testing.T) {
 		t.Fatalf("feedback type = %v, want string", got)
 	}
 	if description, ok := schema.Properties["feedback"]["description"].(string); !ok ||
-		!strings.Contains(description, "Empty when correct") {
+		!strings.Contains(description, "Empty by default") {
 		t.Fatalf(
-			"feedback description = %v, want Empty when correct policy",
+			"feedback description = %v, want empty-by-default policy",
 			schema.Properties["feedback"]["description"],
 		)
 	}
@@ -195,7 +196,7 @@ func TestBuildHandwritingChatCompletionRequestConstrainsGeneration(t *testing.T)
 	t.Parallel()
 
 	req := buildHandwritingChatCompletionRequest(
-		"gemini-3.1-flash-lite",
+		"gemini-3.5-flash-lite",
 		"system prompt",
 		"user prompt",
 		"data:image/png;base64,abc",
@@ -207,8 +208,8 @@ func TestBuildHandwritingChatCompletionRequestConstrainsGeneration(t *testing.T)
 	if req.ReasoningEffort != "" {
 		t.Fatalf("ReasoningEffort = %q, want empty", req.ReasoningEffort)
 	}
-	if req.Temperature != handwritingTemperature {
-		t.Fatalf("Temperature = %v, want %v", req.Temperature, handwritingTemperature)
+	if req.Temperature != 0 {
+		t.Fatalf("Temperature = %v, want omitted zero value", req.Temperature)
 	}
 	if req.ResponseFormat == nil || req.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONSchema {
 		t.Fatalf("ResponseFormat = %#v, want JSON schema", req.ResponseFormat)

@@ -68,6 +68,19 @@ func TestLoadLoggingDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadLLMDefaults(t *testing.T) {
+	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
+	t.Chdir(t.TempDir())
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got, want := cfg.LLM.Model, "gemini-3.5-flash-lite"; got != want {
+		t.Fatalf("LLM.Model = %q, want %q", got, want)
+	}
+}
+
 func TestLoadScheduleDefaults(t *testing.T) {
 	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
 	t.Chdir(t.TempDir())

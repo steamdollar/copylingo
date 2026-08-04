@@ -41,11 +41,8 @@ type GeneratedTip struct {
 const (
 	handwritingMaxCompletionTokens = 80
 	learningQuestionMaxTokens      = 700
-	// go-openai omits zero-valued temperature, so use a near-zero value to force low-variance decoding.
-	handwritingTemperature = 0.01
-	// tipGenerationTemperature keeps some variety across tips while staying on-topic.
-	tipGenerationTemperature = 0.7
-	tipGenerationMaxTokens   = 800
+	// Gemini 3.5 Flash-Lite deprecates sampling parameters; deterministic behavior comes from system prompts.
+	tipGenerationMaxTokens = 800
 )
 
 type DefaultLLMClient struct {
@@ -139,7 +136,6 @@ func (c *DefaultLLMClient) AnswerLearningQuestion(ctx context.Context, question 
 	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model:               c.model,
 		MaxCompletionTokens: learningQuestionMaxTokens,
-		Temperature:         0.2,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role: openai.ChatMessageRoleSystem,
@@ -212,7 +208,6 @@ func buildHandwritingChatCompletionRequest(
 	return openai.ChatCompletionRequest{
 		Model:               model,
 		MaxCompletionTokens: handwritingMaxCompletionTokens,
-		Temperature:         handwritingTemperature,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
@@ -254,14 +249,15 @@ Decision policy:
 - Input provenance: the student drew with a finger on a mobile canvas. The server collected sampled stroke points, rebuilt them as a static PNG, and sent only that PNG. Temporal pen-movement information is not available in this image.
 - Evaluate only the final visible bitmap.
 - Do not infer or grade stroke order, starting point, writing direction, or pen movement. The image does not contain reliable evidence for them.
-- Grade generously. This is low-stakes beginner practice; a wrong rejection discourages the learner far more than a lenient acceptance helps. When in any doubt, return true.
-- Default to true when the Expected Text is a plausible reading of the image.
+- This is an acceptance-first decision. The default is is_correct=true.
+- Grade generously. This is low-stakes beginner practice; a wrong rejection discourages the learner far more than a lenient acceptance helps.
+- If the image is ambiguous, low-resolution, partially clipped, rough, or plausibly matches the Expected Text, return true.
 - Do not search for or prefer an alternative transcription.
 - If the image resembles both the Expected Text and another kana or kanji, return true when the Expected Text remains plausible.
 - If distinguishing the Expected Text from another character would require knowing stroke direction or pen movement, return true when the Expected Text remains plausible.
-- Accept rough mobile handwriting, joined or separated strokes, uneven proportions, and ambiguous small kana or diacritic marks when plausibly present.
-- For a short kana word, compare the full expected string in order.
-- Return false ONLY when you are highly confident of a clear, specific error you can name (a character clearly missing, extra, swapped, or clearly a different shape). If you cannot name a concrete observable error, return true.
+- Accept rough mobile handwriting, joined or separated strokes, uneven proportions, spacing, alignment, size, and ambiguous small kana or diacritic marks when plausibly present.
+- For a short kana word, compare the full expected string, but do not reject for spacing, alignment, relative size, or stroke segmentation. Reject only for a clearly missing, extra, substituted, or swapped character that is visibly unambiguous.
+- Return false ONLY when you can name one concrete, observable defect in the final bitmap with high confidence. If you cannot name that defect without guessing, return true.
 
 Marks and script (do not over-reject on these):
 - Diacritics (゛dakuten / ゜handakuten) render as tiny, low-resolution marks. If a diacritic is plausibly present where one is expected, accept it. NEVER reject solely because you cannot tell dakuten from handakuten, or cannot count the exact number of dots.
@@ -281,11 +277,13 @@ Apply this principle generally, not only to this example:
 
 Feedback policy:
 - If is_correct is true, feedback must be an empty string.
-- Never invent or guess a correction. Return a Korean correction note ONLY for an error you can clearly see in the image, and only when a reliable note exists.
-- Explain only which expected feature is clearly missing or wrong.
+- Feedback is empty by default, including for an incorrect result.
+- When is_correct is false, return a Korean correction note ONLY when one concrete visual defect is clearly visible and can be stated with high confidence.
+- If the false verdict is not supported by a precise visual defect, set feedback to an empty string. The app will show the Expected Text without an additional correction, which is safer than a speculative explanation.
+- Explain only which expected feature is clearly missing or wrong; do not explain why the handwriting is merely unusual.
 - Do not propose, transcribe, or mention an alternative character.
 - Never mention stroke order, starting point, writing direction, or pen movement.
-- If you are not sure why it is wrong, return an empty string. A wrong correction is worse than none.
+- Never write speculative or hedged feedback such as "maybe", "probably", "looks like", or "it seems".
 - Do not praise, encourage, or add filler.`
 }
 
@@ -302,7 +300,7 @@ func buildHandwritingResponseFormat() *openai.ChatCompletionResponseFormat {
 					"is_correct": { "type": "boolean" },
 						"feedback": {
 							"type": "string",
-							"description": "Empty when correct. When incorrect, optional short Korean correction note about a clearly missing or wrong expected feature. Do not mention alternative characters, stroke order, starting point, writing direction, or pen movement."
+							"description": "Empty by default. Only when is_correct is false and one concrete visual defect is clearly visible, provide a short Korean note about that missing or wrong expected feature. Never speculate or mention alternative characters, stroke order, starting point, writing direction, or pen movement."
 						}
 				},
 				"required": ["is_correct", "feedback"],
@@ -345,7 +343,6 @@ func (c *DefaultLLMClient) GenerateTips(
 	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model:               c.model,
 		MaxCompletionTokens: tipGenerationMaxTokens,
-		Temperature:         tipGenerationTemperature,
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
