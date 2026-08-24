@@ -94,5 +94,149 @@
     "chunks": ["一緒に", "行きましょう。"],
     "correct_answer": "一緒に行きましょう。",
     "explanation": "ましょう는 함께 하자는 제안을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_013",
+    "grammar_id": "n5_grammar_013",
+    "prompt": "'이것은 물입니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["これ", "は", "水", "です。"],
+    "correct_answer": "これは水です。",
+    "explanation": "です는 명사 뒤에 붙어 정중하게 서술합니다."
+  },
+  {
+    "id": "n5_word_order_014",
+    "grammar_id": "n5_grammar_014",
+    "prompt": "'오늘은 쉬는 날이다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["今日", "は", "休み", "だ。"],
+    "correct_answer": "今日は休みだ。",
+    "explanation": "だ는 명사 뒤에 붙어 비정중형(반말)으로 서술합니다."
+  },
+  {
+    "id": "n5_word_order_015",
+    "grammar_id": "n5_grammar_015",
+    "prompt": "'저는 학생이 아닙니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["私", "は", "学生", "ではありません。"],
+    "correct_answer": "私は学生ではありません。",
+    "explanation": "ではありません은 명사의 정중한 부정을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_016",
+    "grammar_id": "n5_grammar_016",
+    "prompt": "'어제는 비였습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["昨日", "は", "雨", "でした。"],
+    "correct_answer": "昨日は雨でした。",
+    "explanation": "でした는 명사의 정중한 과거형을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_017",
+    "grammar_id": "n5_grammar_017",
+    "prompt": "'어제는 쉬는 날이 아니었습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["昨日", "は", "休み", "ではありませんでした。"],
+    "correct_answer": "昨日は休みではありませんでした。",
+    "explanation": "ではありませんでした는 명사의 정중한 과거 부정형을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_018",
+    "grammar_id": "n5_grammar_018",
+    "prompt": "'매일 학교에 갑니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["毎日", "学校", "へ", "行きます。"],
+    "correct_answer": "毎日学校へ行きます。",
+    "explanation": "ます는 동사의 정중한 서술을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_019",
+    "grammar_id": "n5_grammar_019",
+    "prompt": "'어제 친구를 만났습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["昨日", "友達", "に", "会いました。"],
+    "correct_answer": "昨日友達に会いました。",
+    "explanation": "ました는 동사의 정중한 과거형을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_020",
+    "grammar_id": "n5_grammar_020",
+    "prompt": "'아침밥을 먹지 않았습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["朝ご飯", "を", "食べませんでした。"],
+    "correct_answer": "朝ご飯を食べませんでした。",
+    "explanation": "ませんでした는 동사의 정중한 과거 부정형을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_021",
+    "grammar_id": "n5_grammar_021",
+    "prompt": "'도와드릴까요?'가 되도록 문장을 배열하세요.",
+    "chunks": ["手伝い", "ましょう", "か。"],
+    "correct_answer": "手伝いましょうか。",
+    "explanation": "ましょうか는 상대에게 제안하거나 권유하는 정중한 의문형입니다."
+  },
+  {
+    "id": "n5_word_order_022",
+    "grammar_id": "n5_grammar_022",
+    "prompt": "'책을 읽어 주세요.'가 되도록 문장을 배열하세요.",
+    "chunks": ["本", "を", "読んで", "ください。"],
+    "correct_answer": "本を読んでください。",
+    "explanation": "てください는 상대에게 행동을 정중하게 요청할 때 사용합니다."
+  },
+  {
+    "id": "n5_word_order_023",
+    "grammar_id": "n5_grammar_023",
+    "prompt": "'지금 텔레비전을 보고 있습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["今", "テレビ", "を", "見て", "います。"],
+    "correct_answer": "今テレビを見ています。",
+    "explanation": "ています는 현재 진행 중인 동작이나 상태의 지속을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_024",
+    "grammar_id": "n5_grammar_024",
+    "prompt": "'여기에 들어와도 좋습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["ここ", "に", "入って", "も", "いいです。"],
+    "correct_answer": "ここに入ってもいいです。",
+    "explanation": "てもいいです는 어떤 행동을 허가하거나 허용할 때 사용합니다."
+  },
+  {
+    "id": "n5_word_order_025",
+    "grammar_id": "n5_grammar_025",
+    "prompt": "'여기서 사진을 찍어서는 안 됩니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["ここ", "で", "写真", "を", "撮って", "はいけません。"],
+    "correct_answer": "ここで写真を撮ってはいけません。",
+    "explanation": "てはいけません은 특정 행동을 금지할 때 사용합니다."
+  },
+  {
+    "id": "n5_word_order_026",
+    "grammar_id": "n5_grammar_026",
+    "prompt": "'추우니까 창문을 닫겠습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["寒い", "から", "窓", "を", "閉めます。"],
+    "correct_answer": "寒いから窓を閉めます。",
+    "explanation": "から는 앞 문장의 이유나 원인을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_027",
+    "grammar_id": "n5_grammar_027",
+    "prompt": "'비가 내리고 있습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["雨", "が", "降って", "います。"],
+    "correct_answer": "雨が降っています。",
+    "explanation": "が는 동작이나 상태의 주체를 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_028",
+    "grammar_id": "n5_grammar_028",
+    "prompt": "'친구와 놉니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["友達", "と", "遊びます。"],
+    "correct_answer": "友達と遊びます。",
+    "explanation": "と는 공동 동작의 대상을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_029",
+    "grammar_id": "n5_grammar_029",
+    "prompt": "'책상 위에 책이랑 펜 등이 있습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["机の上", "に", "本", "や", "ペン", "があります。"],
+    "correct_answer": "机の上に本やペンがあります。",
+    "explanation": "や는 명사 중 일부를 골라 예시로 나열할 때 사용합니다."
+  },
+  {
+    "id": "n5_word_order_030",
+    "grammar_id": "n5_grammar_030",
+    "prompt": "'과일과 야채 등을 샀습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["果物", "や", "野菜", "など", "を", "買いました。"],
+    "correct_answer": "果物や野菜などを買いました。",
+    "explanation": "など는 열거한 사물 외에도 더 있음을 나타냅니다."
   }
 ]

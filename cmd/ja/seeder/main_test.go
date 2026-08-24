@@ -994,6 +994,9 @@ func TestBuildReadingQuestions(t *testing.T) {
 func TestN5WordOrderIntegrity(t *testing.T) {
 	t.Parallel()
 
+	if len(n5WordOrderQuestions) != 30 {
+		t.Fatalf("expected 30 word-order questions, got %d", len(n5WordOrderQuestions))
+	}
 	grammarIDs := make(map[string]struct{}, len(n5GrammarPoints))
 	for _, point := range n5GrammarPoints {
 		grammarIDs[point.ID] = struct{}{}

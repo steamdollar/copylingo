@@ -7,7 +7,7 @@
 
 ## 변경 내용
 
-- `cmd/ja/catalog/data/n5_word_order.json`: 기존 grammar material에 연결된 static N5 Word Order 12문항을 추가했다.
+- `cmd/ja/catalog/data/n5_word_order.json`: 기존 grammar material에 연결된 static N5 Word Order 30문항을 추가했다. 초기 12문항 구현 후 `n5_grammar_013..030`의 authored example을 기반으로 18문항을 확장했다.
 - `cmd/ja/catalog/datasets.go`, `cmd/ja/seeder/main.go`, `cmd/ja/seeder/main_test.go`: embedded dataset, stable `question_key`, material link, chunk/correct-answer integrity 검증을 추가했다.
 - `internal/bot/word_order.go`, `internal/bot/word_order_test.go`: deterministic shuffle, Redis draft, tap·undo·reset·submit, 반복 chunk index 처리와 focused tests를 추가했다.
 - `internal/bot/session_question.go`, `internal/bot/session_flow.go`, `internal/config/constants.go`: type renderer, callback dispatch, session 종료 cleanup, callback/Redis key 규약을 연결했다.
@@ -22,6 +22,7 @@
 ## 검증
 
 - `go test ./internal/bot ./cmd/ja/seeder ./cmd/ja/catalog ./internal/callback` — PASS
+- `go test ./cmd/ja/catalog ./cmd/ja/seeder` — PASS (30문항 count·ID·material link·chunk join integrity)
 - `make test` — PASS
 - `git diff --check` — PASS
 - `make restart-app` — PASS (`http://localhost:8080/health` ready)
