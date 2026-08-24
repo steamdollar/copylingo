@@ -247,6 +247,9 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 		if len(mAPI.sentMessages) != 1 {
 			t.Fatalf("expected 1 instruction message, got %d", len(mAPI.sentMessages))
 		}
+		if !keyboardHasCallback(mAPI.sentMessages[0], config.ActionLLMCancel) {
+			t.Fatalf("instruction message does not include %q callback", config.ActionLLMCancel)
+		}
 	})
 
 	t.Run("non-owner is ignored", func(t *testing.T) {
@@ -314,6 +317,9 @@ func TestHandleStudyAskLLMQuestion(t *testing.T) {
 		}
 		if len(api.sentMessages) != 1 {
 			t.Fatalf("instruction messages = %d, want 1", len(api.sentMessages))
+		}
+		if !keyboardHasCallback(api.sentMessages[0], config.ActionLLMCancel) {
+			t.Fatalf("instruction message does not include %q callback", config.ActionLLMCancel)
 		}
 	})
 

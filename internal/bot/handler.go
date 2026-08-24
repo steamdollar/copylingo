@@ -256,6 +256,8 @@ func telegramUpdateAttrs(update tgbotapi.Update) []slog.Attr {
 
 func callbackType(data string) string {
 	switch {
+	case data == config.ActionLLMCancel:
+		return "llm"
 	case strings.HasPrefix(data, "menu:"):
 		return "menu"
 	case strings.HasPrefix(data, config.PrefixSession):
@@ -334,6 +336,8 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	data := cb.Data
 
 	switch {
+	case data == config.ActionLLMCancel:
+		b.handleLLMCancel(ctx, cb)
 	case data == config.ActionMenuMain:
 		b.showMainMenu(ctx, cb.Message.Chat.ID, cb.From)
 	case data == config.ActionMenuStudy:

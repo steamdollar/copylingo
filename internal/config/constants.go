@@ -21,6 +21,8 @@ const (
 
 // Callback Data Actions
 const (
+	// LLM 질의 대기 상태 취소
+	ActionLLMCancel = "llm:cancel"
 	// 메인 메뉴 화면 출력
 	ActionMenuMain = "menu:main"
 	// 일반 학습 세션 시작

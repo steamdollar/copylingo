@@ -257,6 +257,46 @@ func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
 	if !strings.Contains(sent.Text, "LLM mode 활성화") {
 		t.Fatalf("message text = %q", sent.Text)
 	}
+	if !keyboardHasCallback(sent, config.ActionLLMCancel) {
+		t.Fatalf("activation message does not include %q callback", config.ActionLLMCancel)
+	}
+}
+
+func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
+	api := &mockBotAPI{}
+	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	otherUserID := allowedUserID + 1
+	rdb := &testRedis{values: map[string]string{
+		config.UserLLMPendingRedisKey.Format(allowedUserID): "1",
+		config.UserLLMPendingRedisKey.Format(otherUserID):   "1",
+	}}
+	b := &Bot{api: api, rdb: rdb}
+
+	b.handleCallback(context.Background(), &tgbotapi.CallbackQuery{
+		ID:   "cancel-llm",
+		Data: config.ActionLLMCancel,
+		From: &tgbotapi.User{ID: allowedUserID},
+		Message: &tgbotapi.Message{
+			Chat: &tgbotapi.Chat{ID: 456},
+		},
+	})
+
+	if _, ok := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; ok {
+		t.Fatal("invoking user's LLM pending key still exists")
+	}
+	if got := rdb.values[config.UserLLMPendingRedisKey.Format(otherUserID)]; got != "1" {
+		t.Fatalf("other user's LLM pending value = %q, want 1", got)
+	}
+	if len(api.sentMessages) != 1 {
+		t.Fatalf("sent messages = %d, want 1", len(api.sentMessages))
+	}
+	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
+	if !strings.Contains(sent.Text, "LLM mode를 취소했습니다") {
+		t.Fatalf("message text = %q", sent.Text)
+	}
+	if got := callbackType(config.ActionLLMCancel); got != "llm" {
+		t.Fatalf("callback type = %q, want llm", got)
+	}
 }
 
 func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {

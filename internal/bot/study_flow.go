@@ -315,8 +315,8 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
 		return
 	}
-	sf.bot.SendMessage(cb.Message.Chat.ID,
-		"🤖 이 Study Material에 대해 궁금한 점을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.")
+	sf.bot.SendMessageWithKeyboard(cb.Message.Chat.ID,
+		"🤖 이 Study Material에 대해 궁금한 점을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.", llmCancelKeyboard())
 }
 
 func studyMaterialIndexByOrder(items []model.StudySessionMaterial, materialOrder int) int {

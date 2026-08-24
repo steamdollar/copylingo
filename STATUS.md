@@ -36,6 +36,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-08-24 | `/llm`·Quiz·Study LLM one-shot mode 활성화 안내에 취소 버튼 추가 + 사용자별 pending 상태 정리 | `2608/2608241420_llm_mode_cancel.md` |
 | 2026-08-24 | Go 1.27.0 toolchain·Docker builder pin 정렬 + stale `/app/data` COPY 제거 (ADR-044) | `2608/2608241408_go_127_upgrade.md` |
 | 2026-08-24 | Telegram tap-to-build Word Order 30문항: stable shuffle·Redis draft·undo/reset/submit·exact grading (ADR-043) | `2608/2608241307_word_order_telegram_mvp.md` |
 | 2026-08-22 | Scheduled Quiz/Study가 새 세션 대신 미완료 backlog를 우선 재알림 (ADR-042) | `2608/2608222156_scheduled_session_backlog_reminder.md` |

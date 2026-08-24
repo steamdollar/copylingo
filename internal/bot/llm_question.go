@@ -41,7 +41,38 @@ func (b *Bot) handleLLM(ctx context.Context, msg *tgbotapi.Message) {
 		b.SendMessage(msg.Chat.ID, "❌ LLM mode를 활성화할 수 없습니다.")
 		return
 	}
-	b.SendMessage(msg.Chat.ID, "🤖 <b>LLM mode 활성화</b>\n질문을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.")
+	b.SendMessageWithKeyboard(msg.Chat.ID,
+		"🤖 <b>LLM mode 활성화</b>\n질문을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.", llmCancelKeyboard())
+}
+
+func llmCancelKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("❌ 취소", config.ActionLLMCancel),
+		),
+	)
+}
+
+func (b *Bot) handleLLMCancel(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
+		return
+	}
+	if b.rdb == nil {
+		b.SendMessage(cb.Message.Chat.ID, "❌ LLM mode를 취소할 수 없습니다.")
+		return
+	}
+
+	key := config.UserLLMPendingRedisKey.Format(cb.From.ID)
+	if err := b.rdb.Del(ctx, key).Err(); err != nil {
+		slog.ErrorContext(ctx, "Failed to cancel LLM mode",
+			"event", "telegram.llm.cancel_failed",
+			"user_id", cb.From.ID,
+			"error", err,
+		)
+		b.SendMessage(cb.Message.Chat.ID, "❌ LLM mode를 취소할 수 없습니다.")
+		return
+	}
+	b.SendMessage(cb.Message.Chat.ID, "✅ LLM mode를 취소했습니다.")
 }
 
 func (b *Bot) handleLLMQuestion(ctx context.Context, msg *tgbotapi.Message) bool {
