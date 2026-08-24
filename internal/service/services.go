@@ -13,6 +13,7 @@ type Services struct {
 	User               *UserService
 	SRS                *SRSService
 	SessionBuilder     *SessionBuilderService
+	SessionQuery       *SessionQueryService
 	StudySession       *StudySessionService
 	StudyActiveSession *StudyActiveSessionService
 	ActiveSession      *ActiveSessionService
@@ -59,6 +60,7 @@ func NewServices(repos *repository.Repositories, cfg *config.Config, rdb redis.C
 		SRS:  srsService,
 		SessionBuilder: NewSessionBuilderService(repos.Question,
 			repos.Session, repos.SessionQuestion, srsService),
+		SessionQuery:       NewSessionQueryService(repos.Session),
 		StudySession:       NewStudySessionService(repos.Material, repos.Session, repos.SessionMaterial),
 		StudyActiveSession: NewStudyActiveSessionService(repos.StudyActiveSession, repos.Session, rdb),
 		ActiveSession:      activeSessionService,

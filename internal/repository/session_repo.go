@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -13,6 +15,13 @@ import (
 type SessionRepository struct {
 	db *sqlx.DB
 }
+
+const getOldestUnfinishedQuery = `
+	SELECT * FROM sessions
+	WHERE user_id = $1 AND status IN ('in_progress', 'pending')
+	ORDER BY CASE WHEN status = 'in_progress' THEN 0 ELSE 1 END, created_at ASC
+	LIMIT 1
+`
 
 func NewSessionRepository(db *sqlx.DB) *SessionRepository {
 	return &SessionRepository{db: db}
@@ -38,6 +47,20 @@ func (r *SessionRepository) GetByID(ctx context.Context, id int) (*model.Session
 	s := &model.Session{}
 	if err := r.db.GetContext(ctx, s, `SELECT * FROM sessions WHERE id = $1`, id); err != nil {
 		return nil, fmt.Errorf("SessionRepository.GetByID id=%d: %w", id, err)
+	}
+	return s, nil
+}
+
+// GetOldestUnfinished returns the highest-priority unfinished session for a user.
+// In-progress sessions take precedence over pending sessions; within a status,
+// the oldest created session is returned. A missing session is not an error.
+func (r *SessionRepository) GetOldestUnfinished(ctx context.Context, userID int64) (*model.Session, error) {
+	s := &model.Session{}
+	if err := r.db.GetContext(ctx, s, getOldestUnfinishedQuery, userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("SessionRepository.GetOldestUnfinished user_id=%d: %w", userID, err)
 	}
 	return s, nil
 }

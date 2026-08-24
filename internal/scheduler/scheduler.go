@@ -20,9 +20,14 @@ import (
 type Scheduler struct {
 	cfg          *config.Config
 	services     *service.Services
-	bot          *bot.Bot
+	bot          sessionPusher
 	orchestrator *pipeline.Orchestrator
 	cron         *cron.Cron
+}
+
+type sessionPusher interface {
+	PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error
+	PushStudySession(ctx context.Context, chatID int64, sessionID int) error
 }
 
 // New creates a new Scheduler.
@@ -219,8 +224,25 @@ func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.
 	// 세션 빌드는 큐에 넣고, 푸시는 큐에서 빼서 하는 식으로? 일단은 간단하게 동기적으로 처리하지만, 나중에 확장성을 고려해서 개선할 수 있을듯.
 	var failures int
 	for _, user := range users {
+		reminded, err := s.remindUnfinishedSession(ctx, user.ID)
+		if err != nil {
+			failures++
+			slog.ErrorContext(ctx, "Failed to remind unfinished session",
+				"event", "scheduler.session.reminder_failed",
+				"user_id", user.ID,
+				"error", err,
+			)
+			continue
+		}
+		if reminded {
+			slog.InfoContext(ctx, "Unfinished session reminded",
+				"event", "scheduler.session.reminded",
+				"user_id", user.ID,
+			)
+			continue
+		}
+
 		var session *model.Session
-		var err error
 
 		switch sessionType {
 		case model.SessionMorning:
@@ -366,6 +388,24 @@ func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
 
 	var failures int
 	for _, user := range users {
+		reminded, err := s.remindUnfinishedSession(ctx, user.ID)
+		if err != nil {
+			failures++
+			slog.ErrorContext(ctx, "Failed to remind unfinished session",
+				"event", "scheduler.study_session.reminder_failed",
+				"user_id", user.ID,
+				"error", err,
+			)
+			continue
+		}
+		if reminded {
+			slog.InfoContext(ctx, "Unfinished session reminded",
+				"event", "scheduler.study_session.reminded",
+				"user_id", user.ID,
+			)
+			continue
+		}
+
 		session, err := s.services.StudySession.BuildStudySession(ctx, user.ID, user.Language, user.ProficiencyLevel)
 		if err != nil {
 			failures++
@@ -411,4 +451,43 @@ func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
 		return fmt.Errorf("%d study session operations failed", failures)
 	}
 	return nil
+}
+
+// remindUnfinishedSession re-sends one existing session before a scheduled build.
+// The repository query already applies status and age priority across both modes.
+func (s *Scheduler) remindUnfinishedSession(ctx context.Context, userID int64) (bool, error) {
+	if s.services == nil || s.services.SessionQuery == nil {
+		return false, fmt.Errorf("session query service unavailable")
+	}
+	if s.bot == nil {
+		return false, fmt.Errorf("session pusher unavailable")
+	}
+
+	session, err := s.services.SessionQuery.GetOldestUnfinished(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("query unfinished session user_id=%d: %w", userID, err)
+	}
+	if session == nil {
+		return false, nil
+	}
+
+	switch session.Mode {
+	case model.SessionModeStudy:
+		if err := s.bot.PushStudySession(ctx, userID, session.ID); err != nil {
+			return true, fmt.Errorf("push study session reminder user_id=%d session_id=%d: %w", userID, session.ID, err)
+		}
+		return true, nil
+	case model.SessionModeQuiz, "":
+		if err := s.bot.PushSession(ctx, userID, session.ID, string(session.Type)); err != nil {
+			return true, fmt.Errorf("push quiz session reminder user_id=%d session_id=%d: %w", userID, session.ID, err)
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf(
+			"unsupported unfinished session mode user_id=%d session_id=%d mode=%q",
+			userID,
+			session.ID,
+			session.Mode,
+		)
+	}
 }

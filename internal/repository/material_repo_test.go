@@ -51,11 +51,12 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 func TestStudySessionMaterialsQueryIncludesGrammarAndInterleavesCategories(t *testing.T) {
 	for _, want := range []string{
 		"m.category = ANY($4)",
-		"PARTITION BY m.category",
+		"PARTITION BY mp.category",
 		"WHEN 'vocabulary' THEN 0",
 		"WHEN 'grammar' THEN 1",
 		"WHEN 'reading' THEN 2",
-		"ORDER BY category_rank ASC, category_order ASC",
+		"CASE WHEN category = 'reading' THEN category_bucket_rank ELSE category_rank END ASC",
+		"category_order ASC",
 	} {
 		if !strings.Contains(studySessionMaterialsQuery, want) {
 			t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
@@ -79,10 +80,87 @@ func TestStudySessionMaterialCategoriesIncludeReading(t *testing.T) {
 	}
 }
 
-// Reading is capped at one card per study session (ADR-036): the ranked CTE
-// keeps only the top reading candidate while other categories stay unbounded.
-func TestStudySessionMaterialsQueryCapsReadingAtOne(t *testing.T) {
-	if !strings.Contains(studySessionMaterialsQuery, "WHERE category <> 'reading' OR category_rank <= 1") {
-		t.Fatalf("studySessionMaterialsQuery does not cap reading candidates:\n%s", studySessionMaterialsQuery)
-	}
+func TestStudySessionMaterialsQueryReadingPolicy(t *testing.T) {
+	t.Run("due and new coexist selects at most one from each bucket", func(t *testing.T) {
+		for _, want := range []string{
+			"CASE WHEN mp.progress_material_id IS NULL THEN 'new' ELSE 'review' END",
+			"(progress_material_id IS NULL AND category_bucket_rank <= 1)",
+			"CASE WHEN has_unseen_reading THEN 1 ELSE 2 END",
+		} {
+			if !strings.Contains(studySessionMaterialsQuery, want) {
+				t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+			}
+		}
+	})
+
+	t.Run("all reading seen allows two due reviews", func(t *testing.T) {
+		for _, want := range []string{
+			"WHERE category = 'reading'",
+			"AND progress_material_id IS NULL",
+			") AS has_unseen_reading",
+			"progress_material_id IS NOT NULL",
+			"CASE WHEN has_unseen_reading THEN 1 ELSE 2 END",
+		} {
+			if !strings.Contains(studySessionMaterialsQuery, want) {
+				t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+			}
+		}
+	})
+
+	t.Run("no due review never pulls a future review forward", func(t *testing.T) {
+		for _, want := range []string{
+			"WHERE (mp.progress_material_id IS NULL OR mp.next_review_at <= NOW())",
+			"(progress_material_id IS NULL AND category_bucket_rank <= 1)",
+		} {
+			if !strings.Contains(studySessionMaterialsQuery, want) {
+				t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+			}
+		}
+		if strings.Contains(studySessionMaterialsQuery, "mp.next_review_at IS NOT NULL") {
+			t.Fatalf("studySessionMaterialsQuery must not admit not-yet-due reviews:\n%s", studySessionMaterialsQuery)
+		}
+	})
+
+	t.Run("non reading categories and general limit remain unchanged", func(t *testing.T) {
+		for _, want := range []string{
+			"WHERE category <> 'reading'",
+			"CASE WHEN category = 'reading' THEN category_bucket_rank ELSE category_rank END ASC",
+			"category_order ASC",
+			"LIMIT $5",
+		} {
+			if !strings.Contains(studySessionMaterialsQuery, want) {
+				t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+			}
+		}
+	})
+
+	t.Run("many due readings do not push selected new reading past the global limit", func(t *testing.T) {
+		for _, want := range []string{
+			"CASE WHEN category = 'reading' THEN category_bucket_rank ELSE category_rank END ASC",
+			"CASE WHEN category = 'reading' AND progress_material_id IS NULL THEN 1 ELSE 0 END ASC",
+			"id ASC",
+		} {
+			if !strings.Contains(studySessionMaterialsQuery, want) {
+				t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+			}
+		}
+		if strings.Contains(studySessionMaterialsQuery, "ORDER BY category_rank ASC, category_order ASC") {
+			t.Fatalf(
+				"studySessionMaterialsQuery still orders selected reading by the unfiltered category rank:\n%s",
+				studySessionMaterialsQuery,
+			)
+		}
+	})
+
+	t.Run("pending and in progress materials remain excluded", func(t *testing.T) {
+		for _, want := range []string{
+			"AND sm.material_id = mp.id",
+			"AND s.mode = 'study'",
+			"AND s.status IN ('pending', 'in_progress')",
+		} {
+			if !strings.Contains(studySessionMaterialsQuery, want) {
+				t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+			}
+		}
+	})
 }

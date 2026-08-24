@@ -65,7 +65,7 @@ A user request falls into one of these, and the deliverable and procedure differ
 - **Owner**: Claude / Codex
 - **Procedure**:
   1. Discuss with the user thoroughly. State tradeoffs at the assumed scale (see §4).
-  2. **Once the decision settles, the agent immediately adds an entry to the latest ADR file under `docs/adr/` (currently `ADR_from_21_to_40.md`) without waiting to be asked** (background / decision / consequences). The user often forgets to update ADRs, so do it proactively.
+  2. **Once the decision settles, the agent immediately adds an entry to the latest ADR file under `docs/adr/` (currently `ADR_from_41_to_60.md`) without waiting to be asked** (background / decision / consequences). The user often forgets to update ADRs, so do it proactively.
      - **Separate-file rule**: if the entry chunk is large or the decision is significant to the project, put it in a **separate file** (keeping the series numbering, e.g. `ADR-031_032_listening_audio_pipeline.md`) and leave a **pointer stub** (number + one-line summary + link) in the range file.
   3. If code changes follow, continue into Case B.
 - **Note**: don't default to "it's fine, single user" or "YAGNI" — rationale and application are in §4.
@@ -167,7 +167,7 @@ Cases often change mid-work. Handle all of these explicitly (no implicit case ch
 - [STATUS.md](STATUS.md) — current work state (🚨 read before working)
 - [ROADMAP.md](ROADMAP.md) — overall Phase/Subphase progress
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system structure, data flow, callback convention
-- [docs/adr/](docs/adr/) — technical decision records (split by range: `ADR_from_01_to_20.md`, `ADR_from_21_to_40.md`; large/significant decisions live in separate files with a pointer stub in the range file, e.g. `ADR-031_032_listening_audio_pipeline.md`)
+- [docs/adr/](docs/adr/) — technical decision records (split by range: `ADR_from_01_to_20.md`, `ADR_from_21_to_40.md`, `ADR_from_41_to_60.md`; large/significant decisions live in separate files with a pointer stub in the range file, e.g. `ADR-031_032_listening_audio_pipeline.md`)
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — coding conventions (Go / Telegram bot / DB / config)
 - [docs/workthrough/](docs/workthrough/) — detailed records of completed work
 - [docs/todos/](docs/todos/) — self-contained plan docs for TODOs executed in a separate session

@@ -36,6 +36,9 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-08-22 | Scheduled Quiz/Study가 새 세션 대신 미완료 backlog를 우선 재알림 (ADR-042) | `2608/2608222156_scheduled_session_backlog_reminder.md` |
+| 2026-08-05 | Morning 17·Evening 12문항 확장 + Daily Session 신규 Listening 1자리 예약 (ADR-041) | `2608/2608050024_daily_session_listening_reservation.md` |
+| 2026-08-04 | Reading Study 편성: unseen이 남으면 due 1+new 1, 모두 학습했으면 due 2 (ADR-040) | `2608/2608042344_reading_study_review_new_mix.md` |
 | 2026-08-04 | 손글씨 채점 acceptance-first prompt 보강: 불확실한 오답은 feedback을 비우고 정답만 표시 | `2608/2608042248_handwriting_grading_acceptance_prompt.md` |
 | 2026-08-04 | Main LLM을 Gemini 3.5 Flash-Lite로 업그레이드하고 Gemini 3.x deprecated sampling parameter 제거 (TTS 유지, 재시작 보류) | `2608/2608042240_gemini_35_flash_lite_upgrade.md` |
 | 2026-07-28 | Study Session card별 owner-only AI 질문: 10분 one-shot context, session owner·Material membership 재검증 (ADR-037) | `2607/2607282230_study_ai_question.md` |

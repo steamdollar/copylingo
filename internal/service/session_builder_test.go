@@ -98,8 +98,8 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 				if cat != string(model.CategoryVocabulary) {
 					t.Fatalf("expected first category %q, got %q", model.CategoryVocabulary, cat)
 				}
-				if limit != 5 {
-					t.Fatalf("expected 5 reserved vocabulary slots, got %d", limit)
+				if limit != 6 {
+					t.Fatalf("expected 6 reserved vocabulary slots, got %d", limit)
 				}
 			}
 			getNewQuestionsCalls++
@@ -159,6 +159,95 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 	}
 }
 
+func TestBuildMorningSession_ReservesListeningAndBuildsSeventeenQuestions(t *testing.T) {
+	ctx := context.Background()
+	const userID int64 = 123
+	listeningFetches := 0
+
+	srsMock := &mockSRS{
+		getDueReviewsFn: func(context.Context, int64, int, int) ([]model.Question, error) {
+			questions := make([]model.Question, 6)
+			for i := range questions {
+				questions[i].ID = i + 1
+			}
+			return questions, nil
+		},
+	}
+	qFetcher := &mockQuestionFetcher{
+		getNewQuestionsFn: func(
+			ctx context.Context,
+			gotUserID int64,
+			language, level, category string,
+			excludeIDs []int,
+			limit, kanjiRecallLimit int,
+		) ([]model.Question, error) {
+			switch category {
+			case string(model.CategoryVocabulary):
+				if limit == 6 {
+					questions := make([]model.Question, 6)
+					for i := range questions {
+						questions[i] = model.Question{ID: 101 + i, Category: model.CategoryVocabulary}
+					}
+					return questions, nil
+				}
+				return nil, nil
+			case string(model.CategoryListening):
+				listeningFetches++
+				if listeningFetches == 1 {
+					if limit != 1 {
+						t.Fatalf("reserved listening limit = %d, want 1", limit)
+					}
+					return []model.Question{{ID: 201, Category: model.CategoryListening}}, nil
+				}
+				return nil, nil
+			case "":
+				questions := make([]model.Question, limit)
+				for i := range questions {
+					questions[i] = model.Question{ID: 301 + i, Category: model.CategoryGrammar}
+				}
+				return questions, nil
+			default:
+				return nil, nil
+			}
+		},
+	}
+	sStore := &mockSessionStore{
+		createSessionFn: func(ctx context.Context, session *model.Session) error {
+			if session.TotalQuestions != 17 {
+				t.Fatalf("TotalQuestions = %d, want 17", session.TotalQuestions)
+			}
+			session.ID = 10
+			return nil
+		},
+	}
+	sqStore := &mockSessionQuestionStore{
+		createSessionQuestionsFn: func(ctx context.Context, questions []model.SessionQuestion) error {
+			if len(questions) != 17 {
+				t.Fatalf("len(questions) = %d, want 17", len(questions))
+			}
+			listeningCount := 0
+			for _, question := range questions {
+				if question.QuestionID == 201 {
+					listeningCount++
+				}
+			}
+			if listeningCount != 1 {
+				t.Fatalf("listeningCount = %d, want 1", listeningCount)
+			}
+			return nil
+		},
+	}
+
+	builder := NewSessionBuilderService(qFetcher, sStore, sqStore, srsMock)
+	session, err := builder.BuildMorningSession(ctx, userID, "ja", "N5")
+	if err != nil {
+		t.Fatalf("BuildMorningSession failed: %v", err)
+	}
+	if session == nil {
+		t.Fatal("expected session")
+	}
+}
+
 func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
@@ -168,10 +257,10 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
-			if limit != 6 {
-				t.Fatalf("expected review limit 6 after vocabulary reservation, got %d", limit)
+			if limit != 7 {
+				t.Fatalf("expected review limit 7 after vocabulary and listening reservations, got %d", limit)
 			}
-			return []model.Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}}, nil
+			return []model.Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}, {ID: 7}}, nil
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
@@ -179,19 +268,27 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
-			if cat != string(model.CategoryVocabulary) {
-				t.Fatalf("expected reserved vocabulary fetch, got category %q", cat)
+			switch cat {
+			case string(model.CategoryVocabulary):
+				if limit != 4 {
+					t.Fatalf("expected 4 reserved vocabulary slots, got %d", limit)
+				}
+				return []model.Question{{ID: 101}, {ID: 102}, {ID: 103}, {ID: 104}}, nil
+			case string(model.CategoryListening):
+				if limit != 1 {
+					t.Fatalf("expected 1 reserved listening slot, got %d", limit)
+				}
+				return []model.Question{{ID: 105, Category: model.CategoryListening}}, nil
+			default:
+				t.Fatalf("unexpected new-question category %q", cat)
+				return nil, nil
 			}
-			if limit != 4 {
-				t.Fatalf("expected 4 reserved vocabulary slots, got %d", limit)
-			}
-			return []model.Question{{ID: 101}, {ID: 102}, {ID: 103}, {ID: 104}}, nil
 		},
 	}
 	sStore := &mockSessionStore{
 		createSessionFn: func(ctx context.Context, s *model.Session) error {
-			if s.TotalQuestions != 10 {
-				t.Fatalf("expected total 10, got %d", s.TotalQuestions)
+			if s.TotalQuestions != 12 {
+				t.Fatalf("expected total 12, got %d", s.TotalQuestions)
 			}
 			s.ID = 10
 			return nil
@@ -199,13 +296,16 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 	}
 	sqStore := &mockSessionQuestionStore{
 		createSessionQuestionsFn: func(ctx context.Context, sqs []model.SessionQuestion) error {
-			if len(sqs) != 10 {
-				t.Fatalf("expected 10 session questions, got %d", len(sqs))
+			if len(sqs) != 12 {
+				t.Fatalf("expected 12 session questions, got %d", len(sqs))
 			}
 			for i, wantID := range []int{101, 102, 103, 104} {
-				if got := sqs[6+i].QuestionID; got != wantID {
-					t.Fatalf("session question %d id = %d, want %d", 6+i, got, wantID)
+				if got := sqs[7+i].QuestionID; got != wantID {
+					t.Fatalf("session question %d id = %d, want %d", 7+i, got, wantID)
 				}
+			}
+			if got := sqs[11].QuestionID; got != 105 {
+				t.Fatalf("reserved listening id = %d, want 105", got)
 			}
 			return nil
 		},
@@ -240,15 +340,15 @@ func TestBuildEveningSession_FillsVocabularyShortageWithRelay(t *testing.T) {
 				}
 			}
 			if cat == "" {
-				return []model.Question{{ID: 201}, {ID: 202}}, nil
+				return []model.Question{{ID: 201}, {ID: 202}, {ID: 203}, {ID: 204}}, nil
 			}
 			return nil, nil
 		},
 	}
 	sStore := &mockSessionStore{
 		createSessionFn: func(ctx context.Context, s *model.Session) error {
-			if s.TotalQuestions != 10 {
-				t.Fatalf("expected total 10, got %d", s.TotalQuestions)
+			if s.TotalQuestions != 12 {
+				t.Fatalf("expected total 12, got %d", s.TotalQuestions)
 			}
 			s.ID = 10
 			return nil

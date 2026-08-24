@@ -14,6 +14,7 @@ const (
 	maxKanjiRecallPerSession      = 3
 	maxReadingPerSession          = 1
 	minVocabularyRatioDenominator = 3
+	minListeningPerDailySession   = 1
 )
 
 var defaultCategoryOrder = []model.QuestionCategory{
@@ -77,26 +78,26 @@ func NewSessionBuilderService(
 	}
 }
 
-// BuildMorningSession creates a morning session with up to 40% review, total 15 questions.
+// BuildMorningSession creates a morning session with up to 6 reviews, total 17 questions.
 func (s *SessionBuilderService) BuildMorningSession(
 	ctx context.Context,
 	userID int64,
 	language, level string,
 ) (*model.Session, error) {
-	const totalQuestions = 15
-	const reviewCount = 6 // Up to 40%
+	const totalQuestions = 17
+	const reviewCount = 6
 
 	return s.buildSession(ctx, userID, language, level, model.SessionMorning, totalQuestions, reviewCount)
 }
 
-// BuildEveningSession creates an evening session with vocabulary reservation, total 10 questions.
+// BuildEveningSession creates an evening session with vocabulary and listening reservations, total 12 questions.
 func (s *SessionBuilderService) BuildEveningSession(
 	ctx context.Context,
 	userID int64,
 	language, level string,
 ) (*model.Session, error) {
-	const totalQuestions = 10
-	const reviewCount = 8 // Reduced to 6 when reserving 4 vocabulary slots.
+	const totalQuestions = 12
+	const reviewCount = 8 // Reduced to 7 when reserving 4 vocabulary and 1 listening slot.
 
 	return s.buildSession(ctx, userID, language, level, model.SessionEvening, totalQuestions, reviewCount)
 }
@@ -124,9 +125,11 @@ func (s *SessionBuilderService) buildSession(
 	order := 0
 	kanjiRecallCount := 0
 	reservedVocabularyCount := 0
+	reservedListeningCount := 0
 	if sessionType != model.SessionReview && language != "" && level != "" {
 		reservedVocabularyCount = divideRoundingUp(totalQuestions, minVocabularyRatioDenominator)
-		if maxReviewCount := totalQuestions - reservedVocabularyCount; reviewCount > maxReviewCount {
+		reservedListeningCount = minListeningPerDailySession
+		if maxReviewCount := totalQuestions - reservedVocabularyCount - reservedListeningCount; reviewCount > maxReviewCount {
 			reviewCount = maxReviewCount
 		}
 	}
@@ -200,7 +203,29 @@ func (s *SessionBuilderService) buildSession(
 		}
 	}
 
-	// 3. Fill remaining with new questions (Random Slot Relay)
+	// 3. Reserve one new listening slot in each daily session. If no audio-ready
+	// unseen listening question exists, the relay below fills the unused slot.
+	if reservedListeningCount > 0 {
+		newQs, err := s.questionRepo.GetNewQuestions(
+			ctx,
+			userID,
+			language,
+			level,
+			string(model.CategoryListening),
+			excludeIDs,
+			reservedListeningCount,
+			maxKanjiRecallPerSession-kanjiRecallCount,
+		)
+		if err != nil {
+			log.Printf("Error getting reserved listening questions: %v", err)
+		} else {
+			for _, q := range newQs {
+				appendQuestion(q, false)
+			}
+		}
+	}
+
+	// 4. Fill remaining with new questions (Random Slot Relay)
 	remainingNew := totalQuestions - len(sessionQuestions)
 
 	if sessionType != model.SessionReview && remainingNew > 0 && language != "" && level != "" {

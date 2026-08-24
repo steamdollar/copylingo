@@ -482,3 +482,22 @@
 - **검증/후속**:
   - prompt 문자열과 strict JSON schema 계약 테스트를 추가하고 `make test`를 통과시킨다.
   - 운영 반영 후 기존 false-negative 이미지 replay와 live sample로 acceptance/feedback 품질을 재측정한다.
+
+---
+
+## ADR-040: Reading Study는 due review와 unseen new를 분리 편성한다
+
+- **날짜**: 2026-08-04
+- **상태**: 채택됨
+- **맥락**:
+  - ADR-036의 Study Session당 Reading 1개 제한은 긴 지문의 과밀 노출을 막았지만, 복습과 새 지문 학습을 같은 세션에서 병행할 수 없었다.
+  - 아직 due가 아닌 Reading을 당기면 기존 Material SRS 계약을 깨므로 단순 2개 상향은 적절하지 않다.
+- **결정**:
+  - unseen Reading이 남아 있으면 due review 최대 1개와 unseen new 최대 1개를 별도 bucket에서 선택한다.
+  - Reading을 모두 학습했으면 due review를 최대 2개 선택한다. review는 항상 `next_review_at <= NOW()`인 항목만 허용한다.
+  - 한 bucket이 부족해도 다른 Reading bucket에서 빌리지 않으며, 전체 session limit의 남는 자리는 Vocabulary/Grammar가 채운다.
+  - `pending`/`in_progress` Study Session 중복 제외와 기존 category interleave는 유지한다. 단, Reading의 최종 selection rank는 전체 category rank가 아니라 due/new bucket rank를 사용하고 동률이면 due를 먼저 둬, due가 많아도 선택된 new가 global limit 밖으로 밀리지 않게 한다. unseen 여부는 active-session 제외 전 catalog 기준으로 판정해, unseen이 이미 다른 active session에 있으면 Reading이 2개 미만이어도 review로 보충하지 않는다.
+  - ADR-036의 Daily Quiz Reading 최대 1개 제한은 변경하지 않는다.
+- **결과 / 트레이드오프**:
+  - 새 지문 진도와 SRS 복습을 한 Study Session에서 균형 있게 노출하면서 future review 강제 선택을 막는다.
+  - 단일 query 안에서 inventory 확인과 due/new bucket ranking을 수행해 추가 DB round trip은 없지만, Reading 정책을 위해 window rank 하나가 추가된다.

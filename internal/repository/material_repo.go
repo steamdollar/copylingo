@@ -37,7 +37,7 @@ func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []strin
 	return materials, nil
 }
 
-// GetForStudySession returns level-matched due or new vocabulary or grammar materials for a user.
+// GetForStudySession returns level-matched due or new study materials for a user.
 func (r *MaterialRepository) GetForStudySession(
 	ctx context.Context,
 	userID int64,
@@ -58,8 +58,8 @@ func (r *MaterialRepository) GetForStudySession(
 }
 
 // studySessionMaterialCategories are the material categories a study session
-// draws from. Reading is additionally capped to one card per session in the
-// query below (ADR-036) — passages take longer to read than word/grammar cards.
+// draws from. Reading uses separate due-review/new buckets in the query below
+// so a session can mix one of each without pulling not-yet-due reviews forward.
 var studySessionMaterialCategories = []string{
 	string(model.MaterialCategoryVocabulary),
 	string(model.MaterialCategoryGrammar),
@@ -67,23 +67,11 @@ var studySessionMaterialCategories = []string{
 }
 
 const studySessionMaterialsQuery = `
-		WITH candidates AS (
+		WITH material_pool AS (
 			SELECT
 				m.*,
-				ROW_NUMBER() OVER (
-					PARTITION BY m.category
-					ORDER BY
-						CASE WHEN ump.next_review_at IS NULL THEN 1 ELSE 0 END ASC,
-						ump.next_review_at ASC NULLS LAST,
-						m.difficulty ASC,
-						m.id ASC
-				) AS category_rank,
-				CASE m.category
-					WHEN 'vocabulary' THEN 0
-					WHEN 'grammar' THEN 1
-					WHEN 'reading' THEN 2
-					ELSE 3
-				END AS category_order
+				ump.material_id AS progress_material_id,
+				ump.next_review_at
 			FROM materials m
 			LEFT JOIN user_material_progress ump
 			ON ump.material_id = m.id
@@ -91,13 +79,51 @@ const studySessionMaterialsQuery = `
 			WHERE m.language = $2
 			AND m.proficiency_level = $3
 			AND m.category = ANY($4)
-			AND (ump.material_id IS NULL OR ump.next_review_at <= NOW())
+		),
+		reading_inventory AS (
+			SELECT EXISTS (
+				SELECT 1
+				FROM material_pool
+				WHERE category = 'reading'
+				AND progress_material_id IS NULL
+			) AS has_unseen_reading
+		),
+		candidates AS (
+			SELECT
+				mp.*,
+				ROW_NUMBER() OVER (
+					PARTITION BY mp.category
+					ORDER BY
+						CASE WHEN mp.progress_material_id IS NULL THEN 1 ELSE 0 END ASC,
+						mp.next_review_at ASC NULLS LAST,
+						mp.difficulty ASC,
+						mp.id ASC
+				) AS category_rank,
+				ROW_NUMBER() OVER (
+					PARTITION BY
+						mp.category,
+						CASE WHEN mp.progress_material_id IS NULL THEN 'new' ELSE 'review' END
+					ORDER BY
+						mp.next_review_at ASC NULLS LAST,
+						mp.difficulty ASC,
+						mp.id ASC
+				) AS category_bucket_rank,
+				ri.has_unseen_reading,
+				CASE mp.category
+					WHEN 'vocabulary' THEN 0
+					WHEN 'grammar' THEN 1
+					WHEN 'reading' THEN 2
+					ELSE 3
+				END AS category_order
+			FROM material_pool mp
+			CROSS JOIN reading_inventory ri
+			WHERE (mp.progress_material_id IS NULL OR mp.next_review_at <= NOW())
 			AND NOT EXISTS (
 				SELECT 1
 				FROM session_materials sm
 				JOIN sessions s ON s.id = sm.session_id
 				WHERE s.user_id = $1
-					AND sm.material_id = m.id
+					AND sm.material_id = mp.id
 					AND s.mode = 'study'
 					AND s.status IN ('pending', 'in_progress')
 			)
@@ -114,8 +140,22 @@ const studySessionMaterialsQuery = `
 			difficulty,
 			created_at
 		FROM candidates
-		WHERE category <> 'reading' OR category_rank <= 1
-		ORDER BY category_rank ASC, category_order ASC
+		WHERE category <> 'reading'
+		OR (
+			category = 'reading'
+			AND (
+				(progress_material_id IS NULL AND category_bucket_rank <= 1)
+				OR (
+					progress_material_id IS NOT NULL
+					AND category_bucket_rank <= CASE WHEN has_unseen_reading THEN 1 ELSE 2 END
+				)
+			)
+		)
+		ORDER BY
+			CASE WHEN category = 'reading' THEN category_bucket_rank ELSE category_rank END ASC,
+			category_order ASC,
+			CASE WHEN category = 'reading' AND progress_material_id IS NULL THEN 1 ELSE 0 END ASC,
+			id ASC
 		LIMIT $5
 	`
 
