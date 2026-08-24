@@ -991,6 +991,73 @@ func TestBuildReadingQuestions(t *testing.T) {
 	assertContainsAll(t, string(question.Options), "毎週月曜日", "毎日")
 }
 
+func TestN5WordOrderIntegrity(t *testing.T) {
+	t.Parallel()
+
+	grammarIDs := make(map[string]struct{}, len(n5GrammarPoints))
+	for _, point := range n5GrammarPoints {
+		grammarIDs[point.ID] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(n5WordOrderQuestions))
+	for _, item := range n5WordOrderQuestions {
+		if item.ID == "" {
+			t.Fatal("word-order item has empty id")
+		}
+		if _, ok := seen[item.ID]; ok {
+			t.Fatalf("duplicate word-order id %q", item.ID)
+		}
+		seen[item.ID] = struct{}{}
+		if _, ok := grammarIDs[item.GrammarID]; !ok {
+			t.Fatalf("word-order item %q references unknown grammar %q", item.ID, item.GrammarID)
+		}
+		if len(item.Chunks) < 2 {
+			t.Fatalf("word-order item %q has too few chunks", item.ID)
+		}
+		if got := strings.Join(item.Chunks, ""); got != item.CorrectAnswer {
+			t.Fatalf("word-order item %q joins to %q, want %q", item.ID, got, item.CorrectAnswer)
+		}
+	}
+}
+
+func TestBuildWordOrderQuestions(t *testing.T) {
+	t.Parallel()
+
+	materialIDs := make(map[string]int, len(n5GrammarPoints))
+	for i, point := range n5GrammarPoints {
+		materialIDs[point.ID] = i + 1
+	}
+	questions := buildWordOrderQuestions(n5WordOrderQuestions, materialIDs)
+	if len(questions) != len(n5WordOrderQuestions) {
+		t.Fatalf("len(word-order questions) = %d, want %d", len(questions), len(n5WordOrderQuestions))
+	}
+	seen := make(map[string]struct{}, len(questions))
+	for _, question := range questions {
+		if question.Type != model.QuestionWordOrder {
+			t.Fatalf("type = %q, want %q", question.Type, model.QuestionWordOrder)
+		}
+		if question.Skill == nil || *question.Skill != model.SkillSentenceComposition {
+			t.Fatalf("skill = %v, want %q", question.Skill, model.SkillSentenceComposition)
+		}
+		if question.QuestionKey == nil {
+			t.Fatal("word-order question missing question key")
+		}
+		if question.MaterialID == nil {
+			t.Fatalf("question %q missing material link", *question.QuestionKey)
+		}
+		if _, ok := seen[*question.QuestionKey]; ok {
+			t.Fatalf("duplicate question key %q", *question.QuestionKey)
+		}
+		seen[*question.QuestionKey] = struct{}{}
+		options, err := question.GetOptions()
+		if err != nil {
+			t.Fatalf("GetOptions: %v", err)
+		}
+		if strings.Join(options, "") != question.CorrectAnswer {
+			t.Fatalf("question %q options do not join to answer", *question.QuestionKey)
+		}
+	}
+}
+
 func TestLoadReadingMaterialIDs(t *testing.T) {
 	t.Parallel()
 

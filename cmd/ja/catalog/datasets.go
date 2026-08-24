@@ -29,6 +29,9 @@ var n5ListeningJSON []byte
 //go:embed data/n5_reading.json
 var n5ReadingJSON []byte
 
+//go:embed data/n5_word_order.json
+var n5WordOrderJSON []byte
+
 const (
 	VocabLanguage         = "ja"
 	VocabProficiencyLevel = "N5"
@@ -109,6 +112,19 @@ type ReadingPassage struct {
 	Difficulty    int                 `json:"difficulty"`
 }
 
+// WordOrderQuestion is a static N5 sentence-composition item. Chunks retain
+// their authored order in the catalog; the Telegram renderer shuffles them
+// deterministically per session/question while callbacks carry the original
+// option index.
+type WordOrderQuestion struct {
+	ID            string   `json:"id"`
+	GrammarID     string   `json:"grammar_id"`
+	Prompt        string   `json:"prompt"`
+	Chunks        []string `json:"chunks"`
+	CorrectAnswer string   `json:"correct_answer"`
+	Explanation   string   `json:"explanation"`
+}
+
 // KanaMap maps each kana to its romaji. Script-label and hint logic lives in Go.
 var KanaMap = mustLoadJSON[map[string]string]("kana", kanaJSON)
 
@@ -126,6 +142,9 @@ var N5ListeningQuestions = mustLoadJSON[[]ListeningQuestion]("n5_listening", n5L
 
 // N5ReadingPassages is the original N5 reading-comprehension catalog.
 var N5ReadingPassages = mustLoadJSON[[]ReadingPassage]("n5_reading", n5ReadingJSON)
+
+// N5WordOrderQuestions is the static Japanese N5 sentence-composition catalog.
+var N5WordOrderQuestions = mustLoadJSON[[]WordOrderQuestion]("n5_word_order", n5WordOrderJSON)
 
 // loadJSON decodes an embedded dataset into T.
 func loadJSON[T any](name string, data []byte) (T, error) {

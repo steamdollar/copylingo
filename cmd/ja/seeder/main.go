@@ -31,12 +31,14 @@ type grammarPoint = ja.GrammarPoint
 type vocabContext = ja.VocabContext
 type listeningQuestion = ja.ListeningQuestion
 type readingPassage = ja.ReadingPassage
+type wordOrderQuestion = ja.WordOrderQuestion
 
 var n5Words = ja.N5Words
 var n5GrammarPoints = ja.N5GrammarPoints
 var n5VocabContext = ja.N5VocabContext
 var n5ListeningQuestions = ja.N5ListeningQuestions
 var n5ReadingPassages = ja.N5ReadingPassages
+var n5WordOrderQuestions = ja.N5WordOrderQuestions
 
 func kanaScriptLabel(kana string) string {
 	return ja.ScriptLabel(kana)
@@ -120,6 +122,7 @@ func main() {
 	grammarQuestions := buildGrammarQuestions(rng, n5GrammarPoints, materialIDsByGrammarID)
 	listeningQuestions := buildListeningQuestions(n5ListeningQuestions)
 	readingQuestions := buildReadingQuestions(n5ReadingPassages, materialIDsByReadingID)
+	wordOrderQuestions := buildWordOrderQuestions(n5WordOrderQuestions, materialIDsByGrammarID)
 	questions := make(
 		[]*model.Question,
 		0,
@@ -135,6 +138,8 @@ func main() {
 			listeningQuestions,
 		)+len(
 			readingQuestions,
+		)+len(
+			wordOrderQuestions,
 		),
 	)
 	questions = append(questions, kanaQuestions...)
@@ -143,6 +148,7 @@ func main() {
 	questions = append(questions, grammarQuestions...)
 	questions = append(questions, listeningQuestions...)
 	questions = append(questions, readingQuestions...)
+	questions = append(questions, wordOrderQuestions...)
 
 	if err := repos.Question.UpsertSeedBatch(ctx, questions); err != nil {
 		log.Printf("Failed to upsert Japanese questions batch: %v", err)
@@ -150,7 +156,7 @@ func main() {
 	}
 
 	log.Printf(
-		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d vocab_context=%d grammar=%d listening=%d reading=%d",
+		"Successfully upserted %d Japanese questions. kana=%d vocabulary=%d vocab_context=%d grammar=%d listening=%d reading=%d word_order=%d",
 		len(questions),
 		len(kanaQuestions),
 		len(vocabularyQuestions),
@@ -158,6 +164,7 @@ func main() {
 		len(grammarQuestions),
 		len(listeningQuestions),
 		len(readingQuestions),
+		len(wordOrderQuestions),
 	)
 }
 
@@ -243,6 +250,59 @@ func buildReadingQuestions(
 		}
 		setQuestionMaterial(question, materialID)
 		setQuestionKey(question, readingQuestionKey(passage))
+		questions = append(questions, question)
+	}
+	return questions
+}
+
+func wordOrderQuestionKey(item wordOrderQuestion) string {
+	return fmt.Sprintf("ja:word_order:%s", item.ID)
+}
+
+// buildWordOrderQuestions creates one tap-to-build question per authored N5
+// item. The original chunk indices are preserved in Options; the Telegram
+// renderer owns the per-session display shuffle.
+func buildWordOrderQuestions(
+	items []wordOrderQuestion,
+	materialIDsByGrammarID map[string]int,
+) []*model.Question {
+	questions := make([]*model.Question, 0, len(items))
+	seenKeys := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		if item.ID == "" || len(item.Chunks) == 0 || item.CorrectAnswer == "" {
+			log.Fatalf("word_order: invalid item %q", item.ID)
+		}
+		for _, chunk := range item.Chunks {
+			if chunk == "" {
+				log.Fatalf("word_order: empty chunk for %q", item.ID)
+			}
+		}
+		if strings.Join(item.Chunks, "") != item.CorrectAnswer {
+			log.Fatalf("word_order: chunks do not join to correct_answer for %q", item.ID)
+		}
+		materialID, ok := materialIDsByGrammarID[item.GrammarID]
+		if !ok {
+			log.Fatalf("word_order: missing grammar material for %q", item.GrammarID)
+		}
+		key := wordOrderQuestionKey(item)
+		if _, exists := seenKeys[key]; exists {
+			log.Fatalf("word_order: duplicate question key %q", key)
+		}
+		seenKeys[key] = struct{}{}
+		question := &model.Question{
+			Type:             model.QuestionWordOrder,
+			Skill:            model.SkillPtr(model.SkillSentenceComposition),
+			Language:         vocabLanguage,
+			ProficiencyLevel: vocabProficiencyLevel,
+			Category:         model.CategoryGrammar,
+			Prompt:           item.Prompt,
+			Options:          mustJSON(item.Chunks),
+			CorrectAnswer:    item.CorrectAnswer,
+			Explanation:      item.Explanation,
+			Difficulty:       ja.GrammarDifficulty,
+		}
+		setQuestionKey(question, key)
+		setQuestionMaterial(question, materialID)
 		questions = append(questions, question)
 	}
 	return questions

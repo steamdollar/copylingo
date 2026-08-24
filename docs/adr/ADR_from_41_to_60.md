@@ -34,3 +34,22 @@
   - Scheduled session이 무한히 쌓이지 않고 사용자가 진행 중이거나 오래 기다린 세션부터 소비하게 된다.
   - 사용자가 미완료 세션을 끝내지 않으면 새 학습 콘텐츠는 노출되지 않고 같은 세션 알림이 반복된다.
   - 조회 후 생성 사이의 동시성 경쟁을 완전히 차단하는 distributed lock 또는 DB 제약은 별도 확장성 과제로 남는다.
+
+## ADR-043: Word Order는 Telegram tap-to-build와 Redis draft로 구현한다
+
+- **날짜**: 2026-08-24
+- **상태**: 채택됨
+- **맥락**:
+  - `QuestionWordOrder` type과 `SkillSentenceComposition` taxonomy는 있지만 seed·renderer·answer path가 없어 실제로는 출제되지 않았다.
+  - Telegram inline keyboard에서 drag-and-drop은 지원되지 않으며, 이 문제만을 위한 Mini App은 별도 web UI·auth·submit endpoint를 요구한다.
+  - 문장 조립 중간 상태는 최종 채점 결과가 아니므로 DB 영속 대상이 아니다.
+- **결정**:
+  - 사용자는 Telegram inline keyboard의 문장 조각을 순서대로 tap하고, `되돌리기`·`초기화`·`제출` action으로 조립한다. 반복되는 조각은 text가 아닌 option index로 식별한다.
+  - 조각 표시 순서는 session·question ID로 안정적으로 shuffle하여 callback 사이에 유지한다.
+  - 선택한 index 목록은 question별 별도 Redis draft key에 active session과 같은 TTL로 저장하고, 완료·세션 종료 시 삭제한다. DB `session_questions.user_answer`에는 제출한 최종 문장만 저장한다.
+  - `questions.options` JSONB에는 문장 조각 배열, `correct_answer`에는 정규 완성 문장을 저장한다. 일본어 MVP는 조각을 공백 없이 join해 기존 exact-match grader에 전달한다.
+  - 초기 데이터는 기존 N5 grammar material에 연결된 static seed로 구성하고 stable `question_key`를 사용한다.
+- **결과 / 트레이드오프**:
+  - 기존 Question catalog·SessionBuilder·exact grader·SRS를 재사용하므로 DB migration과 복습 정책 변경이 없다.
+  - 조각 tap마다 작은 Redis write가 발생하지만, 전체 Active Session blob을 다시 저장하지 않아 write amplification을 제한한다.
+  - Drag UX와 다국어 delimiter·복수 정답 지원은 현재 일본어 Telegram MVP 범위에서 제외한다.

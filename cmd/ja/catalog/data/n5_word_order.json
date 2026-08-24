@@ -1,0 +1,98 @@
+[
+  {
+    "id": "n5_word_order_001",
+    "grammar_id": "n5_grammar_001",
+    "prompt": "'저는 학생입니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["私", "は", "学生", "です。"],
+    "correct_answer": "私は学生です。",
+    "explanation": "は는 주제를 나타내며, です는 정중한 서술을 만듭니다."
+  },
+  {
+    "id": "n5_word_order_002",
+    "grammar_id": "n5_grammar_002",
+    "prompt": "'이것은 제 책입니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["これ", "は", "私", "の", "本", "です。"],
+    "correct_answer": "これは私の本です。",
+    "explanation": "の는 소유 관계를 연결합니다."
+  },
+  {
+    "id": "n5_word_order_003",
+    "grammar_id": "n5_grammar_003",
+    "prompt": "'빵을 먹습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["パン", "を", "食べます。"],
+    "correct_answer": "パンを食べます。",
+    "explanation": "を는 동작의 대상을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_004",
+    "grammar_id": "n5_grammar_004",
+    "prompt": "'7시에 일어납니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["七時", "に", "起きます。"],
+    "correct_answer": "七時に起きます。",
+    "explanation": "に는 동작이 일어나는 시간을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_005",
+    "grammar_id": "n5_grammar_005",
+    "prompt": "'도서관에서 공부합니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["図書館", "で", "勉強します。"],
+    "correct_answer": "図書館で勉強します。",
+    "explanation": "で는 동작이 이루어지는 장소를 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_006",
+    "grammar_id": "n5_grammar_006",
+    "prompt": "'학교에 갑니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["学校", "へ", "行きます。"],
+    "correct_answer": "学校へ行きます。",
+    "explanation": "へ는 이동 방향을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_007",
+    "grammar_id": "n5_grammar_007",
+    "prompt": "'저도 갑니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["私", "も", "行きます。"],
+    "correct_answer": "私も行きます。",
+    "explanation": "も는 '도'라는 의미를 더합니다."
+  },
+  {
+    "id": "n5_word_order_008",
+    "grammar_id": "n5_grammar_008",
+    "prompt": "'9시부터 공부합니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["九時", "から", "勉強します。"],
+    "correct_answer": "九時から勉強します。",
+    "explanation": "から는 시작점을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_009",
+    "grammar_id": "n5_grammar_009",
+    "prompt": "'책상 위에 책이 있습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["机の上", "に", "本", "があります。"],
+    "correct_answer": "机の上に本があります。",
+    "explanation": "あります는 사물의 존재를 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_010",
+    "grammar_id": "n5_grammar_010",
+    "prompt": "'방에 선생님이 있습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["部屋", "に", "先生", "がいます。"],
+    "correct_answer": "部屋に先生がいます。",
+    "explanation": "います는 사람이나 동물의 존재를 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_011",
+    "grammar_id": "n5_grammar_011",
+    "prompt": "'커피를 마시지 않습니다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["コーヒー", "を", "飲みません。"],
+    "correct_answer": "コーヒーを飲みません。",
+    "explanation": "ません은 정중한 부정을 나타냅니다."
+  },
+  {
+    "id": "n5_word_order_012",
+    "grammar_id": "n5_grammar_012",
+    "prompt": "'같이 갑시다.'가 되도록 문장을 배열하세요.",
+    "chunks": ["一緒に", "行きましょう。"],
+    "correct_answer": "一緒に行きましょう。",
+    "explanation": "ましょう는 함께 하자는 제안을 나타냅니다."
+  }
+]

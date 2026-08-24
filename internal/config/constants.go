@@ -69,11 +69,18 @@ const (
 	FormatQuestionAnswer = "q:%d:%d:%d"
 	FormatQuestionNext   = "q:%d:next:%d"
 	FormatQuestionAskLLM = "q:%d:ask:%d"
-	FormatStudyStart     = "study:%d:start"
-	FormatStudyNext      = "study:%d:next:%d"
-	FormatStudyPrev      = "study:%d:prev:%d"
-	FormatStudyFinish    = "study:%d:finish:%d"
-	FormatStudyAskLLM    = "study:%d:ask:%d"
+	// Word-order callbacks carry the session/question identity and the action;
+	// a select action also carries the original option index. Keeping this
+	// compact leaves ample room under Telegram's 64-byte callback limit.
+	FormatWordOrderSelect = "q:%d:wo:%d:a:%d"
+	FormatWordOrderUndo   = "q:%d:wo:%d:u"
+	FormatWordOrderReset  = "q:%d:wo:%d:r"
+	FormatWordOrderSubmit = "q:%d:wo:%d:s"
+	FormatStudyStart      = "study:%d:start"
+	FormatStudyNext       = "study:%d:next:%d"
+	FormatStudyPrev       = "study:%d:prev:%d"
+	FormatStudyFinish     = "study:%d:finish:%d"
+	FormatStudyAskLLM     = "study:%d:ask:%d"
 )
 
 type RedisKeyFormat string
@@ -110,6 +117,11 @@ const (
 	// HandwritingMessageRedisKey stores the Telegram message that contains a handwriting Mini App button.
 	// Value: "chat_id:message_id". Used to remove stale inline buttons after Mini App submission.
 	HandwritingMessageRedisKey RedisKeyFormat = "handwriting:msg:%d:%d"
+
+	// WordOrderDraftRedisKey stores a JSON array of original option indices for
+	// one active session question. Its TTL matches the active session working
+	// set; the draft never lives inside ActiveSessionState.
+	WordOrderDraftRedisKey RedisKeyFormat = "session:%d:word_order:%d:draft"
 )
 
 // Mini App routes

@@ -169,6 +169,13 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		}
 		return text, buildMCQKeyboard(sessionID, question.ID, options), false
 
+	case model.QuestionWordOrder:
+		wordOrderText, keyboard, done := sf.renderWordOrder(ctx, sessionID, question)
+		if done {
+			return "", nil, true
+		}
+		return text + "\n\n" + wordOrderText, keyboard, false
+
 	case model.QuestionFillBlank, model.QuestionSubjective:
 		sf.bot.rdb.Set(ctx, config.UserActiveQuestionRedisKey.Format(chatID),
 			fmt.Sprintf("%d:%d", sessionID, questionIdx), 1*time.Hour)

@@ -223,6 +223,11 @@ func (sf *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Ca
 		return
 	}
 
+	if parts[2] == "wo" {
+		sf.handleWordOrderCallback(ctx, cb)
+		return
+	}
+
 	if parts[2] == "next" {
 		if cb.Message == nil {
 			return
@@ -334,6 +339,20 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 }
 
 func (sf *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
+	// Capture word-order draft keys before CompleteSession deletes the active
+	// session working set. Drafts are ephemeral and must not survive a finished
+	// session, including when the user reached the result screen via a retry.
+	var wordOrderQuestionIDs []int
+	if sf.bot.services != nil && sf.bot.services.ActiveSession != nil {
+		if state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID); err == nil &&
+			cb != nil && cb.From != nil && state.Session.UserID == cb.From.ID {
+			for _, item := range state.Items {
+				if item.Question.Type == model.QuestionWordOrder {
+					wordOrderQuestionIDs = append(wordOrderQuestionIDs, item.Question.ID)
+				}
+			}
+		}
+	}
 	result, err := sf.bot.services.Grader.CompleteSession(ctx, sessionID, cb.From.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to complete session",
@@ -342,6 +361,9 @@ func (sf *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQ
 			"error", err,
 		)
 		return
+	}
+	for _, questionID := range wordOrderQuestionIDs {
+		sf.deleteWordOrderDraft(ctx, sessionID, questionID)
 	}
 
 	accuracy := float64(0)
