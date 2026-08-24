@@ -36,6 +36,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-08-24 | Go 1.27.0 toolchain·Docker builder pin 정렬 + stale `/app/data` COPY 제거 (ADR-044) | `2608/2608241408_go_127_upgrade.md` |
 | 2026-08-24 | Telegram tap-to-build Word Order 30문항: stable shuffle·Redis draft·undo/reset/submit·exact grading (ADR-043) | `2608/2608241307_word_order_telegram_mvp.md` |
 | 2026-08-22 | Scheduled Quiz/Study가 새 세션 대신 미완료 backlog를 우선 재알림 (ADR-042) | `2608/2608222156_scheduled_session_backlog_reminder.md` |
 | 2026-08-05 | Morning 17·Evening 12문항 확장 + Daily Session 신규 Listening 1자리 예약 (ADR-041) | `2608/2608050024_daily_session_listening_reservation.md` |

@@ -53,3 +53,18 @@
   - 기존 Question catalog·SessionBuilder·exact grader·SRS를 재사용하므로 DB migration과 복습 정책 변경이 없다.
   - 조각 tap마다 작은 Redis write가 발생하지만, 전체 Active Session blob을 다시 저장하지 않아 write amplification을 제한한다.
   - Drag UX와 다국어 delimiter·복수 정답 지원은 현재 일본어 Telegram MVP 범위에서 제외한다.
+
+## ADR-044: Go toolchain과 container builder를 1.27.0으로 올린다
+
+- **날짜**: 2026-08-24
+- **상태**: 채택됨
+- **맥락**:
+  - Project의 `go.mod`는 Go 1.25.5, Docker builder는 `golang:1.25-alpine`에 고정돼 있어 local과 container의 patch version이 일치하지 않았다.
+  - Go 1.27.0은 2026-08-19 정식 release됐고 Go 1 compatibility를 유지한다.
+- **결정**:
+  - `go.mod` minimum Go version을 `1.27.0`, Docker builder image를 `golang:1.27.0-alpine`로 올려 local·CI·container build 기준을 같은 patch version으로 맞춘다.
+  - Upgrade와 dependency version 변경을 분리하고, Go 1.27 신규 language·standard-library API는 이 작업에서 도입하지 않는다.
+  - Go 1.27.0으로 `go mod tidy`, `make test`, binary build, container rebuild, health check를 모두 통과해야 upgrade를 완료한다.
+- **결과 / 트레이드오프**:
+  - 최신 supported toolchain의 runtime·compiler·standard-library 개선을 사용하고 local/container 재현성을 높인다.
+  - `.0` release의 초기 regression 가능성은 있지만 full test·container smoke로 현재 application contract를 검증하고, 문제 시 두 version pin을 같이 revert한다.

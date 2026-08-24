@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.27.0-alpine AS builder
 
 RUN apk add --no-cache git
 
@@ -18,7 +18,6 @@ RUN apk add --no-cache ca-certificates tzdata ffmpeg
 
 WORKDIR /app
 COPY --from=builder /copylingo .
-COPY --from=builder /app/data ./data
 
 EXPOSE 8080
 
