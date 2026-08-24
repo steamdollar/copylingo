@@ -26,3 +26,6 @@
 - `make test` — PASS
 - `git diff --check` — PASS
 - `make restart-app` — PASS (`http://localhost:8080/health` ready)
+- local PostgreSQL `copylingo` JA seeder 2회 실행 — PASS (`word_order` 30 rows / 30 unique keys, type·skill·category·material link 각 30)
+- 2회 실행 전·후 Word Order DB ID hash `c1552d2e057ead6e15da99fcdf349ce5` 유지 — 멱등성 확인
+- 적용 전 full DB backup: `/tmp/copylingo-word-order-seed.5ooTGA/pre_seed.dump`
