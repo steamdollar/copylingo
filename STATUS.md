@@ -36,6 +36,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-08-24 | 손글씨 팔레트 85% 축소 + 정오표시 emoji·정답 노출 + 촉음 별도 칸 제거 | `2608/2608241746_handwriting_palette_ui.md` |
 | 2026-08-24 | `/llm`·Quiz·Study LLM one-shot mode 활성화 안내에 취소 버튼 추가 + 사용자별 pending 상태 정리 | `2608/2608241420_llm_mode_cancel.md` |
 | 2026-08-24 | Go 1.27.0 toolchain·Docker builder pin 정렬 + stale `/app/data` COPY 제거 (ADR-044) | `2608/2608241408_go_127_upgrade.md` |
 | 2026-08-24 | Telegram tap-to-build Word Order 30문항: stable shuffle·Redis draft·undo/reset/submit·exact grading (ADR-043) | `2608/2608241307_word_order_telegram_mvp.md` |

@@ -104,8 +104,8 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 
 	switch question.Type {
 	case model.QuestionKanaHandwriting:
-		// cells = answer 글자 수. 정답 문자열 자체는 cheat 방지를 위해 client로 보내지 않고, 길이만 전달해 캔버스 폭을 글자 수에 비례시킨다.
-		cells := len([]rune(question.CorrectAnswer))
+		// cells = answer 글자 수(촉음은 다음 글자와 같은 셀). 정답 문자열 자체는 cheat 방지를 위해 client로 보내지 않고, 길이만 전달해 캔버스 폭을 글자 수에 비례시킨다.
+		cells := handwritingCellCount(question.CorrectAnswer)
 		miniAppURL, err := sf.handwritingMiniAppURL(
 			sessionID,
 			question.ID,
@@ -193,6 +193,20 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		}
 		return text, buildMCQKeyboard(sessionID, question.ID, options), false
 	}
+}
+
+// handwritingCellCount returns the number of writing cells for a Japanese answer.
+// Sokuon (small っ/ッ) is written within the following kana's cell, so it does
+// not receive a separate slot in the handwriting pad.
+func handwritingCellCount(answer string) int {
+	cells := 0
+	for _, r := range answer {
+		if r == 'っ' || r == 'ッ' {
+			continue
+		}
+		cells++
+	}
+	return cells
 }
 
 // buildMCQKeyboard lays out option buttons two per row, each carrying the

@@ -8,6 +8,7 @@ const submitButton = document.getElementById("submit");
 const overview = document.getElementById("overview");
 const overviewCtx = overview.getContext("2d");
 const statusEl = document.getElementById("status");
+const gradeResult = document.getElementById("gradeResult");
 const questionPanel = document.getElementById("questionPanel");
 const questionPrompt = document.getElementById("questionPrompt");
 const padViewport = document.getElementById("padViewport");
@@ -22,9 +23,9 @@ const tipBody = document.getElementById("tipBody");
 const params = new URLSearchParams(window.location.search);
 
 // 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
-// 셀 1칸은 가로:세로 = 4:5 비율(정사각형보다 가로를 살짝 좁힘) — 글자가 세로로 살짝 길게 보이도록.
-const PAD_CELL_CSS_PX = 224; // = 280 * 4/5
-const PAD_HEIGHT_CSS_PX = 280;
+// 기존 패드 크기(224x280)의 약 85%로 줄여 작은 화면에서 도구 영역을 함께 보이게 한다.
+const PAD_CELL_CSS_PX = 190;
+const PAD_HEIGHT_CSS_PX = 238;
 const PAD_SCALE = 2;
 const PAD_CELL_PX = PAD_CELL_CSS_PX * PAD_SCALE;
 const PAD_HEIGHT_PX = PAD_HEIGHT_CSS_PX * PAD_SCALE;
@@ -240,6 +241,11 @@ function setStatus(message) {
   statusEl.textContent = message;
 }
 
+function setGradeResult(message) {
+  gradeResult.textContent = message;
+  gradeResult.hidden = !message;
+}
+
 function pointFromEvent(event) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -394,6 +400,7 @@ async function submitAnswer() {
 
   setToolsDisabled(true);
   setStatus("");
+  setGradeResult("");
   startLoading();
 
   try {
@@ -414,11 +421,13 @@ async function submitAnswer() {
       throw new Error(payload.error || "채점 요청에 실패했습니다.");
     }
 
+    const answerText = `정답: ${payload.correct_answer}`;
     if (payload.is_correct) {
-      setStatus("정답입니다.");
+      setGradeResult(`✅ ${answerText}`);
+      setStatus("");
     } else {
-      const prefix = `오답입니다. 정답은 ${payload.correct_answer} 입니다.`;
-      setStatus(`${prefix} ${payload.feedback || ""}`.trim());
+      setGradeResult(`❌ ${answerText}`);
+      setStatus(payload.feedback || "");
     }
     tg?.HapticFeedback?.notificationOccurred(payload.is_correct ? "success" : "error");
   } catch (error) {

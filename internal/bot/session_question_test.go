@@ -61,6 +61,26 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 	})
 }
 
+func TestHandwritingCellCountExcludesSokuon(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		answer string
+		want   int
+	}{
+		{name: "hiragana", answer: "がっこう", want: 3},
+		{name: "katakana", answer: "カッコ", want: 2},
+		{name: "without sokuon", answer: "かな", want: 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := handwritingCellCount(tt.answer); got != tt.want {
+				t.Errorf("handwritingCellCount(%q) = %d, want %d", tt.answer, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestQuestionNavigation(t *testing.T) {
 	ctx := context.Background()
 	rdb := &testRedis{values: map[string]string{}}
