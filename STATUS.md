@@ -36,6 +36,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-08-25 | 미완료 Quiz/Study 재알림 재진입을 Redis-first resume로 수정 + stale callback self-heal (ADR-042 보정) | `2608/2608252215_session_resume_fix.md` |
+| 2026-08-24 | Linux host CPU·load·memory·swap·disk·상위 process resource monitor script 추가 | `2608/2608241826_host_resource_monitor.md` |
 | 2026-08-24 | 손글씨 팔레트 85% 축소 + 정오표시 emoji·정답 노출 + 촉음 별도 칸 제거 | `2608/2608241746_handwriting_palette_ui.md` |
 | 2026-08-24 | `/llm`·Quiz·Study LLM one-shot mode 활성화 안내에 취소 버튼 추가 + 사용자별 pending 상태 정리 | `2608/2608241420_llm_mode_cancel.md` |
 | 2026-08-24 | Go 1.27.0 toolchain·Docker builder pin 정렬 + stale `/app/data` COPY 제거 (ADR-044) | `2608/2608241408_go_127_upgrade.md` |

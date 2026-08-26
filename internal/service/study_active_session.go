@@ -65,16 +65,23 @@ func (s *StudyActiveSessionService) Start(
 	sessionID int,
 	userID int64,
 ) (*model.StudyActiveSessionState, error) {
-	state, err := s.loadFromDB(ctx, sessionID)
+	// Resume from the Redis working set when present. Loading from DB here
+	// would discard materials marked studied since the session was started.
+	state, err := s.workingSet.get(ctx, sessionID)
+	if errors.Is(err, ErrStudyActiveSessionNotFound) {
+		state, err = s.loadFromDB(ctx, sessionID)
+	}
 	if err != nil {
 		return nil, err
 	}
+	state.RecountStudied()
 	if err := validateStudyOwnerAndMode(state, sessionID, userID); err != nil {
 		return nil, err
 	}
 	if state.Session.Status == model.SessionCompleted {
 		return state, nil
 	}
+	state.CurrentIndex = state.NextUnstudiedIndex()
 	if state.Session.Status == model.SessionPending {
 		if s.sessionRepo == nil {
 			return nil, ErrStudyActiveSessionDependencyMissing

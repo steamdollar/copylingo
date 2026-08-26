@@ -362,6 +362,146 @@ func TestHandleSessionCallback(t *testing.T) {
 	})
 }
 
+func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
+	ctx := context.Background()
+	mAPI := &mockBotAPI{}
+	rdb := &testRedis{values: map[string]string{}}
+	startCalls := 0
+	mSessionStore := &mockSessionStore{
+		startFn: func(ctx context.Context, id int) error {
+			startCalls++
+			return nil
+		},
+	}
+	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
+	active := service.NewActiveSessionService(nil, rdb, nil)
+	b := &Bot{
+		api: mAPI,
+		rdb: rdb,
+		services: &service.Services{
+			SessionBuilder: sb,
+			ActiveSession:  active,
+		},
+	}
+	sf := NewSessionFlow(b)
+
+	sessionID := 31
+	answered := true
+	state := &model.ActiveSessionState{
+		Version: model.ActiveSessionStateVersion,
+		Session: model.Session{ID: sessionID, UserID: 123, Mode: model.SessionModeQuiz},
+		Items: []model.ActiveSessionQuestion{
+			{
+				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &answered},
+				Question:        model.Question{ID: 1, Prompt: "첫 문제", Type: model.QuestionMultipleChoice},
+			},
+			{
+				SessionQuestion: model.SessionQuestion{QuestionID: 2},
+				Question: model.Question{
+					ID:      2,
+					Prompt:  "두 번째 문제",
+					Type:    model.QuestionMultipleChoice,
+					Options: json.RawMessage(`["A", "B"]`),
+				},
+			},
+		},
+	}
+	storeActiveState(t, rdb, sessionID, state)
+	cb := cbWithMessage("session:31:start", 123, 456, 123)
+
+	sf.HandleSessionCallback(ctx, cb)
+	sf.HandleSessionCallback(ctx, cb)
+
+	if startCalls != 2 {
+		t.Fatalf("StartSession calls = %d, want 2 callback invocations", startCalls)
+	}
+	if len(mAPI.sentMessages) != 2 {
+		t.Fatalf("rendered messages = %d, want 2", len(mAPI.sentMessages))
+	}
+	last, ok := mAPI.sentMessages[1].(tgbotapi.EditMessageTextConfig)
+	if !ok {
+		t.Fatalf("last message type = %T, want edit", mAPI.sentMessages[1])
+	}
+	if !strings.Contains(last.Text, "두 번째 문제") {
+		t.Fatalf("repeated start should resume next unanswered question, got %q", last.Text)
+	}
+	resumed, err := active.Get(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("active state read failed: %v", err)
+	}
+	if resumed.Items[0].SessionQuestion.IsCorrect == nil {
+		t.Fatal("repeated start must preserve answered state")
+	}
+}
+
+type quizStartActiveRepo struct {
+	state *model.ActiveSessionState
+}
+
+func (r *quizStartActiveRepo) LoadQuestionSessionWithStateBySessionID(
+	ctx context.Context,
+	sessionID int,
+) (*model.ActiveSessionState, error) {
+	return r.state, nil
+}
+
+func (r *quizStartActiveRepo) FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error {
+	return nil
+}
+
+func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
+	ctx := context.Background()
+	mAPI := &mockBotAPI{}
+	rdb := &testRedis{values: map[string]string{}}
+	dbState := &model.ActiveSessionState{
+		Version: model.ActiveSessionStateVersion,
+		Session: model.Session{
+			ID:     32,
+			UserID: 123,
+			Mode:   model.SessionModeQuiz,
+			Status: model.SessionPending,
+		},
+		Items: []model.ActiveSessionQuestion{
+			{
+				SessionQuestion: model.SessionQuestion{QuestionID: 1},
+				Question: model.Question{
+					ID:      1,
+					Prompt:  "첫 문제",
+					Type:    model.QuestionMultipleChoice,
+					Options: json.RawMessage(`["A"]`),
+				},
+			},
+		},
+	}
+	repo := &quizStartActiveRepo{state: dbState}
+	store := &mockSessionStore{
+		startFn: func(ctx context.Context, sessionID int) error {
+			repo.state.Session.Status = model.SessionInProgress
+			return nil
+		},
+	}
+	active := service.NewActiveSessionService(repo, rdb, nil)
+	b := &Bot{
+		api: mAPI,
+		rdb: rdb,
+		services: &service.Services{
+			SessionBuilder: service.NewSessionBuilderService(nil, store, nil, nil),
+			ActiveSession:  active,
+		},
+	}
+	storeActiveState(t, rdb, 32, dbState)
+
+	NewSessionFlow(b).HandleSessionCallback(ctx, cbWithMessage("session:32:start", 123, 456, 123))
+
+	state, err := active.Get(ctx, 32)
+	if err != nil {
+		t.Fatalf("active state read failed: %v", err)
+	}
+	if state.Session.Status != model.SessionInProgress {
+		t.Fatalf("active status = %s, want %s after DB start", state.Session.Status, model.SessionInProgress)
+	}
+}
+
 func TestPushSession(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	b := &Bot{api: mAPI}

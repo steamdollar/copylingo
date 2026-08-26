@@ -126,7 +126,7 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 	}
 }
 
-func TestProcessAnswerText_AlreadyAnswered(t *testing.T) {
+func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 	ctx := context.Background()
 	rdb := &testRedis{values: map[string]string{}}
 	active := service.NewActiveSessionService(nil, rdb, nil)
@@ -159,7 +159,63 @@ func TestProcessAnswerText_AlreadyAnswered(t *testing.T) {
 	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "apple", nil)
 
 	msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(msg.Text, "이미 답변한 문제입니다") {
-		t.Errorf("wrong text: %s", msg.Text)
+	if strings.Contains(msg.Text, "이미 답변한 문제입니다") {
+		t.Fatalf("stale answer should not return already-answered error: %s", msg.Text)
+	}
+	if !strings.Contains(msg.Text, "모든 문제를 풀었습니다") {
+		t.Errorf("expected result redirect, got: %s", msg.Text)
+	}
+}
+
+func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
+	ctx := context.Background()
+	rdb := &testRedis{values: map[string]string{}}
+	active := service.NewActiveSessionService(nil, rdb, nil)
+	mAPI := &mockBotAPI{}
+	b := &Bot{
+		api: mAPI,
+		rdb: rdb,
+		cfg: &config.Config{},
+		services: &service.Services{
+			ActiveSession: active,
+		},
+	}
+	sf := NewSessionFlow(b)
+
+	sessionID := 11
+	firstAnswered := true
+	state := &model.ActiveSessionState{
+		Version: model.ActiveSessionStateVersion,
+		Session: model.Session{ID: sessionID},
+		Items: []model.ActiveSessionQuestion{
+			{
+				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &firstAnswered},
+				Question:        model.Question{ID: 1, Prompt: "첫 문제", Type: model.QuestionMultipleChoice},
+			},
+			{
+				SessionQuestion: model.SessionQuestion{QuestionID: 2},
+				Question: model.Question{
+					ID:      2,
+					Prompt:  "두 번째 문제",
+					Type:    model.QuestionMultipleChoice,
+					Options: json.RawMessage(`["A", "B"]`),
+				},
+			},
+		},
+	}
+	raw, _ := json.Marshal(state)
+	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
+
+	sf.processAnswer(ctx, cbWithMessage("q:11:1:0", 123, 456, 123), sessionID, 1, 0)
+
+	if len(mAPI.sentMessages) != 1 {
+		t.Fatalf("expected one redirected message, got %d", len(mAPI.sentMessages))
+	}
+	msg, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	if !ok {
+		t.Fatalf("expected edited message, got %T", mAPI.sentMessages[0])
+	}
+	if strings.Contains(msg.Text, "이미 답변한 문제입니다") || !strings.Contains(msg.Text, "두 번째 문제") {
+		t.Fatalf("expected redirect to next question, got %q", msg.Text)
 	}
 }

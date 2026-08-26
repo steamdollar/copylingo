@@ -308,6 +308,28 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 }
 
 func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
+	// Redis is the source of truth while a quiz is in progress. Recovering from
+	// DB unconditionally here would overwrite answers already recorded in the
+	// working set when the user presses an old/repeated start button.
+	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to load active session state before start",
+			"event", "telegram.session.active_state_lookup_failed",
+			"session_id", sessionID,
+			"error", err,
+		)
+		return
+	}
+	if cb.From != nil && state.Session.UserID != 0 && state.Session.UserID != cb.From.ID {
+		slog.WarnContext(ctx, "Rejected session start for non-owner",
+			"event", "telegram.session.start_owner_mismatch",
+			"session_id", sessionID,
+			"user_id", cb.From.ID,
+		)
+		return
+	}
+	wasPending := state.Session.Status == model.SessionPending
+
 	// update session status at db (pending > in progress)
 	if err := sf.bot.
 		services.SessionBuilder.StartSession(ctx, sessionID); err != nil {
@@ -318,16 +340,20 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 		)
 		return
 	}
-
-	// session fetch by id, set at redis
-	if _, err := sf.bot.services.ActiveSession.CreateFromDB(ctx, sessionID); err != nil {
-		slog.ErrorContext(ctx, "Failed to create active session state",
-			"event", "telegram.session.active_state_create_failed",
-			"session_id", sessionID,
-			"error", err,
-		)
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ 세션 상태를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.")
-		return
+	// A DB-backed pending state has no progress to preserve. Reload it after
+	// StartSession so the Redis copy also reflects the in_progress transition;
+	// an already in-progress working set must never be replaced from DB.
+	if wasPending {
+		state, err = sf.bot.services.ActiveSession.CreateFromDB(ctx, sessionID)
+		if err != nil {
+			slog.ErrorContext(ctx, "Failed to refresh active session after start",
+				"event", "telegram.session.active_state_refresh_failed",
+				"session_id", sessionID,
+				"error", err,
+			)
+			sf.bot.SendMessage(cb.Message.Chat.ID, "❌ 세션 상태를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.")
+			return
+		}
 	}
 
 	// redis에 k-v로 시작 시간 기록
@@ -335,7 +361,7 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 	sf.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
 
 	editMessageID := cb.Message.MessageID
-	sf.showQuestion(ctx, cb.Message.Chat.ID, &editMessageID, sessionID, 0)
+	sf.showQuestion(ctx, cb.Message.Chat.ID, &editMessageID, sessionID, state.NextUnansweredIndex())
 }
 
 func (sf *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {

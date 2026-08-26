@@ -30,9 +30,12 @@
   - `in_progress`를 우선하고, 같은 상태에서는 가장 오래된 세션을 선택한다. 미완료 세션이 있으면 새 세션을 생성하지 않고 해당 mode에 맞는 Telegram 알림을 다시 보낸다.
   - 미완료 세션이 없을 때만 기존처럼 cron 종류에 맞는 새 세션을 생성하고 발송한다.
   - `/study` 등 사용자가 직접 요청하는 세션 생성은 제한하지 않는다. `expired` 전환과 기존 backlog 일괄 정리는 이번 결정에 포함하지 않는다.
+  - **2026-08-25 보정**: 재알림된 `in_progress` 세션 진입은 새 시작이 아니라 resume으로 취급한다. Quiz/Study 모두 Redis working set을 우선하고, Redis miss일 때만 DB에서 복구하며, 첫 미답변 문제/미학습 카드부터 다시 표시한다.
+  - 이미 처리된 Telegram callback은 오류 문구를 추가 전송하지 않고 현재 첫 미답변 문제로 self-heal한다. 모든 문제가 답변된 상태라면 기존 완료 경로를 사용한다.
 - **결과 / 트레이드오프**:
   - Scheduled session이 무한히 쌓이지 않고 사용자가 진행 중이거나 오래 기다린 세션부터 소비하게 된다.
   - 사용자가 미완료 세션을 끝내지 않으면 새 학습 콘텐츠는 노출되지 않고 같은 세션 알림이 반복된다.
+  - 완료 전 진행 상태의 SSOT는 Redis working set이며 DB는 완료 시 flush된다. 따라서 Redis TTL 만료 시에는 DB에 없는 부분 진행 상태를 복구할 수 없다는 기존 제약은 유지된다.
   - 조회 후 생성 사이의 동시성 경쟁을 완전히 차단하는 distributed lock 또는 DB 제약은 별도 확장성 과제로 남는다.
 
 ## ADR-043: Word Order는 Telegram tap-to-build와 Redis draft로 구현한다

@@ -68,6 +68,49 @@ func TestStudyActiveSessionStartLoadsAndStoresWorkingSet(t *testing.T) {
 	}
 }
 
+func TestStudyActiveSessionStartResumesRedisWorkingSet(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 77
+	userID := int64(123)
+	rdb := newFakeActiveSessionRedis()
+	starter := &fakeStudySessionStarter{}
+	loadCalls := 0
+	repo := &fakeStudyActiveRepo{
+		loadFn: func(ctx context.Context, gotSessionID int) (*model.StudyActiveSessionState, error) {
+			loadCalls++
+			return studyActiveState(sessionID, userID, model.SessionPending), nil
+		},
+	}
+	svc := NewStudyActiveSessionService(repo, starter, rdb)
+
+	if _, err := svc.Start(ctx, sessionID, userID); err != nil {
+		t.Fatalf("initial Start failed: %v", err)
+	}
+	if _, err := svc.MarkStudied(ctx, sessionID, userID, 0); err != nil {
+		t.Fatalf("MarkStudied failed: %v", err)
+	}
+
+	resumed, err := svc.Start(ctx, sessionID, userID)
+	if err != nil {
+		t.Fatalf("resumed Start failed: %v", err)
+	}
+	if loadCalls != 1 {
+		t.Fatalf("DB load calls = %d, want 1 after Redis resume", loadCalls)
+	}
+	if len(starter.started) != 1 {
+		t.Fatalf("starter calls = %+v, want one initial DB start", starter.started)
+	}
+	if resumed.Items[0].SessionMaterial.StudiedAt == nil {
+		t.Fatal("expected previously studied material to survive repeated Start")
+	}
+	if got := resumed.NextUnstudiedIndex(); got != 1 {
+		t.Fatalf("next unstudied index = %d, want 1", got)
+	}
+	if resumed.CurrentIndex != 1 {
+		t.Fatalf("current index = %d, want 1 on resume", resumed.CurrentIndex)
+	}
+}
+
 func TestStudyActiveSessionMarkStudiedUpdatesRedisOnly(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77

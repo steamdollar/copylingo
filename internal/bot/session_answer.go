@@ -28,6 +28,16 @@ func (sf *SessionFlow) processAnswer(
 	}
 	item, _, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
+		// A delayed button can point at a question that is no longer current
+		// (including one already answered). Re-render the first unanswered item
+		// instead of silently dropping the callback.
+		if _, exists := state.ItemByQuestionID(questionID); exists {
+			sf.redirectToNextUnansweredQuestion(ctx, cb.Message.Chat.ID, sessionID, &cb.Message.MessageID)
+		}
+		return
+	}
+	if item.SessionQuestion.IsCorrect != nil {
+		sf.redirectToNextUnansweredQuestion(ctx, cb.Message.Chat.ID, sessionID, &cb.Message.MessageID)
 		return
 	}
 	question := item.Question
@@ -95,10 +105,13 @@ func (sf *SessionFlow) processAnswerText(
 		slog.WarnContext(ctx, "Question not found in active session",
 			"event", "telegram.answer.question_not_found",
 		)
+		if _, exists := state.ItemByQuestionID(questionID); exists {
+			sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
+		}
 		return
 	}
 	if item.SessionQuestion.IsCorrect != nil {
-		sf.bot.SendMessage(chatID, "이미 답변한 문제입니다.")
+		sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
 		return
 	}
 	question := item.Question
@@ -131,6 +144,10 @@ func (sf *SessionFlow) processAnswerText(
 				selectedAnswer,
 				false,
 			); recordErr != nil {
+				if errors.Is(recordErr, service.ErrActiveSessionAlreadyAnswered) {
+					sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
+					return
+				}
 				slog.ErrorContext(ctx, "Failed to record fallback wrong answer",
 					"event", "telegram.answer.fallback_record_failed",
 					"error", recordErr,
@@ -138,7 +155,7 @@ func (sf *SessionFlow) processAnswerText(
 				return
 			}
 		} else if errors.Is(err, service.ErrActiveSessionAlreadyAnswered) {
-			sf.bot.SendMessage(chatID, "이미 답변한 문제입니다.")
+			sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
 			return
 		} else {
 			slog.ErrorContext(ctx, "Failed to grade answer",
@@ -192,4 +209,21 @@ func (sf *SessionFlow) processAnswerText(
 		// 텍스트 답변은 사용자 메시지로 들어오므로 편집할 봇 문제 메시지가 없다.
 		sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
 	}
+}
+
+// redirectToNextUnansweredQuestion repairs delayed answer callbacks by
+// rendering the current working-set position. When every item is answered,
+// showQuestion renders the existing result button.
+func (sf *SessionFlow) redirectToNextUnansweredQuestion(
+	ctx context.Context,
+	chatID int64,
+	sessionID int,
+	editMessageID *int,
+) {
+	nextIdx, err := sf.nextUnansweredQuestionIndex(ctx, sessionID)
+	if err != nil {
+		sf.showActiveSessionUnavailable(chatID, editMessageID)
+		return
+	}
+	sf.showQuestion(ctx, chatID, editMessageID, sessionID, nextIdx)
 }

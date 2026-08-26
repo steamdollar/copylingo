@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css?v=2608241815">
+    <link rel="stylesheet" href="/miniapp/handwriting/assets/style.css?v=2608260859">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     </head>
     <body>
@@ -13,9 +13,11 @@
           <span class="question-eyebrow">문제</span>
           <p id="questionPrompt" class="question-prompt"></p>
         </div>
-        <div id="padViewport" class="pad-viewport">
+        <div class="pad-frame">
+          <div id="padViewport" class="pad-viewport">
+            <canvas id="pad" width="320" height="320" aria-label="손글씨 입력 패드"></canvas>
+          </div>
           <p id="gradeResult" class="grade-result" aria-live="polite" hidden></p>
-          <canvas id="pad" width="320" height="320" aria-label="손글씨 입력 패드"></canvas>
         </div>
         <label id="padScrollControl" class="pad-scroll-control" for="padScroll">
           <span>좌우 이동</span>
@@ -47,6 +49,6 @@
       </section>
     </main>
 
-    <script src="/miniapp/handwriting/assets/app.js?v=2608241815"></script>
+    <script src="/miniapp/handwriting/assets/app.js?v=2608260853"></script>
   </body>
 </html>
