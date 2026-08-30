@@ -36,6 +36,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-08-30 | Scheduled Quiz/Study 미완료 backlog를 합산 3개까지 허용하고 cap 도달 시 기존 세션 재알림 (ADR-045) | `2608/2608302142_session_backlog_cap.md` |
 | 2026-08-25 | 미완료 Quiz/Study 재알림 재진입을 Redis-first resume로 수정 + stale callback self-heal (ADR-042 보정) | `2608/2608252215_session_resume_fix.md` |
 | 2026-08-24 | Linux host CPU·load·memory·swap·disk·상위 process resource monitor script 추가 | `2608/2608241826_host_resource_monitor.md` |
 | 2026-08-24 | 손글씨 팔레트 85% 축소 + 정오표시 emoji·정답 노출 + 촉음 별도 칸 제거 | `2608/2608241746_handwriting_palette_ui.md` |

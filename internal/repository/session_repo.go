@@ -23,6 +23,12 @@ const getOldestUnfinishedQuery = `
 	LIMIT 1
 `
 
+const countUnfinishedQuery = `
+	SELECT COUNT(*) FROM sessions
+	WHERE user_id = $1
+	  AND status IN ('in_progress', 'pending')
+`
+
 func NewSessionRepository(db *sqlx.DB) *SessionRepository {
 	return &SessionRepository{db: db}
 }
@@ -63,6 +69,16 @@ func (r *SessionRepository) GetOldestUnfinished(ctx context.Context, userID int6
 		return nil, fmt.Errorf("SessionRepository.GetOldestUnfinished user_id=%d: %w", userID, err)
 	}
 	return s, nil
+}
+
+// CountUnfinished returns the number of pending and in-progress sessions for a user.
+// Both quiz and study sessions are included in the count.
+func (r *SessionRepository) CountUnfinished(ctx context.Context, userID int64) (int, error) {
+	var count int
+	if err := r.db.GetContext(ctx, &count, countUnfinishedQuery, userID); err != nil {
+		return 0, fmt.Errorf("SessionRepository.CountUnfinished user_id=%d: %w", userID, err)
+	}
+	return count, nil
 }
 
 func (r *SessionRepository) GetSessionsByStatus(

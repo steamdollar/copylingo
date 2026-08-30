@@ -214,6 +214,12 @@ func (s *Scheduler) runJob(name string, timeout time.Duration, run func(context.
 }
 
 func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.SessionType) error {
+	if s.cfg == nil {
+		return fmt.Errorf("scheduler config unavailable")
+	}
+	if s.services == nil || s.services.SessionQuery == nil {
+		return fmt.Errorf("session query service unavailable")
+	}
 	users, err := s.services.User.GetAllUsers(ctx)
 	if err != nil {
 		return fmt.Errorf("get users: %w", err)
@@ -224,21 +230,33 @@ func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.
 	// 세션 빌드는 큐에 넣고, 푸시는 큐에서 빼서 하는 식으로? 일단은 간단하게 동기적으로 처리하지만, 나중에 확장성을 고려해서 개선할 수 있을듯.
 	var failures int
 	for _, user := range users {
-		reminded, err := s.remindUnfinishedSession(ctx, user.ID)
+		unfinishedCount, err := s.services.SessionQuery.CountUnfinished(ctx, user.ID)
 		if err != nil {
 			failures++
-			slog.ErrorContext(ctx, "Failed to remind unfinished session",
-				"event", "scheduler.session.reminder_failed",
+			slog.ErrorContext(ctx, "Failed to count unfinished sessions",
+				"event", "scheduler.session.count_failed",
 				"user_id", user.ID,
 				"error", err,
 			)
 			continue
 		}
-		if reminded {
-			slog.InfoContext(ctx, "Unfinished session reminded",
-				"event", "scheduler.session.reminded",
-				"user_id", user.ID,
-			)
+		if unfinishedCount >= s.cfg.Schedule.MaxUnfinishedSessions {
+			reminded, err := s.remindUnfinishedSession(ctx, user.ID)
+			if err != nil {
+				failures++
+				slog.ErrorContext(ctx, "Failed to remind unfinished session",
+					"event", "scheduler.session.reminder_failed",
+					"user_id", user.ID,
+					"error", err,
+				)
+				continue
+			}
+			if reminded {
+				slog.InfoContext(ctx, "Unfinished session reminded",
+					"event", "scheduler.session.reminded",
+					"user_id", user.ID,
+				)
+			}
 			continue
 		}
 
@@ -381,6 +399,12 @@ func (s *Scheduler) topUpAudio(ctx context.Context, users []model.User) {
 }
 
 func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
+	if s.cfg == nil {
+		return fmt.Errorf("scheduler config unavailable")
+	}
+	if s.services == nil || s.services.SessionQuery == nil {
+		return fmt.Errorf("session query service unavailable")
+	}
 	users, err := s.services.User.GetAllUsers(ctx)
 	if err != nil {
 		return fmt.Errorf("get users for study sessions: %w", err)
@@ -388,21 +412,33 @@ func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
 
 	var failures int
 	for _, user := range users {
-		reminded, err := s.remindUnfinishedSession(ctx, user.ID)
+		unfinishedCount, err := s.services.SessionQuery.CountUnfinished(ctx, user.ID)
 		if err != nil {
 			failures++
-			slog.ErrorContext(ctx, "Failed to remind unfinished session",
-				"event", "scheduler.study_session.reminder_failed",
+			slog.ErrorContext(ctx, "Failed to count unfinished sessions",
+				"event", "scheduler.study_session.count_failed",
 				"user_id", user.ID,
 				"error", err,
 			)
 			continue
 		}
-		if reminded {
-			slog.InfoContext(ctx, "Unfinished session reminded",
-				"event", "scheduler.study_session.reminded",
-				"user_id", user.ID,
-			)
+		if unfinishedCount >= s.cfg.Schedule.MaxUnfinishedSessions {
+			reminded, err := s.remindUnfinishedSession(ctx, user.ID)
+			if err != nil {
+				failures++
+				slog.ErrorContext(ctx, "Failed to remind unfinished session",
+					"event", "scheduler.study_session.reminder_failed",
+					"user_id", user.ID,
+					"error", err,
+				)
+				continue
+			}
+			if reminded {
+				slog.InfoContext(ctx, "Unfinished session reminded",
+					"event", "scheduler.study_session.reminded",
+					"user_id", user.ID,
+				)
+			}
 			continue
 		}
 
@@ -453,7 +489,7 @@ func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
 	return nil
 }
 
-// remindUnfinishedSession re-sends one existing session before a scheduled build.
+// remindUnfinishedSession re-sends one existing unfinished session when the cap is reached.
 // The repository query already applies status and age priority across both modes.
 func (s *Scheduler) remindUnfinishedSession(ctx context.Context, userID int64) (bool, error) {
 	if s.services == nil || s.services.SessionQuery == nil {

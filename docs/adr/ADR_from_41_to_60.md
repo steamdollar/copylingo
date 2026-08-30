@@ -71,3 +71,20 @@
 - **결과 / 트레이드오프**:
   - 최신 supported toolchain의 runtime·compiler·standard-library 개선을 사용하고 local/container 재현성을 높인다.
   - `.0` release의 초기 regression 가능성은 있지만 full test·container smoke로 현재 application contract를 검증하고, 문제 시 두 version pin을 같이 revert한다.
+
+## ADR-045: Scheduled Session backlog를 합산 3개까지 허용한다
+
+- **날짜**: 2026-08-30
+- **상태**: 채택됨
+- **맥락**:
+  - ADR-042는 Quiz/Study 전체에서 미완료 세션이 하나라도 있으면 새 scheduled session을 만들지 않고 기존 세션만 재알림한다.
+  - 무한 backlog는 방지하지만, 세션 하나를 놓친 경우 이후 Quiz/Study content가 전혀 노출되지 않는 차단 효과가 크다.
+- **결정**:
+  - `pending`/`in_progress` Quiz·Study를 합산한 사용자별 scheduled backlog 상한을 `schedule.max_unfinished_sessions` 설정으로 관리하고 기본값을 3으로 둔다.
+  - scheduled cron 실행 시 미완료 세션 수가 상한보다 적으면 해당 cron 종류의 새 세션을 생성·발송한다.
+  - 상한에 도달하면 새 세션을 만들지 않고 ADR-042의 우선순위(`in_progress` 우선, 같은 상태에서 오래된 순)로 기존 세션 하나를 재알림한다.
+  - `/study` 등 수동 생성 세션도 미완료 수에 포함하지만, 수동 요청 자체를 차단하지는 않는다. 자동 `expired` 전환은 도입하지 않는다.
+- **결과 / 트레이드오프**:
+  - 사용자는 일시적으로 세션을 놓쳐도 최대 3개의 서로 다른 scheduled content를 받으며, backlog은 유한하게 유지된다.
+  - 상한 도달 전에는 기존 backlog 재알림 대신 새 세션이 전송되므로, 오래된 세션의 즉시 소비를 강제하지 않는다.
+  - 수동 생성이 상한을 넘길 수 있고 조회 후 생성 사이의 동시성 race가 남는 제약은 유지한다.

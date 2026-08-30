@@ -99,6 +99,9 @@ func TestLoadScheduleDefaults(t *testing.T) {
 	if cfg.Schedule.StudyPushCron.IsZero() {
 		t.Fatal("Schedule.StudyPushCron IsZero() = true, want false")
 	}
+	if got, want := cfg.Schedule.MaxUnfinishedSessions, 3; got != want {
+		t.Fatalf("Schedule.MaxUnfinishedSessions = %d, want %d", got, want)
+	}
 }
 
 func TestLoadScheduleEnvOverrides(t *testing.T) {
@@ -113,6 +116,34 @@ func TestLoadScheduleEnvOverrides(t *testing.T) {
 
 	if got, want := cfg.Schedule.AfternoonStudyPushCron.String(), "0 17 * * *"; got != want {
 		t.Fatalf("Schedule.AfternoonStudyPushCron = %q, want %q", got, want)
+	}
+}
+
+func TestLoadScheduleMaxUnfinishedSessionsEnvOverride(t *testing.T) {
+	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
+	t.Setenv("COPYLINGO_SCHEDULE_MAX_UNFINISHED_SESSIONS", "2")
+	t.Chdir(t.TempDir())
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got, want := cfg.Schedule.MaxUnfinishedSessions, 2; got != want {
+		t.Fatalf("Schedule.MaxUnfinishedSessions = %d, want %d", got, want)
+	}
+}
+
+func TestLoadRejectsInvalidMaxUnfinishedSessions(t *testing.T) {
+	for _, value := range []string{"0", "-1", "4"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
+			t.Setenv("COPYLINGO_SCHEDULE_MAX_UNFINISHED_SESSIONS", value)
+			t.Chdir(t.TempDir())
+
+			if _, err := Load(); err == nil {
+				t.Fatal("Load() error = nil, want validation error")
+			}
+		})
 	}
 }
 

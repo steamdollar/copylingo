@@ -115,6 +115,7 @@ func (c CronExpr) Validate(name string) error {
 }
 
 type ScheduleConfig struct {
+	MaxUnfinishedSessions  int      `mapstructure:"max_unfinished_sessions"`   // 사용자별 자동 세션 미완료 상한
 	ContentCollectCron     CronExpr `mapstructure:"content_collect_cron"`      // 콘텐츠 수집 크론
 	MorningBuildCron       CronExpr `mapstructure:"morning_build_cron"`        // 오전 세션 빌드 크론
 	MorningPushCron        CronExpr `mapstructure:"morning_push_cron"`         // 오전 세션 푸시 크론
@@ -126,6 +127,9 @@ type ScheduleConfig struct {
 
 // validate는 모든 cron expression 필드를 fail-fast 검증한다.
 func (s *ScheduleConfig) validate() error {
+	if s.MaxUnfinishedSessions < 1 || s.MaxUnfinishedSessions > 3 {
+		return fmt.Errorf("schedule.max_unfinished_sessions must be between 1 and 3")
+	}
 	checks := []struct {
 		name string
 		expr CronExpr
@@ -212,6 +216,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("storage.use_path_style", true)
 
 	// session schedule
+	viper.SetDefault("schedule.max_unfinished_sessions", 3)
 	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *")        // 매일 03:00
 	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")         // 매일 07:30
 	viper.SetDefault("schedule.morning_push_cron", "0 8 * * *")           // 매일 08:00
@@ -280,6 +285,7 @@ func bindEnv() error {
 		"storage.access_key",
 		"storage.secret_key",
 		"storage.use_path_style",
+		"schedule.max_unfinished_sessions",
 		"schedule.content_collect_cron",
 		"schedule.morning_build_cron",
 		"schedule.morning_push_cron",

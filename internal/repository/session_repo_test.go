@@ -24,3 +24,15 @@ func TestGetOldestUnfinishedQueryPrioritizesActiveBacklog(t *testing.T) {
 		)
 	}
 }
+
+func TestCountUnfinishedQueryIncludesPendingAndInProgress(t *testing.T) {
+	for _, want := range []string{
+		"COUNT(*)",
+		"user_id = $1",
+		"status IN ('in_progress', 'pending')",
+	} {
+		if !strings.Contains(countUnfinishedQuery, want) {
+			t.Fatalf("countUnfinishedQuery does not contain %q:\n%s", want, countUnfinishedQuery)
+		}
+	}
+}
