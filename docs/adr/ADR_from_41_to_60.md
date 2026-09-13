@@ -108,3 +108,10 @@
   - repository query는 단일 level 대신 최대 3개의 level array를 사용하며, SRS progress와 catalog 데이터의 migration은 필요 없다.
   - level별 분기와 중복 identifier가 없어져 새 catalog 추가가 기존 seeder 조립 코드를 수정하지 않지만, dataset 파일·생성 방식·기존 key compatibility는 manifest에서 명시해야 한다.
   - 향후 다른 언어 또는 proficiency 체계에 인접 범위를 적용하려면 해당 체계의 순서를 별도로 명시해야 하며, 미정 label을 lexical 비교로 처리하지 않는다.
+
+## ADR-047: Study 시간대별 분량과 유형별 신규·복습 할당
+
+- **날짜**: 2026-09-13
+- **상태**: 채택됨
+- Study를 아침 20개·저녁 24개로 편성하고 유형별 신규량을 보장한다. 현재 레벨의 신규 Material을 우선하며, 복습 부족 시 신규량을 임의로 늘리지 않는다.
+- 상세: [ADR-047_study_morning_evening_mix.md](ADR-047_study_morning_evening_mix.md)

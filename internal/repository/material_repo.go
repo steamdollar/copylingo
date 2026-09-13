@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,8 +13,13 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
+type materialDB interface {
+	SelectContext(context.Context, any, string, ...any) error
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
 type MaterialRepository struct {
-	db *sqlx.DB
+	db materialDB
 }
 
 func NewMaterialRepository(db *sqlx.DB) *MaterialRepository {
@@ -37,134 +44,242 @@ func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []strin
 	return materials, nil
 }
 
-// GetForStudySession returns level-matched due or new study materials for a user.
+// GetForStudySession returns materials according to the per-category new and
+// review quotas in plan. New materials prefer the current level, while due
+// reviews remain ordered by oldest due time.
 func (r *MaterialRepository) GetForStudySession(
 	ctx context.Context,
 	userID int64,
 	language string,
+	level string,
 	levels []string,
-	limit int,
+	plan model.StudySessionPlan,
 ) ([]model.Material, error) {
-	if limit <= 0 {
+	if len(plan.Quotas) == 0 {
 		return nil, nil
+	}
+	if err := validateStudySessionPlan(plan); err != nil {
+		return nil, fmt.Errorf("MaterialRepository.GetForStudySession invalid plan: %w", err)
+	}
+	limit := plan.TotalMaterialCount()
+	if limit == 0 {
+		return nil, nil
+	}
+	quotaJSON, err := json.Marshal(plan.Quotas)
+	if err != nil {
+		return nil, fmt.Errorf("MaterialRepository.GetForStudySession marshal plan: %w", err)
 	}
 
 	var materials []model.Material
 	if err := r.db.SelectContext(ctx, &materials, studySessionMaterialsQuery,
-		userID, language, pq.Array(levels), pq.Array(studySessionMaterialCategories), limit); err != nil {
+		userID, language, level, pq.Array(levels), quotaJSON, limit); err != nil {
 		return nil, fmt.Errorf("MaterialRepository.GetForStudySession user_id=%d language=%s level=%s limit=%d: %w",
-			userID, language, levels, limit, err)
+			userID, language, level, limit, err)
 	}
 	return materials, nil
 }
 
-// studySessionMaterialCategories are the material categories a study session
-// draws from. Reading uses separate due-review/new buckets in the query below
-// so a session can mix one of each without pulling not-yet-due reviews forward.
-var studySessionMaterialCategories = []string{
-	string(model.MaterialCategoryVocabulary),
-	string(model.MaterialCategoryGrammar),
-	string(model.MaterialCategoryReading),
+func validateStudySessionPlan(plan model.StudySessionPlan) error {
+	seen := make(map[model.MaterialCategory]struct{}, len(plan.Quotas))
+	for i, quota := range plan.Quotas {
+		if quota.NewCount < 0 || quota.ReviewCount < 0 {
+			return fmt.Errorf("quota index=%d category=%s has negative count", i, quota.Category)
+		}
+		switch quota.Category {
+		case model.MaterialCategoryVocabulary, model.MaterialCategoryGrammar, model.MaterialCategoryReading:
+		default:
+			return fmt.Errorf("quota index=%d has unsupported category=%s", i, quota.Category)
+		}
+		if _, ok := seen[quota.Category]; ok {
+			return fmt.Errorf("duplicate category=%s", quota.Category)
+		}
+		seen[quota.Category] = struct{}{}
+	}
+	return nil
 }
 
 const studySessionMaterialsQuery = `
-		WITH material_pool AS (
-			SELECT
-				m.*,
-				ump.material_id AS progress_material_id,
-				ump.next_review_at
-			FROM materials m
-			LEFT JOIN user_material_progress ump
+	WITH quotas AS (
+		SELECT
+			q.category,
+			q.new_count,
+			q.review_count,
+			q.new_count + q.review_count AS category_total
+		FROM jsonb_to_recordset($5::jsonb) AS q(
+			category text,
+			new_count integer,
+			review_count integer
+		)
+	),
+	material_pool AS (
+		SELECT
+			m.*,
+			ump.material_id AS progress_material_id,
+			ump.next_review_at,
+			CASE WHEN ump.material_id IS NULL THEN 'new' ELSE 'review' END AS bucket,
+			CASE WHEN m.proficiency_level = $3 THEN 0 ELSE 1 END AS level_rank,
+			RANDOM() AS random_order
+		FROM materials m
+		JOIN quotas q ON q.category = m.category
+		LEFT JOIN user_material_progress ump
 			ON ump.material_id = m.id
-				AND ump.user_id = $1
-			WHERE m.language = $2
-			AND m.proficiency_level = ANY($3)
-			AND m.category = ANY($4)
-		),
-		reading_inventory AS (
-			SELECT EXISTS (
-				SELECT 1
-				FROM material_pool
-				WHERE category = 'reading'
-				AND progress_material_id IS NULL
-			) AS has_unseen_reading
-		),
-		candidates AS (
-			SELECT
-				mp.*,
-				ROW_NUMBER() OVER (
-					PARTITION BY mp.category
-					ORDER BY
-						CASE WHEN mp.progress_material_id IS NULL THEN 1 ELSE 0 END ASC,
-						mp.next_review_at ASC NULLS LAST,
-						mp.difficulty ASC,
-						mp.id ASC
-				) AS category_rank,
-				ROW_NUMBER() OVER (
-					PARTITION BY
-						mp.category,
-						CASE WHEN mp.progress_material_id IS NULL THEN 'new' ELSE 'review' END
-					ORDER BY
-						mp.next_review_at ASC NULLS LAST,
-						mp.difficulty ASC,
-						mp.id ASC
-				) AS category_bucket_rank,
-				ri.has_unseen_reading,
-				CASE mp.category
-					WHEN 'vocabulary' THEN 0
-					WHEN 'grammar' THEN 1
-					WHEN 'reading' THEN 2
-					ELSE 3
-				END AS category_order
-			FROM material_pool mp
-			CROSS JOIN reading_inventory ri
-			WHERE (
-				mp.progress_material_id IS NULL
-				OR (
-					mp.progress_material_id IS NOT NULL
-					AND mp.next_review_at <= NOW()
-				)
+			AND ump.user_id = $1
+		WHERE m.language = $2
+			AND m.proficiency_level = ANY($4)
+			AND (
+				ump.material_id IS NULL
+				OR ump.next_review_at <= NOW()
 			)
 			AND NOT EXISTS (
 				SELECT 1
 				FROM session_materials sm
 				JOIN sessions s ON s.id = sm.session_id
 				WHERE s.user_id = $1
-					AND sm.material_id = mp.id
+					AND sm.material_id = m.id
 					AND s.mode = 'study'
 					AND s.status IN ('pending', 'in_progress')
 			)
-		)
+	),
+	ranked AS (
 		SELECT
-			id,
-			material_key,
-			content_id,
-			category,
-			language,
-			proficiency_level,
-			title,
-			payload,
-			difficulty,
-			created_at
-		FROM candidates
-		WHERE category <> 'reading'
-		OR (
-			category = 'reading'
-			AND (
-				(progress_material_id IS NULL AND category_bucket_rank <= 1)
-				OR (
-					progress_material_id IS NOT NULL
-					AND category_bucket_rank <= CASE WHEN has_unseen_reading THEN 1 ELSE 2 END
-				)
+			mp.*,
+			ROW_NUMBER() OVER (
+				PARTITION BY mp.category, mp.bucket
+				ORDER BY
+					CASE WHEN mp.bucket = 'new' THEN mp.level_rank END ASC NULLS LAST,
+					CASE WHEN mp.bucket = 'new' THEN mp.difficulty END ASC NULLS LAST,
+					CASE WHEN mp.bucket = 'new' THEN mp.random_order END ASC NULLS LAST,
+					CASE WHEN mp.bucket = 'review' THEN mp.next_review_at END ASC NULLS LAST,
+					CASE WHEN mp.bucket = 'review' THEN mp.id END ASC
+			) AS bucket_rank
+		FROM material_pool mp
+	),
+	primary_selected AS (
+		SELECT r.*
+		FROM ranked r
+		JOIN quotas q ON q.category = r.category
+		WHERE r.bucket = 'new' AND r.bucket_rank <= q.new_count
+		UNION ALL
+		SELECT r.*
+		FROM ranked r
+		JOIN quotas q ON q.category = r.category
+		WHERE r.bucket = 'review' AND r.bucket_rank <= q.review_count
+	),
+	primary_counts AS (
+		SELECT
+			q.category,
+			q.new_count,
+			q.review_count,
+			q.category_total,
+			COUNT(p.id) AS primary_count,
+			COUNT(p.id) FILTER (WHERE p.bucket = 'new') AS new_selected,
+			COUNT(p.id) FILTER (WHERE p.bucket = 'review') AS review_selected
+		FROM quotas q
+		LEFT JOIN primary_selected p ON p.category = q.category
+		GROUP BY q.category, q.new_count, q.review_count, q.category_total
+	),
+	remaining_due AS (
+		SELECT
+			r.*,
+			pc.new_count - pc.new_selected AS new_missing,
+			pc.review_count - pc.review_selected AS review_missing,
+			pc.category_total,
+			pc.primary_count,
+			ROW_NUMBER() OVER (
+				PARTITION BY r.category
+				ORDER BY r.next_review_at ASC, r.id ASC
+			) AS due_category_rank
+		FROM ranked r
+		JOIN primary_counts pc ON pc.category = r.category
+		WHERE r.bucket = 'review'
+			AND r.bucket_rank > pc.review_selected
+	),
+	same_category_due AS (
+		SELECT rd.*
+		FROM remaining_due rd
+		WHERE rd.new_missing > 0
+			AND (rd.category <> 'reading' OR rd.primary_count < rd.category_total)
+			AND rd.due_category_rank <= rd.new_missing
+	),
+	other_due AS (
+		SELECT
+			rd.*,
+			ROW_NUMBER() OVER (
+				ORDER BY rd.next_review_at ASC, rd.id ASC
+			) AS fallback_rank
+		FROM remaining_due rd
+		WHERE rd.category IN ('vocabulary', 'grammar')
+			AND NOT EXISTS (
+				SELECT 1
+				FROM same_category_due sd
+				WHERE sd.id = rd.id
 			)
+	),
+	selected_other_due AS (
+		SELECT od.*
+		FROM other_due od
+		WHERE od.fallback_rank <= GREATEST(
+			$6
+			- (SELECT COUNT(*) FROM primary_selected)
+			- (SELECT COUNT(*) FROM same_category_due),
+			0
 		)
-		ORDER BY
-			CASE WHEN category = 'reading' THEN category_bucket_rank ELSE category_rank END ASC,
-			category_order ASC,
-			CASE WHEN category = 'reading' AND progress_material_id IS NULL THEN 1 ELSE 0 END ASC,
-			id ASC
-		LIMIT $5
-	`
+	),
+	selected AS (
+		SELECT
+			id, material_key, content_id, category, language,
+			proficiency_level, title, payload, difficulty, created_at,
+			progress_material_id, next_review_at, bucket, level_rank, random_order
+		FROM primary_selected
+		UNION ALL
+		SELECT
+			id, material_key, content_id, category, language,
+			proficiency_level, title, payload, difficulty, created_at,
+			progress_material_id, next_review_at, bucket, level_rank, random_order
+		FROM same_category_due
+		UNION ALL
+		SELECT
+			id, material_key, content_id, category, language,
+			proficiency_level, title, payload, difficulty, created_at,
+			progress_material_id, next_review_at, bucket, level_rank, random_order
+		FROM selected_other_due
+	),
+	ordered AS (
+		SELECT
+			s.*,
+			ROW_NUMBER() OVER (
+				PARTITION BY s.category
+				ORDER BY
+					CASE WHEN s.bucket = 'new' THEN 0 ELSE 1 END,
+					CASE WHEN s.bucket = 'new' THEN s.level_rank END ASC NULLS LAST,
+					CASE WHEN s.bucket = 'new' THEN s.difficulty END ASC NULLS LAST,
+					CASE WHEN s.bucket = 'new' THEN s.random_order END ASC NULLS LAST,
+					CASE WHEN s.bucket = 'review' THEN s.next_review_at END ASC NULLS LAST,
+					CASE WHEN s.bucket = 'review' THEN s.id END ASC
+			) AS category_rank,
+			CASE s.category
+				WHEN 'vocabulary' THEN 0
+				WHEN 'grammar' THEN 1
+				WHEN 'reading' THEN 2
+				ELSE 3
+			END AS category_order
+		FROM selected s
+	)
+	SELECT
+		id,
+		material_key,
+		content_id,
+		category,
+		language,
+		proficiency_level,
+		title,
+		payload,
+		difficulty,
+		created_at
+	FROM ordered
+	ORDER BY category_rank ASC, category_order ASC, id ASC
+	LIMIT $6
+`
 
 // UpsertBatch inserts or refreshes materials identified by their stable material key.
 func (r *MaterialRepository) UpsertBatch(ctx context.Context, materials []*model.Material) error {

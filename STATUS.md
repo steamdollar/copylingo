@@ -36,6 +36,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-13 | Study 아침 20·저녁 24개 및 유형별 신규량 보장, 현재 레벨 신규 우선, due 보충·수동 limit 배분, cron 설정 정합성 (ADR-047) | [2609132312_study_morning_evening_mix.md](docs/workthrough/2609/2609132312_study_morning_evening_mix.md) |
 | 2026-09-02 | N4 원본 catalog 15종(760 materials/1,040 questions) + generic level registry + Study·Quiz 현재 level ±1 scope + TTS 80건 (ADR-046) | `2609/2609020916_n4_catalog_adjacent_levels.md` |
 | 2026-08-30 | Scheduled Quiz/Study 미완료 backlog를 합산 3개까지 허용하고 cap 도달 시 기존 세션 재알림 (ADR-045) | `2608/2608302142_session_backlog_cap.md` |
 | 2026-08-25 | 미완료 Quiz/Study 재알림 재진입을 Redis-first resume로 수정 + stale callback self-heal (ADR-042 보정) | `2608/2608252215_session_resume_fix.md` |

@@ -65,14 +65,15 @@ type commandStudyMaterialStore struct {
 func (s *commandStudyMaterialStore) GetForStudySession(
 	ctx context.Context,
 	userID int64,
-	language string,
+	language, level string,
 	levels []string,
-	limit int,
+	plan model.StudySessionPlan,
 ) ([]model.Material, error) {
 	s.userID = userID
 	s.language = language
+	_ = level
 	s.levels = append([]string(nil), levels...)
-	s.limit = limit
+	s.limit = plan.TotalMaterialCount()
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -495,7 +496,7 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	if !ok {
 		t.Fatalf("sent message type = %T, want MessageConfig", api.sentMessages[0])
 	}
-	if !strings.Contains(msg.Text, "정오 학습 세션") {
+	if !strings.Contains(msg.Text, "Study Session이 도착했습니다") {
 		t.Fatalf("message text = %q", msg.Text)
 	}
 	if got := onlyMessageCallbackData(t, msg); got != "study:321:start" {

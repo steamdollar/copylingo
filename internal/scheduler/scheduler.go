@@ -93,7 +93,9 @@ func (s *Scheduler) Start() {
 
 	// Study session: build and push
 	if _, err := s.cron.AddFunc(s.cfg.Schedule.StudyPushCron.String(), func() {
-		s.runJob("study_push", 0, s.buildAndPushStudySessions)
+		s.runJob("study_push", 0, func(ctx context.Context) error {
+			return s.buildAndPushStudySessions(ctx, service.StudyProfileMorning)
+		})
 	}); err != nil {
 		slog.Error("Failed to register scheduler job",
 			"event", "scheduler.job.registration_failed",
@@ -112,7 +114,9 @@ func (s *Scheduler) Start() {
 
 	// Afternoon study session: build and push
 	if _, err := s.cron.AddFunc(s.cfg.Schedule.AfternoonStudyPushCron.String(), func() {
-		s.runJob("afternoon_study_push", 0, s.buildAndPushStudySessions)
+		s.runJob("afternoon_study_push", 0, func(ctx context.Context) error {
+			return s.buildAndPushStudySessions(ctx, service.StudyProfileEvening)
+		})
 	}); err != nil {
 		slog.Error("Failed to register scheduler job",
 			"event", "scheduler.job.registration_failed",
@@ -398,7 +402,7 @@ func (s *Scheduler) topUpAudio(ctx context.Context, users []model.User) {
 	}
 }
 
-func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
+func (s *Scheduler) buildAndPushStudySessions(ctx context.Context, profile service.StudySessionProfile) error {
 	if s.cfg == nil {
 		return fmt.Errorf("scheduler config unavailable")
 	}
@@ -442,7 +446,13 @@ func (s *Scheduler) buildAndPushStudySessions(ctx context.Context) error {
 			continue
 		}
 
-		session, err := s.services.StudySession.BuildStudySession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+		session, err := s.services.StudySession.BuildStudySessionWithProfile(
+			ctx,
+			user.ID,
+			user.Language,
+			user.ProficiencyLevel,
+			profile,
+		)
 		if err != nil {
 			failures++
 			slog.ErrorContext(ctx, "Failed to build study session",

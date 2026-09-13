@@ -26,7 +26,7 @@ func NewStudyFlow(bot *Bot) *StudyFlow {
 }
 
 func (sf *StudyFlow) PushSession(ctx context.Context, chatID int64, sessionID int) error {
-	text := "☀️ <b>정오 학습 세션이 도착했습니다!</b>\n\n오늘 레벨에 맞춘 Study Material을 짧게 훑고 가세요."
+	text := "📚 <b>Study Session이 도착했습니다!</b>\n\n현재 레벨에 맞춘 Study Material을 짧게 훑고 가세요."
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf(config.FormatStudyStart, sessionID)),
@@ -173,7 +173,7 @@ func (sf *StudyFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQue
 	}
 
 	sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID,
-		"✅ <b>정오 Study Session 완료!</b>\n\n오늘 학습한 Material 이력이 저장됐습니다.",
+		"✅ <b>Study Session 완료!</b>\n\n학습한 Material 이력이 저장됐습니다.",
 		mainMenuKeyboard(),
 	)
 }
@@ -344,7 +344,7 @@ type vocabularyStudyPayload struct {
 }
 
 func renderStudyMaterial(material model.Material, idx, total int) string {
-	header := fmt.Sprintf("☀️ <b>정오 Study</b>\n\n<b>%d/%d · %s</b>\n\n",
+	header := fmt.Sprintf("📚 <b>Study Session</b>\n\n<b>%d/%d · %s</b>\n\n",
 		idx+1, total, escapeHTML(materialCategoryLabel(material.Category)))
 	title := fmt.Sprintf("<b>%s</b>", escapeHTML(material.Title))
 

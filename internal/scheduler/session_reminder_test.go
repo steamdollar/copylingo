@@ -3,7 +3,11 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"reflect"
+	"sort"
 	"testing"
+
+	"github.com/robfig/cron/v3"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
@@ -123,12 +127,31 @@ func (schedulerSRSSStub) GetDueCount(context.Context, int64, string, string) (in
 type schedulerMaterialRepoStub struct{}
 
 func (schedulerMaterialRepoStub) GetForStudySession(
-	context.Context,
-	int64,
-	string,
-	[]string,
-	int,
+	_ context.Context,
+	_ int64,
+	_ string,
+	_ string,
+	_ []string,
+	_ model.StudySessionPlan,
 ) ([]model.Material, error) {
+	return []model.Material{{ID: 1}}, nil
+}
+
+type schedulerMaterialRepoRecorder struct {
+	plan  model.StudySessionPlan
+	plans []model.StudySessionPlan
+}
+
+func (r *schedulerMaterialRepoRecorder) GetForStudySession(
+	_ context.Context,
+	_ int64,
+	_ string,
+	_ string,
+	_ []string,
+	plan model.StudySessionPlan,
+) ([]model.Material, error) {
+	r.plan = plan
+	r.plans = append(r.plans, plan)
 	return []model.Material{{ID: 1}}, nil
 }
 
@@ -262,7 +285,7 @@ func TestBuildAndPushStudySessionsRemindsExistingStudyWithoutBuilding(t *testing
 		pusher,
 	)
 
-	if err := scheduler.buildAndPushStudySessions(context.Background()); err != nil {
+	if err := scheduler.buildAndPushStudySessions(context.Background(), service.StudyProfileMorning); err != nil {
 		t.Fatalf("buildAndPushStudySessions failed: %v", err)
 	}
 	if len(pusher.studyCalls) != 1 {
@@ -279,6 +302,7 @@ func TestBuildAndPushStudySessionsRemindsExistingStudyWithoutBuilding(t *testing
 
 func TestBuildAndPushStudySessionsBuildsWhenBacklogBelowCap(t *testing.T) {
 	pusher := &schedulerPusherStub{}
+	materialRepo := &schedulerMaterialRepoRecorder{}
 	scheduler := newSchedulerForReminderTestWithCount(
 		model.User{ID: 456},
 		&model.Session{ID: 88, Type: model.SessionStudy, Mode: model.SessionModeStudy, Status: model.SessionPending},
@@ -287,12 +311,12 @@ func TestBuildAndPushStudySessionsBuildsWhenBacklogBelowCap(t *testing.T) {
 		2,
 	)
 	scheduler.services.StudySession = service.NewStudySessionService(
-		schedulerMaterialRepoStub{},
+		materialRepo,
 		&schedulerSessionStoreStub{nextID: 202},
 		schedulerSessionMaterialStoreStub{},
 	)
 
-	if err := scheduler.buildAndPushStudySessions(context.Background()); err != nil {
+	if err := scheduler.buildAndPushStudySessions(context.Background(), service.StudyProfileMorning); err != nil {
 		t.Fatalf("buildAndPushStudySessions failed: %v", err)
 	}
 	if len(pusher.studyCalls) != 1 {
@@ -304,6 +328,93 @@ func TestBuildAndPushStudySessionsBuildsWhenBacklogBelowCap(t *testing.T) {
 	}
 	if len(pusher.quizCalls) != 0 {
 		t.Fatalf("quiz push calls = %d, want 0", len(pusher.quizCalls))
+	}
+	want := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+		{Category: model.MaterialCategoryVocabulary, NewCount: 8, ReviewCount: 7},
+		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
+		{Category: model.MaterialCategoryReading, NewCount: 1, ReviewCount: 0},
+	}}
+	if !reflect.DeepEqual(materialRepo.plan, want) {
+		t.Fatalf("plan = %+v, want %+v", materialRepo.plan, want)
+	}
+}
+
+func TestBuildAndPushStudySessionsUsesEveningProfileWhenBuilding(t *testing.T) {
+	pusher := &schedulerPusherStub{}
+	materialRepo := &schedulerMaterialRepoRecorder{}
+	scheduler := newSchedulerForReminderTestWithCount(
+		model.User{ID: 456, Language: "ja", ProficiencyLevel: "N5"},
+		nil,
+		nil,
+		pusher,
+		2,
+	)
+	scheduler.services.StudySession = service.NewStudySessionService(
+		materialRepo,
+		&schedulerSessionStoreStub{nextID: 202},
+		schedulerSessionMaterialStoreStub{},
+	)
+
+	if err := scheduler.buildAndPushStudySessions(context.Background(), service.StudyProfileEvening); err != nil {
+		t.Fatalf("buildAndPushStudySessions failed: %v", err)
+	}
+	want := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+		{Category: model.MaterialCategoryVocabulary, NewCount: 4, ReviewCount: 14},
+		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
+		{Category: model.MaterialCategoryReading, NewCount: 0, ReviewCount: 2},
+	}}
+	if !reflect.DeepEqual(materialRepo.plan, want) {
+		t.Fatalf("plan = %+v, want %+v", materialRepo.plan, want)
+	}
+	if len(pusher.studyCalls) != 1 || pusher.studyCalls[0].sessionID != 202 {
+		t.Fatalf("study push calls = %+v, want session 202", pusher.studyCalls)
+	}
+}
+
+func TestStartRunsStudyJobsWithDistinctProfiles(t *testing.T) {
+	cronScheduler := cron.New()
+	materialRepo := &schedulerMaterialRepoRecorder{}
+	scheduler := newSchedulerForReminderTestWithCount(
+		model.User{ID: 456, Language: "ja", ProficiencyLevel: "N5"},
+		nil,
+		nil,
+		&schedulerPusherStub{},
+		2,
+	)
+	scheduler.cfg.Schedule.StudyPushCron = "0 12 * * *"
+	scheduler.cfg.Schedule.AfternoonStudyPushCron = "30 16 * * *"
+	scheduler.cron = cronScheduler
+	scheduler.services.StudySession = service.NewStudySessionService(
+		materialRepo,
+		&schedulerSessionStoreStub{nextID: 202},
+		schedulerSessionMaterialStoreStub{},
+	)
+
+	scheduler.Start()
+	defer scheduler.Stop()
+	entries := cronScheduler.Entries()
+	if len(entries) != 2 {
+		t.Fatalf("registered study entries = %d, want 2", len(entries))
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
+	for _, entry := range entries {
+		entry.Job.Run()
+	}
+
+	wantMorning := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+		{Category: model.MaterialCategoryVocabulary, NewCount: 8, ReviewCount: 7},
+		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
+		{Category: model.MaterialCategoryReading, NewCount: 1, ReviewCount: 0},
+	}}
+	wantEvening := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+		{Category: model.MaterialCategoryVocabulary, NewCount: 4, ReviewCount: 14},
+		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
+		{Category: model.MaterialCategoryReading, NewCount: 0, ReviewCount: 2},
+	}}
+	if len(materialRepo.plans) != 2 ||
+		!reflect.DeepEqual(materialRepo.plans[0], wantMorning) ||
+		!reflect.DeepEqual(materialRepo.plans[1], wantEvening) {
+		t.Fatalf("study plans = %+v, want morning then evening", materialRepo.plans)
 	}
 }
 

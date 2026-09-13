@@ -117,12 +117,12 @@ func (c CronExpr) Validate(name string) error {
 type ScheduleConfig struct {
 	MaxUnfinishedSessions  int      `mapstructure:"max_unfinished_sessions"`   // 사용자별 자동 세션 미완료 상한
 	ContentCollectCron     CronExpr `mapstructure:"content_collect_cron"`      // 콘텐츠 수집 크론
-	MorningBuildCron       CronExpr `mapstructure:"morning_build_cron"`        // 오전 세션 빌드 크론
-	MorningPushCron        CronExpr `mapstructure:"morning_push_cron"`         // 오전 세션 푸시 크론
-	StudyPushCron          CronExpr `mapstructure:"study_push_cron"`           // 정오 Study 세션 푸시 크론
+	MorningBuildCron       CronExpr `mapstructure:"morning_build_cron"`        // 오전 세션 빌드 크론 (legacy 키)
+	MorningPushCron        CronExpr `mapstructure:"morning_push_cron"`         // 정오 Quiz 세션 푸시 크론 (legacy 키)
+	StudyPushCron          CronExpr `mapstructure:"study_push_cron"`           // 아침 Study 세션 푸시 크론
 	AfternoonStudyPushCron CronExpr `mapstructure:"afternoon_study_push_cron"` // 오후 Study 세션 푸시 크론
-	EveningBuildCron       CronExpr `mapstructure:"evening_build_cron"`        // 오후 세션 빌드 크론
-	EveningPushCron        CronExpr `mapstructure:"evening_push_cron"`         // 오후 세션 푸시 크론
+	EveningBuildCron       CronExpr `mapstructure:"evening_build_cron"`        // 저녁 세션 빌드 크론 (legacy 키)
+	EveningPushCron        CronExpr `mapstructure:"evening_push_cron"`         // 저녁 Quiz 세션 푸시 크론 (legacy 키)
 }
 
 // validate는 모든 cron expression 필드를 fail-fast 검증한다.
@@ -218,12 +218,12 @@ func Load() (*Config, error) {
 	// session schedule
 	viper.SetDefault("schedule.max_unfinished_sessions", 3)
 	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *")        // 매일 03:00
-	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")         // 매일 07:30
-	viper.SetDefault("schedule.morning_push_cron", "0 8 * * *")           // 매일 08:00
-	viper.SetDefault("schedule.study_push_cron", "0 12 * * *")            // 매일 12:00
+	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")         // 매일 07:30 - 오전 세션 빌드 (legacy 키)
+	viper.SetDefault("schedule.morning_push_cron", "0 12 * * *")          // 매일 12:00 - 정오 Quiz 세션 푸시 (legacy 키)
+	viper.SetDefault("schedule.study_push_cron", "0 8 * * *")             // 매일 08:00 - 아침 Study 세션 푸시
 	viper.SetDefault("schedule.afternoon_study_push_cron", "30 16 * * *") // 매일 16:30
-	viper.SetDefault("schedule.evening_build_cron", "30 20 * * *")        // 매일 20:30
-	viper.SetDefault("schedule.evening_push_cron", "0 21 * * *")          // 매일 21:00
+	viper.SetDefault("schedule.evening_build_cron", "30 20 * * *")        // 매일 20:30 - 저녁 세션 빌드 (legacy 키)
+	viper.SetDefault("schedule.evening_push_cron", "0 21 * * *")          // 매일 21:00 - 저녁 Quiz 세션 푸시 (legacy 키)
 
 	// logging
 	viper.SetDefault("logging.dir", "./logs")
