@@ -3,6 +3,7 @@ package catalog
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/lsj/copylingo/internal/model"
@@ -37,10 +38,36 @@ type ReadingMaterialPayload struct {
 }
 
 func BuildAllMaterials() []*model.Material {
+	return BuildAllMaterialsForLevels(DefaultProficiencyLevel())
+}
+
+// BuildAllMaterialsForLevels builds the shared material catalog for the
+// requested levels. The registry default remains the single-level compatibility
+// callers retain their exact catalog scope.
+func BuildAllMaterialsForLevels(levels ...string) []*model.Material {
+	if len(levels) == 0 {
+		levels = []string{DefaultProficiencyLevel()}
+	}
+
 	kanaMaterials := BuildKanaMaterials(KanaMap)
-	vocabMaterials := BuildVocabularyMaterials(N5Words)
-	grammarMaterials := BuildGrammarMaterials(N5GrammarPoints)
-	readingMaterials := BuildReadingMaterials(N5ReadingPassages)
+	vocabMaterials := make([]*model.Material, 0)
+	grammarMaterials := make([]*model.Material, 0)
+	readingMaterials := make([]*model.Material, 0)
+	seenLevels := make(map[string]struct{}, len(levels))
+	for _, level := range levels {
+		level = strings.ToUpper(strings.TrimSpace(level))
+		if _, seen := seenLevels[level]; seen {
+			continue
+		}
+		seenLevels[level] = struct{}{}
+		catalog, ok := LevelCatalogFor(level)
+		if !ok {
+			continue
+		}
+		vocabMaterials = append(vocabMaterials, BuildVocabularyMaterialsForLevel(level, catalog.Words)...)
+		grammarMaterials = append(grammarMaterials, BuildGrammarMaterialsForLevel(level, catalog.GrammarPoints)...)
+		readingMaterials = append(readingMaterials, BuildReadingMaterialsForLevel(level, catalog.ReadingPassages)...)
+	}
 
 	materials := make(
 		[]*model.Material,
@@ -56,12 +83,18 @@ func BuildAllMaterials() []*model.Material {
 
 func BuildKanaMaterials(kanaMap map[string]string) []*model.Material {
 	materials := make([]*model.Material, 0, len(kanaMap))
-	for kana, romaji := range kanaMap {
+	kanas := make([]string, 0, len(kanaMap))
+	for kana := range kanaMap {
+		kanas = append(kanas, kana)
+	}
+	sort.Strings(kanas)
+	for _, kana := range kanas {
+		romaji := kanaMap[kana]
 		materials = append(materials, &model.Material{
 			MaterialKey:      MaterialKeyForKana(kana),
 			Category:         model.MaterialCategoryKana,
 			Language:         VocabLanguage,
-			ProficiencyLevel: VocabProficiencyLevel,
+			ProficiencyLevel: DefaultProficiencyLevel(),
 			Title:            kana,
 			Payload: mustMaterialJSON(KanaMaterialPayload{
 				Kana:   kana,
@@ -75,13 +108,20 @@ func BuildKanaMaterials(kanaMap map[string]string) []*model.Material {
 }
 
 func BuildVocabularyMaterials(words []VocabWord) []*model.Material {
+	return BuildVocabularyMaterialsForLevel(datasetLevel(words, DefaultProficiencyLevel()), words)
+}
+
+// BuildVocabularyMaterialsForLevel maps authored vocabulary to materials with
+// an explicit proficiency level. The level is part of every material key.
+func BuildVocabularyMaterialsForLevel(level string, words []VocabWord) []*model.Material {
+	level = strings.ToUpper(strings.TrimSpace(level))
 	materials := make([]*model.Material, 0, len(words))
 	for _, word := range words {
 		materials = append(materials, &model.Material{
-			MaterialKey:      MaterialKeyForVocab(word),
+			MaterialKey:      MaterialKeyForVocabAtLevel(level, word),
 			Category:         model.MaterialCategoryVocabulary,
 			Language:         VocabLanguage,
-			ProficiencyLevel: VocabProficiencyLevel,
+			ProficiencyLevel: level,
 			Title:            word.Kana,
 			Payload: mustMaterialJSON(VocabularyMaterialPayload{
 				Kana:         word.Kana,
@@ -96,13 +136,20 @@ func BuildVocabularyMaterials(words []VocabWord) []*model.Material {
 }
 
 func BuildGrammarMaterials(points []GrammarPoint) []*model.Material {
+	return BuildGrammarMaterialsForLevel(datasetLevelGrammar(points, DefaultProficiencyLevel()), points)
+}
+
+// BuildGrammarMaterialsForLevel maps authored grammar to materials with an
+// explicit proficiency level. The level is part of every material key.
+func BuildGrammarMaterialsForLevel(level string, points []GrammarPoint) []*model.Material {
+	level = strings.ToUpper(strings.TrimSpace(level))
 	materials := make([]*model.Material, 0, len(points))
 	for _, point := range points {
 		materials = append(materials, &model.Material{
-			MaterialKey:      MaterialKeyForGrammar(point),
+			MaterialKey:      MaterialKeyForGrammarAtLevel(level, point),
 			Category:         model.MaterialCategoryGrammar,
 			Language:         VocabLanguage,
-			ProficiencyLevel: VocabProficiencyLevel,
+			ProficiencyLevel: level,
 			Title:            point.Pattern,
 			Payload: mustMaterialJSON(GrammarMaterialPayload{
 				Pattern:        point.Pattern,
@@ -122,13 +169,20 @@ func BuildGrammarMaterials(points []GrammarPoint) []*model.Material {
 // quiz-only fields (Prompt/Options/CorrectAnswer/Explanation) stay out of the
 // payload so the study card never leaks the answer rationale (ADR-036).
 func BuildReadingMaterials(passages []ReadingPassage) []*model.Material {
+	return BuildReadingMaterialsForLevel(datasetLevelReading(passages, DefaultProficiencyLevel()), passages)
+}
+
+// BuildReadingMaterialsForLevel maps authored reading to materials with an
+// explicit proficiency level. The level is part of every material key.
+func BuildReadingMaterialsForLevel(level string, passages []ReadingPassage) []*model.Material {
+	level = strings.ToUpper(strings.TrimSpace(level))
 	materials := make([]*model.Material, 0, len(passages))
 	for _, passage := range passages {
 		materials = append(materials, &model.Material{
-			MaterialKey:      MaterialKeyForReading(passage),
+			MaterialKey:      MaterialKeyForReadingAtLevel(level, passage),
 			Category:         model.MaterialCategoryReading,
 			Language:         VocabLanguage,
-			ProficiencyLevel: VocabProficiencyLevel,
+			ProficiencyLevel: level,
 			Title:            passage.Title,
 			Payload: mustMaterialJSON(ReadingMaterialPayload{
 				Passage:       passage.Passage,
@@ -152,15 +206,63 @@ func MaterialKeyForKana(kana string) string {
 // Material keys embed the dataset ID verbatim so the proficiency level stays
 // part of the key; trimming a level prefix here would collide IDs across levels.
 func MaterialKeyForVocab(word VocabWord) string {
-	return "ja:vocab:" + word.ID
+	return MaterialKeyForVocabAtLevel(word.Level, word)
 }
 
 func MaterialKeyForGrammar(point GrammarPoint) string {
-	return "ja:grammar:" + point.ID
+	return MaterialKeyForGrammarAtLevel(point.Level, point)
 }
 
 func MaterialKeyForReading(passage ReadingPassage) string {
-	return "ja:reading:" + passage.ID
+	return MaterialKeyForReadingAtLevel(passage.Level, passage)
+}
+
+func MaterialKeyForVocabAtLevel(level string, word VocabWord) string {
+	return "ja:vocab:" + sourceIDWithLevel(level, word.ID)
+}
+
+func MaterialKeyForGrammarAtLevel(level string, point GrammarPoint) string {
+	return "ja:grammar:" + sourceIDWithLevel(level, point.ID)
+}
+
+func MaterialKeyForReadingAtLevel(level string, passage ReadingPassage) string {
+	return "ja:reading:" + sourceIDWithLevel(level, passage.ID)
+}
+
+func sourceIDWithLevel(level, sourceID string) string {
+	level = strings.ToLower(strings.TrimSpace(level))
+	sourceID = strings.TrimSpace(sourceID)
+	if level == "" || strings.HasPrefix(strings.ToLower(sourceID), level+"_") {
+		return sourceID
+	}
+	return level + "_" + sourceID
+}
+
+func datasetLevel(words []VocabWord, fallback string) string {
+	for _, word := range words {
+		if strings.TrimSpace(word.Level) != "" {
+			return strings.ToUpper(strings.TrimSpace(word.Level))
+		}
+	}
+	return fallback
+}
+
+func datasetLevelGrammar(points []GrammarPoint, fallback string) string {
+	for _, point := range points {
+		if strings.TrimSpace(point.Level) != "" {
+			return strings.ToUpper(strings.TrimSpace(point.Level))
+		}
+	}
+	return fallback
+}
+
+func datasetLevelReading(passages []ReadingPassage, fallback string) string {
+	for _, passage := range passages {
+		if strings.TrimSpace(passage.Level) != "" {
+			return strings.ToUpper(strings.TrimSpace(passage.Level))
+		}
+	}
+	return fallback
 }
 
 func ScriptLabel(kana string) string {

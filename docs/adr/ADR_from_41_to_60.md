@@ -88,3 +88,23 @@
   - 사용자는 일시적으로 세션을 놓쳐도 최대 3개의 서로 다른 scheduled content를 받으며, backlog은 유한하게 유지된다.
   - 상한 도달 전에는 기존 backlog 재알림 대신 새 세션이 전송되므로, 오래된 세션의 즉시 소비를 강제하지 않는다.
   - 수동 생성이 상한을 넘길 수 있고 조회 후 생성 사이의 동시성 race가 남는 제약은 유지한다.
+
+## ADR-046: Study·Quiz는 현재 JLPT level과 인접 level을 함께 편성한다
+
+- **날짜**: 2026-09-02
+- **상태**: 채택됨
+- **맥락**:
+  - 사용자는 현재 level만 반복하기보다 바로 아래·위 난이도의 Material과 Question을 한 session에서 함께 학습하기로 했다.
+  - 기존 Study·Quiz 조회는 `proficiency_level`을 단일 값으로 exact 비교해 인접 level의 신규·복습 item을 모두 누락했다.
+  - `N1`·`N2` 같은 label은 문자열 정렬로 순서를 판단할 수 없고, Question `type`/render 동작과 `item_type` taxonomy는 이번 level scope와 독립적이다.
+- **결정**:
+  - 일본어 JLPT level 순서를 하나의 ordered slice로 정의하고, 현재 level의 index에서 바로 아래·위 한 단계만 session scope로 계산한다. 따라서 N4는 `[N5, N4, N3]`, N5는 경계 밖을 제외한 `[N5, N4]`가 된다.
+  - authored content는 level-specific Go symbol이나 `switch` 대신 `LevelCatalog` registry로 묶는다. seeder와 material builder는 registry를 순회하며, 새 level은 dataset manifest entry로 등록한다.
+  - Study의 신규·due Material과 Quiz의 신규·due Question 모두 같은 인접-level scope를 사용한다.
+  - level별 고정 비율이나 우선순위는 두지 않고, 기존 category·difficulty·SRS 정렬과 후보 부족 fallback을 유지한다.
+  - 일본어 이외 언어와 정의되지 않은 level은 ordering을 추측하지 않고 exact scope로 fallback한다. 사용자 level 값, content dataset, DB schema와 audio scheduler는 변경하지 않는다.
+- **결과 / 트레이드오프**:
+  - N4 사용자는 N5·N4·N3의 신규 콘텐츠와 due 복습을 함께 받고, N5 사용자는 N5·N4를 함께 받는다.
+  - repository query는 단일 level 대신 최대 3개의 level array를 사용하며, SRS progress와 catalog 데이터의 migration은 필요 없다.
+  - level별 분기와 중복 identifier가 없어져 새 catalog 추가가 기존 seeder 조립 코드를 수정하지 않지만, dataset 파일·생성 방식·기존 key compatibility는 manifest에서 명시해야 한다.
+  - 향후 다른 언어 또는 proficiency 체계에 인접 범위를 적용하려면 해당 체계의 순서를 별도로 명시해야 하며, 미정 label을 lexical 비교로 처리하지 않는다.

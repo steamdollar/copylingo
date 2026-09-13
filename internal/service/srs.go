@@ -11,10 +11,11 @@ type questionQuerier interface {
 	GetDueReviews(
 		ctx context.Context,
 		userID int64,
-		language, level string,
+		language string,
+		levels []string,
 		limit, kanjiRecallLimit int,
 	) ([]model.Question, error)
-	GetDueReviewCount(ctx context.Context, userID int64, language, level string) (int, error)
+	GetDueReviewCount(ctx context.Context, userID int64, language string, levels []string) (int, error)
 }
 
 // srs: Spaced Repetition System
@@ -89,7 +90,14 @@ func (s *SRSService) GetDueReviews(
 	language, level string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return s.questionRepo.GetDueReviews(ctx, userID, language, level, limit, kanjiRecallLimit)
+	return s.questionRepo.GetDueReviews(
+		ctx,
+		userID,
+		language,
+		sessionLevelsFor(language, level),
+		limit,
+		kanjiRecallLimit,
+	)
 }
 
 // GetDueCount returns the number of questions due for review.
@@ -98,5 +106,5 @@ func (s *SRSService) GetDueCount(
 	userID int64,
 	language, level string,
 ) (int, error) {
-	return s.questionRepo.GetDueReviewCount(ctx, userID, language, level)
+	return s.questionRepo.GetDueReviewCount(ctx, userID, language, sessionLevelsFor(language, level))
 }

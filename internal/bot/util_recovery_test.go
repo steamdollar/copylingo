@@ -59,7 +59,9 @@ type emptyQuestionFetcher struct{}
 func (e *emptyQuestionFetcher) GetNewQuestions(
 	ctx context.Context,
 	userID int64,
-	language, level, category string,
+	language string,
+	levels []string,
+	category string,
 	excludeIDs []int,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {

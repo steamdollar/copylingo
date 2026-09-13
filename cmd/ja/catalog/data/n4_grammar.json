@@ -1,0 +1,1802 @@
+[
+  {
+    "id": "n4_grammar_0001",
+    "level": "N4",
+    "pattern": "そうです",
+    "meaning_ko": "전해 들은 내용",
+    "explanation_ko": "동사나 형용사의 보통형 뒤에 붙여 들은 정보를 전달합니다.",
+    "example": "田中さんは来週、京都へ行くそうです。",
+    "example_reading": "たなかさんはらいしゅう、きょうとへいくそうです。",
+    "translation_ko": "다나카 씨는 다음 주에 교토에 간다고 합니다.",
+    "cloze_prompt": "田中さんは来週、京都へ行く__。",
+    "correct_answer": "そうです",
+    "form_options": [
+      "そうです",
+      "ようです",
+      "らしいです",
+      "みたいです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0002",
+    "level": "N4",
+    "pattern": "ようです",
+    "meaning_ko": "~인 것 같습니다",
+    "explanation_ko": "근거를 바탕으로 어떤 상태나 사실을 추측할 때 사용합니다.",
+    "example": "このかばんは少し重いようです。",
+    "example_reading": "このかばんはすこしおもいようです。",
+    "translation_ko": "이 가방은 조금 무거운 것 같습니다.",
+    "cloze_prompt": "このかばんは少し重い__。",
+    "correct_answer": "ようです",
+    "form_options": [
+      "ようです",
+      "そうです",
+      "はずです",
+      "かもしれません"
+    ]
+  },
+  {
+    "id": "n4_grammar_0003",
+    "level": "N4",
+    "pattern": "らしいです",
+    "meaning_ko": "~라고 합니다 / ~인 모양입니다",
+    "explanation_ko": "전해 들은 정보나 정황을 근거로 한 판단을 나타냅니다.",
+    "example": "田中さんは来月、会社を辞めるらしいです。",
+    "example_reading": "たなかさんはらいげつ、かいしゃをやめるらしいです。",
+    "translation_ko": "다나카 씨는 다음 달에 회사를 그만둔다고 합니다.",
+    "cloze_prompt": "田中さんは来月、会社を辞める__。",
+    "correct_answer": "らしいです",
+    "form_options": [
+      "らしいです",
+      "そうです",
+      "ようです",
+      "はずです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0004",
+    "level": "N4",
+    "pattern": "みたいです",
+    "meaning_ko": "~인 것 같습니다",
+    "explanation_ko": "눈으로 보거나 직접 느낀 인상을 바탕으로 비유하거나 추측합니다.",
+    "example": "あの人は先生みたいです。",
+    "example_reading": "あのひとはせんせいみたいです。",
+    "translation_ko": "저 사람은 선생님인 것 같습니다.",
+    "cloze_prompt": "あの人は先生__。",
+    "correct_answer": "みたいです",
+    "form_options": [
+      "みたいです",
+      "ようです",
+      "らしいです",
+      "そうです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0005",
+    "level": "N4",
+    "pattern": "かもしれません",
+    "meaning_ko": "~일지도 모릅니다",
+    "explanation_ko": "어떤 일이 일어날 가능성이 있지만 확실하지 않음을 나타냅니다.",
+    "example": "午後は雨が降るかもしれません。",
+    "example_reading": "ごごはあめがふるかもしれません。",
+    "translation_ko": "오후에는 비가 올지도 모릅니다.",
+    "cloze_prompt": "午後は雨が降る__。",
+    "correct_answer": "かもしれません",
+    "form_options": [
+      "かもしれません",
+      "はずです",
+      "そうです",
+      "ようです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0006",
+    "level": "N4",
+    "pattern": "はずです",
+    "meaning_ko": "분명 ~일 것입니다",
+    "explanation_ko": "알고 있는 사실이나 근거를 바탕으로 당연히 그렇다고 추측합니다.",
+    "example": "山田さんはもう駅に着いたはずです。",
+    "example_reading": "やまださんはもうえきについたはずです。",
+    "translation_ko": "야마다 씨는 이미 역에 도착했을 것입니다.",
+    "cloze_prompt": "山田さんはもう駅に着いた__。",
+    "correct_answer": "はずです",
+    "form_options": [
+      "はずです",
+      "かもしれません",
+      "つもりです",
+      "ようです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0007",
+    "level": "N4",
+    "pattern": "ために",
+    "meaning_ko": "~하기 위해",
+    "explanation_ko": "어떤 목적을 이루기 위해 하는 행동을 나타냅니다.",
+    "example": "日本で働くために、日本語を勉強しています。",
+    "example_reading": "にほんではたらくために、にほんごをべんきょうしています。",
+    "translation_ko": "일본에서 일하기 위해 일본어를 공부하고 있습니다.",
+    "cloze_prompt": "日本で働く__、日本語を勉強しています。",
+    "correct_answer": "ために",
+    "form_options": [
+      "ために",
+      "ように",
+      "ので",
+      "のに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0008",
+    "level": "N4",
+    "pattern": "ようにする",
+    "meaning_ko": "~하도록 하다 / ~하려고 노력하다",
+    "explanation_ko": "어떤 행동이나 상태가 이루어지도록 의식적으로 노력함을 나타냅니다.",
+    "example": "毎朝、野菜を食べるようにしています。",
+    "example_reading": "まいあさ、やさいをたべるようにしています。",
+    "translation_ko": "매일 아침 채소를 먹으려고 하고 있습니다.",
+    "cloze_prompt": "毎朝、野菜を食べる__しています。",
+    "correct_answer": "ように",
+    "form_options": [
+      "ように",
+      "ために",
+      "ことに",
+      "みたいに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0009",
+    "level": "N4",
+    "pattern": "ようになる",
+    "meaning_ko": "~하게 되다",
+    "explanation_ko": "능력이나 습관, 상태가 변하여 그렇게 됨을 나타냅니다.",
+    "example": "最近、漢字が読めるようになりました。",
+    "example_reading": "さいきん、かんじがよめるようになりました。",
+    "translation_ko": "최근 한자를 읽을 수 있게 되었습니다.",
+    "cloze_prompt": "最近、漢字が読める__なりました。",
+    "correct_answer": "ように",
+    "form_options": [
+      "ように",
+      "ことに",
+      "ために",
+      "そうに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0010",
+    "level": "N4",
+    "pattern": "ことになる",
+    "meaning_ko": "~하게 되다 / ~로 정해지다",
+    "explanation_ko": "자신의 의지와 관계없이 결정된 일이나 정해진 결과를 나타냅니다.",
+    "example": "来月から大阪で働くことになりました。",
+    "example_reading": "らいげつからおおさかではたらくことになりました。",
+    "translation_ko": "다음 달부터 오사카에서 일하게 되었습니다.",
+    "cloze_prompt": "来月から大阪で働く__。",
+    "correct_answer": "ことになりました",
+    "form_options": [
+      "ことになりました",
+      "ことにしました",
+      "ようになりました",
+      "つもりです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0011",
+    "level": "N4",
+    "pattern": "なら",
+    "meaning_ko": "~라면 / ~라면 말인데",
+    "explanation_ko": "상대의 말을 조건으로 삼거나 특정 대상을 화제로 제시합니다.",
+    "example": "京都へ行くなら、秋がおすすめです。",
+    "example_reading": "きょうとへいくなら、あきがおすすめです。",
+    "translation_ko": "교토에 간다면 가을을 추천합니다.",
+    "cloze_prompt": "京都へ行く__、秋がおすすめです。",
+    "correct_answer": "なら",
+    "form_options": [
+      "なら",
+      "たら",
+      "ても",
+      "ので"
+    ]
+  },
+  {
+    "id": "n4_grammar_0012",
+    "level": "N4",
+    "pattern": "たら",
+    "meaning_ko": "~하면 / ~했을 때",
+    "explanation_ko": "어떤 조건이나 일이 끝난 뒤에 이어지는 일을 나타냅니다.",
+    "example": "駅に着いたら、メッセージをください。",
+    "example_reading": "えきについたら、メッセージをください。",
+    "translation_ko": "역에 도착하면 메시지를 보내 주세요.",
+    "cloze_prompt": "駅に着い__、メッセージをください。",
+    "correct_answer": "たら",
+    "form_options": [
+      "たら",
+      "なら",
+      "ても",
+      "ので"
+    ]
+  },
+  {
+    "id": "n4_grammar_0013",
+    "level": "N4",
+    "pattern": "ても",
+    "meaning_ko": "~해도",
+    "explanation_ko": "앞의 조건과 관계없이 뒤의 일이 성립함을 나타냅니다.",
+    "example": "雨が降っても、試合をします。",
+    "example_reading": "あめがふっても、しあいをします。",
+    "translation_ko": "비가 와도 시합을 합니다.",
+    "cloze_prompt": "雨が降っ__、試合をします。",
+    "correct_answer": "ても",
+    "form_options": [
+      "ても",
+      "たら",
+      "なら",
+      "のに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0014",
+    "level": "N4",
+    "pattern": "ので",
+    "meaning_ko": "~이므로 / ~이기 때문에",
+    "explanation_ko": "이유나 원인을 부드럽게 설명할 때 사용합니다.",
+    "example": "今日は病院へ行くので、早く帰ります。",
+    "example_reading": "きょうはびょういんへいくので、はやくかえります。",
+    "translation_ko": "오늘은 병원에 가기 때문에 일찍 돌아갑니다.",
+    "cloze_prompt": "今日は病院へ行く__、早く帰ります。",
+    "correct_answer": "ので",
+    "form_options": [
+      "ので",
+      "から",
+      "のに",
+      "し"
+    ]
+  },
+  {
+    "id": "n4_grammar_0015",
+    "level": "N4",
+    "pattern": "のに",
+    "meaning_ko": "~인데도 / ~했는데도",
+    "explanation_ko": "앞의 사실에서 예상되는 결과와 다른 결과가 나왔음을 나타냅니다.",
+    "example": "薬を飲んだのに、まだ熱があります。",
+    "example_reading": "くすりをのんだのに、まだねつがあります。",
+    "translation_ko": "약을 먹었는데도 아직 열이 있습니다.",
+    "cloze_prompt": "薬を飲んだ__、まだ熱があります。",
+    "correct_answer": "のに",
+    "form_options": [
+      "のに",
+      "ので",
+      "ても",
+      "から"
+    ]
+  },
+  {
+    "id": "n4_grammar_0016",
+    "level": "N4",
+    "pattern": "し",
+    "meaning_ko": "~하고 / ~하기도 하고",
+    "explanation_ko": "여러 이유나 특징을 나열할 때 사용합니다.",
+    "example": "この店は安いし、駅から近いです。",
+    "example_reading": "このみせはやすいし、えきからちかいです。",
+    "translation_ko": "이 가게는 싸고 역에서 가깝습니다.",
+    "cloze_prompt": "この店は安い__、駅から近いです。",
+    "correct_answer": "し",
+    "form_options": [
+      "し",
+      "ので",
+      "のに",
+      "から"
+    ]
+  },
+  {
+    "id": "n4_grammar_0017",
+    "level": "N4",
+    "pattern": "ば",
+    "meaning_ko": "~하면",
+    "explanation_ko": "어떤 조건이 충족되면 뒤의 결과가 생김을 나타냅니다.",
+    "example": "時間があれば、映画を見ませんか。",
+    "example_reading": "じかんがあれば、えいがをみませんか。",
+    "translation_ko": "시간이 있으면 영화를 보지 않겠습니까?",
+    "cloze_prompt": "時間が__、映画を見ませんか。",
+    "correct_answer": "あれば",
+    "form_options": [
+      "あれば",
+      "なければ",
+      "あるなら",
+      "あるので"
+    ]
+  },
+  {
+    "id": "n4_grammar_0018",
+    "level": "N4",
+    "pattern": "ばかり",
+    "meaning_ko": "막 ~한 참",
+    "explanation_ko": "어떤 동작이 끝난 지 얼마 되지 않았음을 나타냅니다.",
+    "example": "さっき昼ご飯を食べたばかりです。",
+    "example_reading": "さっきひるごはんをたべたばかりです。",
+    "translation_ko": "방금 점심을 먹은 참입니다.",
+    "cloze_prompt": "さっき昼ご飯を食べた__です。",
+    "correct_answer": "ばかり",
+    "form_options": [
+      "ばかり",
+      "ところ",
+      "まま",
+      "ほど"
+    ]
+  },
+  {
+    "id": "n4_grammar_0019",
+    "level": "N4",
+    "pattern": "まま",
+    "meaning_ko": "~한 채로",
+    "explanation_ko": "앞의 상태를 바꾸지 않고 그대로 둔 채 뒤의 행동을 함을 나타냅니다.",
+    "example": "電気をつけたまま、寝てしまいました。",
+    "example_reading": "でんきをつけたまま、ねてしまいました。",
+    "translation_ko": "불을 켠 채로 잠들어 버렸습니다.",
+    "cloze_prompt": "電気をつけた__、寝てしまいました。",
+    "correct_answer": "まま",
+    "form_options": [
+      "まま",
+      "ばかり",
+      "ところ",
+      "ために"
+    ]
+  },
+  {
+    "id": "n4_grammar_0020",
+    "level": "N4",
+    "pattern": "最中に",
+    "meaning_ko": "~하는 중에",
+    "explanation_ko": "어떤 행동이나 사건이 한창 진행 중인 때를 나타냅니다.",
+    "example": "会議の最中に、電話が鳴りました。",
+    "example_reading": "かいぎのさいちゅうに、でんわがなりました。",
+    "translation_ko": "회의 중에 전화가 울렸습니다.",
+    "cloze_prompt": "会議の__、電話が鳴りました。",
+    "correct_answer": "最中に",
+    "form_options": [
+      "最中に",
+      "間に",
+      "前に",
+      "後で"
+    ]
+  },
+  {
+    "id": "n4_grammar_0021",
+    "level": "N4",
+    "pattern": "ところです",
+    "meaning_ko": "막 ~하려는 참이다 / ~하는 중이다",
+    "explanation_ko": "동작이 시작되기 직전이나 현재 진행 중인 시점을 나타냅니다.",
+    "example": "これから昼ご飯を食べるところです。",
+    "example_reading": "これからひるごはんをたべるところです。",
+    "translation_ko": "지금부터 점심을 먹으려는 참입니다.",
+    "cloze_prompt": "これから昼ご飯を食べる__。",
+    "correct_answer": "ところです",
+    "form_options": [
+      "ところです",
+      "ばかりです",
+      "ままです",
+      "ようです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0022",
+    "level": "N4",
+    "pattern": "たばかりです",
+    "meaning_ko": "막 ~한 참이다",
+    "explanation_ko": "동작이 끝난 지 얼마 되지 않았음을 나타냅니다.",
+    "example": "先月、この町に引っ越したばかりです。",
+    "example_reading": "せんげつ、このまちにひっこしたばかりです。",
+    "translation_ko": "지난달에 이 동네로 이사 온 지 얼마 안 됐습니다.",
+    "cloze_prompt": "先月、この町に引っ越し__。",
+    "correct_answer": "たばかりです",
+    "form_options": [
+      "たばかりです",
+      "ところです",
+      "ままです",
+      "ようです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0023",
+    "level": "N4",
+    "pattern": "うちに",
+    "meaning_ko": "~하는 동안에 / ~하기 전에",
+    "explanation_ko": "어떤 상태가 계속되는 동안 또는 그 상태가 바뀌기 전에 하는 일을 나타냅니다.",
+    "example": "若いうちに、いろいろな国へ行きたいです。",
+    "example_reading": "わかいうちに、いろいろなくにへいきたいです。",
+    "translation_ko": "젊을 때 여러 나라에 가고 싶습니다.",
+    "cloze_prompt": "若い__、いろいろな国へ行きたいです。",
+    "correct_answer": "うちに",
+    "form_options": [
+      "うちに",
+      "間に",
+      "最中に",
+      "前に"
+    ]
+  },
+  {
+    "id": "n4_grammar_0024",
+    "level": "N4",
+    "pattern": "間に",
+    "meaning_ko": "~하는 동안에",
+    "explanation_ko": "일정한 시간 동안 다른 일이 일어나는 때를 나타냅니다.",
+    "example": "母が料理をしている間に、私はテーブルを拭きました。",
+    "example_reading": "ははがりょうりをしているあいだに、わたしはテーブルをふきました。",
+    "translation_ko": "어머니가 요리하는 동안 저는 식탁을 닦았습니다.",
+    "cloze_prompt": "母が料理をしている__、私はテーブルを拭きました。",
+    "correct_answer": "間に",
+    "form_options": [
+      "間に",
+      "うちに",
+      "最中に",
+      "ために"
+    ]
+  },
+  {
+    "id": "n4_grammar_0025",
+    "level": "N4",
+    "pattern": "かどうか",
+    "meaning_ko": "~인지 아닌지",
+    "explanation_ko": "어떤 내용이 맞는지 아닌지를 모를 때 그 여부를 나타냅니다.",
+    "example": "明日、店が開いているかどうか電話で聞きます。",
+    "example_reading": "あした、みせがあいているかどうかでんわでききます。",
+    "translation_ko": "내일 가게가 열려 있는지 전화로 물어보겠습니다.",
+    "cloze_prompt": "明日、店が開いている__電話で聞きます。",
+    "correct_answer": "かどうか",
+    "form_options": [
+      "かどうか",
+      "かもしれません",
+      "はずです",
+      "ということ"
+    ]
+  },
+  {
+    "id": "n4_grammar_0026",
+    "level": "N4",
+    "pattern": "ようと思います",
+    "meaning_ko": "~하려고 합니다",
+    "explanation_ko": "말하는 사람이 하려고 생각하는 의지나 계획을 나타냅니다.",
+    "example": "週末は部屋を掃除しようと思います。",
+    "example_reading": "しゅうまつはへやをそうじしようとおもいます。",
+    "translation_ko": "주말에는 방을 청소하려고 합니다.",
+    "cloze_prompt": "週末は部屋を掃除し__。",
+    "correct_answer": "ようと思います",
+    "form_options": [
+      "ようと思います",
+      "ことにします",
+      "つもりです",
+      "はずです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0027",
+    "level": "N4",
+    "pattern": "たらどうですか",
+    "meaning_ko": "~하면 어떻습니까",
+    "explanation_ko": "상대방에게 어떤 행동을 해 보라고 조언할 때 사용합니다.",
+    "example": "疲れたら、少し休んだらどうですか。",
+    "example_reading": "つかれたら、すこしやすんだらどうですか。",
+    "translation_ko": "피곤하면 조금 쉬는 게 어떻습니까?",
+    "cloze_prompt": "疲れたら、少し休ん__。",
+    "correct_answer": "だらどうですか",
+    "form_options": [
+      "だらどうですか",
+      "だほうがいいです",
+      "でみませんか",
+      "でもいいです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0028",
+    "level": "N4",
+    "pattern": "たらいいですか",
+    "meaning_ko": "~하면 좋습니까 / 어떻게 하면 됩니까",
+    "explanation_ko": "방법이나 적절한 행동에 대해 조언을 구할 때 사용합니다.",
+    "example": "駅へはどの道を通ったらいいですか。",
+    "example_reading": "えきへはどのみちをとおったらいいですか。",
+    "translation_ko": "역에는 어느 길로 가면 좋습니까?",
+    "cloze_prompt": "駅へはどの道を通っ__。",
+    "correct_answer": "たらいいですか",
+    "form_options": [
+      "たらいいですか",
+      "ばいいですか",
+      "てもいいですか",
+      "でしょうか"
+    ]
+  },
+  {
+    "id": "n4_grammar_0029",
+    "level": "N4",
+    "pattern": "ばいいです",
+    "meaning_ko": "~하면 됩니다",
+    "explanation_ko": "어떤 방법이나 행동이 좋다는 조언을 나타냅니다.",
+    "example": "わからない言葉は辞書で調べればいいです。",
+    "example_reading": "わからないことばはじしょでしらべればいいです。",
+    "translation_ko": "모르는 말은 사전으로 찾아보면 됩니다.",
+    "cloze_prompt": "わからない言葉は辞書で調べれ__。",
+    "correct_answer": "ばいいです",
+    "form_options": [
+      "ばいいです",
+      "たらいいです",
+      "ほうがいいです",
+      "ことができます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0030",
+    "level": "N4",
+    "pattern": "てもらえませんか",
+    "meaning_ko": "~해 주시겠습니까",
+    "explanation_ko": "상대방에게 정중하게 어떤 행동을 부탁할 때 사용합니다.",
+    "example": "この荷物を少し持ってもらえませんか。",
+    "example_reading": "このにもつをすこしもってもらえませんか。",
+    "translation_ko": "이 짐을 좀 들어 주시겠습니까?",
+    "cloze_prompt": "この荷物を少し持っ__。",
+    "correct_answer": "てもらえませんか",
+    "form_options": [
+      "てもらえませんか",
+      "てくれませんか",
+      "てください",
+      "てみませんか"
+    ]
+  },
+  {
+    "id": "n4_grammar_0031",
+    "level": "N4",
+    "pattern": "させてください",
+    "meaning_ko": "~하게 해 주세요",
+    "explanation_ko": "자신이 어떤 행동을 할 수 있도록 허락을 부탁할 때 사용합니다.",
+    "example": "今日は私に説明させてください。",
+    "example_reading": "きょうはわたしにせつめいさせてください。",
+    "translation_ko": "오늘은 제가 설명하게 해 주세요.",
+    "cloze_prompt": "今日は私に説明__。",
+    "correct_answer": "させてください",
+    "form_options": [
+      "させてください",
+      "てもらえませんか",
+      "てください",
+      "させられます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0032",
+    "level": "N4",
+    "pattern": "とおりに",
+    "meaning_ko": "~대로",
+    "explanation_ko": "앞에서 본 것이나 들은 것과 같은 방식으로 행동함을 나타냅니다.",
+    "example": "地図に書いてあるとおりに歩いてください。",
+    "example_reading": "ちずにかいてあるとおりにあるいてください。",
+    "translation_ko": "지도에 적힌 대로 걸어 주세요.",
+    "cloze_prompt": "地図に書いてある__歩いてください。",
+    "correct_answer": "とおりに",
+    "form_options": [
+      "とおりに",
+      "ように",
+      "ために",
+      "まま"
+    ]
+  },
+  {
+    "id": "n4_grammar_0033",
+    "level": "N4",
+    "pattern": "について",
+    "meaning_ko": "~에 대하여",
+    "explanation_ko": "어떤 주제나 대상에 관해 말하거나 생각할 때 사용합니다.",
+    "example": "先生に日本の祭りについて質問しました。",
+    "example_reading": "せんせいににほんのまつりについてしつもんしました。",
+    "translation_ko": "선생님께 일본의 축제에 대해 질문했습니다.",
+    "cloze_prompt": "先生に日本の祭り__質問しました。",
+    "correct_answer": "について",
+    "form_options": [
+      "について",
+      "によると",
+      "にとって",
+      "に対して"
+    ]
+  },
+  {
+    "id": "n4_grammar_0034",
+    "level": "N4",
+    "pattern": "によると",
+    "meaning_ko": "~에 따르면",
+    "explanation_ko": "정보의 출처를 밝히며 그 내용에 따르면 어떻다고 말할 때 사용합니다.",
+    "example": "天気予報によると、午後から雪だそうです。",
+    "example_reading": "てんきよほうによると、ごごからゆきだそうです。",
+    "translation_ko": "일기 예보에 따르면 오후부터 눈이 온다고 합니다.",
+    "cloze_prompt": "天気予報__、午後から雪だそうです。",
+    "correct_answer": "によると",
+    "form_options": [
+      "によると",
+      "について",
+      "にとって",
+      "とおりに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0035",
+    "level": "N4",
+    "pattern": "にとって",
+    "meaning_ko": "~에게는 / ~의 입장에서는",
+    "explanation_ko": "특정한 사람이나 입장에서 어떤 평가나 판단을 나타냅니다.",
+    "example": "この経験は私にとって大切な勉強です。",
+    "example_reading": "このけいけんはわたしにとってたいせつなべんきょうです。",
+    "translation_ko": "이 경험은 제게 소중한 공부입니다.",
+    "cloze_prompt": "この経験は私__大切な勉強です。",
+    "correct_answer": "にとって",
+    "form_options": [
+      "にとって",
+      "に対して",
+      "について",
+      "によると"
+    ]
+  },
+  {
+    "id": "n4_grammar_0036",
+    "level": "N4",
+    "pattern": "に対して",
+    "meaning_ko": "~에 대하여 / ~에 반하여",
+    "explanation_ko": "행동이나 태도의 대상 또는 서로 대비되는 대상을 나타냅니다.",
+    "example": "店員はお客さんに対して丁寧に説明しました。",
+    "example_reading": "てんいんはおきゃくさんにたいしてていねいにせつめいしました。",
+    "translation_ko": "점원은 손님에게 정중하게 설명했습니다.",
+    "cloze_prompt": "店員はお客さん__丁寧に説明しました。",
+    "correct_answer": "に対して",
+    "form_options": [
+      "に対して",
+      "にとって",
+      "について",
+      "によると"
+    ]
+  },
+  {
+    "id": "n4_grammar_0037",
+    "level": "N4",
+    "pattern": "おかげで",
+    "meaning_ko": "~덕분에",
+    "explanation_ko": "좋은 결과가 생긴 원인이나 도움을 고마운 마음으로 나타냅니다.",
+    "example": "友達が手伝ってくれたおかげで、早く終わりました。",
+    "example_reading": "ともだちがてつだってくれたおかげで、はやくおわりました。",
+    "translation_ko": "친구가 도와준 덕분에 빨리 끝났습니다.",
+    "cloze_prompt": "友達が手伝ってくれた__、早く終わりました。",
+    "correct_answer": "おかげで",
+    "form_options": [
+      "おかげで",
+      "せいで",
+      "ために",
+      "ので"
+    ]
+  },
+  {
+    "id": "n4_grammar_0038",
+    "level": "N4",
+    "pattern": "せいで",
+    "meaning_ko": "~탓에",
+    "explanation_ko": "좋지 않은 결과를 일으킨 원인을 탓하는 마음으로 나타냅니다.",
+    "example": "雨のせいで、電車が遅れました。",
+    "example_reading": "あめのせいで、でんしゃがおくれました。",
+    "translation_ko": "비 때문에 전철이 늦었습니다.",
+    "cloze_prompt": "雨の__、電車が遅れました。",
+    "correct_answer": "せいで",
+    "form_options": [
+      "せいで",
+      "おかげで",
+      "ために",
+      "ので"
+    ]
+  },
+  {
+    "id": "n4_grammar_0039",
+    "level": "N4",
+    "pattern": "ずつ",
+    "meaning_ko": "~씩",
+    "explanation_ko": "수량이나 정도를 일정하게 나누어 반복함을 나타냅니다.",
+    "example": "毎日、新しい漢字を三つずつ覚えています。",
+    "example_reading": "まいにち、あたらしいかんじをみっつずつおぼえています。",
+    "translation_ko": "매일 새로운 한자를 세 개씩 외우고 있습니다.",
+    "cloze_prompt": "毎日、新しい漢字を三つ__覚えています。",
+    "correct_answer": "ずつ",
+    "form_options": [
+      "ずつ",
+      "しか",
+      "だけ",
+      "ほど"
+    ]
+  },
+  {
+    "id": "n4_grammar_0040",
+    "level": "N4",
+    "pattern": "として",
+    "meaning_ko": "~로서 / ~의 자격으로",
+    "explanation_ko": "어떤 역할이나 자격, 입장에서 행동함을 나타냅니다.",
+    "example": "山田さんは通訳として会議に参加しました。",
+    "example_reading": "やまださんはつうやくとしてかいぎにさんかしました。",
+    "translation_ko": "야마다 씨는 통역으로 회의에 참가했습니다.",
+    "cloze_prompt": "山田さんは通訳__会議に参加しました。",
+    "correct_answer": "として",
+    "form_options": [
+      "として",
+      "にとって",
+      "に対して",
+      "について"
+    ]
+  },
+  {
+    "id": "n4_grammar_0041",
+    "level": "N4",
+    "pattern": "たところ",
+    "meaning_ko": "막 ~한 참이다",
+    "explanation_ko": "동작이 끝난 직후의 시점을 나타냅니다.",
+    "example": "今、駅に着いたところです。",
+    "example_reading": "いま、えきについたところです。",
+    "translation_ko": "지금 막 역에 도착한 참입니다.",
+    "cloze_prompt": "今、駅に着い__です。",
+    "correct_answer": "たところ",
+    "form_options": [
+      "たところ",
+      "たばかり",
+      "ところ",
+      "まま"
+    ]
+  },
+  {
+    "id": "n4_grammar_0042",
+    "level": "N4",
+    "pattern": "ないといけません",
+    "meaning_ko": "~하지 않으면 안 됩니다",
+    "explanation_ko": "어떤 행동을 반드시 해야 한다는 의무를 나타냅니다.",
+    "example": "明日は早く起きないといけません。",
+    "example_reading": "あしたははやくおきないといけません。",
+    "translation_ko": "내일은 일찍 일어나야 합니다.",
+    "cloze_prompt": "明日は早く起き__。",
+    "correct_answer": "ないといけません",
+    "form_options": [
+      "ないといけません",
+      "なくてもいいです",
+      "なければなりません",
+      "ないでください"
+    ]
+  },
+  {
+    "id": "n4_grammar_0043",
+    "level": "N4",
+    "pattern": "という",
+    "meaning_ko": "~라는",
+    "explanation_ko": "이름이나 내용을 소개하며 ‘~라고 하는’이라는 뜻을 나타냅니다.",
+    "example": "この花は「ひまわり」という名前です。",
+    "example_reading": "このはなは「ひまわり」というなまえです。",
+    "translation_ko": "이 꽃은 ‘해바라기’라는 이름입니다.",
+    "cloze_prompt": "この花は「ひまわり」__名前です。",
+    "correct_answer": "という",
+    "form_options": [
+      "という",
+      "とおりに",
+      "について",
+      "によると"
+    ]
+  },
+  {
+    "id": "n4_grammar_0044",
+    "level": "N4",
+    "pattern": "と言われています",
+    "meaning_ko": "~라고 합니다 / ~라고 알려져 있습니다",
+    "explanation_ko": "많은 사람이 그렇게 말하거나 일반적으로 알려진 내용을 나타냅니다.",
+    "example": "この町は水がきれいだと言われています。",
+    "example_reading": "このまちはみずがきれいだといわれています。",
+    "translation_ko": "이 마을은 물이 깨끗하다고 알려져 있습니다.",
+    "cloze_prompt": "この町は水がきれいだ__。",
+    "correct_answer": "と言われています",
+    "form_options": [
+      "と言われています",
+      "と言いました",
+      "と思います",
+      "ということです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0045",
+    "level": "N4",
+    "pattern": "ように言う",
+    "meaning_ko": "~하도록 말하다",
+    "explanation_ko": "다른 사람에게 어떤 행동을 하도록 지시하거나 부탁함을 나타냅니다.",
+    "example": "母は弟に部屋を片づけるように言いました。",
+    "example_reading": "はははおとうとにへやをかたづけるようにいいました。",
+    "translation_ko": "어머니는 남동생에게 방을 정리하라고 말했습니다.",
+    "cloze_prompt": "母は弟に部屋を片づける__。",
+    "correct_answer": "ように言いました",
+    "form_options": [
+      "ように言いました",
+      "ようと思いました",
+      "ことになりました",
+      "ようになりました"
+    ]
+  },
+  {
+    "id": "n4_grammar_0046",
+    "level": "N4",
+    "pattern": "だけでなく",
+    "meaning_ko": "~뿐만 아니라",
+    "explanation_ko": "앞의 것에 더해 다른 것도 해당함을 나타냅니다.",
+    "example": "この店は料理だけでなく、デザートもおいしいです。",
+    "example_reading": "このみせはりょうりだけでなく、デザートもおいしいです。",
+    "translation_ko": "이 가게는 요리뿐만 아니라 디저트도 맛있습니다.",
+    "cloze_prompt": "この店は料理__、デザートもおいしいです。",
+    "correct_answer": "だけでなく",
+    "form_options": [
+      "だけでなく",
+      "だけ",
+      "しか",
+      "ほど"
+    ]
+  },
+  {
+    "id": "n4_grammar_0047",
+    "level": "N4",
+    "pattern": "なかなか〜ない",
+    "meaning_ko": "좀처럼 ~하지 않다",
+    "explanation_ko": "기대하거나 바라던 일이 쉽게 이루어지지 않음을 나타냅니다.",
+    "example": "忙しくて、なかなか友達に会えません。",
+    "example_reading": "いそがしくて、なかなかともだちにあえません。",
+    "translation_ko": "바빠서 좀처럼 친구를 만날 수 없습니다.",
+    "cloze_prompt": "忙しくて、__友達に会えません。",
+    "correct_answer": "なかなか",
+    "form_options": [
+      "なかなか",
+      "ほとんど",
+      "全然",
+      "いつも"
+    ]
+  },
+  {
+    "id": "n4_grammar_0048",
+    "level": "N4",
+    "pattern": "全然〜ない",
+    "meaning_ko": "전혀 ~하지 않다",
+    "explanation_ko": "부정 표현과 함께 사용하여 정도가 전혀 없음을 강조합니다.",
+    "example": "この漢字は難しくて、全然覚えられません。",
+    "example_reading": "このかんじはむずかしくて、ぜんぜんおぼえられません。",
+    "translation_ko": "이 한자는 어려워서 전혀 외울 수 없습니다.",
+    "cloze_prompt": "この漢字は難しくて、__覚えられません。",
+    "correct_answer": "全然",
+    "form_options": [
+      "全然",
+      "だいたい",
+      "かなり",
+      "ぜひ"
+    ]
+  },
+  {
+    "id": "n4_grammar_0049",
+    "level": "N4",
+    "pattern": "ほとんど〜ない",
+    "meaning_ko": "거의 ~하지 않다",
+    "explanation_ko": "어떤 행동이나 상태가 대부분 일어나지 않음을 나타냅니다.",
+    "example": "私は朝、ほとんどテレビを見ません。",
+    "example_reading": "わたしはあさ、ほとんどテレビをみません。",
+    "translation_ko": "저는 아침에 거의 텔레비전을 보지 않습니다.",
+    "cloze_prompt": "私は朝、__テレビを見ません。",
+    "correct_answer": "ほとんど",
+    "form_options": [
+      "ほとんど",
+      "たいてい",
+      "いつも",
+      "ぜひ"
+    ]
+  },
+  {
+    "id": "n4_grammar_0050",
+    "level": "N4",
+    "pattern": "一度も〜ない",
+    "meaning_ko": "한 번도 ~하지 않다",
+    "explanation_ko": "어떤 일이 단 한 번도 일어나지 않았음을 강조합니다.",
+    "example": "私はまだ富士山に一度も登ったことがありません。",
+    "example_reading": "わたしはまだふじさんにいちどものぼったことがありません。",
+    "translation_ko": "저는 아직 후지산에 한 번도 올라간 적이 없습니다.",
+    "cloze_prompt": "私はまだ富士山に__登ったことがありません。",
+    "correct_answer": "一度も",
+    "form_options": [
+      "一度も",
+      "何度も",
+      "たいてい",
+      "すぐに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0051",
+    "level": "N4",
+    "pattern": "がる",
+    "meaning_ko": "~해하다 / ~한 기색을 보이다",
+    "explanation_ko": "다른 사람이 느끼는 감정이나 희망을 겉으로 드러내는 모습을 나타냅니다.",
+    "example": "妹は新しい靴をうれしがっています。",
+    "example_reading": "いもうとはあたらしいくつをうれしがっています。",
+    "translation_ko": "여동생은 새 신발을 기뻐하고 있습니다.",
+    "cloze_prompt": "妹は新しい靴をうれし__。",
+    "correct_answer": "がっています",
+    "form_options": [
+      "がっています",
+      "くなっています",
+      "そうです",
+      "たがっています"
+    ]
+  },
+  {
+    "id": "n4_grammar_0052",
+    "level": "N4",
+    "pattern": "たがる",
+    "meaning_ko": "~하고 싶어 하다",
+    "explanation_ko": "다른 사람이 어떤 일을 하고 싶어 하는 모습을 나타냅니다.",
+    "example": "子どもが外で遊びたがっています。",
+    "example_reading": "こどもがそとであそびたがっています。",
+    "translation_ko": "아이가 밖에서 놀고 싶어 합니다.",
+    "cloze_prompt": "子どもが外で遊び__。",
+    "correct_answer": "たがっています",
+    "form_options": [
+      "たがっています",
+      "たいです",
+      "たそうです",
+      "てみます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0053",
+    "level": "N4",
+    "pattern": "てある",
+    "meaning_ko": "~해져 있다",
+    "explanation_ko": "누군가가 한 행동의 결과가 현재도 남아 있는 상태를 나타냅니다.",
+    "example": "机の上に資料が置いてあります。",
+    "example_reading": "つくえのうえにしりょうがおいてあります。",
+    "translation_ko": "책상 위에 자료가 놓여 있습니다.",
+    "cloze_prompt": "机の上に資料が置い__。",
+    "correct_answer": "てあります",
+    "form_options": [
+      "てあります",
+      "ています",
+      "ておきます",
+      "てみます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0054",
+    "level": "N4",
+    "pattern": "ていく",
+    "meaning_ko": "계속 ~해 가다",
+    "explanation_ko": "현재를 기준으로 앞으로 변화하거나 행동이 계속됨을 나타냅니다.",
+    "example": "これからも日本語を勉強していきます。",
+    "example_reading": "これからもにほんごをべんきょうしていきます。",
+    "translation_ko": "앞으로도 일본어를 계속 공부해 나가겠습니다.",
+    "cloze_prompt": "これからも日本語を勉強し__。",
+    "correct_answer": "ていきます",
+    "form_options": [
+      "ていきます",
+      "てきます",
+      "ています",
+      "ておきます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0055",
+    "level": "N4",
+    "pattern": "てくる",
+    "meaning_ko": "~해 오다",
+    "explanation_ko": "과거부터 현재까지의 변화나 어떤 장소로 이동해 온 일을 나타냅니다.",
+    "example": "駅まで歩いてきました。",
+    "example_reading": "えきまであるいてきました。",
+    "translation_ko": "역까지 걸어 왔습니다.",
+    "cloze_prompt": "駅まで歩い__。",
+    "correct_answer": "てきました",
+    "form_options": [
+      "てきました",
+      "ていきました",
+      "ています",
+      "てしまいました"
+    ]
+  },
+  {
+    "id": "n4_grammar_0056",
+    "level": "N4",
+    "pattern": "ための",
+    "meaning_ko": "~을 위한",
+    "explanation_ko": "뒤의 명사가 어떤 목적을 위한 것임을 나타냅니다.",
+    "example": "これは旅行のための小さいバッグです。",
+    "example_reading": "これはりょこうのためのちいさいバッグです。",
+    "translation_ko": "이것은 여행용 작은 가방입니다.",
+    "cloze_prompt": "これは旅行__小さいバッグです。",
+    "correct_answer": "のための",
+    "form_options": [
+      "のための",
+      "のような",
+      "についての",
+      "にとっての"
+    ]
+  },
+  {
+    "id": "n4_grammar_0057",
+    "level": "N4",
+    "pattern": "たびに",
+    "meaning_ko": "~할 때마다",
+    "explanation_ko": "같은 일이 일어날 때마다 반복해서 다른 일이 일어남을 나타냅니다.",
+    "example": "この写真を見るたびに、夏休みを思い出します。",
+    "example_reading": "このしゃしんをみるたびに、なつやすみをおもいだします。",
+    "translation_ko": "이 사진을 볼 때마다 여름 방학이 생각납니다.",
+    "cloze_prompt": "この写真を見る__、夏休みを思い出します。",
+    "correct_answer": "たびに",
+    "form_options": [
+      "たびに",
+      "うちに",
+      "間に",
+      "最中に"
+    ]
+  },
+  {
+    "id": "n4_grammar_0058",
+    "level": "N4",
+    "pattern": "途中で",
+    "meaning_ko": "~하는 도중에",
+    "explanation_ko": "어떤 행동이나 이동이 끝나기 전에 중간에 다른 일이 일어남을 나타냅니다.",
+    "example": "学校へ行く途中で、友達に会いました。",
+    "example_reading": "がっこうへいくとちゅうで、ともだちにあいました。",
+    "translation_ko": "학교에 가는 도중에 친구를 만났습니다.",
+    "cloze_prompt": "学校へ行く__、友達に会いました。",
+    "correct_answer": "途中で",
+    "form_options": [
+      "途中で",
+      "最中に",
+      "ところで",
+      "ために"
+    ]
+  },
+  {
+    "id": "n4_grammar_0059",
+    "level": "N4",
+    "pattern": "だらけ",
+    "meaning_ko": "~투성이",
+    "explanation_ko": "어떤 대상이 같은 것으로 가득하거나 많이 묻어 있음을 나타냅니다.",
+    "example": "旅行の後、かばんは砂だらけになりました。",
+    "example_reading": "りょこうのあと、かばんはすなだらけになりました。",
+    "translation_ko": "여행 후 가방이 온통 모래투성이가 되었습니다.",
+    "cloze_prompt": "旅行の後、かばんは砂__になりました。",
+    "correct_answer": "だらけ",
+    "form_options": [
+      "だらけ",
+      "ばかり",
+      "まま",
+      "ずつ"
+    ]
+  },
+  {
+    "id": "n4_grammar_0060",
+    "level": "N4",
+    "pattern": "させる",
+    "meaning_ko": "~하게 하다",
+    "explanation_ko": "다른 사람에게 어떤 행동을 하도록 시키거나 허락함을 나타냅니다.",
+    "example": "先生は学生に教室を掃除させました。",
+    "example_reading": "せんせいはがくせいにきょうしつをそうじさせました。",
+    "translation_ko": "선생님은 학생들에게 교실을 청소하게 했습니다.",
+    "cloze_prompt": "先生は学生に教室を掃除__。",
+    "correct_answer": "させました",
+    "form_options": [
+      "させました",
+      "されました",
+      "しました",
+      "させています"
+    ]
+  },
+  {
+    "id": "n4_grammar_0061",
+    "level": "N4",
+    "pattern": "んです",
+    "meaning_ko": "~인 것입니다 / ~거든요",
+    "explanation_ko": "상황을 설명하거나 이유를 묻고 답할 때 배경을 강조합니다.",
+    "example": "どうして今日は早く帰るんですか。",
+    "example_reading": "どうしてきょうははやくかえるんですか。",
+    "translation_ko": "왜 오늘은 일찍 돌아가는 건가요?",
+    "cloze_prompt": "どうして今日は早く帰る__。",
+    "correct_answer": "んですか",
+    "form_options": [
+      "んですか",
+      "でしょうか",
+      "そうですか",
+      "ことですか"
+    ]
+  },
+  {
+    "id": "n4_grammar_0062",
+    "level": "N4",
+    "pattern": "のは",
+    "meaning_ko": "~하는 것은",
+    "explanation_ko": "동작이나 문장을 명사처럼 만들어 화제로 삼습니다.",
+    "example": "日本語を話すのは楽しいです。",
+    "example_reading": "にほんごをはなすのはたのしいです。",
+    "translation_ko": "일본어를 말하는 것은 즐겁습니다.",
+    "cloze_prompt": "日本語を話す__楽しいです。",
+    "correct_answer": "のは",
+    "form_options": [
+      "のは",
+      "のが",
+      "のを",
+      "ことが"
+    ]
+  },
+  {
+    "id": "n4_grammar_0063",
+    "level": "N4",
+    "pattern": "のが",
+    "meaning_ko": "~하는 것을",
+    "explanation_ko": "동작을 명사처럼 만들어 좋아하거나 잘하는 대상임을 나타냅니다.",
+    "example": "私は料理を作るのが好きです。",
+    "example_reading": "わたしはりょうりをつくるのがすきです。",
+    "translation_ko": "저는 요리하는 것을 좋아합니다.",
+    "cloze_prompt": "私は料理を作る__好きです。",
+    "correct_answer": "のが",
+    "form_options": [
+      "のが",
+      "のは",
+      "のを",
+      "ことを"
+    ]
+  },
+  {
+    "id": "n4_grammar_0064",
+    "level": "N4",
+    "pattern": "のを",
+    "meaning_ko": "~하는 것을",
+    "explanation_ko": "동작을 명사처럼 만들어 잊거나 보거나 듣는 대상임을 나타냅니다.",
+    "example": "宿題をするのを忘れました。",
+    "example_reading": "しゅくだいをするのをわすれました。",
+    "translation_ko": "숙제하는 것을 잊었습니다.",
+    "cloze_prompt": "宿題をする__忘れました。",
+    "correct_answer": "のを",
+    "form_options": [
+      "のを",
+      "のは",
+      "のが",
+      "ことが"
+    ]
+  },
+  {
+    "id": "n4_grammar_0065",
+    "level": "N4",
+    "pattern": "ないで",
+    "meaning_ko": "~하지 않고",
+    "explanation_ko": "앞의 행동을 하지 않은 상태로 뒤의 행동을 함을 나타냅니다.",
+    "example": "朝ご飯を食べないで学校へ行きました。",
+    "example_reading": "あさごはんをたべないでがっこうへいきました。",
+    "translation_ko": "아침을 먹지 않고 학교에 갔습니다.",
+    "cloze_prompt": "朝ご飯を食べ__学校へ行きました。",
+    "correct_answer": "ないで",
+    "form_options": [
+      "ないで",
+      "なくて",
+      "ないと",
+      "ながら"
+    ]
+  },
+  {
+    "id": "n4_grammar_0066",
+    "level": "N4",
+    "pattern": "なさい",
+    "meaning_ko": "~하세요",
+    "explanation_ko": "윗사람이 아랫사람에게 정중하지만 단호하게 지시할 때 사용합니다.",
+    "example": "寝る前に歯を磨きなさい。",
+    "example_reading": "ねるまえにはをみがきなさい。",
+    "translation_ko": "자기 전에 이를 닦으세요.",
+    "cloze_prompt": "寝る前に歯を磨き__。",
+    "correct_answer": "なさい",
+    "form_options": [
+      "なさい",
+      "ないでください",
+      "てください",
+      "ましょう"
+    ]
+  },
+  {
+    "id": "n4_grammar_0067",
+    "level": "N4",
+    "pattern": "場合",
+    "meaning_ko": "~한 경우에는",
+    "explanation_ko": "특정한 상황이나 조건을 가정하여 그때의 대응을 말합니다.",
+    "example": "雨の場合は、試合を体育館で行います。",
+    "example_reading": "あめのばあいは、しあいをたいいくかんでおこないます。",
+    "translation_ko": "비가 오는 경우에는 시합을 체육관에서 합니다.",
+    "cloze_prompt": "雨の__は、試合を体育館で行います。",
+    "correct_answer": "場合",
+    "form_options": [
+      "場合",
+      "途中",
+      "最中",
+      "うち"
+    ]
+  },
+  {
+    "id": "n4_grammar_0068",
+    "level": "N4",
+    "pattern": "ことになっている",
+    "meaning_ko": "~하기로 되어 있다",
+    "explanation_ko": "규칙이나 일정처럼 이미 정해져 있는 사항을 나타냅니다.",
+    "example": "この図書館では、飲み物を持ち込まないことになっています。",
+    "example_reading": "このとしょかんでは、のみものをもちこまないことになっています。",
+    "translation_ko": "이 도서관에서는 음료를 반입하지 않기로 되어 있습니다.",
+    "cloze_prompt": "この図書館では、飲み物を持ち込まない__。",
+    "correct_answer": "ことになっています",
+    "form_options": [
+      "ことになっています",
+      "ことにしました",
+      "ようになりました",
+      "つもりです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0069",
+    "level": "N4",
+    "pattern": "ところだった",
+    "meaning_ko": "하마터면 ~할 뻔했다",
+    "explanation_ko": "실제로 일어나지는 않았지만 거의 일어날 뻔한 일을 나타냅니다.",
+    "example": "電車に乗り遅れるところでした。",
+    "example_reading": "でんしゃにのりおくれるところでした。",
+    "translation_ko": "전철을 놓칠 뻔했습니다.",
+    "cloze_prompt": "電車に乗り遅れる__。",
+    "correct_answer": "ところでした",
+    "form_options": [
+      "ところでした",
+      "ばかりでした",
+      "ままでした",
+      "ようでした"
+    ]
+  },
+  {
+    "id": "n4_grammar_0070",
+    "level": "N4",
+    "pattern": "ばよかった",
+    "meaning_ko": "~했으면 좋았을 텐데",
+    "explanation_ko": "과거의 일에 대한 후회나 아쉬움을 나타냅니다.",
+    "example": "もっと早く予約すればよかったです。",
+    "example_reading": "もっとはやくよやくすればよかったです。",
+    "translation_ko": "좀 더 일찍 예약했으면 좋았을 텐데요.",
+    "cloze_prompt": "もっと早く予約すれ__。",
+    "correct_answer": "ばよかったです",
+    "form_options": [
+      "ばよかったです",
+      "ばいいです",
+      "たらどうですか",
+      "なくてもいいです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0071",
+    "level": "N4",
+    "pattern": "なくてよかった",
+    "meaning_ko": "~하지 않아서 다행이다",
+    "explanation_ko": "걱정했던 일이 일어나지 않아 안도하는 마음을 나타냅니다.",
+    "example": "今日は雨が降らなくてよかったです。",
+    "example_reading": "きょうはあめがふらなくてよかったです。",
+    "translation_ko": "오늘은 비가 오지 않아서 다행입니다.",
+    "cloze_prompt": "今日は雨が降ら__。",
+    "correct_answer": "なくてよかったです",
+    "form_options": [
+      "なくてよかったです",
+      "ないといけません",
+      "ないでください",
+      "なければなりません"
+    ]
+  },
+  {
+    "id": "n4_grammar_0072",
+    "level": "N4",
+    "pattern": "てほしい",
+    "meaning_ko": "~해 주었으면 하다",
+    "explanation_ko": "상대방이 어떤 행동을 하기를 바라는 마음을 나타냅니다.",
+    "example": "明日までにこの書類を出してほしいです。",
+    "example_reading": "あしたまでにこのしょるいをだしてほしいです。",
+    "translation_ko": "내일까지 이 서류를 제출해 주었으면 합니다.",
+    "cloze_prompt": "明日までにこの書類を出し__。",
+    "correct_answer": "てほしいです",
+    "form_options": [
+      "てほしいです",
+      "てもらいます",
+      "てください",
+      "てみます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0073",
+    "level": "N4",
+    "pattern": "てもらいたい",
+    "meaning_ko": "~해 주었으면 하다",
+    "explanation_ko": "상대방에게 어떤 도움이나 행동을 받고 싶다는 희망을 나타냅니다.",
+    "example": "駅まで案内してもらいたいです。",
+    "example_reading": "えきまであんないしてもらいたいです。",
+    "translation_ko": "역까지 안내해 주셨으면 합니다.",
+    "cloze_prompt": "駅まで案内し__。",
+    "correct_answer": "てもらいたいです",
+    "form_options": [
+      "てもらいたいです",
+      "ていただけませんか",
+      "てくれませんか",
+      "てほしいです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0074",
+    "level": "N4",
+    "pattern": "てくれない",
+    "meaning_ko": "~해 주지 않을래",
+    "explanation_ko": "친한 사이에서 상대방에게 정중하지 않게 부탁할 때 사용합니다.",
+    "example": "ちょっと窓を開けてくれない？",
+    "example_reading": "ちょっとまどをあけてくれない？",
+    "translation_ko": "창문을 좀 열어 주지 않을래?",
+    "cloze_prompt": "ちょっと窓を開け__？",
+    "correct_answer": "てくれない",
+    "form_options": [
+      "てくれない",
+      "てもらえない",
+      "てほしい",
+      "てください"
+    ]
+  },
+  {
+    "id": "n4_grammar_0075",
+    "level": "N4",
+    "pattern": "ていただけませんか",
+    "meaning_ko": "~해 주실 수 없습니까",
+    "explanation_ko": "상대방에게 매우 정중하게 행동을 부탁할 때 사용합니다.",
+    "example": "もう一度説明していただけませんか。",
+    "example_reading": "もういちどせつめいしていただけませんか。",
+    "translation_ko": "한 번 더 설명해 주시겠습니까?",
+    "cloze_prompt": "もう一度説明し__。",
+    "correct_answer": "ていただけませんか",
+    "form_options": [
+      "ていただけませんか",
+      "てもらえませんか",
+      "てください",
+      "てくれませんか"
+    ]
+  },
+  {
+    "id": "n4_grammar_0076",
+    "level": "N4",
+    "pattern": "られる",
+    "meaning_ko": "~할 수 있다",
+    "explanation_ko": "동사의 가능형으로 어떤 행동을 할 능력이나 가능성을 나타냅니다.",
+    "example": "この店では新鮮な魚が食べられます。",
+    "example_reading": "このみせではしんせんなさかながたべられます。",
+    "translation_ko": "이 가게에서는 신선한 생선을 먹을 수 있습니다.",
+    "cloze_prompt": "この店では新鮮な魚が食べ__。",
+    "correct_answer": "られます",
+    "form_options": [
+      "られます",
+      "させます",
+      "らしいです",
+      "できます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0077",
+    "level": "N4",
+    "pattern": "そうな",
+    "meaning_ko": "~할 것 같은",
+    "explanation_ko": "겉으로 보이는 상태나 인상을 바탕으로 뒤의 명사를 꾸밉니다.",
+    "example": "このケーキは甘そうな色をしています。",
+    "example_reading": "このケーキはあまそうないろをしています。",
+    "translation_ko": "이 케이크는 달 것 같은 색을 하고 있습니다.",
+    "cloze_prompt": "このケーキは__色をしています。",
+    "correct_answer": "甘そうな",
+    "form_options": [
+      "甘そうな",
+      "甘いような",
+      "甘いらしい",
+      "甘いはずの"
+    ]
+  },
+  {
+    "id": "n4_grammar_0078",
+    "level": "N4",
+    "pattern": "そうに",
+    "meaning_ko": "~할 것처럼",
+    "explanation_ko": "겉으로 보이는 상태나 인상을 바탕으로 동작을 꾸밉니다.",
+    "example": "赤ちゃんが気持ちよさそうに眠っています。",
+    "example_reading": "あかちゃんがきもちよさそうにねむっています。",
+    "translation_ko": "아기가 기분 좋은 듯이 자고 있습니다.",
+    "cloze_prompt": "赤ちゃんが気持ちよさ__眠っています。",
+    "correct_answer": "そうに",
+    "form_options": [
+      "そうに",
+      "ように",
+      "らしく",
+      "みたいに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0079",
+    "level": "N4",
+    "pattern": "たらすぐ",
+    "meaning_ko": "~하면 바로",
+    "explanation_ko": "앞의 일이 끝나자마자 뒤의 일이 일어남을 나타냅니다.",
+    "example": "家に帰ったらすぐ、手を洗います。",
+    "example_reading": "いえにかえったらすぐ、てをあらいます。",
+    "translation_ko": "집에 돌아오면 바로 손을 씻습니다.",
+    "cloze_prompt": "家に帰っ__、手を洗います。",
+    "correct_answer": "たらすぐ",
+    "form_options": [
+      "たらすぐ",
+      "たばかり",
+      "たところ",
+      "ていく"
+    ]
+  },
+  {
+    "id": "n4_grammar_0080",
+    "level": "N4",
+    "pattern": "に比べて",
+    "meaning_ko": "~에 비해",
+    "explanation_ko": "두 대상의 정도나 상태를 비교할 때 사용합니다.",
+    "example": "去年に比べて、今年は暑いです。",
+    "example_reading": "きょねんにくらべて、ことしはあついです。",
+    "translation_ko": "작년에 비해 올해는 덥습니다.",
+    "cloze_prompt": "去年__、今年は暑いです。",
+    "correct_answer": "に比べて",
+    "form_options": [
+      "に比べて",
+      "にとって",
+      "に対して",
+      "について"
+    ]
+  },
+  {
+    "id": "n4_grammar_0081",
+    "level": "N4",
+    "pattern": "なきゃ",
+    "meaning_ko": "~해야 해",
+    "explanation_ko": "하지 않으면 안 된다는 의무를 나타내는 구어체 표현입니다.",
+    "example": "もう帰らなきゃいけません。",
+    "example_reading": "もうかえらなきゃいけません。",
+    "translation_ko": "이제 돌아가야 합니다.",
+    "cloze_prompt": "もう帰ら__いけません。",
+    "correct_answer": "なきゃ",
+    "form_options": [
+      "なきゃ",
+      "なくちゃ",
+      "ないと",
+      "なさい"
+    ]
+  },
+  {
+    "id": "n4_grammar_0082",
+    "level": "N4",
+    "pattern": "なくちゃ",
+    "meaning_ko": "~해야 해",
+    "explanation_ko": "하지 않으면 안 된다는 의무를 나타내는 친근한 구어체 표현입니다.",
+    "example": "薬を飲まなくちゃいけません。",
+    "example_reading": "くすりをのまなくちゃいけません。",
+    "translation_ko": "약을 먹어야 합니다.",
+    "cloze_prompt": "薬を飲ま__いけません。",
+    "correct_answer": "なくちゃ",
+    "form_options": [
+      "なくちゃ",
+      "なきゃ",
+      "ないで",
+      "なくて"
+    ]
+  },
+  {
+    "id": "n4_grammar_0083",
+    "level": "N4",
+    "pattern": "といい",
+    "meaning_ko": "~하면 좋겠다",
+    "explanation_ko": "바라는 일이나 좋은 결과에 대한 희망을 나타냅니다.",
+    "example": "明日、晴れるといいですね。",
+    "example_reading": "あした、はれるといいですね。",
+    "translation_ko": "내일 맑으면 좋겠네요.",
+    "cloze_prompt": "明日、晴れる__ですね。",
+    "correct_answer": "といい",
+    "form_options": [
+      "といい",
+      "とき",
+      "なら",
+      "たら"
+    ]
+  },
+  {
+    "id": "n4_grammar_0084",
+    "level": "N4",
+    "pattern": "はずだった",
+    "meaning_ko": "~할 예정이었다 / ~일 터였다",
+    "explanation_ko": "예정이나 예상과 실제 결과가 달라졌음을 나타냅니다.",
+    "example": "会議は三時に終わるはずでした。",
+    "example_reading": "かいぎはさんじにおわるはずでした。",
+    "translation_ko": "회의는 3시에 끝날 예정이었습니다.",
+    "cloze_prompt": "会議は三時に終わる__。",
+    "correct_answer": "はずでした",
+    "form_options": [
+      "はずでした",
+      "つもりでした",
+      "ことでした",
+      "ようでした"
+    ]
+  },
+  {
+    "id": "n4_grammar_0085",
+    "level": "N4",
+    "pattern": "ことにしている",
+    "meaning_ko": "~하기로 하고 있다 / ~하는 습관이 있다",
+    "explanation_ko": "스스로 정한 일을 계속 지키고 있음을 나타냅니다.",
+    "example": "健康のため、毎晩歩くことにしています。",
+    "example_reading": "けんこうのため、まいばんあるくことにしています。",
+    "translation_ko": "건강을 위해 매일 밤 걷기로 하고 있습니다.",
+    "cloze_prompt": "健康のため、毎晩歩く__。",
+    "correct_answer": "ことにしています",
+    "form_options": [
+      "ことにしています",
+      "ことになっています",
+      "ようにしています",
+      "つもりです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0086",
+    "level": "N4",
+    "pattern": "ような気がする",
+    "meaning_ko": "~인 것 같은 느낌이 들다",
+    "explanation_ko": "확실하지 않지만 그렇게 느끼거나 생각하는 마음을 나타냅니다.",
+    "example": "今日はいつもより静かなような気がします。",
+    "example_reading": "きょうはいつもよりしずかなようなきがします。",
+    "translation_ko": "오늘은 평소보다 조용한 것 같은 느낌이 듭니다.",
+    "cloze_prompt": "今日はいつもより静か__。",
+    "correct_answer": "なような気がします",
+    "form_options": [
+      "なような気がします",
+      "なはずです",
+      "なことになります",
+      "なつもりです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0087",
+    "level": "N4",
+    "pattern": "と思っている",
+    "meaning_ko": "~라고 생각하고 있다",
+    "explanation_ko": "현재 가지고 있는 생각이나 계획을 계속 유지하고 있음을 나타냅니다.",
+    "example": "来年、日本へ留学したいと思っています。",
+    "example_reading": "らいねん、にほんへりゅうがくしたいとおもっています。",
+    "translation_ko": "내년에 일본에 유학하고 싶다고 생각하고 있습니다.",
+    "cloze_prompt": "来年、日本へ留学したい__。",
+    "correct_answer": "と思っています",
+    "form_options": [
+      "と思っています",
+      "と言われています",
+      "ことになっています",
+      "ようになっています"
+    ]
+  },
+  {
+    "id": "n4_grammar_0088",
+    "level": "N4",
+    "pattern": "てみせる",
+    "meaning_ko": "반드시 ~해 보이다 / ~하고 말다",
+    "explanation_ko": "강한 의지를 가지고 반드시 어떤 행동을 하겠다고 말할 때 사용합니다.",
+    "example": "次の試合では必ず勝ってみせます。",
+    "example_reading": "つぎのしあいではかならずかってみせます。",
+    "translation_ko": "다음 시합에서는 반드시 이기고 말겠습니다.",
+    "cloze_prompt": "次の試合では必ず勝っ__。",
+    "correct_answer": "てみせます",
+    "form_options": [
+      "てみせます",
+      "てみます",
+      "ていきます",
+      "てしまいます"
+    ]
+  },
+  {
+    "id": "n4_grammar_0089",
+    "level": "N4",
+    "pattern": "そうにない",
+    "meaning_ko": "~할 것 같지 않다",
+    "explanation_ko": "어떤 일이 일어날 가능성이 낮아 보임을 나타냅니다.",
+    "example": "この仕事は今日中に終わりそうにありません。",
+    "example_reading": "このしごとはきょうじゅうにおわりそうにありません。",
+    "translation_ko": "이 일은 오늘 안에 끝날 것 같지 않습니다.",
+    "cloze_prompt": "この仕事は今日中に終わり__。",
+    "correct_answer": "そうにありません",
+    "form_options": [
+      "そうにありません",
+      "そうです",
+      "ようです",
+      "らしいです"
+    ]
+  },
+  {
+    "id": "n4_grammar_0090",
+    "level": "N4",
+    "pattern": "とか",
+    "meaning_ko": "~라든가 / ~등",
+    "explanation_ko": "여러 예를 가볍게 들어 말할 때 사용합니다.",
+    "example": "休みの日は本を読むとかして過ごします。",
+    "example_reading": "やすみのひはほんをよむとかしてすごします。",
+    "translation_ko": "쉬는 날에는 책을 읽는 등 하며 보냅니다.",
+    "cloze_prompt": "休みの日は本を読む__して過ごします。",
+    "correct_answer": "とか",
+    "form_options": [
+      "とか",
+      "など",
+      "とおりに",
+      "ために"
+    ]
+  },
+  {
+    "id": "n4_grammar_0091",
+    "level": "N4",
+    "pattern": "なんか",
+    "meaning_ko": "~같은 것 / ~따위",
+    "explanation_ko": "대상을 가볍게 예로 들거나 낮추어 말할 때 사용합니다.",
+    "example": "そんな話なんか信じません。",
+    "example_reading": "そんなはなしなんかしんじません。",
+    "translation_ko": "그런 이야기는 믿지 않습니다.",
+    "cloze_prompt": "そんな話__信じません。",
+    "correct_answer": "なんか",
+    "form_options": [
+      "なんか",
+      "など",
+      "だけ",
+      "しか"
+    ]
+  },
+  {
+    "id": "n4_grammar_0092",
+    "level": "N4",
+    "pattern": "ごとに",
+    "meaning_ko": "~마다",
+    "explanation_ko": "일정한 간격이나 단위가 반복됨을 나타냅니다.",
+    "example": "この薬は六時間ごとに飲んでください。",
+    "example_reading": "このくすりはろくじかんごとにのんでください。",
+    "translation_ko": "이 약은 6시간마다 드세요.",
+    "cloze_prompt": "この薬は六時間__飲んでください。",
+    "correct_answer": "ごとに",
+    "form_options": [
+      "ごとに",
+      "おきに",
+      "ずつ",
+      "たびに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0093",
+    "level": "N4",
+    "pattern": "おきに",
+    "meaning_ko": "~간격으로 / ~마다",
+    "explanation_ko": "일정한 시간이나 거리만큼 간격을 두고 반복됨을 나타냅니다.",
+    "example": "この電車は十五分おきに来ます。",
+    "example_reading": "このでんしゃはじゅうごふんおきにきます。",
+    "translation_ko": "이 전철은 15분마다 옵니다.",
+    "cloze_prompt": "この電車は十五分__来ます。",
+    "correct_answer": "おきに",
+    "form_options": [
+      "おきに",
+      "ごとに",
+      "ずつ",
+      "たびに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0094",
+    "level": "N4",
+    "pattern": "に関して",
+    "meaning_ko": "~에 관하여",
+    "explanation_ko": "어떤 주제나 사항에 관련하여 말할 때 사용합니다.",
+    "example": "新しい計画に関して、部長から説明がありました。",
+    "example_reading": "あたらしいけいかくにかんして、ぶちょうからせつめいがありました。",
+    "translation_ko": "새 계획에 관해 부장님의 설명이 있었습니다.",
+    "cloze_prompt": "新しい計画__、部長から説明がありました。",
+    "correct_answer": "に関して",
+    "form_options": [
+      "に関して",
+      "について",
+      "によると",
+      "にとって"
+    ]
+  },
+  {
+    "id": "n4_grammar_0095",
+    "level": "N4",
+    "pattern": "によって",
+    "meaning_ko": "~에 따라 / ~에 의해",
+    "explanation_ko": "차이를 만드는 기준이나 수단, 원인을 나타냅니다.",
+    "example": "この地方では季節によって天気が大きく変わります。",
+    "example_reading": "このちほうではきせつによっててんきがおおきくかわります。",
+    "translation_ko": "이 지방은 계절에 따라 날씨가 크게 변합니다.",
+    "cloze_prompt": "この地方では季節__天気が大きく変わります。",
+    "correct_answer": "によって",
+    "form_options": [
+      "によって",
+      "に対して",
+      "にとって",
+      "に関して"
+    ]
+  },
+  {
+    "id": "n4_grammar_0096",
+    "level": "N4",
+    "pattern": "かわりに",
+    "meaning_ko": "~대신에",
+    "explanation_ko": "어떤 사람이나 사물을 대신하여 행동하거나 사용하는 것을 나타냅니다.",
+    "example": "今日は私が母のかわりに買い物へ行きます。",
+    "example_reading": "きょうはわたしがははのかわりにかいものへいきます。",
+    "translation_ko": "오늘은 제가 어머니 대신 장을 보러 갑니다.",
+    "cloze_prompt": "今日は私が母の__買い物へ行きます。",
+    "correct_answer": "かわりに",
+    "form_options": [
+      "かわりに",
+      "ために",
+      "とおりに",
+      "うちに"
+    ]
+  },
+  {
+    "id": "n4_grammar_0097",
+    "level": "N4",
+    "pattern": "お〜ください",
+    "meaning_ko": "부디 ~해 주세요",
+    "explanation_ko": "상대방의 행동을 높여 정중하게 부탁할 때 사용합니다.",
+    "example": "少々お待ちください。",
+    "example_reading": "しょうしょうおまちください。",
+    "translation_ko": "잠시만 기다려 주세요.",
+    "cloze_prompt": "少々__ください。",
+    "correct_answer": "お待ち",
+    "form_options": [
+      "お待ち",
+      "お入り",
+      "お座り",
+      "お休み"
+    ]
+  },
+  {
+    "id": "n4_grammar_0098",
+    "level": "N4",
+    "pattern": "お〜になります",
+    "meaning_ko": "~하십니다",
+    "explanation_ko": "상대방이나 제삼자의 행동을 높여 말하는 존경 표현입니다.",
+    "example": "先生は授業の前に資料をお読みになります。",
+    "example_reading": "せんせいはじゅぎょうのまえにしりょうをおよみになります。",
+    "translation_ko": "선생님은 수업 전에 자료를 읽으십니다.",
+    "cloze_prompt": "先生は授業の前に資料を__になります。",
+    "correct_answer": "お読み",
+    "form_options": [
+      "お読み",
+      "お帰り",
+      "お休み",
+      "お待ち"
+    ]
+  },
+  {
+    "id": "n4_grammar_0099",
+    "level": "N4",
+    "pattern": "ご〜ください",
+    "meaning_ko": "~해 주세요",
+    "explanation_ko": "한자어 동사의 행동을 높여 정중하게 부탁할 때 사용합니다.",
+    "example": "資料をご確認ください。",
+    "example_reading": "しりょうをごかくにんください。",
+    "translation_ko": "자료를 확인해 주세요.",
+    "cloze_prompt": "資料を__ください。",
+    "correct_answer": "ご確認",
+    "form_options": [
+      "ご確認",
+      "ご連絡",
+      "ご利用",
+      "ご参加"
+    ]
+  },
+  {
+    "id": "n4_grammar_0100",
+    "level": "N4",
+    "pattern": "を通じて",
+    "meaning_ko": "~을 통해",
+    "explanation_ko": "어떤 수단이나 경험을 매개로 일이 이루어짐을 나타냅니다.",
+    "example": "この仕事を通じて、たくさんの人と知り合いました。",
+    "example_reading": "このしごとをつうじて、たくさんのひととしりあいました。",
+    "translation_ko": "이 일을 통해 많은 사람과 알게 되었습니다.",
+    "cloze_prompt": "この仕事__、たくさんの人と知り合いました。",
+    "correct_answer": "を通じて",
+    "form_options": [
+      "を通じて",
+      "によって",
+      "について",
+      "かわりに"
+    ]
+  }
+]

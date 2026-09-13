@@ -81,7 +81,16 @@ h1 {
   display: none;
 }
 
-.question-eyebrow,
+.question-eyebrow {
+  display: inline;
+  color: var(--accent-dark);
+  font-family: "Trebuchet MS", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .pad-scroll-control span {
   display: block;
   color: var(--accent-dark);
@@ -93,7 +102,7 @@ h1 {
 }
 
 .question-prompt {
-  margin: 6px 0 0;
+  margin: 0;
   color: var(--ink);
   font-size: 15px;
   line-height: 1.5;
@@ -142,13 +151,13 @@ h1 {
 /* 실제 width/height/background-size 는 글자 수에 맞춰 app.js(configurePad)가 인라인으로 설정한다. */
 #pad {
   display: block;
-  width: 190px;
-  height: 238px;
+  width: 170px;
+  height: 224px;
   background:
     linear-gradient(rgba(31, 122, 82, 0.12) 1px, transparent 1px),
     linear-gradient(90deg, rgba(31, 122, 82, 0.12) 1px, transparent 1px),
     var(--field);
-  background-size: 190px 238px;
+  background-size: 170px 224px;
   touch-action: none;
 }
 

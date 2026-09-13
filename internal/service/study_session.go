@@ -13,7 +13,13 @@ const (
 )
 
 type studyMaterialStore interface {
-	GetForStudySession(ctx context.Context, userID int64, language, level string, limit int) ([]model.Material, error)
+	GetForStudySession(
+		ctx context.Context,
+		userID int64,
+		language string,
+		levels []string,
+		limit int,
+	) ([]model.Material, error)
 }
 
 type studySessionStore interface {
@@ -61,7 +67,13 @@ func (s *StudySessionService) BuildStudySessionWithLimit(
 		return nil, fmt.Errorf("build study session invalid limit user_id=%d limit=%d", userID, limit)
 	}
 
-	materials, err := s.materialRepo.GetForStudySession(ctx, userID, language, level, limit)
+	materials, err := s.materialRepo.GetForStudySession(
+		ctx,
+		userID,
+		language,
+		sessionLevelsFor(language, level),
+		limit,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("build study session fetch materials user_id=%d language=%s level=%s: %w",
 			userID, language, level, err)

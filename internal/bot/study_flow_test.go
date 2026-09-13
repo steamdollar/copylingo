@@ -21,7 +21,8 @@ type botStudyMaterialStore struct{}
 func (s *botStudyMaterialStore) GetForStudySession(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 	limit int,
 ) ([]model.Material, error) {
 	return nil, nil

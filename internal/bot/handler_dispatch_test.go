@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -27,12 +28,19 @@ type mockSRSRepo struct{}
 func (m *mockSRSRepo) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	return nil, nil
 }
-func (m *mockSRSRepo) GetDueReviewCount(ctx context.Context, userID int64, language, level string) (int, error) {
+
+func (m *mockSRSRepo) GetDueReviewCount(
+	ctx context.Context,
+	userID int64,
+	language string,
+	levels []string,
+) (int, error) {
 	return 5, nil // Return 5 for main menu display test
 }
 
@@ -50,19 +58,20 @@ type commandStudyMaterialStore struct {
 	err       error
 	userID    int64
 	language  string
-	level     string
+	levels    []string
 	limit     int
 }
 
 func (s *commandStudyMaterialStore) GetForStudySession(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 	limit int,
 ) ([]model.Material, error) {
 	s.userID = userID
 	s.language = language
-	s.level = level
+	s.levels = append([]string(nil), levels...)
 	s.limit = limit
 	if s.err != nil {
 		return nil, s.err
@@ -451,9 +460,12 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	b.handleMessage(ctx, commandMessage("/study", 123, 456, "learner"))
 
 	if materialStore.userID != 123 || materialStore.language != "ja" ||
-		materialStore.level != "N5" || materialStore.limit != service.DefaultStudySessionMaterialCount {
-		t.Fatalf("GetForStudySession args = (%d, %s, %s, %d), want user/language/level and default limit %d",
-			materialStore.userID, materialStore.language, materialStore.level, materialStore.limit,
+		!slices.Equal(
+			materialStore.levels,
+			[]string{"N5", "N4"},
+		) || materialStore.limit != service.DefaultStudySessionMaterialCount {
+		t.Fatalf("GetForStudySession args = (%d, %s, %v, %d), want user/language/levels and default limit %d",
+			materialStore.userID, materialStore.language, materialStore.levels, materialStore.limit,
 			service.DefaultStudySessionMaterialCount)
 	}
 	if len(sessionStore.created) != 1 {

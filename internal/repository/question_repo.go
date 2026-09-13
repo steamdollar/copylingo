@@ -75,7 +75,9 @@ func (r *QuestionRepository) GetByID(ctx context.Context, id int) (*model.Questi
 func (r *QuestionRepository) GetNewQuestions(
 	ctx context.Context,
 	userID int64,
-	language, level, category string,
+	language string,
+	levels []string,
+	category string,
 	excludeIDs []int,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
@@ -86,7 +88,7 @@ func (r *QuestionRepository) GetNewQuestions(
 		newQuestionsForStudiedMaterialsQuery,
 		userID,
 		language,
-		level,
+		pq.Array(levels),
 		category,
 		pq.Array(excludeIDs),
 		limit,
@@ -119,7 +121,7 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 			LEFT JOIN user_question_progress uqp
 				ON uqp.question_id = q.id
 				AND uqp.user_id = $1
-			WHERE q.language = $2 AND q.proficiency_level = $3
+			WHERE q.language = $2 AND q.proficiency_level = ANY($3)
 			AND ($4 = '' OR q.category = $4)
 			AND NOT (q.id = ANY(COALESCE($5::int[], '{}')))
 			AND uqp.question_id IS NULL
@@ -183,7 +185,8 @@ func (r *QuestionRepository) SetAudioFileID(ctx context.Context, id int, fileID 
 func (r *QuestionRepository) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
@@ -193,7 +196,7 @@ func (r *QuestionRepository) GetDueReviews(
 		dueReviewsForStudiedMaterialsQuery,
 		userID,
 		language,
-		level,
+		pq.Array(levels),
 		limit,
 		kanjiRecallLimit,
 	)
@@ -224,7 +227,7 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
 			  AND uqp.next_review_at IS NOT NULL
 			  AND uqp.next_review_at <= NOW()
 			  AND q.language = $2
-			  AND q.proficiency_level = $3
+			  AND q.proficiency_level = ANY($3)
 		)
 		SELECT %s
 		FROM questions q
@@ -241,7 +244,8 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
 func (r *QuestionRepository) GetDueReviewCount(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 ) (int, error) {
 	var count int
 	err := r.db.GetContext(ctx, &count, `
@@ -252,8 +256,8 @@ func (r *QuestionRepository) GetDueReviewCount(
 		  AND uqp.next_review_at IS NOT NULL
 		  AND uqp.next_review_at <= NOW()
 		  AND q.language = $2
-		  AND q.proficiency_level = $3
-	`, userID, language, level)
+		  AND q.proficiency_level = ANY($3)
+	`, userID, language, pq.Array(levels))
 	return count, err
 }
 

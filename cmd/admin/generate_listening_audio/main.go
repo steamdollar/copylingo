@@ -12,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 
+	ja "github.com/lsj/copylingo/cmd/ja/catalog"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/repository"
@@ -26,10 +27,26 @@ func initDB(cfg *config.Config) (*sqlx.DB, error) {
 	return db, nil
 }
 
+func waitForNextCycle(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func main() {
 	language := flag.String("language", "ja", "question language")
-	level := flag.String("level", "N5", "proficiency level")
+	level := flag.String("level", ja.DefaultProficiencyLevel(), "proficiency level")
 	timeout := flag.Duration("timeout", 10*time.Minute, "maximum duration for the complete batch")
+	batchDelay := flag.Duration("batch-delay", 0, "delay between TTS batches for provider rate limits")
 	flag.Parse()
 
 	cfg, err := config.Load()
@@ -75,6 +92,11 @@ func main() {
 	for cycle := 1; cycle <= cycles; cycle++ {
 		if err := audio.TopUpAudio(ctx, *language, *level); err != nil {
 			log.Fatalf("generate listening audio cycle=%d/%d: %v", cycle, cycles, err)
+		}
+		if cycle < cycles {
+			if err := waitForNextCycle(ctx, *batchDelay); err != nil {
+				log.Fatalf("wait between listening audio cycles=%d/%d: %v", cycle, cycles, err)
+			}
 		}
 	}
 

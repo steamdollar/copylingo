@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -10,16 +11,17 @@ import (
 )
 
 type mockStudyMaterialStore struct {
-	getForStudySessionFn func(ctx context.Context, userID int64, language, level string, limit int) ([]model.Material, error)
+	getForStudySessionFn func(ctx context.Context, userID int64, language string, levels []string, limit int) ([]model.Material, error)
 }
 
 func (m *mockStudyMaterialStore) GetForStudySession(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 	limit int,
 ) ([]model.Material, error) {
-	return m.getForStudySessionFn(ctx, userID, language, level, limit)
+	return m.getForStudySessionFn(ctx, userID, language, levels, limit)
 }
 
 type mockStudySessionStore struct {
@@ -43,10 +45,11 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 	userID := int64(123)
 
 	materialStore := &mockStudyMaterialStore{
-		getForStudySessionFn: func(ctx context.Context, gotUserID int64, language, level string, limit int) ([]model.Material, error) {
-			if gotUserID != userID || language != "ja" || level != "N5" {
-				t.Fatalf("GetForStudySession args = (%d, %s, %s), want (%d, ja, N5)",
-					gotUserID, language, level, userID)
+		getForStudySessionFn: func(ctx context.Context, gotUserID int64, language string, levels []string, limit int) ([]model.Material, error) {
+			want := []string{"N5", "N4"}
+			if gotUserID != userID || language != "ja" || !reflect.DeepEqual(levels, want) {
+				t.Fatalf("GetForStudySession args = (%d, %s, %v), want (%d, ja, %v)",
+					gotUserID, language, levels, userID, want)
 			}
 			if limit != DefaultStudySessionMaterialCount {
 				t.Fatalf("limit = %d, want %d", limit, DefaultStudySessionMaterialCount)
@@ -91,15 +94,51 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 	}
 }
 
+func TestBuildStudySessionUsesAdjacentJapaneseLevelScope(t *testing.T) {
+	materialStore := &mockStudyMaterialStore{
+		getForStudySessionFn: func(
+			_ context.Context,
+			_ int64,
+			language string,
+			levels []string,
+			_ int,
+		) ([]model.Material, error) {
+			want := []string{"N5", "N4", "N3"}
+			if !reflect.DeepEqual(levels, want) {
+				t.Fatalf("session levels = %v, want %v", levels, want)
+			}
+			return []model.Material{{ID: 10}}, nil
+		},
+	}
+	sessionStore := &mockStudySessionStore{
+		createSessionFn: func(_ context.Context, s *model.Session) error {
+			s.ID = 99
+			return nil
+		},
+	}
+	sessionMaterialStore := &mockStudySessionMaterialStore{
+		createSessionMaterialsFn: func(_ context.Context, _ []model.SessionMaterial) error {
+			return nil
+		},
+	}
+
+	session, err := NewStudySessionService(materialStore, sessionStore, sessionMaterialStore).
+		BuildStudySession(context.Background(), 123, "ja", "N4")
+	if err != nil || session == nil || session.ID != 99 {
+		t.Fatalf("BuildStudySession() = %+v, %v", session, err)
+	}
+}
+
 func TestBuildStudySessionWithLimitUsesRequestedLimit(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
 
 	materialStore := &mockStudyMaterialStore{
-		getForStudySessionFn: func(ctx context.Context, gotUserID int64, language, level string, limit int) ([]model.Material, error) {
-			if gotUserID != userID || language != "ja" || level != "N5" {
-				t.Fatalf("GetForStudySession args = (%d, %s, %s), want (%d, ja, N5)",
-					gotUserID, language, level, userID)
+		getForStudySessionFn: func(ctx context.Context, gotUserID int64, language string, levels []string, limit int) ([]model.Material, error) {
+			want := []string{"N5", "N4"}
+			if gotUserID != userID || language != "ja" || !reflect.DeepEqual(levels, want) {
+				t.Fatalf("GetForStudySession args = (%d, %s, %v), want (%d, ja, %v)",
+					gotUserID, language, levels, userID, want)
 			}
 			if limit != 20 {
 				t.Fatalf("limit = %d, want 20", limit)
@@ -146,7 +185,7 @@ func TestBuildStudySessionWithLimitRejectsOutOfRangeLimit(t *testing.T) {
 func TestBuildStudySessionNoMaterialsReturnsNil(t *testing.T) {
 	ctx := context.Background()
 	materialStore := &mockStudyMaterialStore{
-		getForStudySessionFn: func(ctx context.Context, userID int64, language, level string, limit int) ([]model.Material, error) {
+		getForStudySessionFn: func(ctx context.Context, userID int64, language string, levels []string, limit int) ([]model.Material, error) {
 			return nil, nil
 		},
 	}
@@ -171,7 +210,7 @@ func TestBuildStudySessionNoMaterialsReturnsNil(t *testing.T) {
 func TestBuildStudySessionWrapsMaterialError(t *testing.T) {
 	ctx := context.Background()
 	materialStore := &mockStudyMaterialStore{
-		getForStudySessionFn: func(ctx context.Context, userID int64, language, level string, limit int) ([]model.Material, error) {
+		getForStudySessionFn: func(ctx context.Context, userID int64, language string, levels []string, limit int) ([]model.Material, error) {
 			return nil, errors.New("db down")
 		},
 	}

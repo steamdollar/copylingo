@@ -49,7 +49,7 @@ func (schedulerQuestionRepoStub) GetNewQuestions(
 	context.Context,
 	int64,
 	string,
-	string,
+	[]string,
 	string,
 	[]int,
 	int,
@@ -126,7 +126,7 @@ func (schedulerMaterialRepoStub) GetForStudySession(
 	context.Context,
 	int64,
 	string,
-	string,
+	[]string,
 	int,
 ) ([]model.Material, error) {
 	return []model.Material{{ID: 1}}, nil

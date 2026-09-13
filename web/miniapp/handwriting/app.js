@@ -23,9 +23,9 @@ const tipBody = document.getElementById("tipBody");
 const params = new URLSearchParams(window.location.search);
 
 // 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
-// 기존 패드 크기(224x280)의 약 85%로 줄여 작은 화면에서 도구 영역을 함께 보이게 한다.
-const PAD_CELL_CSS_PX = 190;
-const PAD_HEIGHT_CSS_PX = 238;
+// 기존 패드 크기(224x280) 대비 세로는 약 80%, 가로는 기존 비율보다 약 5% 좁게 줄인다.
+const PAD_CELL_CSS_PX = 170;
+const PAD_HEIGHT_CSS_PX = 224;
 const PAD_SCALE = 2;
 const PAD_CELL_PX = PAD_CELL_CSS_PX * PAD_SCALE;
 const PAD_HEIGHT_PX = PAD_HEIGHT_CSS_PX * PAD_SCALE;

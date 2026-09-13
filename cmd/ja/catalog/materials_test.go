@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 func TestBuildVocabularyMaterials(t *testing.T) {
 	t.Parallel()
 
-	materials := BuildVocabularyMaterials(N5Words)
+	materials := BuildVocabularyMaterials(levelCatalogForTest(t, DefaultProficiencyLevel()).Words)
 	if len(materials) != 540 {
 		t.Fatalf("len(materials) = %d, want 540", len(materials))
 	}
@@ -28,7 +29,7 @@ func TestBuildVocabularyMaterials(t *testing.T) {
 func TestBuildVocabularyMaterialsPayload(t *testing.T) {
 	t.Parallel()
 
-	for _, material := range BuildVocabularyMaterials(N5Words) {
+	for _, material := range BuildVocabularyMaterials(levelCatalogForTest(t, DefaultProficiencyLevel()).Words) {
 		if material.MaterialKey != "ja:vocab:n5_word_024" {
 			continue
 		}
@@ -51,7 +52,7 @@ func TestBuildVocabularyMaterialsPayload(t *testing.T) {
 func TestBuildGrammarMaterials(t *testing.T) {
 	t.Parallel()
 
-	materials := BuildGrammarMaterials(N5GrammarPoints)
+	materials := BuildGrammarMaterials(levelCatalogForTest(t, DefaultProficiencyLevel()).GrammarPoints)
 	if len(materials) != 80 {
 		t.Fatalf("len(materials) = %d, want 80", len(materials))
 	}
@@ -67,7 +68,7 @@ func TestBuildGrammarMaterials(t *testing.T) {
 	for _, material := range materials {
 		if material.Category != model.MaterialCategoryGrammar ||
 			material.Language != VocabLanguage ||
-			material.ProficiencyLevel != VocabProficiencyLevel ||
+			material.ProficiencyLevel != DefaultProficiencyLevel() ||
 			material.Difficulty != GrammarDifficulty {
 			t.Fatalf("unexpected grammar material metadata: %+v", material)
 		}
@@ -77,7 +78,7 @@ func TestBuildGrammarMaterials(t *testing.T) {
 func TestBuildGrammarMaterialsPayload(t *testing.T) {
 	t.Parallel()
 
-	for _, material := range BuildGrammarMaterials(N5GrammarPoints) {
+	for _, material := range BuildGrammarMaterials(levelCatalogForTest(t, DefaultProficiencyLevel()).GrammarPoints) {
 		if material.MaterialKey != "ja:grammar:n5_grammar_009" {
 			continue
 		}
@@ -117,7 +118,7 @@ func TestBuildKanaMaterials(t *testing.T) {
 	for _, material := range materials {
 		if material.Category != model.MaterialCategoryKana ||
 			material.Language != VocabLanguage ||
-			material.ProficiencyLevel != VocabProficiencyLevel ||
+			material.ProficiencyLevel != DefaultProficiencyLevel() ||
 			material.Difficulty != 1 {
 			t.Fatalf("unexpected kana material metadata: %+v", material)
 		}
@@ -128,7 +129,8 @@ func TestBuildAllMaterialsIncludesGrammar(t *testing.T) {
 	t.Parallel()
 
 	materials := BuildAllMaterials()
-	want := len(KanaMap) + len(N5Words) + len(N5GrammarPoints) + len(N5ReadingPassages)
+	catalog := levelCatalogForTest(t, DefaultProficiencyLevel())
+	want := len(KanaMap) + len(catalog.Words) + len(catalog.GrammarPoints) + len(catalog.ReadingPassages)
 	if len(materials) != want {
 		t.Fatalf("len(materials) = %d, want %d", len(materials), want)
 	}
@@ -172,7 +174,7 @@ func TestBuildReadingMaterials(t *testing.T) {
 	if material.MaterialKey != "ja:reading:n5_reading_0001" ||
 		material.Category != model.MaterialCategoryReading ||
 		material.Language != VocabLanguage ||
-		material.ProficiencyLevel != VocabProficiencyLevel ||
+		material.ProficiencyLevel != DefaultProficiencyLevel() ||
 		material.Title != "図書館のお知らせ" ||
 		material.Difficulty != 2 {
 		t.Fatalf("unexpected reading material metadata: %+v", material)
@@ -229,12 +231,13 @@ func TestBuildReadingMaterialsPayload(t *testing.T) {
 func TestN5WordsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(N5Words) != 540 {
-		t.Fatalf("len(N5Words) = %d, want 540", len(N5Words))
+	words := levelCatalogForTest(t, DefaultProficiencyLevel()).Words
+	if len(words) != 540 {
+		t.Fatalf("len(words) = %d, want 540", len(words))
 	}
 
-	ids := make(map[string]bool, len(N5Words))
-	for _, word := range N5Words {
+	ids := make(map[string]bool, len(words))
+	for _, word := range words {
 		if word.ID == "" || word.Kana == "" || word.Kanji == "" || word.MeaningKo == "" || word.PartOfSpeech == "" {
 			t.Fatalf("incomplete word: %+v", word)
 		}
@@ -248,12 +251,13 @@ func TestN5WordsIntegrity(t *testing.T) {
 func TestN5GrammarPointsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(N5GrammarPoints) != 80 {
-		t.Fatalf("len(N5GrammarPoints) = %d, want 80", len(N5GrammarPoints))
+	grammarPoints := levelCatalogForTest(t, DefaultProficiencyLevel()).GrammarPoints
+	if len(grammarPoints) != 80 {
+		t.Fatalf("len(grammarPoints) = %d, want 80", len(grammarPoints))
 	}
 
-	ids := make(map[string]bool, len(N5GrammarPoints))
-	for _, point := range N5GrammarPoints {
+	ids := make(map[string]bool, len(grammarPoints))
+	for _, point := range grammarPoints {
 		if point.ID == "" || point.Pattern == "" || point.MeaningKo == "" ||
 			point.ExplanationKo == "" || point.Example == "" || point.TranslationKo == "" ||
 			point.ClozePrompt == "" || point.CorrectAnswer == "" {
@@ -292,18 +296,19 @@ func TestN5GrammarPointsIntegrity(t *testing.T) {
 func TestN5VocabContextIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(N5VocabContext) != 15 {
-		t.Fatalf("len(N5VocabContext) = %d, want 15", len(N5VocabContext))
+	catalog := levelCatalogForTest(t, DefaultProficiencyLevel())
+	if len(catalog.VocabContexts) != 15 {
+		t.Fatalf("len(vocab contexts) = %d, want 15", len(catalog.VocabContexts))
 	}
 
-	wordIDs := make(map[string]bool, len(N5Words))
-	for _, word := range N5Words {
+	wordIDs := make(map[string]bool, len(catalog.Words))
+	for _, word := range catalog.Words {
 		wordIDs[word.ID] = true
 	}
 
 	totalClozes := 0
-	seenWords := make(map[string]bool, len(N5VocabContext))
-	for _, vc := range N5VocabContext {
+	seenWords := make(map[string]bool, len(catalog.VocabContexts))
+	for _, vc := range catalog.VocabContexts {
 		if !wordIDs[vc.WordID] {
 			t.Fatalf("vocab context references unknown word_id %q", vc.WordID)
 		}
@@ -359,4 +364,47 @@ func materialKeys(materials []*model.Material) map[string]bool {
 		keys[material.MaterialKey] = true
 	}
 	return keys
+}
+
+func TestBuildAdditionalLevelMaterialsAreLevelAwareAndDoNotCollide(t *testing.T) {
+	t.Parallel()
+
+	defaultCatalog := levelCatalogForTest(t, DefaultProficiencyLevel())
+	additionalCatalog := levelCatalogForTest(t, "N4")
+	defaultMaterials := BuildAllMaterialsForLevels(defaultCatalog.Level)
+	combined := BuildAllMaterialsForLevels(defaultCatalog.Level, additionalCatalog.Level)
+	defaultKeys := materialKeys(defaultMaterials)
+	seen := make(map[string]bool, len(combined))
+	additionalCount := 0
+	for _, material := range combined {
+		if seen[material.MaterialKey] {
+			t.Fatalf("duplicate material key %q", material.MaterialKey)
+		}
+		seen[material.MaterialKey] = true
+		if material.ProficiencyLevel != additionalCatalog.Level {
+			continue
+		}
+		additionalCount++
+		if defaultKeys[material.MaterialKey] {
+			t.Fatalf("additional material key collides with default: %q", material.MaterialKey)
+		}
+		if !strings.Contains(strings.ToLower(material.MaterialKey), "n4") {
+			t.Fatalf("N4 material key %q does not include level", material.MaterialKey)
+		}
+	}
+	wantAdditional := len(
+		additionalCatalog.Words,
+	) + len(
+		additionalCatalog.GrammarPoints,
+	) + len(
+		additionalCatalog.ReadingPassages,
+	)
+	if additionalCount != wantAdditional {
+		t.Fatalf("additional material count = %d, want %d", additionalCount, wantAdditional)
+	}
+
+	second := BuildAllMaterialsForLevels(defaultCatalog.Level, additionalCatalog.Level)
+	if !reflect.DeepEqual(second, combined) {
+		t.Fatal("combined material output is not deterministic")
+	}
 }

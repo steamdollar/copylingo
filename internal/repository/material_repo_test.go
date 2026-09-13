@@ -51,6 +51,7 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 func TestStudySessionMaterialsQueryIncludesGrammarAndInterleavesCategories(t *testing.T) {
 	for _, want := range []string{
 		"m.category = ANY($4)",
+		"m.proficiency_level = ANY($3)",
 		"PARTITION BY mp.category",
 		"WHEN 'vocabulary' THEN 0",
 		"WHEN 'grammar' THEN 1",
@@ -109,7 +110,9 @@ func TestStudySessionMaterialsQueryReadingPolicy(t *testing.T) {
 
 	t.Run("no due review never pulls a future review forward", func(t *testing.T) {
 		for _, want := range []string{
-			"WHERE (mp.progress_material_id IS NULL OR mp.next_review_at <= NOW())",
+			"mp.progress_material_id IS NULL",
+			"mp.progress_material_id IS NOT NULL",
+			"mp.next_review_at <= NOW()",
 			"(progress_material_id IS NULL AND category_bucket_rank <= 1)",
 		} {
 			if !strings.Contains(studySessionMaterialsQuery, want) {

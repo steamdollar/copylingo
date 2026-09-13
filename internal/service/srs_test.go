@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/model"
@@ -12,27 +13,30 @@ type mockQuestionQuerier struct {
 	getDueReviewsFn func(
 		ctx context.Context,
 		userID int64,
-		language, level string,
+		language string,
+		levels []string,
 		limit, kanjiRecallLimit int,
 	) ([]model.Question, error)
-	getDueReviewCountFn func(ctx context.Context, userID int64, language, level string) (int, error)
+	getDueReviewCountFn func(ctx context.Context, userID int64, language string, levels []string) (int, error)
 }
 
 func (m *mockQuestionQuerier) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, userID, language, level, limit, kanjiRecallLimit)
+	return m.getDueReviewsFn(ctx, userID, language, levels, limit, kanjiRecallLimit)
 }
 
 func (m *mockQuestionQuerier) GetDueReviewCount(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 ) (int, error) {
-	return m.getDueReviewCountFn(ctx, userID, language, level)
+	return m.getDueReviewCountFn(ctx, userID, language, levels)
 }
 
 func TestScheduleAnswer(t *testing.T) {
@@ -127,11 +131,13 @@ func TestSRSService_GetDueReviewsForwardsUserScope(t *testing.T) {
 		getDueReviewsFn: func(
 			_ context.Context,
 			userID int64,
-			language, level string,
+			language string,
+			levels []string,
 			limit, kanjiRecallLimit int,
 		) ([]model.Question, error) {
-			if userID != 42 || language != "ja" || level != "N5" || limit != 10 || kanjiRecallLimit != 3 {
-				t.Fatalf("unexpected scope: %d %s %s %d %d", userID, language, level, limit, kanjiRecallLimit)
+			if userID != 42 || language != "ja" || !reflect.DeepEqual(levels, []string{"N5", "N4"}) || limit != 10 ||
+				kanjiRecallLimit != 3 {
+				t.Fatalf("unexpected scope: %d %s %v %d %d", userID, language, levels, limit, kanjiRecallLimit)
 			}
 			return want, nil
 		},
@@ -143,13 +149,39 @@ func TestSRSService_GetDueReviewsForwardsUserScope(t *testing.T) {
 	}
 }
 
+func TestSRSService_GetDueReviewsUsesAdjacentJapaneseScope(t *testing.T) {
+	repo := &mockQuestionQuerier{
+		getDueReviewsFn: func(
+			_ context.Context,
+			_ int64,
+			language string,
+			levels []string,
+			_, _ int,
+		) ([]model.Question, error) {
+			if language != "ja" {
+				t.Fatalf("language = %s, want ja", language)
+			}
+			want := []string{"N5", "N4", "N3"}
+			if !reflect.DeepEqual(levels, want) {
+				t.Fatalf("levels = %v, want %v", levels, want)
+			}
+			return []model.Question{{ID: 1}}, nil
+		},
+	}
+
+	got, err := NewSRSService(repo).GetDueReviews(context.Background(), 42, "ja", "N4", 1, 0)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("GetDueReviews() = %v, %v", got, err)
+	}
+}
+
 func TestSRSService_GetDueReviewsPropagatesError(t *testing.T) {
 	expectedErr := errors.New("query failed")
 	repo := &mockQuestionQuerier{
 		getDueReviewsFn: func(
 			context.Context,
 			int64,
-			string, string,
+			string, []string,
 			int, int,
 		) ([]model.Question, error) {
 			return nil, expectedErr
@@ -163,15 +195,35 @@ func TestSRSService_GetDueReviewsPropagatesError(t *testing.T) {
 
 func TestSRSService_GetDueCountForwardsUserScope(t *testing.T) {
 	repo := &mockQuestionQuerier{
-		getDueReviewCountFn: func(_ context.Context, userID int64, language, level string) (int, error) {
-			if userID != 42 || language != "ja" || level != "N5" {
-				t.Fatalf("unexpected scope: %d %s %s", userID, language, level)
+		getDueReviewCountFn: func(_ context.Context, userID int64, language string, levels []string) (int, error) {
+			if userID != 42 || language != "ja" || !reflect.DeepEqual(levels, []string{"N5", "N4"}) {
+				t.Fatalf("unexpected scope: %d %s %v", userID, language, levels)
 			}
 			return 7, nil
 		},
 	}
 	got, err := NewSRSService(repo).GetDueCount(context.Background(), 42, "ja", "N5")
 	if err != nil || got != 7 {
+		t.Fatalf("GetDueCount() = %d, %v", got, err)
+	}
+}
+
+func TestSRSService_GetDueCountUsesAdjacentJapaneseScope(t *testing.T) {
+	repo := &mockQuestionQuerier{
+		getDueReviewCountFn: func(_ context.Context, _ int64, language string, levels []string) (int, error) {
+			if language != "ja" {
+				t.Fatalf("language = %s, want ja", language)
+			}
+			want := []string{"N5", "N4", "N3"}
+			if !reflect.DeepEqual(levels, want) {
+				t.Fatalf("levels = %v, want %v", levels, want)
+			}
+			return 2, nil
+		},
+	}
+
+	got, err := NewSRSService(repo).GetDueCount(context.Background(), 42, "ja", "N4")
+	if err != nil || got != 2 {
 		t.Fatalf("GetDueCount() = %d, %v", got, err)
 	}
 }

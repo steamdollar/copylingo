@@ -161,6 +161,7 @@ func TestNewQuestionsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) 
 		"LEFT JOIN user_question_progress uqp",
 		"uqp.user_id = $1",
 		"uqp.question_id IS NULL",
+		"q.proficiency_level = ANY($3)",
 		"CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END",
 		// Listening questions must not be scheduled before their audio exists.
 		"q.category <> 'listening' OR q.audio_path IS NOT NULL",
@@ -195,7 +196,7 @@ func TestDueReviewsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) {
 		"uqp.user_id = $1",
 		"uqp.next_review_at IS NOT NULL",
 		"q.language = $2",
-		"q.proficiency_level = $3",
+		"q.proficiency_level = ANY($3)",
 		"CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END",
 		"q.item_type IS DISTINCT FROM 'vocab_kanji_recall'",
 		"candidate.kanji_recall_rank <= $5",

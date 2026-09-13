@@ -41,7 +41,8 @@ func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []strin
 func (r *MaterialRepository) GetForStudySession(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language string,
+	levels []string,
 	limit int,
 ) ([]model.Material, error) {
 	if limit <= 0 {
@@ -50,9 +51,9 @@ func (r *MaterialRepository) GetForStudySession(
 
 	var materials []model.Material
 	if err := r.db.SelectContext(ctx, &materials, studySessionMaterialsQuery,
-		userID, language, level, pq.Array(studySessionMaterialCategories), limit); err != nil {
+		userID, language, pq.Array(levels), pq.Array(studySessionMaterialCategories), limit); err != nil {
 		return nil, fmt.Errorf("MaterialRepository.GetForStudySession user_id=%d language=%s level=%s limit=%d: %w",
-			userID, language, level, limit, err)
+			userID, language, levels, limit, err)
 	}
 	return materials, nil
 }
@@ -77,7 +78,7 @@ const studySessionMaterialsQuery = `
 			ON ump.material_id = m.id
 				AND ump.user_id = $1
 			WHERE m.language = $2
-			AND m.proficiency_level = $3
+			AND m.proficiency_level = ANY($3)
 			AND m.category = ANY($4)
 		),
 		reading_inventory AS (
@@ -117,7 +118,13 @@ const studySessionMaterialsQuery = `
 				END AS category_order
 			FROM material_pool mp
 			CROSS JOIN reading_inventory ri
-			WHERE (mp.progress_material_id IS NULL OR mp.next_review_at <= NOW())
+			WHERE (
+				mp.progress_material_id IS NULL
+				OR (
+					mp.progress_material_id IS NOT NULL
+					AND mp.next_review_at <= NOW()
+				)
+			)
 			AND NOT EXISTS (
 				SELECT 1
 				FROM session_materials sm

@@ -36,7 +36,9 @@ type questionFetcher interface {
 	GetNewQuestions(
 		ctx context.Context,
 		userID int64,
-		language, level, category string,
+		language string,
+		levels []string,
+		category string,
 		excludeIDs []int,
 		limit, kanjiRecallLimit int,
 	) ([]model.Question, error)
@@ -120,6 +122,7 @@ func (s *SessionBuilderService) buildSession(
 	totalQuestions, reviewCount int,
 ) (*model.Session, error) {
 	var sessionQuestions []model.SessionQuestion
+	levels := sessionLevelsFor(language, level)
 	selectedQuestionIDs := make(map[int]struct{}, totalQuestions)
 	excludeIDs := make([]int, 0, totalQuestions)
 	order := 0
@@ -188,7 +191,7 @@ func (s *SessionBuilderService) buildSession(
 			ctx,
 			userID,
 			language,
-			level,
+			levels,
 			string(model.CategoryVocabulary),
 			excludeIDs,
 			reservedVocabularyCount,
@@ -210,7 +213,7 @@ func (s *SessionBuilderService) buildSession(
 			ctx,
 			userID,
 			language,
-			level,
+			levels,
 			string(model.CategoryListening),
 			excludeIDs,
 			reservedListeningCount,
@@ -266,7 +269,7 @@ func (s *SessionBuilderService) buildSession(
 					ctx,
 					userID,
 					language,
-					level,
+					levels,
 					cat,
 					excludeIDs,
 					alloc,

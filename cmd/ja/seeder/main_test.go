@@ -3,12 +3,27 @@ package main
 import (
 	"context"
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 
 	ja "github.com/lsj/copylingo/cmd/ja/catalog"
 	"github.com/lsj/copylingo/internal/model"
 )
+
+var (
+	defaultTestCatalog    = catalogForTest(defaultProficiencyLevel())
+	additionalTestCatalog = catalogForTest("N4")
+)
+
+func catalogForTest(level string) levelCatalog {
+	for _, catalog := range levelCatalogs {
+		if catalog.Level == level {
+			return catalog
+		}
+	}
+	panic("test catalog not found: " + level)
+}
 
 func TestKanaScriptLabel(t *testing.T) {
 	t.Parallel()
@@ -284,7 +299,7 @@ func TestBuildKanaToMeaningQuestion(t *testing.T) {
 	t.Parallel()
 
 	word := vocabWord{ID: "n5_word_test", Kana: "みず", Kanji: "水", MeaningKo: "물", PartOfSpeech: "noun"}
-	q := buildKanaToMeaningQuestion(rand.New(rand.NewSource(1)), word, n5Words)
+	q := buildKanaToMeaningQuestion(rand.New(rand.NewSource(1)), word, defaultTestCatalog.Words)
 
 	if q.Type != model.QuestionMultipleChoice {
 		t.Fatalf("type = %q, want %q", q.Type, model.QuestionMultipleChoice)
@@ -298,8 +313,8 @@ func TestBuildKanaToMeaningQuestion(t *testing.T) {
 	if q.Language != vocabLanguage {
 		t.Fatalf("language = %q, want %q", q.Language, vocabLanguage)
 	}
-	if q.ProficiencyLevel != vocabProficiencyLevel {
-		t.Fatalf("level = %q, want %q", q.ProficiencyLevel, vocabProficiencyLevel)
+	if q.ProficiencyLevel != defaultTestCatalog.Level {
+		t.Fatalf("level = %q, want %q", q.ProficiencyLevel, defaultTestCatalog.Level)
 	}
 	if q.Difficulty != vocabDifficulty {
 		t.Fatalf("difficulty = %d, want %d", q.Difficulty, vocabDifficulty)
@@ -420,8 +435,8 @@ func TestBuildMeaningToKanaHandwritingQuestionCounterUsesKanjiReadingPrompt(t *t
 func TestBuildGrammarMeaningQuestion(t *testing.T) {
 	t.Parallel()
 
-	point := n5GrammarPoints[0]
-	q := buildGrammarMeaningQuestion(rand.New(rand.NewSource(1)), point, n5GrammarPoints)
+	point := defaultTestCatalog.GrammarPoints[0]
+	q := buildGrammarMeaningQuestion(rand.New(rand.NewSource(1)), point, defaultTestCatalog.GrammarPoints)
 
 	if q.Type != model.QuestionMultipleChoice {
 		t.Fatalf("type = %q, want %q", q.Type, model.QuestionMultipleChoice)
@@ -435,8 +450,8 @@ func TestBuildGrammarMeaningQuestion(t *testing.T) {
 	if q.Language != vocabLanguage {
 		t.Fatalf("language = %q, want %q", q.Language, vocabLanguage)
 	}
-	if q.ProficiencyLevel != vocabProficiencyLevel {
-		t.Fatalf("level = %q, want %q", q.ProficiencyLevel, vocabProficiencyLevel)
+	if q.ProficiencyLevel != defaultTestCatalog.Level {
+		t.Fatalf("level = %q, want %q", q.ProficiencyLevel, defaultTestCatalog.Level)
 	}
 	if q.Difficulty != ja.GrammarDifficulty {
 		t.Fatalf("difficulty = %d, want %d", q.Difficulty, ja.GrammarDifficulty)
@@ -459,7 +474,7 @@ func TestBuildGrammarMeaningQuestion(t *testing.T) {
 func TestBuildGrammarFormQuestion(t *testing.T) {
 	t.Parallel()
 
-	point := n5GrammarPoints[8]
+	point := defaultTestCatalog.GrammarPoints[8]
 	q := buildGrammarFormQuestion(point)
 
 	if q.Type != model.QuestionMultipleChoice {
@@ -488,12 +503,12 @@ func TestBuildGrammarFormQuestion(t *testing.T) {
 func TestSeederN5WordsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(n5Words) != 540 {
-		t.Fatalf("len(n5Words) = %d, want 540", len(n5Words))
+	if len(defaultTestCatalog.Words) != 540 {
+		t.Fatalf("len(default words) = %d, want 540", len(defaultTestCatalog.Words))
 	}
 
-	ids := make(map[string]bool, len(n5Words))
-	for _, word := range n5Words {
+	ids := make(map[string]bool, len(defaultTestCatalog.Words))
+	for _, word := range defaultTestCatalog.Words {
 		if word.ID == "" {
 			t.Fatalf("empty ID for word %+v", word)
 		}
@@ -516,12 +531,12 @@ func TestSeederN5WordsIntegrity(t *testing.T) {
 func TestSeederN5GrammarPointsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(n5GrammarPoints) != 80 {
-		t.Fatalf("len(n5GrammarPoints) = %d, want 80", len(n5GrammarPoints))
+	if len(defaultTestCatalog.GrammarPoints) != 80 {
+		t.Fatalf("len(default grammar points) = %d, want 80", len(defaultTestCatalog.GrammarPoints))
 	}
 
-	ids := make(map[string]bool, len(n5GrammarPoints))
-	for _, point := range n5GrammarPoints {
+	ids := make(map[string]bool, len(defaultTestCatalog.GrammarPoints))
+	for _, point := range defaultTestCatalog.GrammarPoints {
 		if point.ID == "" {
 			t.Fatalf("empty ID for grammar point %+v", point)
 		}
@@ -538,12 +553,12 @@ func TestSeederN5GrammarPointsIntegrity(t *testing.T) {
 func TestBuildVocabularyQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDsByWordID := make(map[string]int, len(n5Words))
-	for idx, word := range n5Words {
+	materialIDsByWordID := make(map[string]int, len(defaultTestCatalog.Words))
+	for idx, word := range defaultTestCatalog.Words {
 		materialIDsByWordID[word.ID] = idx + 1
 	}
 
-	questions := buildVocabularyQuestions(rand.New(rand.NewSource(1)), n5Words, materialIDsByWordID)
+	questions := buildVocabularyQuestions(rand.New(rand.NewSource(1)), defaultTestCatalog.Words, materialIDsByWordID)
 	if len(questions) != 2051 {
 		t.Fatalf("len(questions) = %d, want 2051", len(questions))
 	}
@@ -556,7 +571,7 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 		if q.Skill != nil {
 			countBySkill[*q.Skill]++
 		}
-		if q.Language != vocabLanguage || q.ProficiencyLevel != vocabProficiencyLevel ||
+		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
 			t.Fatalf("unexpected question metadata: %+v", q)
 		}
@@ -649,12 +664,16 @@ func TestShouldBuildKanjiRecallQuestion(t *testing.T) {
 func TestBuildGrammarQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDsByGrammarID := make(map[string]int, len(n5GrammarPoints))
-	for idx, point := range n5GrammarPoints {
+	materialIDsByGrammarID := make(map[string]int, len(defaultTestCatalog.GrammarPoints))
+	for idx, point := range defaultTestCatalog.GrammarPoints {
 		materialIDsByGrammarID[point.ID] = idx + 1
 	}
 
-	questions := buildGrammarQuestions(rand.New(rand.NewSource(1)), n5GrammarPoints, materialIDsByGrammarID)
+	questions := buildGrammarQuestions(
+		rand.New(rand.NewSource(1)),
+		defaultTestCatalog.GrammarPoints,
+		materialIDsByGrammarID,
+	)
 	if len(questions) != 160 {
 		t.Fatalf("len(questions) = %d, want 160", len(questions))
 	}
@@ -663,7 +682,7 @@ func TestBuildGrammarQuestions(t *testing.T) {
 	seenKeys := make(map[string]bool, len(questions))
 	for _, q := range questions {
 		countByType[q.Type]++
-		if q.Language != vocabLanguage || q.ProficiencyLevel != vocabProficiencyLevel ||
+		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryGrammar || q.Difficulty != ja.GrammarDifficulty {
 			t.Fatalf("unexpected question metadata: %+v", q)
 		}
@@ -697,15 +716,15 @@ func TestBuildGrammarQuestions(t *testing.T) {
 func TestBuildVocabContextQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDsByWordID := make(map[string]int, len(n5Words))
-	for idx, word := range n5Words {
+	materialIDsByWordID := make(map[string]int, len(defaultTestCatalog.Words))
+	for idx, word := range defaultTestCatalog.Words {
 		materialIDsByWordID[word.ID] = idx + 1
 	}
 
 	questions := buildVocabContextQuestions(
 		rand.New(rand.NewSource(1)),
-		n5VocabContext,
-		wordsByID(n5Words),
+		defaultTestCatalog.VocabContexts,
+		wordsByID(defaultTestCatalog.Words),
 		materialIDsByWordID,
 	)
 	if len(questions) != 45 {
@@ -720,7 +739,7 @@ func TestBuildVocabContextQuestions(t *testing.T) {
 		if q.Skill == nil || *q.Skill != model.SkillVocabContext {
 			t.Fatalf("skill = %v, want vocab_context: %+v", q.Skill, q)
 		}
-		if q.Language != vocabLanguage || q.ProficiencyLevel != vocabProficiencyLevel ||
+		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
 			t.Fatalf("unexpected question metadata: %+v", q)
 		}
@@ -767,16 +786,16 @@ func TestBuildVocabContextQuestions(t *testing.T) {
 func TestBuildListeningQuestions(t *testing.T) {
 	t.Parallel()
 
-	questions := buildListeningQuestions(n5ListeningQuestions)
+	questions := buildListeningQuestions(defaultTestCatalog.ListeningQuestions)
 	if len(questions) != 50 {
 		t.Fatalf("len(questions) = %d, want 50", len(questions))
 	}
 
 	seenKeys := make(map[string]bool, len(questions))
 	for i, question := range questions {
-		item := n5ListeningQuestions[i]
+		item := defaultTestCatalog.ListeningQuestions[i]
 		if question.Type != model.QuestionListening || question.Category != model.CategoryListening ||
-			question.Language != vocabLanguage || question.ProficiencyLevel != vocabProficiencyLevel {
+			question.Language != vocabLanguage || question.ProficiencyLevel != defaultTestCatalog.Level {
 			t.Fatalf("question %d has unexpected metadata: %+v", i, question)
 		}
 		if question.Skill == nil || *question.Skill != item.Skill {
@@ -970,7 +989,7 @@ func TestBuildReadingQuestions(t *testing.T) {
 		question.Skill == nil || *question.Skill != model.SkillReadingShort ||
 		question.Category != model.CategoryReading ||
 		question.Language != vocabLanguage ||
-		question.ProficiencyLevel != vocabProficiencyLevel ||
+		question.ProficiencyLevel != defaultTestCatalog.Level ||
 		question.Difficulty != 2 {
 		t.Fatalf("unexpected reading question metadata: %+v", question)
 	}
@@ -994,15 +1013,15 @@ func TestBuildReadingQuestions(t *testing.T) {
 func TestN5WordOrderIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(n5WordOrderQuestions) != 30 {
-		t.Fatalf("expected 30 word-order questions, got %d", len(n5WordOrderQuestions))
+	if len(defaultTestCatalog.WordOrderQuestions) != 30 {
+		t.Fatalf("expected 30 word-order questions, got %d", len(defaultTestCatalog.WordOrderQuestions))
 	}
-	grammarIDs := make(map[string]struct{}, len(n5GrammarPoints))
-	for _, point := range n5GrammarPoints {
+	grammarIDs := make(map[string]struct{}, len(defaultTestCatalog.GrammarPoints))
+	for _, point := range defaultTestCatalog.GrammarPoints {
 		grammarIDs[point.ID] = struct{}{}
 	}
-	seen := make(map[string]struct{}, len(n5WordOrderQuestions))
-	for _, item := range n5WordOrderQuestions {
+	seen := make(map[string]struct{}, len(defaultTestCatalog.WordOrderQuestions))
+	for _, item := range defaultTestCatalog.WordOrderQuestions {
 		if item.ID == "" {
 			t.Fatal("word-order item has empty id")
 		}
@@ -1025,13 +1044,13 @@ func TestN5WordOrderIntegrity(t *testing.T) {
 func TestBuildWordOrderQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDs := make(map[string]int, len(n5GrammarPoints))
-	for i, point := range n5GrammarPoints {
+	materialIDs := make(map[string]int, len(defaultTestCatalog.GrammarPoints))
+	for i, point := range defaultTestCatalog.GrammarPoints {
 		materialIDs[point.ID] = i + 1
 	}
-	questions := buildWordOrderQuestions(n5WordOrderQuestions, materialIDs)
-	if len(questions) != len(n5WordOrderQuestions) {
-		t.Fatalf("len(word-order questions) = %d, want %d", len(questions), len(n5WordOrderQuestions))
+	questions := buildWordOrderQuestions(defaultTestCatalog.WordOrderQuestions, materialIDs)
+	if len(questions) != len(defaultTestCatalog.WordOrderQuestions) {
+		t.Fatalf("len(word-order questions) = %d, want %d", len(questions), len(defaultTestCatalog.WordOrderQuestions))
 	}
 	seen := make(map[string]struct{}, len(questions))
 	for _, question := range questions {
@@ -1098,6 +1117,139 @@ func TestLoadReadingMaterialIDsMissing(t *testing.T) {
 	if !strings.Contains(err.Error(), "ja:reading:n5_reading_0003") {
 		t.Fatalf("error = %q, want missing material key", err)
 	}
+}
+
+func TestBuildN4QuestionsIntegrityAndTaxonomy(t *testing.T) {
+	t.Parallel()
+
+	questions := buildAdditionalLevelQuestionsForTest()
+	wantTypes := map[model.Skill]bool{
+		model.SkillVocabKanjiReading:      true,
+		model.SkillVocabOrthography:       true,
+		model.SkillVocabContext:           true,
+		model.SkillVocabParaphrase:        true,
+		model.SkillVocabUsage:             true,
+		model.SkillGrammarForm:            true,
+		model.SkillSentenceComposition:    true,
+		model.SkillGrammarText:            true,
+		model.SkillReadingShort:           true,
+		model.SkillReadingMedium:          true,
+		model.SkillReadingInformation:     true,
+		model.SkillListeningTask:          true,
+		model.SkillListeningKeyPoint:      true,
+		model.SkillListeningVerbal:        true,
+		model.SkillListeningQuickResponse: true,
+	}
+	gotTypes := make(map[model.Skill]bool, len(questions))
+	seenKeys := make(map[string]bool, len(questions))
+	for _, question := range questions {
+		if question.ProficiencyLevel != additionalTestCatalog.Level {
+			t.Fatalf("question level = %q, want %q", question.ProficiencyLevel, additionalTestCatalog.Level)
+		}
+		if question.Skill == nil {
+			t.Fatal("N4 question has nil item_type")
+		}
+		gotTypes[*question.Skill] = true
+		if question.QuestionKey == nil || !strings.Contains(*question.QuestionKey, "n4") {
+			t.Fatalf("N4 question key = %v, want level-aware key", question.QuestionKey)
+		}
+		if seenKeys[*question.QuestionKey] {
+			t.Fatalf("duplicate N4 question key %q", *question.QuestionKey)
+		}
+		seenKeys[*question.QuestionKey] = true
+
+		options, err := question.GetOptions()
+		if err != nil {
+			t.Fatalf("GetOptions(%q): %v", *question.QuestionKey, err)
+		}
+		switch question.Type {
+		case model.QuestionMultipleChoice, model.QuestionReadingComp:
+			if len(options) == 0 || !containsString(options, question.CorrectAnswer) {
+				t.Fatalf(
+					"question %q has invalid options/answer: %v / %q",
+					*question.QuestionKey,
+					options,
+					question.CorrectAnswer,
+				)
+			}
+		case model.QuestionWordOrder:
+			if strings.Join(options, "") != question.CorrectAnswer {
+				t.Fatalf("question %q chunks do not join to answer", *question.QuestionKey)
+			}
+		}
+		if question.Category == model.CategoryListening {
+			if question.MaterialID != nil || question.AudioScript == nil || *question.AudioScript == "" {
+				t.Fatalf("listening question %q must be material-less with audio script", *question.QuestionKey)
+			}
+		} else if question.MaterialID == nil {
+			t.Fatalf("non-listening question %q has no material reference", *question.QuestionKey)
+		}
+	}
+	if len(gotTypes) != len(wantTypes) {
+		t.Fatalf("N4 item_type count = %d, want %d (%v)", len(gotTypes), len(wantTypes), gotTypes)
+	}
+	for itemType := range wantTypes {
+		if !gotTypes[itemType] {
+			t.Fatalf("missing N4 item_type %q", itemType)
+		}
+	}
+}
+
+func TestBuildAdditionalLevelQuestionsDeterministic(t *testing.T) {
+	t.Parallel()
+
+	first := buildAdditionalLevelQuestionsForTest()
+	second := buildAdditionalLevelQuestionsForTest()
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("combined N4 question seed output is not deterministic")
+	}
+}
+
+func buildAdditionalLevelQuestionsForTest() []*model.Question {
+	wordIDs := make(map[string]int, len(additionalTestCatalog.Words))
+	for i, word := range additionalTestCatalog.Words {
+		wordIDs[word.ID] = i + 1
+	}
+	grammarIDs := make(map[string]int, len(additionalTestCatalog.GrammarPoints))
+	for i, point := range additionalTestCatalog.GrammarPoints {
+		grammarIDs[point.ID] = len(wordIDs) + i + 1
+	}
+	readingIDs := make(map[string]int, len(additionalTestCatalog.ReadingPassages))
+	for i, passage := range additionalTestCatalog.ReadingPassages {
+		readingIDs[passage.ID] = len(wordIDs) + len(grammarIDs) + i + 1
+	}
+	materialIDsByKey := materialIDsForCatalogKeys(
+		additionalTestCatalog.Words,
+		additionalTestCatalog.GrammarPoints,
+		additionalTestCatalog.ReadingPassages,
+		wordIDs,
+		grammarIDs,
+		readingIDs,
+	)
+	questions := make([]*model.Question, 0)
+	questions = append(
+		questions,
+		buildListeningQuestionsForLevel(additionalTestCatalog.Level, additionalTestCatalog.ListeningQuestions)...)
+	questions = append(
+		questions,
+		buildReadingQuestionsForLevel(
+			additionalTestCatalog.Level,
+			additionalTestCatalog.ReadingPassages,
+			readingIDs,
+		)...)
+	questions = append(
+		questions,
+		buildQuestionSeeds(additionalTestCatalog.Level, additionalTestCatalog.QuestionSeeds, materialIDsByKey)...)
+	return questions
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 type fakeReadingMaterialStore struct {

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/config"
@@ -10,18 +11,18 @@ import (
 )
 
 type mockQuestionFetcher struct {
-	getNewQuestionsFn func(ctx context.Context, userID int64, language, level, category string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error)
+	getNewQuestionsFn func(ctx context.Context, userID int64, language string, levels []string, category string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error)
 	getByIDFn         func(ctx context.Context, id int) (*model.Question, error)
 }
 
 func (m *mockQuestionFetcher) GetNewQuestions(
 	ctx context.Context,
 	userID int64,
-	lang, level, cat string,
+	lang string, levels []string, cat string,
 	excludeIDs []int,
 	limit, kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return m.getNewQuestionsFn(ctx, userID, lang, level, cat, excludeIDs, limit, kanjiRecallLimit)
+	return m.getNewQuestionsFn(ctx, userID, lang, levels, cat, excludeIDs, limit, kanjiRecallLimit)
 }
 func (m *mockQuestionFetcher) GetByID(ctx context.Context, id int) (*model.Question, error) {
 	return m.getByIDFn(ctx, id)
@@ -90,7 +91,7 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 	collectedNewCount := 0
 	getNewQuestionsCalls := 0
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang string, levels []string, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
@@ -177,10 +178,13 @@ func TestBuildMorningSession_ReservesListeningAndBuildsSeventeenQuestions(t *tes
 		getNewQuestionsFn: func(
 			ctx context.Context,
 			gotUserID int64,
-			language, level, category string,
+			language string, levels []string, category string,
 			excludeIDs []int,
 			limit, kanjiRecallLimit int,
 		) ([]model.Question, error) {
+			if !slices.Equal(levels, []string{"N5", "N4"}) {
+				t.Fatalf("levels = %v, want [N5 N4]", levels)
+			}
 			switch category {
 			case string(model.CategoryVocabulary):
 				if limit == 6 {
@@ -264,7 +268,7 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang string, levels []string, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if gotUserID != userID {
 				t.Fatalf("expected userID %d, got %d", userID, gotUserID)
 			}
@@ -332,7 +336,7 @@ func TestBuildEveningSession_FillsVocabularyShortageWithRelay(t *testing.T) {
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang string, levels []string, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			if cat == string(model.CategoryVocabulary) {
 				vocabularyCalls++
 				if vocabularyCalls == 1 {
@@ -495,7 +499,7 @@ func TestBuildMorningSession_PassesRemainingKanjiRecallBudgetToNewFetches(t *tes
 		getNewQuestionsFn: func(
 			ctx context.Context,
 			userID int64,
-			language, level, category string,
+			language string, levels []string, category string,
 			excludeIDs []int,
 			limit, kanjiRecallLimit int,
 		) ([]model.Question, error) {
@@ -555,7 +559,7 @@ func TestBuildSession_NoQuestions(t *testing.T) {
 	}
 
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang string, levels []string, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return nil, nil
 		},
 	}
@@ -643,7 +647,7 @@ func TestBuildSession_DeduplicatesQuestionIDs(t *testing.T) {
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang string, levels []string, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			return []model.Question{{ID: 1}, {ID: 2}, {ID: 2}}, nil
 		},
 	}
@@ -698,7 +702,7 @@ func TestBuildSession_CapsReadingAtOne(t *testing.T) {
 		},
 	}
 	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang, level, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
+		getNewQuestionsFn: func(ctx context.Context, gotUserID int64, lang string, levels []string, cat string, excludeIDs []int, limit, kanjiRecallLimit int) ([]model.Question, error) {
 			switch cat {
 			case string(model.CategoryReading):
 				// The review already consumed the reading budget, so the relay
