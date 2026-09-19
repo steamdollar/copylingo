@@ -38,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-19 | 동적 개인화 푸시(ADR-048) 활성화 시 레거시 정적 Study Cron 등록 원천 차단 및 config.yaml 정리 | [2609192205_disable_legacy_study_crons.md](docs/workthrough/2609/2609192205_disable_legacy_study_crons.md) |
 | 2026-09-19 | 세션별 객관식·청해 보기(Options) 결정론적 셔플링(`sessionID:questionID` Seed 기반 멱등성 보장 및 위치 암기 방지) | [2609192027_deterministic_question_option_shuffle.md](docs/workthrough/2609/2609192027_deterministic_question_option_shuffle.md) |
 | 2026-09-18 | JLPT N4 vocab_usage(용법) 동어 반복 결함 수정 (120문항 4개 선지 전수 목표 단어 포함 및 DB 반영) | [2609180051_fix_vocab_usage_trivial_distractors.md](docs/workthrough/2609/2609180051_fix_vocab_usage_trivial_distractors.md) |
 | 2026-09-17 | 긴 4지선다 선택지를 세로 4행으로 표시하고 짧은 선택지는 기존 배치 유지 | [2609170929_mcq_long_option_layout.md](docs/workthrough/2609/2609170929_mcq_long_option_layout.md) |

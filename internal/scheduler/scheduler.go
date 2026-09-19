@@ -115,35 +115,36 @@ func (s *Scheduler) Start() {
 		}
 	}
 
-	// Legacy study push cron (backward compatibility when explicitly configured)
-	if !s.cfg.Schedule.StudyPushCron.IsZero() {
-		if _, err := s.cron.AddFunc(s.cfg.Schedule.StudyPushCron.String(), func() {
-			s.runJob("study_push", 0, func(ctx context.Context) error {
-				return s.buildAndPushStudySessions(ctx, service.StudyProfileMorning)
-			})
-		}); err != nil {
-			slog.Error("Failed to register scheduler job",
-				"event", "scheduler.job.registration_failed",
-				"source", "scheduler",
-				"job", "study_push",
-				"error", err,
-			)
+	// Legacy study push crons (only registered when dynamic push is disabled/not configured)
+	if s.cfg.Schedule.DynamicPushCron.IsZero() {
+		if !s.cfg.Schedule.StudyPushCron.IsZero() {
+			if _, err := s.cron.AddFunc(s.cfg.Schedule.StudyPushCron.String(), func() {
+				s.runJob("study_push", 0, func(ctx context.Context) error {
+					return s.buildAndPushStudySessions(ctx, service.StudyProfileMorning)
+				})
+			}); err != nil {
+				slog.Error("Failed to register scheduler job",
+					"event", "scheduler.job.registration_failed",
+					"source", "scheduler",
+					"job", "study_push",
+					"error", err,
+				)
+			}
 		}
-	}
 
-	// Legacy afternoon study push cron (backward compatibility when explicitly configured)
-	if !s.cfg.Schedule.AfternoonStudyPushCron.IsZero() {
-		if _, err := s.cron.AddFunc(s.cfg.Schedule.AfternoonStudyPushCron.String(), func() {
-			s.runJob("afternoon_study_push", 0, func(ctx context.Context) error {
-				return s.buildAndPushStudySessions(ctx, service.StudyProfileEvening)
-			})
-		}); err != nil {
-			slog.Error("Failed to register scheduler job",
-				"event", "scheduler.job.registration_failed",
-				"source", "scheduler",
-				"job", "afternoon_study_push",
-				"error", err,
-			)
+		if !s.cfg.Schedule.AfternoonStudyPushCron.IsZero() {
+			if _, err := s.cron.AddFunc(s.cfg.Schedule.AfternoonStudyPushCron.String(), func() {
+				s.runJob("afternoon_study_push", 0, func(ctx context.Context) error {
+					return s.buildAndPushStudySessions(ctx, service.StudyProfileEvening)
+				})
+			}); err != nil {
+				slog.Error("Failed to register scheduler job",
+					"event", "scheduler.job.registration_failed",
+					"source", "scheduler",
+					"job", "afternoon_study_push",
+					"error", err,
+				)
+			}
 		}
 	}
 

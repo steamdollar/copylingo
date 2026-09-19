@@ -83,3 +83,43 @@ func TestStartRegistersDynamicPushJob(t *testing.T) {
 		t.Fatalf("registered cron entries = %d, want %d", got, want)
 	}
 }
+
+func TestStart_DynamicPushDisablesLegacyStudyCrons(t *testing.T) {
+	t.Run("when dynamic push is active, legacy study crons are not registered", func(t *testing.T) {
+		c := cron.New()
+		scheduler := New(&config.Config{
+			Schedule: config.ScheduleConfig{
+				DynamicPushCron:        "*/30 * * * *",
+				StudyPushCron:          "0 8 * * *",
+				AfternoonStudyPushCron: "30 16 * * *",
+			},
+		}, nil, nil, nil, c)
+
+		scheduler.Start()
+		defer scheduler.Stop()
+
+		// Only dynamic_user_push must be registered; legacy study_push and afternoon_study_push must be skipped
+		if got, want := len(c.Entries()), 1; got != want {
+			t.Fatalf("registered cron entries = %d, want %d (legacy crons should be ignored)", got, want)
+		}
+	})
+
+	t.Run("when dynamic push is zero, legacy study crons are registered", func(t *testing.T) {
+		c := cron.New()
+		scheduler := New(&config.Config{
+			Schedule: config.ScheduleConfig{
+				DynamicPushCron:        "",
+				StudyPushCron:          "0 8 * * *",
+				AfternoonStudyPushCron: "30 16 * * *",
+			},
+		}, nil, nil, nil, c)
+
+		scheduler.Start()
+		defer scheduler.Stop()
+
+		// Legacy study_push and afternoon_study_push should both be registered
+		if got, want := len(c.Entries()), 2; got != want {
+			t.Fatalf("registered cron entries = %d, want %d (legacy crons should be registered)", got, want)
+		}
+	})
+}

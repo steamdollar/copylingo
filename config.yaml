@@ -43,13 +43,14 @@ storage:               # S3-compatible object store for TTS audio (ADR-032)
 schedule:
   max_unfinished_sessions: 3         # 사용자별 자동 세션 미완료 상한 (1~3)
   content_collect_cron: "0 3 * * *"    # 매일 03:00 - 콘텐츠 수집
-  dynamic_push_cron: "*/30 * * * *"    # 30분 단위 개인화 푸시
-  morning_build_cron: "30 7 * * *"     # 매일 07:30 - 오전 세션 빌드 (legacy 키)
-  morning_push_cron: "0 12 * * *"      # 매일 12:00 - 정오 Quiz 세션 푸시 (legacy 키)
-  study_push_cron: "0 8 * * *"         # 매일 08:00 - 아침 Study 세션 푸시
-  afternoon_study_push_cron: "30 16 * * *" # 매일 16:30 - 오후 Study 세션 푸시
-  evening_build_cron: "30 20 * * *"    # 매일 20:30 - 저녁 세션 빌드 (legacy 키)
-  evening_push_cron: "0 21 * * *"      # 매일 21:00 - 저녁 Quiz 세션 푸시 (legacy 키)
+  dynamic_push_cron: "*/30 * * * *"    # 30분 단위 개인화 푸시 엔진 (ADR-048)
+  # Legacy crons below are superseded by dynamic_push_cron and kept empty for backward compatibility
+  morning_build_cron: ""
+  morning_push_cron: ""
+  study_push_cron: ""
+  afternoon_study_push_cron: ""
+  evening_build_cron: ""
+  evening_push_cron: ""
 
 logging:
   dir: ./logs
