@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -117,6 +118,68 @@ func TestActiveSessionCreateFromDBAndGet(t *testing.T) {
 	}
 	if got.CurrentIndex != 1 {
 		t.Fatalf("expected CurrentIndex 1 (first unanswered), got %d", got.CurrentIndex)
+	}
+}
+
+func TestActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
+	ctx := context.Background()
+	sessionID := 101
+	rdb := newFakeActiveSessionRedis()
+
+	rawOptions := json.RawMessage(`["A","B","C","D","E"]`)
+	repo := &fakeActiveSessionRepo{
+		loadFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+			state := activeSessionTestState(sid, 123, false)
+			state.Items[0].Question.ID = 42
+			state.Items[0].Question.Options = rawOptions
+			return state, nil
+		},
+	}
+	svc := NewActiveSessionService(repo, rdb, nil)
+
+	created, err := svc.CreateFromDB(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("CreateFromDB failed: %v", err)
+	}
+
+	opts, err := created.Items[0].Question.GetOptions()
+	if err != nil {
+		t.Fatalf("GetOptions failed: %v", err)
+	}
+	if len(opts) != 5 {
+		t.Fatalf("expected 5 options, got %d", len(opts))
+	}
+
+	// Verify deterministic: same sessionID + questionID yields identical order
+	rdb2 := newFakeActiveSessionRedis()
+	svc2 := NewActiveSessionService(repo, rdb2, nil)
+	created2, err := svc2.CreateFromDB(ctx, sessionID)
+	if err != nil {
+		t.Fatalf("CreateFromDB 2 failed: %v", err)
+	}
+	opts2, _ := created2.Items[0].Question.GetOptions()
+	for i := range opts {
+		if opts[i] != opts2[i] {
+			t.Fatalf("expected identical order for same session, mismatch at %d: %s vs %s", i, opts[i], opts2[i])
+		}
+	}
+
+	// Verify different sessionID yields different permutation across sessions
+	differentPermutationFound := false
+	for nextSID := sessionID + 1; nextSID <= sessionID+20; nextSID++ {
+		rdbN := newFakeActiveSessionRedis()
+		svcN := NewActiveSessionService(repo, rdbN, nil)
+		createdN, err := svcN.CreateFromDB(ctx, nextSID)
+		if err != nil {
+			t.Fatalf("CreateFromDB N failed: %v", err)
+		}
+		if string(createdN.Items[0].Question.Options) != string(created.Items[0].Question.Options) {
+			differentPermutationFound = true
+			break
+		}
+	}
+	if !differentPermutationFound {
+		t.Fatal("expected at least one different permutation across 20 sessions")
 	}
 }
 

@@ -32,10 +32,16 @@
 
 - [ ] Cloudflare Tunnel(cloudflared/trycloudflare) Korea-block 노출 대응 — 손글씨 Mini App ingress가 Cloudflare 의존이라 한국 재차단 시 통째 중단 위험(현시점 도달은 정상). **(Case A 선결: 자체 도메인+named tunnel vs 비-CF ingress vs accept+monitor 미결)** see [docs/todos/cloudflare_korea_tunnel_risk.md](docs/todos/cloudflare_korea_tunnel_risk.md)
 
+- [ ] Tip 및 Audio Top-up 시스템 유지보수 Cron 분리 — 세션 발송과 무관한 시스템 차원의 Tip 보충 및 청해 음성 사전 생성 작업을 독립 Cron으로 분리. see [docs/todos/decouple_tip_audio_topup_cron.md](docs/todos/decouple_tip_audio_topup_cron.md)
+
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-19 | 세션별 객관식·청해 보기(Options) 결정론적 셔플링(`sessionID:questionID` Seed 기반 멱등성 보장 및 위치 암기 방지) | [2609192027_deterministic_question_option_shuffle.md](docs/workthrough/2609/2609192027_deterministic_question_option_shuffle.md) |
+| 2026-09-18 | JLPT N4 vocab_usage(용법) 동어 반복 결함 수정 (120문항 4개 선지 전수 목표 단어 포함 및 DB 반영) | [2609180051_fix_vocab_usage_trivial_distractors.md](docs/workthrough/2609/2609180051_fix_vocab_usage_trivial_distractors.md) |
+| 2026-09-17 | 긴 4지선다 선택지를 세로 4행으로 표시하고 짧은 선택지는 기존 배치 유지 | [2609170929_mcq_long_option_layout.md](docs/workthrough/2609/2609170929_mcq_long_option_layout.md) |
+| 2026-09-14 | 사용자별 30분 단위 개인화 푸시 스케줄링(Study/Quiz 4슬롯), 다중 타임존 partial index, Worker Pool+Rate Limiter, Redis 멱등성 락 및 텔레그램 설정 UI (ADR-048) | [2609140025_dynamic_user_scheduling.md](docs/workthrough/2609/2609140025_dynamic_user_scheduling.md) |
 | 2026-09-13 | Study 아침 20·저녁 24개 및 유형별 신규량 보장, 현재 레벨 신규 우선, due 보충·수동 limit 배분, cron 설정 정합성 (ADR-047) | [2609132312_study_morning_evening_mix.md](docs/workthrough/2609/2609132312_study_morning_evening_mix.md) |
 | 2026-09-02 | N4 원본 catalog 15종(760 materials/1,040 questions) + generic level registry + Study·Quiz 현재 level ±1 scope + TTS 80건 (ADR-046) | `2609/2609020916_n4_catalog_adjacent_levels.md` |
 | 2026-08-30 | Scheduled Quiz/Study 미완료 backlog를 합산 3개까지 허용하고 cap 도달 시 기존 세션 재알림 (ADR-045) | `2608/2608302142_session_backlog_cap.md` |

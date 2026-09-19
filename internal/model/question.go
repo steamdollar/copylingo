@@ -2,6 +2,9 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
+	"hash/fnv"
+	"math/rand"
 	"time"
 )
 
@@ -116,4 +119,33 @@ func (q *Question) GetOptions() ([]string, error) {
 		return nil, err
 	}
 	return opts, nil
+}
+
+// ShuffleOptions deterministically shuffles the question options using a seed derived from sessionID and Question.ID.
+// If options contains 1 or fewer elements, or is empty/nil, it does nothing and returns nil.
+func (q *Question) ShuffleOptions(sessionID int) error {
+	if len(q.Options) == 0 {
+		return nil
+	}
+	var opts []string
+	if err := json.Unmarshal(q.Options, &opts); err != nil {
+		return err
+	}
+	if len(opts) <= 1 {
+		return nil
+	}
+
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(fmt.Sprintf("%d:%d", sessionID, q.ID)))
+	rng := rand.New(rand.NewSource(int64(h.Sum64())))
+	rng.Shuffle(len(opts), func(i, j int) {
+		opts[i], opts[j] = opts[j], opts[i]
+	})
+
+	shuffledJSON, err := json.Marshal(opts)
+	if err != nil {
+		return err
+	}
+	q.Options = shuffledJSON
+	return nil
 }

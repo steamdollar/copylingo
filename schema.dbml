@@ -5,9 +5,20 @@ Table users {
   proficiency_level varchar(10) [not null, default: 'N5', note: 'JLPT: N5-N1, CEFR: A1-C2']
   streak_days int [not null, default: 0]
   streak_last_date date
-  morning_session_time time [not null, default: '08:00']
-  evening_session_time time [not null, default: '21:00']
+  morning_session_time time [not null, default: '08:00', note: 'Legacy morning session time']
+  evening_session_time time [not null, default: '21:00', note: 'Legacy evening session time']
+  morning_study_time time [null, default: '08:00', note: 'Morning study time, null if disabled']
+  morning_quiz_time time [null, default: '12:00', note: 'Morning quiz time, null if disabled']
+  evening_study_time time [null, default: '16:30', note: 'Evening study time, null if disabled']
+  evening_quiz_time time [null, default: '21:00', note: 'Evening quiz time, null if disabled']
   timezone varchar(50) [not null, default: 'Asia/Seoul']
+
+  indexes {
+    (timezone, morning_study_time) [note: 'partial: WHERE morning_study_time IS NOT NULL']
+    (timezone, morning_quiz_time) [note: 'partial: WHERE morning_quiz_time IS NOT NULL']
+    (timezone, evening_study_time) [note: 'partial: WHERE evening_study_time IS NOT NULL']
+    (timezone, evening_quiz_time) [note: 'partial: WHERE evening_quiz_time IS NOT NULL']
+  }
 }
 
 Table contents {

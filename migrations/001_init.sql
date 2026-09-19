@@ -11,10 +11,30 @@ CREATE TABLE IF NOT EXISTS users (
     proficiency_level   VARCHAR(10) NOT NULL DEFAULT 'N5',      -- JLPT: N5-N1, CEFR: A1-C2
     streak_days         INT NOT NULL DEFAULT 0,
     streak_last_date    DATE,
-    morning_session_time TIME NOT NULL DEFAULT '08:00',
-    evening_session_time TIME NOT NULL DEFAULT '21:00',
+    morning_session_time TIME NOT NULL DEFAULT '08:00',         -- Legacy morning session time
+    evening_session_time TIME NOT NULL DEFAULT '21:00',         -- Legacy evening session time
+    morning_study_time  TIME DEFAULT '08:00',                   -- Dynamic slot: null if disabled
+    morning_quiz_time   TIME DEFAULT '12:00',                   -- Dynamic slot: null if disabled
+    evening_study_time  TIME DEFAULT '16:30',                   -- Dynamic slot: null if disabled
+    evening_quiz_time   TIME DEFAULT '21:00',                   -- Dynamic slot: null if disabled
     timezone            VARCHAR(50) NOT NULL DEFAULT 'Asia/Seoul'
 );
+
+CREATE INDEX IF NOT EXISTS idx_users_tz_morning_study
+    ON users(timezone, morning_study_time)
+    WHERE morning_study_time IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_tz_morning_quiz
+    ON users(timezone, morning_quiz_time)
+    WHERE morning_quiz_time IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_tz_evening_study
+    ON users(timezone, evening_study_time)
+    WHERE evening_study_time IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_tz_evening_quiz
+    ON users(timezone, evening_quiz_time)
+    WHERE evening_quiz_time IS NOT NULL;
 
 -----------------------------------------------------------
 -- contents (collected learning materials)

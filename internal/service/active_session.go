@@ -88,6 +88,17 @@ func (s *ActiveSessionService) CreateFromDB(ctx context.Context, sessionID int) 
 	state.RecountAnswered()
 	state.CurrentIndex = state.NextUnansweredIndex()
 
+	for i := range state.Items {
+		if err := state.Items[i].Question.ShuffleOptions(sessionID); err != nil {
+			return nil, fmt.Errorf(
+				"shuffle options session_id=%d question_id=%d: %w",
+				sessionID,
+				state.Items[i].Question.ID,
+				err,
+			)
+		}
+	}
+
 	// set at redis
 	if err := s.save(ctx, state); err != nil {
 		return nil, fmt.Errorf("store active session working set session_id=%d: %w", sessionID, err)
