@@ -38,7 +38,11 @@ func initInfra(cfg *config.Config) (*sqlx.DB, *redis.Client, func(), error) {
 	return db, rdb, func() { db.Close(); rdb.Close() }, nil
 }
 
-func initApp(cfg *config.Config, db *sqlx.DB, rdb *redis.Client) (*repository.Repositories, *service.Services, *bot.Bot, error) {
+func initApp(
+	cfg *config.Config,
+	db *sqlx.DB,
+	rdb *redis.Client,
+) (*repository.Repositories, *service.Services, *bot.Bot, error) {
 	repos := repository.NewRepositories(db)
 	services := service.NewServices(repos, cfg, rdb)
 	botHandler, err := bot.New(cfg, services, rdb)
@@ -48,9 +52,15 @@ func initApp(cfg *config.Config, db *sqlx.DB, rdb *redis.Client) (*repository.Re
 	return repos, services, botHandler, nil
 }
 
-func startWorkers(cfg *config.Config, services *service.Services, botHandler *bot.Bot, repos *repository.Repositories) func() {
+func startWorkers(
+	cfg *config.Config,
+	services *service.Services,
+	botHandler *bot.Bot,
+	repos *repository.Repositories,
+	rdb redis.Cmdable,
+) func() {
 	orchestrator := initPipeline(repos)
-	sched, stopSched := initScheduler(cfg, services, botHandler, orchestrator)
+	sched, stopSched := initScheduler(cfg, services, botHandler, orchestrator, rdb)
 	sched.Start()
 	go botHandler.Start()
 	go botHandler.RefreshStaleMiniAppMessages(context.Background())
@@ -103,9 +113,15 @@ func initPipeline(repos *repository.Repositories) *pipeline.Orchestrator {
 	return orchestrator
 }
 
-func initScheduler(cfg *config.Config, services *service.Services, botHandler *bot.Bot, orchestrator *pipeline.Orchestrator) (*scheduler.Scheduler, func()) {
+func initScheduler(
+	cfg *config.Config,
+	services *service.Services,
+	botHandler *bot.Bot,
+	orchestrator *pipeline.Orchestrator,
+	rdb redis.Cmdable,
+) (*scheduler.Scheduler, func()) {
 	cronScheduler := cron.New()
-	sched := scheduler.New(cfg, services, botHandler, orchestrator, cronScheduler)
+	sched := scheduler.New(cfg, services, botHandler, orchestrator, cronScheduler, rdb)
 	return sched, func() { sched.Stop() }
 }
 
@@ -144,7 +160,13 @@ func waitForShutdown(srv *http.Server, botHandler *bot.Bot) {
 	log.Println("Server stopped")
 }
 
-func setupRouter(cfg *config.Config, db *sqlx.DB, rdb *redis.Client, services *service.Services, botHandler *bot.Bot) *gin.Engine {
+func setupRouter(
+	cfg *config.Config,
+	db *sqlx.DB,
+	rdb *redis.Client,
+	services *service.Services,
+	botHandler *bot.Bot,
+) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}

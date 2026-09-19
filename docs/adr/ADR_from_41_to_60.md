@@ -115,3 +115,11 @@
 - **상태**: 채택됨
 - Study를 아침 20개·저녁 24개로 편성하고 유형별 신규량을 보장한다. 현재 레벨의 신규 Material을 우선하며, 복습 부족 시 신규량을 임의로 늘리지 않는다.
 - 상세: [ADR-047_study_morning_evening_mix.md](ADR-047_study_morning_evening_mix.md)
+
+## ADR-048: 사용자별 맞춤 푸시 스케줄링 및 30분 폴링 엔진
+
+- **날짜**: 2026-09-14
+- **상태**: 채택됨
+- 30분 이산 슬롯(`morning_study`, `morning_quiz`, `evening_study`, `evening_quiz`), 다중 타임존 partial index, Go 동시성 Worker Pool(4개)+Rate Limiter(25 msg/s), Redis 멱등성 락 및 텔레그램 설정 UI.
+- 상세: [ADR-048_personalized_push_scheduling.md](ADR-048_personalized_push_scheduling.md)
+

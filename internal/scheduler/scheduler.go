@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
 
-	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
@@ -23,6 +23,8 @@ type Scheduler struct {
 	bot          sessionPusher
 	orchestrator *pipeline.Orchestrator
 	cron         *cron.Cron
+	rdb          redis.Cmdable
+	dispatcher   *sessionDispatcher
 }
 
 type sessionPusher interface {
@@ -34,17 +36,25 @@ type sessionPusher interface {
 func New(
 	cfg *config.Config,
 	services *service.Services,
-	bot *bot.Bot,
+	bot sessionPusher,
 	orchestrator *pipeline.Orchestrator,
 	c *cron.Cron,
+	rdb ...redis.Cmdable,
 ) *Scheduler {
-	return &Scheduler{
+	var r redis.Cmdable
+	if len(rdb) > 0 {
+		r = rdb[0]
+	}
+	s := &Scheduler{
 		cfg:          cfg,
 		services:     services,
 		bot:          bot,
 		orchestrator: orchestrator,
 		cron:         c,
+		rdb:          r,
 	}
+	s.dispatcher = newSessionDispatcher(cfg, services, bot, r)
+	return s
 }
 
 // Start registers all cron jobs and starts the scheduler.
@@ -70,88 +80,71 @@ func (s *Scheduler) Start() {
 		}
 	}
 
-	// Morning session: build and push
-	if _, err := s.cron.AddFunc(s.cfg.Schedule.MorningPushCron.String(), func() {
-		s.runJob("morning_push", 0, func(ctx context.Context) error {
-			return s.buildAndPushSessions(ctx, model.SessionMorning)
-		})
-	}); err != nil {
-		slog.Error("Failed to register scheduler job",
-			"event", "scheduler.job.registration_failed",
-			"source", "scheduler",
-			"job", "morning_push",
-			"error", err,
-		)
-	} else {
-		slog.Info("Scheduler job registered",
-			"event", "scheduler.job.registered",
-			"source", "scheduler",
-			"job", "morning_push",
-			"cron", s.cfg.Schedule.MorningPushCron.String(),
-		)
+	// Dynamic 30-minute interval user push (primary scheduling engine)
+	if !s.cfg.Schedule.DynamicPushCron.IsZero() {
+		if _, err := s.cron.AddFunc(s.cfg.Schedule.DynamicPushCron.String(), func() {
+			s.runJob("dynamic_user_push", 10*time.Minute, s.tick)
+		}); err != nil {
+			slog.Error("Failed to register scheduler job",
+				"event", "scheduler.job.registration_failed",
+				"source", "scheduler",
+				"job", "dynamic_user_push",
+				"error", err,
+			)
+		} else {
+			slog.Info("Scheduler job registered",
+				"event", "scheduler.job.registered",
+				"source", "scheduler",
+				"job", "dynamic_user_push",
+				"cron", s.cfg.Schedule.DynamicPushCron.String(),
+			)
+		}
+	} else if s.cfg.Schedule.StudyPushCron.IsZero() && s.cfg.Schedule.AfternoonStudyPushCron.IsZero() &&
+		s.cfg.Schedule.MorningPushCron.IsZero() && s.cfg.Schedule.EveningPushCron.IsZero() {
+		// Default to dynamic 30-minute push if no schedule crons are configured
+		defaultCron := "*/30 * * * *"
+		if _, err := s.cron.AddFunc(defaultCron, func() {
+			s.runJob("dynamic_user_push", 10*time.Minute, s.tick)
+		}); err == nil {
+			slog.Info("Scheduler job registered",
+				"event", "scheduler.job.registered",
+				"source", "scheduler",
+				"job", "dynamic_user_push",
+				"cron", defaultCron,
+			)
+		}
 	}
 
-	// Study session: build and push
-	if _, err := s.cron.AddFunc(s.cfg.Schedule.StudyPushCron.String(), func() {
-		s.runJob("study_push", 0, func(ctx context.Context) error {
-			return s.buildAndPushStudySessions(ctx, service.StudyProfileMorning)
-		})
-	}); err != nil {
-		slog.Error("Failed to register scheduler job",
-			"event", "scheduler.job.registration_failed",
-			"source", "scheduler",
-			"job", "study_push",
-			"error", err,
-		)
-	} else {
-		slog.Info("Scheduler job registered",
-			"event", "scheduler.job.registered",
-			"source", "scheduler",
-			"job", "study_push",
-			"cron", s.cfg.Schedule.StudyPushCron.String(),
-		)
+	// Legacy study push cron (backward compatibility when explicitly configured)
+	if !s.cfg.Schedule.StudyPushCron.IsZero() {
+		if _, err := s.cron.AddFunc(s.cfg.Schedule.StudyPushCron.String(), func() {
+			s.runJob("study_push", 0, func(ctx context.Context) error {
+				return s.buildAndPushStudySessions(ctx, service.StudyProfileMorning)
+			})
+		}); err != nil {
+			slog.Error("Failed to register scheduler job",
+				"event", "scheduler.job.registration_failed",
+				"source", "scheduler",
+				"job", "study_push",
+				"error", err,
+			)
+		}
 	}
 
-	// Afternoon study session: build and push
-	if _, err := s.cron.AddFunc(s.cfg.Schedule.AfternoonStudyPushCron.String(), func() {
-		s.runJob("afternoon_study_push", 0, func(ctx context.Context) error {
-			return s.buildAndPushStudySessions(ctx, service.StudyProfileEvening)
-		})
-	}); err != nil {
-		slog.Error("Failed to register scheduler job",
-			"event", "scheduler.job.registration_failed",
-			"source", "scheduler",
-			"job", "afternoon_study_push",
-			"error", err,
-		)
-	} else {
-		slog.Info("Scheduler job registered",
-			"event", "scheduler.job.registered",
-			"source", "scheduler",
-			"job", "afternoon_study_push",
-			"cron", s.cfg.Schedule.AfternoonStudyPushCron.String(),
-		)
-	}
-
-	// Evening session: build and push
-	if _, err := s.cron.AddFunc(s.cfg.Schedule.EveningPushCron.String(), func() {
-		s.runJob("evening_push", 0, func(ctx context.Context) error {
-			return s.buildAndPushSessions(ctx, model.SessionEvening)
-		})
-	}); err != nil {
-		slog.Error("Failed to register scheduler job",
-			"event", "scheduler.job.registration_failed",
-			"source", "scheduler",
-			"job", "evening_push",
-			"error", err,
-		)
-	} else {
-		slog.Info("Scheduler job registered",
-			"event", "scheduler.job.registered",
-			"source", "scheduler",
-			"job", "evening_push",
-			"cron", s.cfg.Schedule.EveningPushCron.String(),
-		)
+	// Legacy afternoon study push cron (backward compatibility when explicitly configured)
+	if !s.cfg.Schedule.AfternoonStudyPushCron.IsZero() {
+		if _, err := s.cron.AddFunc(s.cfg.Schedule.AfternoonStudyPushCron.String(), func() {
+			s.runJob("afternoon_study_push", 0, func(ctx context.Context) error {
+				return s.buildAndPushStudySessions(ctx, service.StudyProfileEvening)
+			})
+		}); err != nil {
+			slog.Error("Failed to register scheduler job",
+				"event", "scheduler.job.registration_failed",
+				"source", "scheduler",
+				"job", "afternoon_study_push",
+				"error", err,
+			)
+		}
 	}
 
 	s.cron.Start()
@@ -161,6 +154,9 @@ func (s *Scheduler) Start() {
 // Stop gracefully stops the scheduler.
 func (s *Scheduler) Stop() {
 	s.cron.Stop()
+	if s.dispatcher != nil && s.dispatcher.limiter != nil {
+		s.dispatcher.limiter.Stop()
+	}
 	slog.Info("Scheduler stopped", "event", "scheduler.stopped", "source", "scheduler")
 }
 
@@ -217,127 +213,205 @@ func (s *Scheduler) runJob(name string, timeout time.Duration, run func(context.
 	)
 }
 
+// tick executes 30-minute interval dynamic dispatch across distinct timezones and slots.
+func (s *Scheduler) tick(ctx context.Context) error {
+	if s.services == nil || s.services.User == nil {
+		return fmt.Errorf("user service unavailable")
+	}
+
+	timezones, err := s.services.User.GetActiveTimezones(ctx)
+	if err != nil {
+		slog.WarnContext(ctx, "Failed to get active timezones, using Asia/Seoul fallback", "error", err)
+		timezones = []string{"Asia/Seoul"}
+	}
+	if len(timezones) == 0 {
+		timezones = []string{"Asia/Seoul"}
+	}
+
+	slots := []model.SessionSlot{
+		model.SessionSlotMorningStudy,
+		model.SessionSlotMorningQuiz,
+		model.SessionSlotEveningStudy,
+		model.SessionSlotEveningQuiz,
+	}
+
+	var allUsers []model.User
+	var failures int
+
+	for _, tz := range timezones {
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			slog.WarnContext(ctx, "Failed to load timezone", "timezone", tz, "error", err)
+			continue
+		}
+
+		nowLocal := time.Now().In(loc)
+		minuteSlot := (nowLocal.Minute() / 30) * 30
+		localTime := fmt.Sprintf("%02d:%02d", nowLocal.Hour(), minuteSlot)
+
+		for _, slot := range slots {
+			users, err := s.services.User.GetUsersBySlot(ctx, slot, localTime, tz)
+			if err != nil {
+				failures++
+				slog.ErrorContext(ctx, "Failed to query users for slot",
+					"event", "scheduler.slot.query_failed",
+					"slot", slot,
+					"timezone", tz,
+					"time", localTime,
+					"error", err,
+				)
+				continue
+			}
+			if len(users) == 0 {
+				continue
+			}
+
+			allUsers = append(allUsers, users...)
+
+			userIDs := make([]int64, len(users))
+			for i, u := range users {
+				userIDs[i] = u.ID
+			}
+
+			var unfinishedCounts map[int64]int
+			if s.services.SessionQuery != nil {
+				counts, err := s.services.SessionQuery.CountUnfinishedBatch(ctx, userIDs)
+				if err != nil {
+					slog.WarnContext(ctx, "Failed to batch count unfinished sessions", "error", err)
+				} else {
+					unfinishedCounts = counts
+				}
+			}
+
+			if err := s.dispatcher.dispatchBatch(ctx, slot, users, unfinishedCounts); err != nil {
+				failures++
+			}
+		}
+	}
+
+	if len(allUsers) > 0 {
+		s.topUpTips(ctx, allUsers)
+		s.topUpAudio(ctx, allUsers)
+	}
+
+	if failures > 0 {
+		return fmt.Errorf("%d slot operations failed during tick", failures)
+	}
+	return nil
+}
+
+func (s *Scheduler) getDispatcher() *sessionDispatcher {
+	if s.dispatcher == nil {
+		s.dispatcher = newSessionDispatcher(s.cfg, s.services, s.bot, s.rdb)
+	}
+	return s.dispatcher
+}
+
 func (s *Scheduler) buildAndPushSessions(ctx context.Context, sessionType model.SessionType) error {
 	if s.cfg == nil {
 		return fmt.Errorf("scheduler config unavailable")
 	}
-	if s.services == nil || s.services.SessionQuery == nil {
-		return fmt.Errorf("session query service unavailable")
+	if s.services == nil || s.services.User == nil {
+		return fmt.Errorf("user service unavailable")
 	}
 	users, err := s.services.User.GetAllUsers(ctx)
 	if err != nil {
 		return fmt.Errorf("get users: %w", err)
 	}
 
-	// TODO: user가 많다고 가정했을때, 뭐 한 10만명 ~ 100만명 된다고 가정했을때, 이걸 빨리 할 방법이 있을까?
-	// 예를 들어서, 세션 빌드 자체를 비동기로 하고, 세션이 준비되는대로 푸시를 한다거나? 아니면 세션 빌드와 푸시를 완전히 분리해서,
-	// 세션 빌드는 큐에 넣고, 푸시는 큐에서 빼서 하는 식으로? 일단은 간단하게 동기적으로 처리하지만, 나중에 확장성을 고려해서 개선할 수 있을듯.
+	slot := model.SessionSlotMorningQuiz
+	if sessionType == model.SessionEvening {
+		slot = model.SessionSlotEveningQuiz
+	}
+
 	var failures int
 	for _, user := range users {
-		unfinishedCount, err := s.services.SessionQuery.CountUnfinished(ctx, user.ID)
-		if err != nil {
-			failures++
-			slog.ErrorContext(ctx, "Failed to count unfinished sessions",
-				"event", "scheduler.session.count_failed",
-				"user_id", user.ID,
-				"error", err,
-			)
-			continue
-		}
-		if unfinishedCount >= s.cfg.Schedule.MaxUnfinishedSessions {
-			reminded, err := s.remindUnfinishedSession(ctx, user.ID)
+		unfinishedCount := 0
+		if s.services.SessionQuery != nil {
+			count, err := s.services.SessionQuery.CountUnfinished(ctx, user.ID)
 			if err != nil {
 				failures++
-				slog.ErrorContext(ctx, "Failed to remind unfinished session",
-					"event", "scheduler.session.reminder_failed",
+				slog.ErrorContext(ctx, "Failed to count unfinished sessions",
+					"event", "scheduler.session.count_failed",
 					"user_id", user.ID,
 					"error", err,
 				)
 				continue
 			}
-			if reminded {
-				slog.InfoContext(ctx, "Unfinished session reminded",
-					"event", "scheduler.session.reminded",
-					"user_id", user.ID,
-				)
-			}
-			continue
+			unfinishedCount = count
 		}
 
-		var session *model.Session
-
-		switch sessionType {
-		case model.SessionMorning:
-			session, err = s.services.SessionBuilder.BuildMorningSession(
-				ctx,
-				user.ID,
-				user.Language,
-				user.ProficiencyLevel,
-			)
-		case model.SessionEvening:
-			session, err = s.services.SessionBuilder.BuildEveningSession(
-				ctx,
-				user.ID,
-				user.Language,
-				user.ProficiencyLevel,
-			)
-		}
-
-		if err != nil {
+		if err := s.getDispatcher().dispatchUser(ctx, user, slot, unfinishedCount); err != nil {
 			failures++
-			slog.ErrorContext(ctx, "Failed to build session",
-				"event", "scheduler.session.build_failed",
+			slog.ErrorContext(ctx, "Failed to dispatch user session",
+				"event", "scheduler.session.dispatch_failed",
 				"user_id", user.ID,
-				"session_type", sessionType,
 				"error", err,
-			)
-			continue
-		}
-
-		if session == nil {
-			slog.WarnContext(ctx, "No questions available for session",
-				"event", "scheduler.session.empty",
-				"user_id", user.ID,
-				"session_type", sessionType,
-			)
-			continue
-		}
-
-		// Push via Telegram
-		if err := s.bot.PushSession(ctx, user.ID, session.ID, string(sessionType)); err != nil {
-			failures++
-			slog.ErrorContext(ctx, "Failed to push session",
-				"event", "scheduler.session.push_failed",
-				"user_id", user.ID,
-				"session_id", session.ID,
-				"session_type", sessionType,
-				"error", err,
-			)
-		} else {
-			slog.InfoContext(ctx, "Session pushed",
-				"event", "scheduler.session.pushed",
-				"user_id", user.ID,
-				"session_id", session.ID,
-				"session_type", sessionType,
-				"total_questions", session.TotalQuestions,
 			)
 		}
 	}
 
-	// Tip top-up runs after session push and is intentionally decoupled: one LLM
-	// call per distinct (language, level) pair, and any failure here is logged
-	// and skipped so it never affects the session-push result above.
 	s.topUpTips(ctx, users)
-
-	// Listening-audio pre-generation is likewise decoupled and best-effort: it
-	// fills a bounded batch of missing clips per (language, level) each cycle so
-	// audio is ready before the next session that serves a listening question.
 	s.topUpAudio(ctx, users)
 
 	if failures > 0 {
 		return fmt.Errorf("%d session operations failed", failures)
 	}
 	return nil
+}
+
+func (s *Scheduler) buildAndPushStudySessions(ctx context.Context, profile service.StudySessionProfile) error {
+	if s.cfg == nil {
+		return fmt.Errorf("scheduler config unavailable")
+	}
+	if s.services == nil || s.services.User == nil {
+		return fmt.Errorf("user service unavailable")
+	}
+	users, err := s.services.User.GetAllUsers(ctx)
+	if err != nil {
+		return fmt.Errorf("get users for study sessions: %w", err)
+	}
+
+	slot := model.SessionSlotMorningStudy
+	if profile == service.StudyProfileEvening {
+		slot = model.SessionSlotEveningStudy
+	}
+
+	var failures int
+	for _, user := range users {
+		unfinishedCount := 0
+		if s.services.SessionQuery != nil {
+			count, err := s.services.SessionQuery.CountUnfinished(ctx, user.ID)
+			if err != nil {
+				failures++
+				slog.ErrorContext(ctx, "Failed to count unfinished sessions",
+					"event", "scheduler.study_session.count_failed",
+					"user_id", user.ID,
+					"error", err,
+				)
+				continue
+			}
+			unfinishedCount = count
+		}
+
+		if err := s.getDispatcher().dispatchUser(ctx, user, slot, unfinishedCount); err != nil {
+			failures++
+			slog.ErrorContext(ctx, "Failed to dispatch user study session",
+				"event", "scheduler.study_session.dispatch_failed",
+				"user_id", user.ID,
+				"error", err,
+			)
+		}
+	}
+
+	if failures > 0 {
+		return fmt.Errorf("%d study session operations failed", failures)
+	}
+	return nil
+}
+
+func (s *Scheduler) remindUnfinishedSession(ctx context.Context, userID int64) (bool, error) {
+	return s.getDispatcher().remindUnfinishedSession(ctx, userID)
 }
 
 // langLevelPair identifies a distinct (language, proficiency level) bucket.
@@ -347,8 +421,7 @@ type langLevelPair struct {
 }
 
 // distinctLangLevelPairs collapses the user slice into the unique set of
-// (language, level) pairs in a single pass, so tip top-up makes at most one LLM
-// call per pair regardless of how many users share it.
+// (language, level) pairs in a single pass.
 func distinctLangLevelPairs(users []model.User) []langLevelPair {
 	seen := make(map[langLevelPair]struct{}, len(users))
 	pairs := make([]langLevelPair, 0, len(users))
@@ -364,9 +437,8 @@ func distinctLangLevelPairs(users []model.User) []langLevelPair {
 }
 
 // topUpTips fills each distinct (language, level) tip bucket toward the target.
-// A failure for one pair is logged and the loop continues with the next pair.
 func (s *Scheduler) topUpTips(ctx context.Context, users []model.User) {
-	if s.services.TipGenerator == nil {
+	if s.services == nil || s.services.TipGenerator == nil {
 		return
 	}
 	for _, p := range distinctLangLevelPairs(users) {
@@ -382,11 +454,9 @@ func (s *Scheduler) topUpTips(ctx context.Context, users []model.User) {
 	}
 }
 
-// topUpAudio fills each distinct (language, level) bucket's missing listening
-// clips toward availability. A failure for one pair is logged and the loop
-// continues with the next pair.
+// topUpAudio fills each distinct (language, level) bucket's missing listening clips.
 func (s *Scheduler) topUpAudio(ctx context.Context, users []model.User) {
-	if s.services.Audio == nil {
+	if s.services == nil || s.services.Audio == nil {
 		return
 	}
 	for _, p := range distinctLangLevelPairs(users) {
@@ -399,141 +469,5 @@ func (s *Scheduler) topUpAudio(ctx context.Context, users []model.User) {
 			)
 			continue
 		}
-	}
-}
-
-func (s *Scheduler) buildAndPushStudySessions(ctx context.Context, profile service.StudySessionProfile) error {
-	if s.cfg == nil {
-		return fmt.Errorf("scheduler config unavailable")
-	}
-	if s.services == nil || s.services.SessionQuery == nil {
-		return fmt.Errorf("session query service unavailable")
-	}
-	users, err := s.services.User.GetAllUsers(ctx)
-	if err != nil {
-		return fmt.Errorf("get users for study sessions: %w", err)
-	}
-
-	var failures int
-	for _, user := range users {
-		unfinishedCount, err := s.services.SessionQuery.CountUnfinished(ctx, user.ID)
-		if err != nil {
-			failures++
-			slog.ErrorContext(ctx, "Failed to count unfinished sessions",
-				"event", "scheduler.study_session.count_failed",
-				"user_id", user.ID,
-				"error", err,
-			)
-			continue
-		}
-		if unfinishedCount >= s.cfg.Schedule.MaxUnfinishedSessions {
-			reminded, err := s.remindUnfinishedSession(ctx, user.ID)
-			if err != nil {
-				failures++
-				slog.ErrorContext(ctx, "Failed to remind unfinished session",
-					"event", "scheduler.study_session.reminder_failed",
-					"user_id", user.ID,
-					"error", err,
-				)
-				continue
-			}
-			if reminded {
-				slog.InfoContext(ctx, "Unfinished session reminded",
-					"event", "scheduler.study_session.reminded",
-					"user_id", user.ID,
-				)
-			}
-			continue
-		}
-
-		session, err := s.services.StudySession.BuildStudySessionWithProfile(
-			ctx,
-			user.ID,
-			user.Language,
-			user.ProficiencyLevel,
-			profile,
-		)
-		if err != nil {
-			failures++
-			slog.ErrorContext(ctx, "Failed to build study session",
-				"event", "scheduler.study_session.build_failed",
-				"user_id", user.ID,
-				"language", user.Language,
-				"level", user.ProficiencyLevel,
-				"error", err,
-			)
-			continue
-		}
-
-		if session == nil {
-			slog.WarnContext(ctx, "No study materials available for session",
-				"event", "scheduler.study_session.empty",
-				"user_id", user.ID,
-				"language", user.Language,
-				"level", user.ProficiencyLevel,
-			)
-			continue
-		}
-
-		if err := s.bot.PushStudySession(ctx, user.ID, session.ID); err != nil {
-			failures++
-			slog.ErrorContext(ctx, "Failed to push study session",
-				"event", "scheduler.study_session.push_failed",
-				"user_id", user.ID,
-				"session_id", session.ID,
-				"error", err,
-			)
-			continue
-		}
-
-		slog.InfoContext(ctx, "Study session pushed",
-			"event", "scheduler.study_session.pushed",
-			"user_id", user.ID,
-			"session_id", session.ID,
-			"total_materials", session.TotalQuestions,
-		)
-	}
-	if failures > 0 {
-		return fmt.Errorf("%d study session operations failed", failures)
-	}
-	return nil
-}
-
-// remindUnfinishedSession re-sends one existing unfinished session when the cap is reached.
-// The repository query already applies status and age priority across both modes.
-func (s *Scheduler) remindUnfinishedSession(ctx context.Context, userID int64) (bool, error) {
-	if s.services == nil || s.services.SessionQuery == nil {
-		return false, fmt.Errorf("session query service unavailable")
-	}
-	if s.bot == nil {
-		return false, fmt.Errorf("session pusher unavailable")
-	}
-
-	session, err := s.services.SessionQuery.GetOldestUnfinished(ctx, userID)
-	if err != nil {
-		return false, fmt.Errorf("query unfinished session user_id=%d: %w", userID, err)
-	}
-	if session == nil {
-		return false, nil
-	}
-
-	switch session.Mode {
-	case model.SessionModeStudy:
-		if err := s.bot.PushStudySession(ctx, userID, session.ID); err != nil {
-			return true, fmt.Errorf("push study session reminder user_id=%d session_id=%d: %w", userID, session.ID, err)
-		}
-		return true, nil
-	case model.SessionModeQuiz, "":
-		if err := s.bot.PushSession(ctx, userID, session.ID, string(session.Type)); err != nil {
-			return true, fmt.Errorf("push quiz session reminder user_id=%d session_id=%d: %w", userID, session.ID, err)
-		}
-		return true, nil
-	default:
-		return false, fmt.Errorf(
-			"unsupported unfinished session mode user_id=%d session_id=%d mode=%q",
-			userID,
-			session.ID,
-			session.Mode,
-		)
 	}
 }

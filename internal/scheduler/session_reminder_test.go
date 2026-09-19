@@ -22,8 +22,33 @@ func (r *schedulerUserRepoStub) GetOrCreate(context.Context, int64, string) (*mo
 	return nil, nil
 }
 
+func (r *schedulerUserRepoStub) GetByID(context.Context, int64) (*model.User, error) {
+	return nil, nil
+}
+
 func (r *schedulerUserRepoStub) GetAllUsers(context.Context) ([]model.User, error) {
 	return r.users, nil
+}
+
+func (r *schedulerUserRepoStub) GetActiveTimezones(context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (r *schedulerUserRepoStub) GetUsersBySlot(
+	context.Context,
+	model.SessionSlot,
+	string,
+	string,
+) ([]model.User, error) {
+	return r.users, nil
+}
+
+func (r *schedulerUserRepoStub) UpdateSlotTime(context.Context, int64, model.SessionSlot, *string) error {
+	return nil
+}
+
+func (r *schedulerUserRepoStub) UpdateTimezone(context.Context, int64, string) error {
+	return nil
 }
 
 type schedulerSessionQueryRepoStub struct {
@@ -38,6 +63,10 @@ func (r *schedulerSessionQueryRepoStub) GetOldestUnfinished(context.Context, int
 
 func (r *schedulerSessionQueryRepoStub) CountUnfinished(context.Context, int64) (int, error) {
 	return r.unfinishedCount, r.err
+}
+
+func (r *schedulerSessionQueryRepoStub) CountUnfinishedBatch(context.Context, []int64) (map[int64]int, error) {
+	return nil, r.err
 }
 
 type schedulerPusherStub struct {

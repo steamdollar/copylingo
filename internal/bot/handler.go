@@ -260,6 +260,8 @@ func callbackType(data string) string {
 		return "llm"
 	case strings.HasPrefix(data, "menu:"):
 		return "menu"
+	case strings.HasPrefix(data, config.PrefixSettings):
+		return "settings"
 	case strings.HasPrefix(data, config.PrefixSession):
 		return "session"
 	case strings.HasPrefix(data, config.PrefixQuestion):
@@ -323,6 +325,8 @@ func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 		b.handleHelp(ctx, msg)
 	case config.CommandExit:
 		b.handleExit(ctx, msg)
+	case config.CommandSettings:
+		b.handleSettingsCommand(ctx, msg)
 	default:
 		b.SendMessage(msg.Chat.ID, "❓ 알 수 없는 명령어입니다. /help 를 입력해 보세요.")
 	}
@@ -346,6 +350,8 @@ func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 		b.flow.StartReview(ctx, cb)
 	case data == config.ActionMenuStats:
 		b.handleStatsCallback(ctx, cb)
+	case data == config.ActionMenuSettings || strings.HasPrefix(data, config.PrefixSettings):
+		b.handleSettingsCallback(ctx, cb)
 		// 학습 세션 시작
 		// e.g. session:50:start
 	case strings.HasPrefix(data, config.PrefixSession):
@@ -508,11 +514,12 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 /llm - LLM 질문 mode 활성화
 /stats - 학습 통계
 /streak - 스트릭 확인
+/settings - 알림 시각 및 시간대 설정
 /exit - 현재 입력 취소 (세션은 보존, /menu 에서 재개)
 /help - 도움말
 
 <b>학습 흐름:</b>
-1. 매일 오전 8시 / 오후 9시에 학습 세션이 전송됩니다
+1. 설정한 시각에 맞춰 맞춤형 학습/퀴즈 세션이 전송됩니다 (설정: /settings)
 2. 인라인 버튼으로 문제를 풀어주세요
 3. 틀린 문제는 SRS로 자동 복습됩니다
 4. /menu → 복습하기로 수동 복습도 가능합니다`

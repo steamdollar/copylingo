@@ -66,21 +66,20 @@ func TestRunJobLogsFailure(t *testing.T) {
 	}
 }
 
-func TestStartRegistersAfternoonStudyPushJob(t *testing.T) {
+func TestStartRegistersDynamicPushJob(t *testing.T) {
 	c := cron.New()
 	scheduler := New(&config.Config{
 		Schedule: config.ScheduleConfig{
-			MorningPushCron:        "0 8 * * *",
-			StudyPushCron:          "0 12 * * *",
-			AfternoonStudyPushCron: "30 16 * * *",
-			EveningPushCron:        "0 21 * * *",
+			ContentCollectCron: "0 3 * * *",
+			DynamicPushCron:    "*/30 * * * *",
 		},
 	}, nil, nil, nil, c)
 
 	scheduler.Start()
 	defer scheduler.Stop()
 
-	if got, want := len(c.Entries()), 4; got != want {
+	// Content collection skips when orchestrator is nil; dynamic user push is registered (1 job)
+	if got, want := len(c.Entries()), 1; got != want {
 		t.Fatalf("registered cron entries = %d, want %d", got, want)
 	}
 }

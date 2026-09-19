@@ -81,6 +81,39 @@ func (r *SessionRepository) CountUnfinished(ctx context.Context, userID int64) (
 	return count, nil
 }
 
+// CountUnfinishedBatch returns the number of pending/in-progress sessions for multiple users in a single query.
+func (r *SessionRepository) CountUnfinishedBatch(ctx context.Context, userIDs []int64) (map[int64]int, error) {
+	counts := make(map[int64]int, len(userIDs))
+	if len(userIDs) == 0 {
+		return counts, nil
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT user_id, COUNT(*) as count
+		FROM sessions
+		WHERE user_id IN (?) AND status IN ('in_progress', 'pending')
+		GROUP BY user_id
+	`, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("SessionRepository.CountUnfinishedBatch sqlx.In: %w", err)
+	}
+	query = r.db.Rebind(query)
+
+	type userCount struct {
+		UserID int64 `db:"user_id"`
+		Count  int   `db:"count"`
+	}
+	var results []userCount
+	if err := r.db.SelectContext(ctx, &results, query, args...); err != nil {
+		return nil, fmt.Errorf("SessionRepository.CountUnfinishedBatch select: %w", err)
+	}
+
+	for _, rc := range results {
+		counts[rc.UserID] = rc.Count
+	}
+	return counts, nil
+}
+
 func (r *SessionRepository) GetSessionsByStatus(
 	ctx context.Context,
 	userID int64,

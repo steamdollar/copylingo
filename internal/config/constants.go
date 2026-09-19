@@ -17,6 +17,7 @@ const (
 	PrefixSession  = "session:"
 	PrefixQuestion = "q:"
 	PrefixStudy    = "study:"
+	PrefixSettings = "settings:"
 )
 
 // Callback Data Actions
@@ -33,6 +34,10 @@ const (
 	ActionMenuStats = "menu:stats"
 	// 설정 메뉴(언어, 레벨 등) 열기
 	ActionMenuSettings = "menu:settings"
+	// 설정 메인 화면 출력
+	ActionSettingsView = "settings:view"
+	// 시간대 변경 메뉴
+	ActionSettingsTimezone = "settings:tz"
 )
 
 type BotCommand string
@@ -57,6 +62,8 @@ const (
 	CommandHelp BotCommand = "help"
 	// 현재 입력 취소 및 대기 상태 종료
 	CommandExit BotCommand = "exit"
+	// 푸시 알림 및 스케줄 설정
+	CommandSettings BotCommand = "settings"
 )
 
 // LLMAllowedTelegramUserIDs are the Telegram users allowed to use /llm.

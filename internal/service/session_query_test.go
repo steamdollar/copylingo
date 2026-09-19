@@ -13,6 +13,7 @@ type unfinishedSessionRepoStub struct {
 	err             error
 	userID          int64
 	unfinishedCount int
+	batchCounts     map[int64]int
 }
 
 func (r *unfinishedSessionRepoStub) GetOldestUnfinished(ctx context.Context, userID int64) (*model.Session, error) {
@@ -22,6 +23,10 @@ func (r *unfinishedSessionRepoStub) GetOldestUnfinished(ctx context.Context, use
 
 func (r *unfinishedSessionRepoStub) CountUnfinished(context.Context, int64) (int, error) {
 	return r.unfinishedCount, r.err
+}
+
+func (r *unfinishedSessionRepoStub) CountUnfinishedBatch(context.Context, []int64) (map[int64]int, error) {
+	return r.batchCounts, r.err
 }
 
 func TestSessionQueryGetOldestUnfinishedPassesThrough(t *testing.T) {
@@ -71,5 +76,19 @@ func TestSessionQueryCountUnfinishedReturnsRepositoryError(t *testing.T) {
 	_, err := svc.CountUnfinished(context.Background(), 123)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
+	}
+}
+
+func TestSessionQueryCountUnfinishedBatchPassesThrough(t *testing.T) {
+	expected := map[int64]int{1: 2, 2: 0}
+	repo := &unfinishedSessionRepoStub{batchCounts: expected}
+	svc := NewSessionQueryService(repo)
+
+	got, err := svc.CountUnfinishedBatch(context.Background(), []int64{1, 2})
+	if err != nil {
+		t.Fatalf("CountUnfinishedBatch failed: %v", err)
+	}
+	if len(got) != 2 || got[1] != 2 || got[2] != 0 {
+		t.Fatalf("counts = %+v, want %+v", got, expected)
 	}
 }

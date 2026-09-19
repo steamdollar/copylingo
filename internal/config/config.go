@@ -117,6 +117,7 @@ func (c CronExpr) Validate(name string) error {
 type ScheduleConfig struct {
 	MaxUnfinishedSessions  int      `mapstructure:"max_unfinished_sessions"`   // 사용자별 자동 세션 미완료 상한
 	ContentCollectCron     CronExpr `mapstructure:"content_collect_cron"`      // 콘텐츠 수집 크론
+	DynamicPushCron        CronExpr `mapstructure:"dynamic_push_cron"`         // 30분 단위 개인화 푸시 크론
 	MorningBuildCron       CronExpr `mapstructure:"morning_build_cron"`        // 오전 세션 빌드 크론 (legacy 키)
 	MorningPushCron        CronExpr `mapstructure:"morning_push_cron"`         // 정오 Quiz 세션 푸시 크론 (legacy 키)
 	StudyPushCron          CronExpr `mapstructure:"study_push_cron"`           // 아침 Study 세션 푸시 크론
@@ -135,6 +136,7 @@ func (s *ScheduleConfig) validate() error {
 		expr CronExpr
 	}{
 		{name: "schedule.content_collect_cron", expr: s.ContentCollectCron},
+		{name: "schedule.dynamic_push_cron", expr: s.DynamicPushCron},
 		{name: "schedule.morning_build_cron", expr: s.MorningBuildCron},
 		{name: "schedule.morning_push_cron", expr: s.MorningPushCron},
 		{name: "schedule.study_push_cron", expr: s.StudyPushCron},

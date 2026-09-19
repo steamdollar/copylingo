@@ -9,6 +9,7 @@ import (
 type unfinishedSessionRepo interface {
 	GetOldestUnfinished(ctx context.Context, userID int64) (*model.Session, error)
 	CountUnfinished(ctx context.Context, userID int64) (int, error)
+	CountUnfinishedBatch(ctx context.Context, userIDs []int64) (map[int64]int, error)
 }
 
 // SessionQueryService exposes session lookup operations used by scheduled jobs.
@@ -28,4 +29,9 @@ func (s *SessionQueryService) GetOldestUnfinished(ctx context.Context, userID in
 // CountUnfinished returns the number of pending and in-progress sessions for a user.
 func (s *SessionQueryService) CountUnfinished(ctx context.Context, userID int64) (int, error) {
 	return s.sessionRepo.CountUnfinished(ctx, userID)
+}
+
+// CountUnfinishedBatch returns the number of pending/in-progress sessions for multiple users.
+func (s *SessionQueryService) CountUnfinishedBatch(ctx context.Context, userIDs []int64) (map[int64]int, error) {
+	return s.sessionRepo.CountUnfinishedBatch(ctx, userIDs)
 }

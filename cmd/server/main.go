@@ -50,7 +50,7 @@ func run() error {
 		return fmt.Errorf("failed to init app: %w", err)
 	}
 
-	stopWorkers := startWorkers(cfg, services, botHandler, repos)
+	stopWorkers := startWorkers(cfg, services, botHandler, repos, rdb)
 	defer stopWorkers()
 
 	router := setupRouter(cfg, db, rdb, services, botHandler)

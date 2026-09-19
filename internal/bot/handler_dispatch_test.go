@@ -21,7 +21,30 @@ type mockUserRepo struct {
 func (m *mockUserRepo) GetOrCreate(ctx context.Context, id int64, username string) (*model.User, error) {
 	return m.getOrCreateFn(ctx, id, username)
 }
-func (m *mockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error) { return nil, nil }
+func (m *mockUserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) { return nil, nil }
+func (m *mockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error)      { return nil, nil }
+func (m *mockUserRepo) GetActiveTimezones(ctx context.Context) ([]string, error)   { return nil, nil }
+
+func (m *mockUserRepo) GetUsersBySlot(
+	ctx context.Context,
+	slot model.SessionSlot,
+	localTime string,
+	timezone string,
+) ([]model.User, error) {
+	return nil, nil
+}
+
+func (m *mockUserRepo) UpdateSlotTime(
+	ctx context.Context,
+	userID int64,
+	slot model.SessionSlot,
+	timeVal *string,
+) error {
+	return nil
+}
+func (m *mockUserRepo) UpdateTimezone(ctx context.Context, userID int64, timezone string) error {
+	return nil
+}
 
 type mockSRSRepo struct{}
 
