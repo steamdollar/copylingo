@@ -245,6 +245,101 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 		t.Fatalf("evening selection exceeded reading cap: %d", readingCount)
 	}
 
+	t.Run("new vocabulary fills shortages after due reviews", func(t *testing.T) {
+		if _, err := tx.ExecContext(ctx, `SAVEPOINT vocabulary_top_up`); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if _, err := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT vocabulary_top_up`); err != nil {
+				t.Error(err)
+			}
+		}()
+		for _, statement := range []string{
+			`INSERT INTO materials (id, material_key, category, language, proficiency_level, title, payload, difficulty)
+			 SELECT id, 'extra-v' || id, 'vocabulary', 'ja', 'N4', 'extra', '{}', 2
+			 FROM generate_series(20, 59) AS id`,
+			`INSERT INTO materials (id, material_key, category, language, proficiency_level, title, payload, difficulty) VALUES
+			 (17, 'extra-g', 'grammar', 'ja', 'N4', 'extra', '{}', 1),
+			 (18, 'extra-r', 'reading', 'ja', 'N4', 'extra', '{}', 1)`,
+		} {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		for _, tt := range []struct {
+			name    string
+			plan    model.StudySessionPlan
+			wantNew [3]int // vocabulary, grammar, reading
+			wantDue []int
+		}{
+			{
+				name: "morning reaches twenty with grammar and reading quotas intact",
+				plan: model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+					{Category: model.MaterialCategoryVocabulary, NewCount: 8, ReviewCount: 7},
+					{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
+					{Category: model.MaterialCategoryReading, NewCount: 1},
+				}},
+				wantNew: [3]int{14, 1, 1}, wantDue: []int{5, 6, 10, 16},
+			},
+			{
+				name: "evening reaches twenty four without new reading",
+				plan: evening, wantNew: [3]int{18, 1, 0}, wantDue: []int{5, 6, 10, 13, 16},
+			},
+			{
+				name: "cross category due reviews precede extra new vocabulary",
+				plan: model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+					{Category: model.MaterialCategoryVocabulary, NewCount: 1, ReviewCount: 4},
+					{Category: model.MaterialCategoryGrammar},
+				}},
+				wantNew: [3]int{1, 0, 0}, wantDue: []int{5, 6, 10, 16},
+			},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				materials, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, tt.plan)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(materials) != tt.plan.TotalMaterialCount() {
+					t.Fatalf("count = %d, want %d", len(materials), tt.plan.TotalMaterialCount())
+				}
+				seen := make(map[int]bool)
+				var newCounts [3]int
+				for _, material := range materials {
+					if seen[material.ID] {
+						t.Fatalf("duplicate material %d", material.ID)
+					}
+					seen[material.ID] = true
+					switch material.ID {
+					case 2, 7, 14:
+						t.Fatalf("included pending, in-progress, or future review material %d", material.ID)
+					case 5, 6, 10, 13, 16:
+						continue
+					}
+					if material.ProficiencyLevel != "N4" {
+						t.Fatalf("selected adjacent-level new material despite current-level supply: %d", material.ID)
+					}
+					switch material.Category {
+					case model.MaterialCategoryVocabulary:
+						newCounts[0]++
+					case model.MaterialCategoryGrammar:
+						newCounts[1]++
+					case model.MaterialCategoryReading:
+						newCounts[2]++
+					}
+				}
+				if newCounts != tt.wantNew {
+					t.Fatalf("new counts (vocabulary, grammar, reading) = %v, want %v", newCounts, tt.wantNew)
+				}
+				for _, id := range tt.wantDue {
+					if !seen[id] {
+						t.Fatalf("extra new vocabulary displaced due review %d", id)
+					}
+				}
+			})
+		}
+	})
+
 	fallbackPlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, NewCount: 4},
 	}}
@@ -285,16 +380,23 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 		}
 	}
 
-	dueOnlyPlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+	scarcePlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, ReviewCount: 10},
 	}}
-	dueOnly, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, dueOnlyPlan)
+	scarce, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, scarcePlan)
 	if err != nil {
-		t.Fatalf("due-only selection failed: %v", err)
+		t.Fatalf("scarce selection failed: %v", err)
 	}
-	for _, material := range dueOnly {
-		if material.ID == 1 || material.ID == 3 || material.ID == 4 {
-			t.Fatalf("due shortage inflated new workload: %#v", dueOnly)
+	// Only three new vocabulary materials (including adjacent-level N5) and
+	// two due reviews are eligible. Shorten only after exhausting both pools.
+	wantScarce := map[int]bool{1: true, 3: true, 4: true, 5: true, 6: true}
+	if len(scarce) != len(wantScarce) {
+		t.Fatalf("scarce count = %d, want %d", len(scarce), len(wantScarce))
+	}
+	for _, material := range scarce {
+		if !wantScarce[material.ID] {
+			t.Fatalf("unexpected or duplicate scarce material %d", material.ID)
 		}
+		delete(wantScarce, material.ID)
 	}
 }

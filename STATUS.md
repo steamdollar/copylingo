@@ -38,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-19 | Study 복습 부족분을 현재 레벨 우선 신규 단어로 보충해 아침 20·저녁 24개 유지, 신규 문법·독해 상한과 SRS 간격 보존 (ADR-049) | [2609192206_study_new_vocabulary_topup.md](docs/workthrough/2609/2609192206_study_new_vocabulary_topup.md) |
 | 2026-09-19 | 동적 개인화 푸시(ADR-048) 활성화 시 레거시 정적 Study Cron 등록 원천 차단 및 config.yaml 정리 | [2609192205_disable_legacy_study_crons.md](docs/workthrough/2609/2609192205_disable_legacy_study_crons.md) |
 | 2026-09-19 | 세션별 객관식·청해 보기(Options) 결정론적 셔플링(`sessionID:questionID` Seed 기반 멱등성 보장 및 위치 암기 방지) | [2609192027_deterministic_question_option_shuffle.md](docs/workthrough/2609/2609192027_deterministic_question_option_shuffle.md) |
 | 2026-09-18 | JLPT N4 vocab_usage(용법) 동어 반복 결함 수정 (120문항 4개 선지 전수 목표 단어 포함 및 DB 반영) | [2609180051_fix_vocab_usage_trivial_distractors.md](docs/workthrough/2609/2609180051_fix_vocab_usage_trivial_distractors.md) |

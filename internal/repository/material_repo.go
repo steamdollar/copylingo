@@ -46,7 +46,8 @@ func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []strin
 
 // GetForStudySession returns materials according to the per-category new and
 // review quotas in plan. New materials prefer the current level, while due
-// reviews remain ordered by oldest due time.
+// reviews remain ordered by oldest due time. Remaining slots are filled with
+// additional new vocabulary after eligible due reviews are exhausted.
 func (r *MaterialRepository) GetForStudySession(
 	ctx context.Context,
 	userID int64,
@@ -244,6 +245,24 @@ const studySessionMaterialsQuery = `
 			progress_material_id, next_review_at, bucket, level_rank, random_order
 		FROM selected_other_due
 	),
+	selected_new_vocabulary AS (
+		SELECT
+			r.id, r.material_key, r.content_id, r.category, r.language,
+			r.proficiency_level, r.title, r.payload, r.difficulty, r.created_at,
+			r.progress_material_id, r.next_review_at, r.bucket, r.level_rank, r.random_order
+		FROM ranked r
+		JOIN quotas q ON q.category = r.category
+		WHERE r.category = 'vocabulary'
+			AND r.bucket = 'new'
+			AND r.bucket_rank > q.new_count
+		ORDER BY r.bucket_rank
+		LIMIT GREATEST($6 - (SELECT COUNT(*) FROM selected), 0)
+	),
+	filled AS (
+		SELECT * FROM selected
+		UNION ALL
+		SELECT * FROM selected_new_vocabulary
+	),
 	ordered AS (
 		SELECT
 			s.*,
@@ -263,7 +282,7 @@ const studySessionMaterialsQuery = `
 				WHEN 'reading' THEN 2
 				ELSE 3
 			END AS category_order
-		FROM selected s
+		FROM filled s
 	)
 	SELECT
 		id,

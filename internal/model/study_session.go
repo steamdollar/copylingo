@@ -10,8 +10,9 @@ type StudyMaterialQuota struct {
 
 // StudySessionPlan contains the per-category material quotas for a study
 // session. The repository may return fewer materials when eligible candidates
-// are unavailable. Fallback due reviews may shift between categories, while
-// total count, new quotas, and reading caps remain bounded by the plan.
+// are unavailable. Fallback due reviews may shift between categories, then new
+// vocabulary fills remaining slots. Total count, new grammar/reading quotas,
+// and reading caps remain bounded by the plan.
 type StudySessionPlan struct {
 	Quotas []StudyMaterialQuota `json:"quotas"`
 }
