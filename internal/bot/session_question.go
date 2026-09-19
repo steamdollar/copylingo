@@ -209,20 +209,32 @@ func handwritingCellCount(answer string) int {
 	return cells
 }
 
-// buildMCQKeyboard lays out option buttons two per row, each carrying the
-// answer callback. Shared by plain multiple-choice and listening comprehension.
+// buildMCQKeyboard uses one button per row when an option is too wide for a
+// two-column layout. Shared by plain multiple-choice and listening comprehension.
 func buildMCQKeyboard(sessionID, questionID int, options []string) *tgbotapi.InlineKeyboardMarkup {
+	const maxTwoColumnOptionWidth = 16
+	buttonsPerRow := 2
+	for _, option := range options {
+		width := 0
+		for _, r := range option {
+			width++
+			if r > 127 { // Japanese and Korean characters take roughly twice the space.
+				width++
+			}
+		}
+		if width > maxTwoColumnOptionWidth {
+			buttonsPerRow = 1
+			break
+		}
+	}
+
 	var rows [][]tgbotapi.InlineKeyboardButton
-	for i := 0; i < len(options); i += 2 {
+	for i := 0; i < len(options); i += buttonsPerRow {
 		var row []tgbotapi.InlineKeyboardButton
-		row = append(row, tgbotapi.NewInlineKeyboardButtonData(
-			options[i],
-			fmt.Sprintf(config.FormatQuestionAnswer, sessionID, questionID, i),
-		))
-		if i+1 < len(options) {
+		for j := i; j < i+buttonsPerRow && j < len(options); j++ {
 			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
-				options[i+1],
-				fmt.Sprintf(config.FormatQuestionAnswer, sessionID, questionID, i+1),
+				options[j],
+				fmt.Sprintf(config.FormatQuestionAnswer, sessionID, questionID, j),
 			))
 		}
 		rows = append(rows, row)

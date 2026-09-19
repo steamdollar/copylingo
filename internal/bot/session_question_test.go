@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
@@ -121,6 +122,45 @@ func TestQuestionNavigation(t *testing.T) {
 			t.Errorf("expected idx 1, got %d", idx)
 		}
 	})
+}
+
+func TestBuildMCQKeyboardLayout(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		options []string
+		widths  []int
+	}{
+		{"short options", []string{"A", "B", "C", "D"}, []int{2, 2}},
+		{"two-column boundary", []string{"あいうえおかきく", "B", "C", "D"}, []int{2, 2}},
+		{"long Japanese option", []string{"あいうえおかきくけ", "B", "C", "D"}, []int{1, 1, 1, 1}},
+		{"long ASCII option", []string{"A", "12345678901234567", "C", "D"}, []int{1, 1, 1, 1}},
+		{"odd option count", []string{"A", "B", "C"}, []int{2, 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			keyboard := buildMCQKeyboard(10, 20, tt.options)
+			if len(keyboard.InlineKeyboard) != len(tt.widths) {
+				t.Fatalf("rows = %d, want %d", len(keyboard.InlineKeyboard), len(tt.widths))
+			}
+			index := 0
+			for rowIndex, row := range keyboard.InlineKeyboard {
+				if len(row) != tt.widths[rowIndex] {
+					t.Fatalf("row %d has %d buttons, want %d", rowIndex, len(row), tt.widths[rowIndex])
+				}
+				for _, button := range row {
+					if button.Text != tt.options[index] {
+						t.Errorf("button %d text = %q, want %q", index, button.Text, tt.options[index])
+					}
+					wantData := fmt.Sprintf(config.FormatQuestionAnswer, 10, 20, index)
+					if button.CallbackData == nil || *button.CallbackData != wantData {
+						t.Errorf("button %d callback = %v, want %q", index, button.CallbackData, wantData)
+					}
+					index++
+				}
+			}
+		})
+	}
 }
 
 func TestRenderByType(t *testing.T) {
