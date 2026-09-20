@@ -38,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-20 | JLPT N4 vocab_paraphrase(유의 표현) 부실 해설 전수 개편 (120문항 문장 해석·정답 근거·4개 선지 개별 어휘 뜻 보강 및 DB 반영) | [2609202045_fix_vocab_paraphrase_explanations.md](docs/workthrough/2609/2609202045_fix_vocab_paraphrase_explanations.md) |
 | 2026-09-19 | 정규 Quiz 현재 레벨 최소 80%·최근 Study 자료 분산 우선, 독해·청해 예약 및 추가 복습 현재 레벨 우선 (ADR-050) | [2609192240_quiz_current_level_focus.md](docs/workthrough/2609/2609192240_quiz_current_level_focus.md) |
 | 2026-09-19 | Study 복습 부족분을 현재 레벨 우선 신규 단어로 보충해 아침 20·저녁 24개 유지, 신규 문법·독해 상한과 SRS 간격 보존 (ADR-049) | [2609192206_study_new_vocabulary_topup.md](docs/workthrough/2609/2609192206_study_new_vocabulary_topup.md) |
 | 2026-09-19 | 동적 개인화 푸시(ADR-048) 활성화 시 레거시 정적 Study Cron 등록 원천 차단 및 config.yaml 정리 | [2609192205_disable_legacy_study_crons.md](docs/workthrough/2609/2609192205_disable_legacy_study_crons.md) |
