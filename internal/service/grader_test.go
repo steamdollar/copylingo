@@ -46,11 +46,12 @@ func (m *mockGraderActiveSession) Delete(ctx context.Context, sessionID int) err
 }
 
 type mockSRS struct {
-	getDueReviewsFn func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
-	getDueCountFn   func(ctx context.Context) (int, error)
-	processAnswerFn func(ctx context.Context, q *model.Question, isCorrect bool) error
-	gotLanguage     string
-	gotLevel        string
+	getDueReviewsForCategoriesFn func(ctx context.Context, userID int64, limit, kanjiRecallLimit int, categories ...model.QuestionCategory) ([]model.Question, error)
+	getDueReviewsFn              func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
+	getDueCountFn                func(ctx context.Context) (int, error)
+	processAnswerFn              func(ctx context.Context, q *model.Question, isCorrect bool) error
+	gotLanguage                  string
+	gotLevel                     string
 }
 
 func (m *mockSRS) GetDueReviews(
@@ -58,9 +59,16 @@ func (m *mockSRS) GetDueReviews(
 	userID int64,
 	language, level string,
 	limit, kanjiRecallLimit int,
+	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	m.gotLanguage = language
 	m.gotLevel = level
+	if len(categories) > 0 {
+		if m.getDueReviewsForCategoriesFn != nil {
+			return m.getDueReviewsForCategoriesFn(ctx, userID, limit, kanjiRecallLimit, categories...)
+		}
+		return nil, nil
+	}
 	return m.getDueReviewsFn(ctx, userID, limit, kanjiRecallLimit)
 }
 func (m *mockSRS) GetDueCount(ctx context.Context, userID int64, language, level string) (int, error) {

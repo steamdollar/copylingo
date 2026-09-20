@@ -98,21 +98,19 @@ func (r *QuestionRepository) GetNewQuestions(
 }
 
 var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
-		WITH candidates AS (
+		WITH selected_material_counts AS (
+			SELECT material_id, COUNT(*) AS question_count
+			FROM questions
+			WHERE id = ANY(COALESCE($5::int[], '{}')) AND material_id IS NOT NULL
+			GROUP BY material_id
+		),
+		eligible AS (
 			SELECT
-				q.id,
+				q.id, q.material_id, q.item_type,
 				CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END AS material_priority,
+				ump.last_studied_at,
 				q.difficulty,
-				RANDOM() AS random_order,
-				CASE WHEN q.item_type = 'vocab_kanji_recall' THEN
-					ROW_NUMBER() OVER (
-						PARTITION BY q.item_type
-						ORDER BY
-							CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
-							q.difficulty ASC,
-							RANDOM()
-					)
-				ELSE 1 END AS kanji_recall_rank
+				RANDOM() AS random_order
 			FROM questions q
 			LEFT JOIN user_material_progress ump
 				ON ump.material_id = q.material_id
@@ -131,6 +129,28 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 			-- their passage material; other categories may fall back to unstudied
 			-- materials (ADR-036).
 			AND (q.category <> 'reading' OR ump.material_id IS NOT NULL)
+		),
+		material_rounds AS (
+			SELECT
+				e.*,
+				COALESCE(s.question_count, 0) + ROW_NUMBER() OVER (
+					PARTITION BY e.material_id, CASE WHEN e.material_id IS NULL THEN e.id END
+					ORDER BY e.difficulty ASC, e.random_order
+				) AS material_question_rank
+			FROM eligible e
+			LEFT JOIN selected_material_counts s ON s.material_id = e.material_id
+		),
+		candidates AS (
+			SELECT
+				r.*,
+				CASE WHEN r.item_type = 'vocab_kanji_recall' THEN
+					ROW_NUMBER() OVER (
+						PARTITION BY r.item_type
+						ORDER BY r.material_priority, r.material_question_rank,
+							r.last_studied_at DESC NULLS LAST, r.difficulty ASC, r.random_order
+					)
+				ELSE 1 END AS kanji_recall_rank
+			FROM material_rounds r
 		)
 		SELECT %s
 		FROM questions q
@@ -139,6 +159,8 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 			OR candidate.kanji_recall_rank <= $7
 		ORDER BY
 			candidate.material_priority,
+			candidate.material_question_rank,
+			candidate.last_studied_at DESC NULLS LAST,
 			candidate.difficulty ASC,
 			candidate.random_order
 		LIMIT $6
@@ -185,9 +207,10 @@ func (r *QuestionRepository) SetAudioFileID(ctx context.Context, id int, fileID 
 func (r *QuestionRepository) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language string,
+	language, currentLevel string,
 	levels []string,
 	limit, kanjiRecallLimit int,
+	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	var questions []model.Question
 	err := r.db.SelectContext(
@@ -199,6 +222,8 @@ func (r *QuestionRepository) GetDueReviews(
 		pq.Array(levels),
 		limit,
 		kanjiRecallLimit,
+		currentLevel,
+		pq.Array(categories),
 	)
 	return questions, err
 }
@@ -207,12 +232,20 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
 		WITH candidates AS (
 			SELECT
 				q.id,
+				CASE WHEN q.proficiency_level = $6 THEN 0 ELSE 1 END AS level_priority,
 				CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END AS material_priority,
 				uqp.next_review_at,
+				ROW_NUMBER() OVER (
+					PARTITION BY q.category
+					ORDER BY CASE WHEN q.proficiency_level = $6 THEN 0 ELSE 1 END,
+						CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
+						uqp.next_review_at ASC, q.id ASC
+				) AS category_rank,
 				CASE WHEN q.item_type = 'vocab_kanji_recall' THEN
 					ROW_NUMBER() OVER (
 						PARTITION BY q.item_type
 						ORDER BY
+							CASE WHEN q.proficiency_level = $6 THEN 0 ELSE 1 END,
 							CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END,
 							uqp.next_review_at ASC
 					)
@@ -228,13 +261,18 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
 			  AND uqp.next_review_at <= NOW()
 			  AND q.language = $2
 			  AND q.proficiency_level = ANY($3)
+			  AND (COALESCE(cardinality($7::text[]), 0) = 0 OR q.category = ANY($7))
+			  AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
+			  AND (q.category <> 'reading' OR ump.material_id IS NOT NULL)
 		)
 		SELECT %s
 		FROM questions q
 		JOIN candidates candidate ON candidate.id = q.id
-		WHERE q.item_type IS DISTINCT FROM 'vocab_kanji_recall'
-			OR candidate.kanji_recall_rank <= $5
+		WHERE (q.item_type IS DISTINCT FROM 'vocab_kanji_recall'
+			OR candidate.kanji_recall_rank <= $5)
+			AND (q.category <> 'reading' OR candidate.category_rank <= 1)
 		ORDER BY
+			candidate.level_priority,
 			candidate.material_priority,
 			candidate.next_review_at ASC
 		LIMIT $4

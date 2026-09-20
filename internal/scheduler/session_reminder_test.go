@@ -139,14 +139,18 @@ func (schedulerSessionQuestionStoreStub) GetBySession(context.Context, int) ([]m
 type schedulerSRSSStub struct{}
 
 func (schedulerSRSSStub) GetDueReviews(
-	context.Context,
-	int64,
-	string,
-	string,
-	int,
-	int,
+	_ context.Context,
+	_ int64,
+	_ string,
+	level string,
+	_ int,
+	_ int,
+	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
-	return []model.Question{{ID: 1}}, nil
+	if len(categories) > 0 {
+		return nil, nil
+	}
+	return []model.Question{{ID: 1, ProficiencyLevel: level, Category: model.CategoryVocabulary}}, nil
 }
 
 func (schedulerSRSSStub) GetDueCount(context.Context, int64, string, string) (int, error) {
@@ -270,7 +274,7 @@ func TestBuildAndPushSessionsBuildsWhenBacklogBelowCap(t *testing.T) {
 		t.Run(string(sessionType), func(t *testing.T) {
 			pusher := &schedulerPusherStub{}
 			scheduler := newSchedulerForReminderTestWithCount(
-				model.User{ID: 123},
+				model.User{ID: 123, Language: "ja", ProficiencyLevel: "N5"},
 				&model.Session{
 					ID:     77,
 					Type:   model.SessionEvening,

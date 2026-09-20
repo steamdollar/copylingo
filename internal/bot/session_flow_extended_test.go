@@ -265,9 +265,10 @@ type mockSRSRepoWithCount struct {
 func (m *mockSRSRepoWithCount) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language string,
+	language, currentLevel string,
 	levels []string,
 	limit, kanjiRecallLimit int,
+	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	if m.count > 0 {
 		return make([]model.Question, m.count), nil

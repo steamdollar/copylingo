@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"math/rand"
+	"strings"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
@@ -80,7 +81,7 @@ func NewSessionBuilderService(
 	}
 }
 
-// BuildMorningSession creates a morning session with up to 6 reviews, total 17 questions.
+// BuildMorningSession creates a 17-question session, normally starting with 6 reviews.
 func (s *SessionBuilderService) BuildMorningSession(
 	ctx context.Context,
 	userID int64,
@@ -99,7 +100,7 @@ func (s *SessionBuilderService) BuildEveningSession(
 	language, level string,
 ) (*model.Session, error) {
 	const totalQuestions = 12
-	const reviewCount = 8 // Reduced to 7 when reserving 4 vocabulary and 1 listening slot.
+	const reviewCount = 8 // Clamped below to leave room for vocabulary, listening, and reading.
 
 	return s.buildSession(ctx, userID, language, level, model.SessionEvening, totalQuestions, reviewCount)
 }
@@ -122,201 +123,176 @@ func (s *SessionBuilderService) buildSession(
 	totalQuestions, reviewCount int,
 ) (*model.Session, error) {
 	var sessionQuestions []model.SessionQuestion
+	currentLevels := []string{level}
 	levels := sessionLevelsFor(language, level)
-	selectedQuestionIDs := make(map[int]struct{}, totalQuestions)
+	selectedIDs := make(map[int]bool, totalQuestions)
 	excludeIDs := make([]int, 0, totalQuestions)
-	order := 0
-	kanjiRecallCount := 0
-	reservedVocabularyCount := 0
-	reservedListeningCount := 0
-	if sessionType != model.SessionReview && language != "" && level != "" {
-		reservedVocabularyCount = divideRoundingUp(totalQuestions, minVocabularyRatioDenominator)
-		reservedListeningCount = minListeningPerDailySession
-		if maxReviewCount := totalQuestions - reservedVocabularyCount - reservedListeningCount; reviewCount > maxReviewCount {
-			reviewCount = maxReviewCount
-		}
-	}
+	kanjiCount, readingCount := 0, 0
+	currentCategories := make(map[model.QuestionCategory]int)
 
-	readingCount := 0
-	appendQuestion := func(question model.Question, isReview bool) bool {
-		if _, exists := selectedQuestionIDs[question.ID]; exists {
+	appendQuestion := func(q model.Question, isReview bool) bool {
+		if len(sessionQuestions) >= totalQuestions || selectedIDs[q.ID] ||
+			(isKanjiRecallQuestion(q) && kanjiCount >= maxKanjiRecallPerSession) ||
+			(q.Category == model.CategoryReading && readingCount >= maxReadingPerSession) {
 			return false
 		}
-		if isKanjiRecallQuestion(question) && kanjiRecallCount >= maxKanjiRecallPerSession {
-			return false
-		}
-		if question.Category == model.CategoryReading && readingCount >= maxReadingPerSession {
-			return false
-		}
-		selectedQuestionIDs[question.ID] = struct{}{}
-		excludeIDs = append(excludeIDs, question.ID)
+		selectedIDs[q.ID] = true
+		excludeIDs = append(excludeIDs, q.ID)
 		sessionQuestions = append(sessionQuestions, model.SessionQuestion{
-			QuestionID:    question.ID,
-			QuestionOrder: order,
-			IsReview:      isReview,
+			QuestionID: q.ID, QuestionOrder: len(sessionQuestions), IsReview: isReview,
 		})
-		if isKanjiRecallQuestion(question) {
-			kanjiRecallCount++
+		if isKanjiRecallQuestion(q) {
+			kanjiCount++
 		}
-		if question.Category == model.CategoryReading {
+		if q.Category == model.CategoryReading {
 			readingCount++
 		}
-		order++
+		if isCurrentLevelQuestion(q, level) {
+			currentCategories[q.Category]++
+		}
 		return true
 	}
-
-	// 1. Get review questions from SRS (due reviews)
-	if reviewCount > 0 {
-		reviews, err := s.srs.GetDueReviews(
-			ctx,
-			userID,
-			language,
-			level,
-			reviewCount,
-			maxKanjiRecallPerSession,
-		)
+	loadDue := func(limit int, categories ...model.QuestionCategory) []model.Question {
+		questions, err := s.srs.GetDueReviews(ctx, userID, language, level,
+			limit, maxKanjiRecallPerSession, categories...)
 		if err != nil {
 			log.Printf("Error getting due reviews: %v", err)
-		} else {
-			for _, q := range reviews {
-				appendQuestion(q, true)
-			}
+			return nil
 		}
+		return questions
 	}
 
-	// 2. Reserve at least one-third of daily session slots for new vocabulary.
-	// If vocabulary inventory is short, the relay below fills the remaining slots.
-	if reservedVocabularyCount > 0 {
-		newQs, err := s.questionRepo.GetNewQuestions(
-			ctx,
-			userID,
-			language,
-			levels,
-			string(model.CategoryVocabulary),
-			excludeIDs,
-			reservedVocabularyCount,
-			maxKanjiRecallPerSession-kanjiRecallCount,
+	if sessionType == model.SessionReview {
+		for _, q := range loadDue(totalQuestions) {
+			appendQuestion(q, true)
+		}
+	} else if language != "" && level != "" {
+		reservedVocabulary := divideRoundingUp(totalQuestions, minVocabularyRatioDenominator)
+		// Both reserved categories must fit alongside the new vocabulary floor.
+		reviewCount = min(
+			reviewCount,
+			totalQuestions-reservedVocabulary-minListeningPerDailySession-maxReadingPerSession,
 		)
-		if err != nil {
-			log.Printf("Error getting reserved vocabulary questions: %v", err)
-		} else {
-			for _, q := range newQs {
-				appendQuestion(q, false)
+		currentTarget := divideRoundingUp(totalQuestions*4, 5)
+
+		// Query reserved due categories separately: a vocabulary backlog must not
+		// hide current listening/reading beyond the general pool's LIMIT.
+		reservedDueCount := 0
+		for _, category := range []model.QuestionCategory{model.CategoryListening, model.CategoryReading} {
+			for _, q := range loadDue(1, category) {
+				if isCurrentLevelQuestion(q, level) && q.Category == category && appendQuestion(q, true) {
+					reservedDueCount++
+					break
+				}
 			}
 		}
-	}
-
-	// 3. Reserve one new listening slot in each daily session. If no audio-ready
-	// unseen listening question exists, the relay below fills the unused slot.
-	if reservedListeningCount > 0 {
-		newQs, err := s.questionRepo.GetNewQuestions(
-			ctx,
-			userID,
-			language,
-			levels,
-			string(model.CategoryListening),
-			excludeIDs,
-			reservedListeningCount,
-			maxKanjiRecallPerSession-kanjiRecallCount,
-		)
-		if err != nil {
-			log.Printf("Error getting reserved listening questions: %v", err)
-		} else {
-			for _, q := range newQs {
-				appendQuestion(q, false)
+		// Extra rows cover overlap with the two reserved queries. SQL applies
+		// the reading/kanji caps before LIMIT, so a cap cannot hide other due rows.
+		due := loadDue(totalQuestions + 2)
+		appendDue := func(goal int, accept func(model.Question) bool) {
+			for _, q := range due {
+				if len(sessionQuestions) >= goal {
+					break
+				}
+				if accept(q) {
+					appendQuestion(q, true)
+				}
 			}
 		}
-	}
+		isCurrent := func(q model.Question) bool { return isCurrentLevelQuestion(q, level) }
+		appendDue(max(reviewCount, reservedDueCount), isCurrent)
 
-	// 4. Fill remaining with new questions (Random Slot Relay)
-	remainingNew := totalQuestions - len(sessionQuestions)
-
-	if sessionType != model.SessionReview && remainingNew > 0 && language != "" && level != "" {
-		// Prepare categories for relay. The last empty category acts as a general fallback.
-		categories := make([]string, 0, len(defaultCategoryOrder)+1)
-		for _, cat := range defaultCategoryOrder {
-			categories = append(categories, string(cat))
+		exhausted := make(map[string]bool)
+		fetchNew := func(scope []string, category model.QuestionCategory, count int) {
+			count = min(count, totalQuestions-len(sessionQuestions))
+			if category == model.CategoryReading {
+				count = min(count, maxReadingPerSession-readingCount)
+			}
+			key := strings.Join(scope, ",") + ":" + string(category)
+			if count <= 0 || exhausted[key] {
+				return
+			}
+			questions, err := s.questionRepo.GetNewQuestions(ctx, userID, language, scope,
+				string(category), excludeIDs, count, maxKanjiRecallPerSession-kanjiCount)
+			if err != nil {
+				log.Printf("Error getting new questions for category %s: %v", category, err)
+				return
+			}
+			// Exclusions only grow during a build; do not query an exhausted
+			// category again during current/adjacent shortage handling.
+			exhausted[key] = len(questions) < count
+			added := 0
+			for _, q := range questions {
+				if added >= count {
+					break
+				}
+				if appendQuestion(q, false) {
+					added++
+				}
+			}
 		}
-		categories = append(categories, "") // Final fallback
+		fetchNew(currentLevels, model.CategoryVocabulary, reservedVocabulary)
+		// Preserve the existing new-listening reservation even when a due
+		// listening item was selected. Reading still has a one-item total cap.
+		fetchNew(currentLevels, model.CategoryListening, minListeningPerDailySession)
+		if currentCategories[model.CategoryReading] == 0 {
+			fetchNew(currentLevels, model.CategoryReading, 1)
+		}
 
-		for i, cat := range categories {
-			if remainingNew <= 0 {
-				break
+		fillNew := func(scope []string, goal int) {
+			// Retain the category relay, then exhaust each category explicitly.
+			// A generic query can otherwise return only capped reading items and
+			// incorrectly suggest that no current-level questions remain.
+			for _, category := range defaultCategoryOrder {
+				remaining := goal - len(sessionQuestions)
+				if remaining <= 0 {
+					return
+				}
+				fetchNew(scope, category, rand.Intn(min(maxPerCategory, remaining)+1))
 			}
+			for _, category := range defaultCategoryOrder {
+				remaining := goal - len(sessionQuestions)
+				if remaining <= 0 {
+					return
+				}
+				fetchNew(scope, category, remaining)
+			}
+		}
 
-			var alloc int
-			if i == len(categories)-1 {
-				// Final category gets all remaining slots
-				alloc = remainingNew
-			} else {
-				// Random allocation with a per-category cap
-				max := maxPerCategory
-				if remainingNew < max {
-					max = remainingNew
-				}
-				// rand.Intn(max+1) returns a value in [0, max]
-				alloc = rand.Intn(max + 1)
-			}
-			// Never fetch more reading questions than the per-session cap admits.
-			if cat == string(model.CategoryReading) {
-				if remaining := maxReadingPerSession - readingCount; alloc > remaining {
-					alloc = remaining
-				}
-			}
-
-			if alloc > 0 {
-				newQs, err := s.questionRepo.GetNewQuestions(
-					ctx,
-					userID,
-					language,
-					levels,
-					cat,
-					excludeIDs,
-					alloc,
-					maxKanjiRecallPerSession-kanjiRecallCount,
-				)
-				if err != nil {
-					log.Printf("Error getting new questions for category %s: %v", cat, err)
-					continue
-				}
-
-				added := 0
-				for _, q := range newQs {
-					if appendQuestion(q, false) {
-						added++
-					}
-				}
-				// Deduct the number of questions actually fetched
-				remainingNew -= added
-			}
+		// No adjacent questions enter before current candidates have had a
+		// chance to meet the target. Due can exceed its usual budget when new
+		// supply is scarce, rather than yielding those slots to another level.
+		fillNew(currentLevels, currentTarget)
+		appendDue(currentTarget, isCurrent)
+		appendDue(totalQuestions, func(q model.Question) bool {
+			return isLowerAdjacentQuestion(q, language, level)
+		})
+		if len(sessionQuestions) < totalQuestions {
+			fillNew(currentLevels, totalQuestions)
+			appendDue(totalQuestions, isCurrent)
+		}
+		if len(sessionQuestions) < totalQuestions && !sameLevelScope(currentLevels, levels) {
+			appendDue(totalQuestions, func(model.Question) bool { return true })
+			fillNew(levels, totalQuestions)
 		}
 	}
 
 	if len(sessionQuestions) == 0 {
-		return nil, nil // No questions available
+		return nil, nil
 	}
-
-	// Create session
 	session := &model.Session{
-		UserID:         userID,
-		Type:           sessionType,
-		Mode:           model.SessionModeQuiz,
-		Status:         model.SessionPending,
-		TotalQuestions: len(sessionQuestions),
+		UserID: userID, Type: sessionType, Mode: model.SessionModeQuiz,
+		Status: model.SessionPending, TotalQuestions: len(sessionQuestions),
 	}
-
 	if err := s.sessionRepo.CreateSession(ctx, session); err != nil {
 		return nil, err
 	}
-
-	// Create session_questions entries
 	for i := range sessionQuestions {
 		sessionQuestions[i].SessionID = session.ID
 	}
 	if err := s.sessionQuestionRepo.CreateSessionQuestions(ctx, sessionQuestions); err != nil {
 		return nil, err
 	}
-
 	return session, nil
 }
 
@@ -326,6 +302,40 @@ func isKanjiRecallQuestion(question model.Question) bool {
 
 func divideRoundingUp(dividend, divisor int) int {
 	return (dividend + divisor - 1) / divisor
+}
+
+func isCurrentLevelQuestion(question model.Question, currentLevel string) bool {
+	return question.ProficiencyLevel != "" && strings.EqualFold(question.ProficiencyLevel, currentLevel)
+}
+
+func isLowerAdjacentQuestion(question model.Question, language, currentLevel string) bool {
+	if question.ProficiencyLevel == "" {
+		return false
+	}
+	scope := sessionLevelsFor(language, currentLevel)
+	currentIndex := -1
+	questionIndex := -1
+	for i, level := range scope {
+		if strings.EqualFold(level, currentLevel) {
+			currentIndex = i
+		}
+		if strings.EqualFold(level, question.ProficiencyLevel) {
+			questionIndex = i
+		}
+	}
+	return currentIndex >= 0 && questionIndex >= 0 && questionIndex < currentIndex
+}
+
+func sameLevelScope(current, scope []string) bool {
+	if len(current) != len(scope) {
+		return false
+	}
+	for i := range current {
+		if !strings.EqualFold(current[i], scope[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *SessionBuilderService) GetSessionsByStatus(

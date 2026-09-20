@@ -13,9 +13,10 @@ type mockQuestionQuerier struct {
 	getDueReviewsFn func(
 		ctx context.Context,
 		userID int64,
-		language string,
+		language, currentLevel string,
 		levels []string,
 		limit, kanjiRecallLimit int,
+		categories ...model.QuestionCategory,
 	) ([]model.Question, error)
 	getDueReviewCountFn func(ctx context.Context, userID int64, language string, levels []string) (int, error)
 }
@@ -23,11 +24,12 @@ type mockQuestionQuerier struct {
 func (m *mockQuestionQuerier) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language string,
+	language, currentLevel string,
 	levels []string,
 	limit, kanjiRecallLimit int,
+	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, userID, language, levels, limit, kanjiRecallLimit)
+	return m.getDueReviewsFn(ctx, userID, language, currentLevel, levels, limit, kanjiRecallLimit, categories...)
 }
 
 func (m *mockQuestionQuerier) GetDueReviewCount(
@@ -131,19 +133,21 @@ func TestSRSService_GetDueReviewsForwardsUserScope(t *testing.T) {
 		getDueReviewsFn: func(
 			_ context.Context,
 			userID int64,
-			language string,
+			language, currentLevel string,
 			levels []string,
 			limit, kanjiRecallLimit int,
+			categories ...model.QuestionCategory,
 		) ([]model.Question, error) {
-			if userID != 42 || language != "ja" || !reflect.DeepEqual(levels, []string{"N5", "N4"}) || limit != 10 ||
-				kanjiRecallLimit != 3 {
+			if userID != 42 || language != "ja" || currentLevel != "N5" || !reflect.DeepEqual(levels, []string{"N5", "N4"}) || limit != 10 ||
+				kanjiRecallLimit != 3 ||
+				!reflect.DeepEqual(categories, []model.QuestionCategory{model.CategoryReading}) {
 				t.Fatalf("unexpected scope: %d %s %v %d %d", userID, language, levels, limit, kanjiRecallLimit)
 			}
 			return want, nil
 		},
 	}
 
-	got, err := NewSRSService(repo).GetDueReviews(context.Background(), 42, "ja", "N5", 10, 3)
+	got, err := NewSRSService(repo).GetDueReviews(context.Background(), 42, "ja", "N5", 10, 3, model.CategoryReading)
 	if err != nil || len(got) != len(want) {
 		t.Fatalf("GetDueReviews() = %v, %v", got, err)
 	}
@@ -154,12 +158,13 @@ func TestSRSService_GetDueReviewsUsesAdjacentJapaneseScope(t *testing.T) {
 		getDueReviewsFn: func(
 			_ context.Context,
 			_ int64,
-			language string,
+			language, currentLevel string,
 			levels []string,
 			_, _ int,
+			_ ...model.QuestionCategory,
 		) ([]model.Question, error) {
-			if language != "ja" {
-				t.Fatalf("language = %s, want ja", language)
+			if language != "ja" || currentLevel != "N4" {
+				t.Fatalf("language/current level = %s/%s, want ja/N4", language, currentLevel)
 			}
 			want := []string{"N5", "N4", "N3"}
 			if !reflect.DeepEqual(levels, want) {
@@ -181,8 +186,9 @@ func TestSRSService_GetDueReviewsPropagatesError(t *testing.T) {
 		getDueReviewsFn: func(
 			context.Context,
 			int64,
-			string, []string,
+			string, string, []string,
 			int, int,
+			...model.QuestionCategory,
 		) ([]model.Question, error) {
 			return nil, expectedErr
 		},

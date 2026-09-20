@@ -11,9 +11,10 @@ type questionQuerier interface {
 	GetDueReviews(
 		ctx context.Context,
 		userID int64,
-		language string,
+		language, currentLevel string,
 		levels []string,
 		limit, kanjiRecallLimit int,
+		categories ...model.QuestionCategory,
 	) ([]model.Question, error)
 	GetDueReviewCount(ctx context.Context, userID int64, language string, levels []string) (int, error)
 }
@@ -27,6 +28,7 @@ type srsScheduler interface {
 		userID int64,
 		language, level string,
 		limit, kanjiRecallLimit int,
+		categories ...model.QuestionCategory,
 	) ([]model.Question, error)
 	GetDueCount(ctx context.Context, userID int64, language, level string) (int, error)
 }
@@ -89,14 +91,17 @@ func (s *SRSService) GetDueReviews(
 	userID int64,
 	language, level string,
 	limit, kanjiRecallLimit int,
+	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	return s.questionRepo.GetDueReviews(
 		ctx,
 		userID,
 		language,
+		level,
 		sessionLevelsFor(language, level),
 		limit,
 		kanjiRecallLimit,
+		categories...,
 	)
 }
 

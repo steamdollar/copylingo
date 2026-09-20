@@ -51,9 +51,10 @@ type mockSRSRepo struct{}
 func (m *mockSRSRepo) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language string,
+	language, currentLevel string,
 	levels []string,
 	limit, kanjiRecallLimit int,
+	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	return nil, nil
 }
