@@ -139,6 +139,14 @@ func TestHandleSettingsCommand(t *testing.T) {
 	}
 }
 
+func TestFormatSlotTimeNormalizesDatabaseTimestamp(t *testing.T) {
+	value := "0000-01-01T08:00:00Z"
+
+	if got, want := formatSlotTime(&value), "08:00"; got != want {
+		t.Fatalf("formatSlotTime() = %q, want %q", got, want)
+	}
+}
+
 func TestHandleSettingsCallback_View(t *testing.T) {
 	bot, _, mockAPI := newSettingsTestBot()
 

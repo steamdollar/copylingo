@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/service"
 )
 
 // RawContent represents raw data fetched from external sources.
@@ -39,12 +40,8 @@ type Processor interface {
 	Process(ctx context.Context, raw []RawContent) ([]model.Content, error)
 }
 
-// SaveResult contains the outcome of a save operation.
-type SaveResult struct {
-	Saved      int     // Number of items successfully saved
-	Duplicates int     // Number of items skipped due to duplicate URL
-	Errors     []error // Individual save errors (non-fatal)
-}
+// SaveResult preserves the pipeline API while the content service owns persistence.
+type SaveResult = service.ContentSaveResult
 
 // Saver persists processed content to the database.
 type Saver interface {
@@ -60,11 +57,4 @@ type PipelineResult struct {
 	FetchedCount int
 	SaveResult   SaveResult
 	Err          error // Fatal error that stopped the pipeline
-}
-
-// ContentRepository defines the interface for content persistence.
-// This allows for mocking in tests.
-type ContentRepository interface {
-	Create(ctx context.Context, content *model.Content) error
-	ExistsByURL(ctx context.Context, url string) (bool, error)
 }

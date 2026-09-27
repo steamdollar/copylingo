@@ -3,7 +3,7 @@
 ## 시스템 개요
 
 JLPT N1 달성을 목표로 하는 개인 일본어 학습 텔레그램 봇.
-Go + Gin 백엔드에서 콘텐츠 수집 → AI 문제 생성 → 텔레그램 푸시 → 풀이 → 채점 → 분석 파이프라인을 자동화한다.
+Go + Gin 백엔드에서 사용자별 세션 생성 → 텔레그램 푸시 → 풀이 → 채점 → 분석을 처리한다. 콘텐츠 수집 파이프라인은 유지하지만 자동 실행하지 않는다.
 
 ## 아키텍처 다이어그램
 
@@ -34,6 +34,7 @@ internal/
 ├── config/                  ← 설정 관리 (Viper)
 ├── model/                   ← 도메인 모델 (구조체 정의)
 ├── repository/              ← 데이터 접근 계층 (PostgreSQL)
+├── redisstore/              ← Redis 키·직렬화·TTL·원자적 명령
 ├── service/                 ← 비즈니스 로직
 │   ├── srs.go               ← SM-2 간격 반복
 │   ├── session_builder.go   ← 세션 생성
@@ -45,26 +46,37 @@ internal/
 └── external/                ← 외부 API 클라이언트 (Phase 2)
 ```
 
+콘텐츠 수집을 재연결할 때는 `pipeline`의 처리 결과를 `ContentService`가 받아 중복 확인·저장을 수행하고, 서비스만 `ContentRepository`를 사용한다. 현재 자동 수집은 실행되지 않는다.
+
+### Redis 접근 경계
+
+`cmd/server`가 Redis 연결을 만들고 저장 구현을 조립한다. 각 호출자는 사용하는 기능의 인터페이스만 받는다. 연결 생성·종료와 `/health` Ping 외의 Redis 명령, 키 조합, 값 직렬화와 TTL은 `redisstore`가 소유한다.
+
+| 호출자 | 저장 기능 | 호출자에 남는 책임 |
+|---|---|---|
+| Quiz·Study 서비스 | 세션 working set 읽기·저장·삭제 | 상태 유효성 검사, 진행·완료 전이, DB 복구 |
+| Bot | 입력 모드, 답안 대기, 어순 초안, 문항 시작 시각, 메시지 참조, 복구 fingerprint | Telegram 입력 해석과 화면 처리 |
+| Mini App | 손글씨 메시지 참조 조회 | HTTP 처리와 기존 메시지 갱신 흐름 |
+| Scheduler | 사용자·슬롯·날짜별 발송 claim | 날짜 결정, Redis 장애 시 경고 후 진행, 발송 정책 |
+
+기존 키·값·TTL은 유지한다. LLM 입력의 `GetDel` 일회성 소비와 발송 claim의 `SetNX` 원자성도 저장 구현에 유지한다. 화면 상태와 발송 claim은 각 호출자가 사용하며 학습 서비스로 우회시키지 않는다. PostgreSQL 저장 경계와 Quiz·Study 공개 서비스 구성은 이 단계에서 변경하지 않는다.
+
 ## 데이터 흐름
 
-### 일일 학습 파이프라인
+### 사용자별 세션 발송 파이프라인
 
 ```
-[새벽 3시] 콘텐츠 수집
+[매시 :00/:30] 단일 푸시 작업 실행
     ↓
-[새벽 3시] AI 문제 생성 + TTS 캐싱
+[DB] 사용자 시간대와 네 세션 슬롯에서 현재 시각의 대상 조회
     ↓
-[오전 7:30] 오전 세션 빌드 (새60% + 복습40%)
+[해당 사용자] 세션 생성 또는 미완료 세션 재알림
     ↓
-[오전 8:00] 텔레그램 푸시
+[텔레그램] 사용자에게 세션 푸시
     ↓
 [사용자] 문제 풀기 (Inline Keyboard)
     ↓
 [시스템] 채점 → SRS 업데이트 → XP 추가 → 스트릭 갱신
-    ↓
-[오후 8:30] 오후 세션 빌드 (보충20% + 복습80%)
-    ↓
-[오후 9:00] 텔레그램 푸시 → 풀기 → 채점
 ```
 
 ### 텔레그램 인터랙션 플로우
@@ -112,12 +124,19 @@ Bot은 세션 진행을 유지하고, Mini App은 canvas stroke data를 HTTP로 
 session:{session_id}:start        → 세션 시작
 q:{session_id}:{question_id}:{n}  → 답변 선택 (n=0~3)
 q:{session_id}:next:{idx}         → 다음 문제
+q:{session_id}:policy:{question_id}        → 연결 자료 설정 메뉴 (저장 없음)
+q:{session_id}:policy:{question_id}:{mode} → 유지 복습/학습 제외 저장
 session:{session_id}:finish       → 결과 보기
 menu:main                         → 메인 메뉴
 menu:study                        → 학습 시작
 menu:review                       → 복습 시작
 menu:stats                        → 통계
 menu:settings                     → 설정
+study:{session_id}:policy:{material_id}        → 자료 학습 설정
+study:{session_id}:policy:{material_id}:{mode} → 일반/유지/제외 변경
+study:{session_id}:card:{material_id}          → 기존 Study 카드로 복귀
+settings:materials:{page}                     → 유지·제외 자료 목록
+settings:restore:{material_id}:{page}          → 일반 학습 복원
 ```
 
 ## DB 스키마 요약
@@ -127,11 +146,22 @@ menu:settings                     → 설정
 | `users` | Telegram ID (BIGINT) | 사용자 프로필, 스트릭, XP |
 | `contents` | SERIAL | 외부에서 수집한 원문 |
 | `materials` | SERIAL | Study Session에서 노출할 학습 단위 SSOT |
+| `user_material_progress` | (user_id, material_id) | 사용자별 Study 이력 + 현재 SRS 상태 |
+| `user_material_preferences` | (user_id, material_id) | 사용자별 유지 복습·제외 설정과 자료 공통 출제 가능 기한 |
 | `questions` | SERIAL | language/level별 공유 Quiz 문항 Catalog |
 | `user_question_progress` | (user_id, question_id) | 사용자별 Quiz 통계 + 현재 SRS 상태 |
 | `sessions` | SERIAL | Quiz 학습 세션 상태 |
 | `session_questions` | SERIAL | Session별 문항 순서와 답안 |
 | `tips` | SERIAL | 손글씨 채점 대기 중 노출할 학습 팁 |
+
+자료 설정은 학습 이력과 독립적이다. 설정 행이 없으면 일반 학습이며, 유지 복습의
+`next_check_at` 이전 또는 제외 상태에서는 새 Study·연결 Quiz 후보에서 제거한다.
+기한이 지난 유지 복습은 연결 Quiz로 우선 확인하고, 정답이면 30→60→120→180일,
+오답이면 일반 학습으로 복귀한다. Quiz 후보가 없어 Study로 확인하면 같은 간격을 유지한다.
+이미 생성된 세션 목록과 Redis 진행 상태에는 소급 적용하지 않는다.
+연결 자료가 있는 Quiz 문제의 `⚙️ 연결 자료 설정` 버튼은 유지 복습·학습 제외
+두 선택지를 열며, 선택한 설정은 새 세션부터 적용한다. 현재 Quiz 문제는 그대로 진행한다.
+세부 규칙: [ADR-051](adr/ADR-051_user_material_preferences.md).
 
 ## 핵심 알고리즘: SM-2
 

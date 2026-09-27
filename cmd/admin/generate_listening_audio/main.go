@@ -53,8 +53,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if !cfg.TTS.Enabled || cfg.LLM.APIKey == "" {
-		log.Fatal("listening TTS requires tts.enabled=true and llm.api_key")
+	if cfg.LLM.APIKey == "" {
+		log.Fatal("listening TTS requires llm.api_key")
 	}
 
 	db, err := initDB(cfg)
@@ -79,7 +79,8 @@ func main() {
 		repos.Question,
 		external.NewTTSClient(cfg),
 		external.NewS3AudioStore(cfg),
-		cfg.TTS.VoiceName,
+		cfg.LLM.TTSVoiceName,
+		cfg.LLM.TTSVoiceNameB,
 	)
 	cycles := (len(pending) + service.AudioGeneratePerCycle - 1) / service.AudioGeneratePerCycle
 	log.Printf(

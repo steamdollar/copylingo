@@ -17,8 +17,8 @@ ADR-035에 따라 `(user_id, question_id)` 기반 `user_question_progress`로 �
 
 - Schema/운영: `migrations/001_init.sql`, `scripts/backfill_user_question_progress.sql`, `Makefile`,
   `cmd/admin/reset_learning_data/main.go`
-- Model: `internal/model/question.go`, `question_progress.go`, `active_session.go`
-- Repository: `question_repo.go`, `active_session_repo.go`, `session_question_repo.go`
+- Model: `internal/model/question.go`, `question_progress.go`, `quiz_active_session.go`
+- Repository: `question_repo.go`, `quiz_active_session_repo.go`, `session_question_repo.go`
 - Service/Bot: SRS scheduling, Session Builder, Active Session flush, analytics, review/menu user scope
 - 문서: `docs/ARCHITECTURE.md`, ADR-035 및 ADR range pointer
 - 관련 model/repository/service/bot test와 mock 계약을 함께 갱신했다.

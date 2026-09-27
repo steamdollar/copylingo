@@ -11,8 +11,8 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/observability"
+	"github.com/lsj/copylingo/internal/pipeline"
 )
 
 func TestRunJobInjectsCorrelationAndTimeout(t *testing.T) {
@@ -24,14 +24,14 @@ func TestRunJobInjectsCorrelationAndTimeout(t *testing.T) {
 	var interactionID string
 	var hasDeadline bool
 	scheduler := &Scheduler{}
-	scheduler.runJob("content_collection", time.Second, func(ctx context.Context) error {
+	scheduler.runJob("dynamic_user_push", time.Second, func(ctx context.Context) error {
 		interactionID = observability.InteractionID(ctx)
 		_, hasDeadline = ctx.Deadline()
 		return nil
 	})
 
-	if !strings.HasPrefix(interactionID, "job-content_collection-") {
-		t.Fatalf("InteractionID() = %q, want job-content_collection prefix", interactionID)
+	if !strings.HasPrefix(interactionID, "job-dynamic_user_push-") {
+		t.Fatalf("InteractionID() = %q, want job-dynamic_user_push prefix", interactionID)
 	}
 	if !hasDeadline {
 		t.Fatal("runJob() context has no deadline")
@@ -54,7 +54,7 @@ func TestRunJobLogsFailure(t *testing.T) {
 	defer slog.SetDefault(previous)
 
 	scheduler := &Scheduler{}
-	scheduler.runJob("morning_push", 0, func(context.Context) error {
+	scheduler.runJob("dynamic_user_push", 0, func(context.Context) error {
 		return errors.New("push failed")
 	})
 
@@ -66,60 +66,20 @@ func TestRunJobLogsFailure(t *testing.T) {
 	}
 }
 
-func TestStartRegistersDynamicPushJob(t *testing.T) {
-	c := cron.New()
-	scheduler := New(&config.Config{
-		Schedule: config.ScheduleConfig{
-			ContentCollectCron: "0 3 * * *",
-			DynamicPushCron:    "*/30 * * * *",
-		},
-	}, nil, nil, nil, c)
+func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
+	cronScheduler := cron.New()
+	scheduler := New(nil, nil, pipeline.NewOrchestrator(), cronScheduler, nil)
 
 	scheduler.Start()
 	defer scheduler.Stop()
 
-	// Content collection skips when orchestrator is nil; dynamic user push is registered (1 job)
-	if got, want := len(c.Entries()), 1; got != want {
-		t.Fatalf("registered cron entries = %d, want %d", got, want)
+	// One aligned trigger serves all users and all four configurable slots.
+	entries := cronScheduler.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("registered cron entries = %d, want 1", len(entries))
 	}
-}
-
-func TestStart_DynamicPushDisablesLegacyStudyCrons(t *testing.T) {
-	t.Run("when dynamic push is active, legacy study crons are not registered", func(t *testing.T) {
-		c := cron.New()
-		scheduler := New(&config.Config{
-			Schedule: config.ScheduleConfig{
-				DynamicPushCron:        "*/30 * * * *",
-				StudyPushCron:          "0 8 * * *",
-				AfternoonStudyPushCron: "30 16 * * *",
-			},
-		}, nil, nil, nil, c)
-
-		scheduler.Start()
-		defer scheduler.Stop()
-
-		// Only dynamic_user_push must be registered; legacy study_push and afternoon_study_push must be skipped
-		if got, want := len(c.Entries()), 1; got != want {
-			t.Fatalf("registered cron entries = %d, want %d (legacy crons should be ignored)", got, want)
-		}
-	})
-
-	t.Run("when dynamic push is zero, legacy study crons are registered", func(t *testing.T) {
-		c := cron.New()
-		scheduler := New(&config.Config{
-			Schedule: config.ScheduleConfig{
-				DynamicPushCron:        "",
-				StudyPushCron:          "0 8 * * *",
-				AfternoonStudyPushCron: "30 16 * * *",
-			},
-		}, nil, nil, nil, c)
-
-		scheduler.Start()
-		defer scheduler.Stop()
-
-		// Legacy study_push and afternoon_study_push should both be registered
-		if got, want := len(c.Entries()), 2; got != want {
-			t.Fatalf("registered cron entries = %d, want %d (legacy crons should be registered)", got, want)
-		}
-	})
+	start := time.Date(2026, time.September, 26, 8, 1, 0, 0, time.UTC)
+	if got, want := entries[0].Schedule.Next(start), start.Add(29*time.Minute); !got.Equal(want) {
+		t.Fatalf("next user push = %s, want %s", got, want)
+	}
 }

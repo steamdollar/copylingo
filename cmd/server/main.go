@@ -45,16 +45,18 @@ func run() error {
 	defer cleanup()
 
 	// initialize application components
-	repos, services, botHandler, err := initApp(cfg, db, rdb)
+	services, botHandler, err := initApp(cfg, db, rdb)
 	if err != nil {
 		return fmt.Errorf("failed to init app: %w", err)
 	}
 
-	stopWorkers := startWorkers(cfg, services, botHandler, repos, rdb)
+	stopWorkers := startWorkers(services, botHandler, rdb)
 	defer stopWorkers()
 
 	router := setupRouter(cfg, db, rdb, services, botHandler)
 	srv := startHTTPServer(cfg, router)
+
+	// wait for shutdown
 	waitForShutdown(srv, botHandler)
 
 	return nil

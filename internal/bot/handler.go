@@ -11,7 +11,6 @@ import (
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/observability"
@@ -42,13 +41,17 @@ type Bot struct {
 	api      BotAPI
 	cfg      *config.Config
 	services *service.Services
-	rdb      redis.Cmdable
+	input    InputStateStore
+	drafts   WordOrderDraftStore
+	messages HandwritingMessageStore
+	recovery MiniAppRecoveryStore
+	timing   QuestionTimingStore
 	flow     *SessionFlow
 	study    *StudyFlow
 	stopCh   chan struct{}
 }
 
-func New(cfg *config.Config, services *service.Services, rdb redis.Cmdable) (*Bot, error) {
+func NewBot(cfg *config.Config, services *service.Services, stores StateStores) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Telegram bot: %w", err)
@@ -61,7 +64,11 @@ func New(cfg *config.Config, services *service.Services, rdb redis.Cmdable) (*Bo
 		api:      api,
 		cfg:      cfg,
 		services: services,
-		rdb:      rdb,
+		input:    stores.Input,
+		drafts:   stores.Drafts,
+		messages: stores.Messages,
+		recovery: stores.Recovery,
+		timing:   stores.Timing,
 		stopCh:   make(chan struct{}),
 	}
 
@@ -528,11 +535,13 @@ func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
 }
 
 func (b *Bot) handleExit(ctx context.Context, msg *tgbotapi.Message) {
-	keys := []string{config.UserActiveQuestionRedisKey.Format(msg.Chat.ID)}
+	var userID *int64
 	if msg.From != nil {
-		keys = append(keys, config.UserLLMPendingRedisKey.Format(msg.From.ID))
+		userID = &msg.From.ID
 	}
-	b.rdb.Del(ctx, keys...)
+	if b.input != nil {
+		_ = b.input.ClearInput(ctx, msg.Chat.ID, userID)
+	}
 	b.SendMessage(msg.Chat.ID, "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요.")
 }
 
@@ -556,11 +565,12 @@ func (b *Bot) handleStudy(ctx context.Context, msg *tgbotapi.Message) {
 		return
 	}
 
-	session, err := b.services.StudySession.BuildStudySessionWithLimit(
+	session, err := b.services.StudySession.BuildStudySession(
 		ctx,
 		user.ID,
 		user.Language,
 		user.ProficiencyLevel,
+		service.StudyProfileMorning,
 		limit,
 	)
 	if err != nil {

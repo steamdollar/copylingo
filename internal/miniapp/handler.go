@@ -3,6 +3,7 @@ package miniapp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
@@ -32,8 +32,12 @@ type tipService interface {
 	ListActive(ctx context.Context, language, level string, limit int) ([]model.Tip, error)
 }
 
-type activeSessionService interface {
-	Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
+type quizActiveSessionService interface {
+	Get(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
+}
+
+type HandwritingMessageStore interface {
+	GetHandwritingMessage(ctx context.Context, sessionID, questionID int) (*model.TelegramMessageRef, error)
 }
 
 type verifier interface {
@@ -41,23 +45,23 @@ type verifier interface {
 }
 
 type Handler struct {
-	handwriting   handwritingService
-	tip           tipService
-	activeSession activeSessionService
-	verifier      verifier
-	rdb           *redis.Client
-	messenger     TelegramMessenger
-	cfg           *config.Config
+	handwriting         handwritingService
+	tip                 tipService
+	quizActiveSession   quizActiveSessionService
+	verifier            verifier
+	handwritingMessages HandwritingMessageStore
+	messenger           TelegramMessenger
+	cfg                 *config.Config
 }
 
 type HandlerDeps struct {
-	Handwriting   handwritingService
-	Tip           tipService
-	ActiveSession activeSessionService
-	Verifier      verifier
-	Redis         *redis.Client
-	Messenger     TelegramMessenger
-	Config        *config.Config
+	Handwriting         handwritingService
+	Tip                 tipService
+	QuizActiveSession   quizActiveSessionService
+	Verifier            verifier
+	HandwritingMessages HandwritingMessageStore
+	Messenger           TelegramMessenger
+	Config              *config.Config
 }
 
 type handwritingSubmitRequest struct {
@@ -69,13 +73,13 @@ type handwritingSubmitRequest struct {
 
 func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
-		handwriting:   deps.Handwriting,
-		tip:           deps.Tip,
-		activeSession: deps.ActiveSession,
-		verifier:      deps.Verifier,
-		rdb:           deps.Redis,
-		messenger:     deps.Messenger,
-		cfg:           deps.Config,
+		handwriting:         deps.Handwriting,
+		tip:                 deps.Tip,
+		quizActiveSession:   deps.QuizActiveSession,
+		verifier:            deps.Verifier,
+		handwritingMessages: deps.HandwritingMessages,
+		messenger:           deps.Messenger,
+		cfg:                 deps.Config,
 	}
 }
 
@@ -83,17 +87,17 @@ func RegisterRoutes(
 	r *gin.Engine,
 	cfg *config.Config,
 	services *service.Services,
-	rdb *redis.Client,
+	handwritingMessages HandwritingMessageStore,
 	messenger TelegramMessenger,
 ) {
 	handler := NewHandler(HandlerDeps{
-		Handwriting:   services.Handwriting,
-		Tip:           services.Tip,
-		ActiveSession: services.ActiveSession,
-		Verifier:      NewInitDataVerifier(cfg.Telegram.Token, 24*time.Hour),
-		Redis:         rdb,
-		Messenger:     messenger,
-		Config:        cfg,
+		Handwriting:         services.Handwriting,
+		Tip:                 services.Tip,
+		QuizActiveSession:   services.QuizActiveSession,
+		Verifier:            NewInitDataVerifier(cfg.Telegram.Token, 24*time.Hour),
+		HandwritingMessages: handwritingMessages,
+		Messenger:           messenger,
+		Config:              cfg,
 	})
 
 	r.Static("/miniapp/handwriting/assets", "./web/miniapp/handwriting")
@@ -220,7 +224,7 @@ func (h *Handler) refreshHandwritingMessage(parent context.Context, sessionID, q
 		slog.Int("session_id", sessionID),
 		slog.Int("question_id", questionID),
 	)
-	if h.rdb == nil || h.messenger == nil || h.cfg == nil {
+	if h.handwritingMessages == nil || h.messenger == nil || h.cfg == nil {
 		slog.WarnContext(parent, "Handwriting cleanup skipped because dependency is missing",
 			"event", "handwriting.cleanup.skipped",
 		)
@@ -230,10 +234,14 @@ func (h *Handler) refreshHandwritingMessage(parent context.Context, sessionID, q
 	ctx, cancel := context.WithTimeout(parent, 15*time.Second)
 	defer cancel()
 
-	key := config.HandwritingMessageRedisKey.Format(sessionID, questionID)
-	val, err := h.rdb.Get(ctx, key).Result()
+	message, err := h.handwritingMessages.GetHandwritingMessage(ctx, sessionID, questionID)
 	if err != nil {
-		if !errors.Is(err, redis.Nil) {
+		if errors.Is(err, model.ErrInvalidTelegramMessageRef) {
+			slog.ErrorContext(ctx, "Invalid handwriting message ID format",
+				"event", "handwriting.cleanup.invalid_message_id",
+				"error", err,
+			)
+		} else {
 			slog.ErrorContext(ctx, "Failed to get handwriting message ID",
 				"event", "handwriting.cleanup.message_lookup_failed",
 				"error", err,
@@ -241,18 +249,12 @@ func (h *Handler) refreshHandwritingMessage(parent context.Context, sessionID, q
 		}
 		return
 	}
-
-	chatID, msgID, err := callback.ParseHandwritingMessageRef(val)
-	if err != nil {
-		slog.ErrorContext(ctx, "Invalid handwriting message ID format",
-			"event", "handwriting.cleanup.invalid_message_id",
-			"error", err,
-		)
+	if message == nil {
 		return
 	}
 
 	// We need to know the question index to format the "Next" button.
-	state, err := h.activeSession.Get(ctx, sessionID)
+	state, err := h.quizActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get active session state for handwriting cleanup",
 			"event", "handwriting.cleanup.session_lookup_failed",
@@ -261,7 +263,7 @@ func (h *Handler) refreshHandwritingMessage(parent context.Context, sessionID, q
 		return
 	}
 
-	_, questionIdx, ok := state.CurrentItemByQuestionID(questionID)
+	item, questionIdx, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		slog.WarnContext(ctx, "Question not found in session for handwriting cleanup",
 			"event", "handwriting.cleanup.question_not_found",
@@ -276,12 +278,22 @@ func (h *Handler) refreshHandwritingMessage(parent context.Context, sessionID, q
 			tgbotapi.NewInlineKeyboardButtonData("다음 문제 →", nextData),
 		),
 	)
+	// Keep the linked-material action available after the Mini App replaces
+	// the original handwriting keyboard with the next-question button.
+	if item.Question.MaterialID != nil {
+		markup.InlineKeyboard = append(markup.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				"⚙️ 연결 자료 설정",
+				fmt.Sprintf(config.FormatQuestionPolicy, sessionID, questionID),
+			),
+		))
+	}
 
-	if err := h.messenger.EditMessageReplyMarkup(chatID, msgID, markup); err != nil {
+	if err := h.messenger.EditMessageReplyMarkup(message.ChatID, message.MessageID, markup); err != nil {
 		slog.ErrorContext(ctx, "Failed to edit handwriting message reply markup",
 			"event", "handwriting.cleanup.reply_markup_failed",
-			"chat_id", chatID,
-			"message_id", msgID,
+			"chat_id", message.ChatID,
+			"message_id", message.MessageID,
 			"error", err,
 		)
 	}

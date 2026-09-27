@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jmoiron/sqlx"
+
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/repository"
 )
 
 const (
@@ -33,25 +36,41 @@ var eveningStudySessionPlan = model.StudySessionPlan{Quotas: []model.StudyMateri
 	{Category: model.MaterialCategoryReading, NewCount: 0, ReviewCount: 2},
 }}
 
-func studySessionPlanForProfile(profile StudySessionProfile) (model.StudySessionPlan, bool) {
-	switch profile {
-	case StudyProfileMorning:
-		return morningStudySessionPlan, true
-	case StudyProfileEvening:
-		return eveningStudySessionPlan, true
-	default:
-		return model.StudySessionPlan{}, false
-	}
-}
-
 // scaleMorningStudySessionPlan scales the morning category weights (15:4:1)
 // to a requested limit. Reading is capped at two slots; any excess is
 // redistributed between vocabulary and grammar using their 15:4 weights.
 func scaleMorningStudySessionPlan(limit int) model.StudySessionPlan {
-	categoryTotals := scaleStudyCategoryTotals(limit)
-	vocabularyNew := scaleStudyNewCount(categoryTotals[0], 8, 15)
-	grammarNew := scaleStudyNewCount(categoryTotals[1], 1, 4)
-	readingNew := scaleStudyNewCount(categoryTotals[2], 1, 1)
+	// Above 40 materials, keep reading at two and distribute the rest by the
+	// vocabulary-to-grammar ratio.
+	var categoryTotals [3]int
+	if limit <= 40 {
+		allocation := largestRemainderStudyAllocation(
+			[]int{15, 4, 1},
+			limit,
+		)
+		categoryTotals = [3]int{allocation[0], allocation[1], allocation[2]}
+	} else {
+		allocation := largestRemainderStudyAllocation(
+			[]int{15, 4},
+			limit-2,
+		)
+		categoryTotals = [3]int{allocation[0], allocation[1], 2}
+	}
+	vocabularyNew := scaleStudyNewCount(
+		categoryTotals[0],
+		8,
+		15,
+	)
+	grammarNew := scaleStudyNewCount(
+		categoryTotals[1],
+		1,
+		4,
+	)
+	readingNew := scaleStudyNewCount(
+		categoryTotals[2],
+		1,
+		1,
+	)
 	return model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{
 			Category:    model.MaterialCategoryVocabulary,
@@ -63,32 +82,37 @@ func scaleMorningStudySessionPlan(limit int) model.StudySessionPlan {
 	}}
 }
 
-func scaleStudyCategoryTotals(limit int) [3]int {
-	if limit <= 40 {
-		allocation := largestRemainderStudyAllocation([]int{15, 4, 1}, limit)
-		return [3]int{allocation[0], allocation[1], allocation[2]}
-	}
-
-	vg := largestRemainderStudyAllocation([]int{15, 4}, limit-2)
-	return [3]int{vg[0], vg[1], 2}
-}
-
 // largestRemainderStudyAllocation uses integer arithmetic so ties are stable
 // in the declared category order.
-func largestRemainderStudyAllocation(weights []int, total int) []int {
+func largestRemainderStudyAllocation(
+	weights []int,
+	total int,
+) []int {
 	if total <= 0 || len(weights) == 0 {
-		return make([]int, len(weights))
+		return make(
+			[]int,
+			len(weights),
+		)
 	}
 	weightTotal := 0
 	for _, weight := range weights {
 		weightTotal += weight
 	}
 	if weightTotal <= 0 {
-		return make([]int, len(weights))
+		return make(
+			[]int,
+			len(weights),
+		)
 	}
 
-	allocation := make([]int, len(weights))
-	remainders := make([]int, len(weights))
+	allocation := make(
+		[]int,
+		len(weights),
+	)
+	remainders := make(
+		[]int,
+		len(weights),
+	)
 	allocated := 0
 	for i, weight := range weights {
 		numerator := total * weight
@@ -109,7 +133,11 @@ func largestRemainderStudyAllocation(weights []int, total int) []int {
 	return allocation
 }
 
-func scaleStudyNewCount(total, newWeight, baseTotal int) int {
+func scaleStudyNewCount(
+	total,
+	newWeight,
+	baseTotal int,
+) int {
 	if total <= 0 || newWeight <= 0 || baseTotal <= 0 {
 		return 0
 	}
@@ -124,84 +152,93 @@ func scaleStudyNewCount(total, newWeight, baseTotal int) int {
 }
 
 type studyMaterialStore interface {
-	GetForStudySession(
+	GetMaterialsByPlan(
 		ctx context.Context,
 		userID int64,
-		language, level string,
+		language,
+		level string,
 		levels []string,
 		plan model.StudySessionPlan,
 	) ([]model.Material, error)
 }
 
 type studySessionStore interface {
-	CreateSession(ctx context.Context, s *model.Session) error
-}
-
-type studySessionMaterialStore interface {
-	CreateSessionMaterials(ctx context.Context, sms []model.SessionMaterial) error
+	CreateSessionInTx(
+		ctx context.Context,
+		tx *sqlx.Tx,
+		session *model.Session,
+	) (int, error)
+	CreateSessionMaterialsInTx(
+		ctx context.Context,
+		tx *sqlx.Tx,
+		sessionID int,
+		materialIDs []int,
+	) error
 }
 
 // StudySessionService creates material-based study sessions.
 type StudySessionService struct {
-	materialRepo        studyMaterialStore
-	sessionRepo         studySessionStore
-	sessionMaterialRepo studySessionMaterialStore
+	materialRepo studyMaterialStore
+	sessionRepo  studySessionStore
+	db           *sqlx.DB
 }
 
 func NewStudySessionService(
 	materialRepo studyMaterialStore,
 	sessionRepo studySessionStore,
-	sessionMaterialRepo studySessionMaterialStore,
+	db *sqlx.DB,
 ) *StudySessionService {
 	return &StudySessionService{
-		materialRepo:        materialRepo,
-		sessionRepo:         sessionRepo,
-		sessionMaterialRepo: sessionMaterialRepo,
+		materialRepo: materialRepo,
+		sessionRepo:  sessionRepo,
+		db:           db,
 	}
 }
 
+// BuildStudySession selects the fixed morning/evening plan, or scales the
+// morning plan when limit is positive, then creates the session in the DB.
 func (s *StudySessionService) BuildStudySession(
 	ctx context.Context,
 	userID int64,
-	language, level string,
-) (*model.Session, error) {
-	return s.BuildStudySessionWithProfile(ctx, userID, language, level, StudyProfileMorning)
-}
-
-// BuildStudySessionWithProfile creates a study session using a named
-// automated-push policy.
-func (s *StudySessionService) BuildStudySessionWithProfile(
-	ctx context.Context,
-	userID int64,
-	language, level string,
+	language,
+	level string,
 	profile StudySessionProfile,
-) (*model.Session, error) {
-	plan, ok := studySessionPlanForProfile(profile)
-	if !ok {
-		return nil, fmt.Errorf("build study session invalid profile user_id=%d profile=%s", userID, profile)
-	}
-	return s.buildStudySessionWithPlan(ctx, userID, language, level, plan)
-}
-
-func (s *StudySessionService) BuildStudySessionWithLimit(
-	ctx context.Context,
-	userID int64,
-	language, level string,
 	limit int,
+	// deprecate 하던가 리팩토링 필요
 ) (*model.Session, error) {
-	if limit <= 0 || limit > MaxStudySessionMaterialCount {
-		return nil, fmt.Errorf("build study session invalid limit user_id=%d limit=%d", userID, limit)
+	// A positive limit scales only the morning plan; evening keeps its fixed plan.
+	if limit < 0 || limit > MaxStudySessionMaterialCount {
+		return nil, fmt.Errorf(
+			"build study session invalid limit user_id=%d limit=%d",
+			userID,
+			limit,
+		)
 	}
-	return s.buildStudySessionWithPlan(ctx, userID, language, level, scaleMorningStudySessionPlan(limit))
-}
 
-func (s *StudySessionService) buildStudySessionWithPlan(
-	ctx context.Context,
-	userID int64,
-	language, level string,
-	plan model.StudySessionPlan,
-) (*model.Session, error) {
-	if plan.TotalMaterialCount() <= 0 || plan.TotalMaterialCount() > MaxStudySessionMaterialCount {
+	// retrieve profile > check the type of profile > fix plan
+	var plan model.StudySessionPlan
+	switch profile {
+	case StudyProfileMorning:
+		if limit == 0 {
+			// default
+			plan = morningStudySessionPlan
+		} else {
+			// TODO: 이 부분 정책, 코드 관련 정리 필요
+			plan = scaleMorningStudySessionPlan(limit)
+		}
+	case StudyProfileEvening:
+		plan = eveningStudySessionPlan
+	default:
+		return nil, fmt.Errorf(
+			"build study session invalid profile user_id=%d profile=%s",
+			userID,
+			profile,
+		)
+	}
+
+	// validate plan
+	if plan.TotalMaterialCount() <= 0 ||
+		plan.TotalMaterialCount() > MaxStudySessionMaterialCount {
 		return nil, fmt.Errorf(
 			"build study session invalid plan user_id=%d total=%d",
 			userID,
@@ -209,17 +246,26 @@ func (s *StudySessionService) buildStudySessionWithPlan(
 		)
 	}
 
-	materials, err := s.materialRepo.GetForStudySession(
+	// get materials
+	materials, err := s.materialRepo.GetMaterialsByPlan(
 		ctx,
 		userID,
 		language,
 		level,
-		sessionLevelsFor(language, level),
+		sessionLevelsFor(
+			language,
+			level,
+		),
 		plan,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("build study session fetch materials user_id=%d language=%s level=%s: %w",
-			userID, language, level, err)
+		return nil, fmt.Errorf(
+			"build study session fetch materials user_id=%d language=%s level=%s: %w",
+			userID,
+			language,
+			level,
+			err,
+		)
 	}
 	if len(materials) == 0 {
 		return nil, nil
@@ -232,21 +278,43 @@ func (s *StudySessionService) buildStudySessionWithPlan(
 		Status:         model.SessionPending,
 		TotalQuestions: len(materials),
 	}
-	if err := s.sessionRepo.CreateSession(ctx, session); err != nil {
-		return nil, fmt.Errorf("build study session create user_id=%d: %w", userID, err)
+	materialIDs := make(
+		[]int,
+		len(materials),
+	)
+	for index, material := range materials {
+		materialIDs[index] = material.ID
 	}
-
-	sessionMaterials := make([]model.SessionMaterial, 0, len(materials))
-	for i, material := range materials {
-		sessionMaterials = append(sessionMaterials, model.SessionMaterial{
-			SessionID:     session.ID,
-			MaterialID:    material.ID,
-			MaterialOrder: i,
-		})
+	// The service owns the boundary: both rows commit together after the ordered links are saved.
+	var sessionID int
+	if err := repository.WithinTx(
+		ctx,
+		s.db,
+		func(tx *sqlx.Tx) error {
+			var err error
+			sessionID, err = s.sessionRepo.CreateSessionInTx(
+				ctx,
+				tx,
+				session,
+			)
+			if err != nil {
+				return err
+			}
+			return s.sessionRepo.CreateSessionMaterialsInTx(
+				ctx,
+				tx,
+				sessionID,
+				materialIDs,
+			)
+		},
+	); err != nil {
+		return nil, fmt.Errorf(
+			"build study session create user_id=%d: %w",
+			userID,
+			err,
+		)
 	}
-	if err := s.sessionMaterialRepo.CreateSessionMaterials(ctx, sessionMaterials); err != nil {
-		return nil, fmt.Errorf("build study session create materials session_id=%d: %w", session.ID, err)
-	}
+	session.ID = sessionID
 
 	return session, nil
 }

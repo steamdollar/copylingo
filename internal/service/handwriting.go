@@ -13,8 +13,8 @@ import (
 	"github.com/lsj/copylingo/internal/observability"
 )
 
-type handwritingActiveSession interface {
-	Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
+type handwritingQuizActiveSession interface {
+	Get(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
 }
 
 type graderClient interface {
@@ -66,13 +66,13 @@ type HandwritingSubmitResult struct {
 
 // HandwritingService coordinates Mini App submissions without coupling HTTP and Bot flows.
 type HandwritingService struct {
-	activeSession handwritingActiveSession
-	grader        graderClient
-	renderer      StrokeRenderer
+	quizActiveSession handwritingQuizActiveSession
+	grader            graderClient
+	renderer          StrokeRenderer
 }
 
 func NewHandwritingService(
-	activeSession handwritingActiveSession,
+	quizActiveSession handwritingQuizActiveSession,
 	grader graderClient,
 	renderer StrokeRenderer,
 ) *HandwritingService {
@@ -80,9 +80,9 @@ func NewHandwritingService(
 		renderer = NewDefaultPNGStrokeRenderer()
 	}
 	return &HandwritingService{
-		activeSession: activeSession,
-		grader:        grader,
-		renderer:      renderer,
+		quizActiveSession: quizActiveSession,
+		grader:            grader,
+		renderer:          renderer,
 	}
 }
 
@@ -98,7 +98,7 @@ func (s *HandwritingService) SubmitAnswer(
 		slog.Int("question_id", req.QuestionID),
 	)
 
-	state, err := s.activeSession.Get(ctx, req.SessionID)
+	state, err := s.quizActiveSession.Get(ctx, req.SessionID)
 	if err != nil {
 		return nil, fmt.Errorf("get active session for handwriting submission: %w", err)
 	}
@@ -132,7 +132,7 @@ func (s *HandwritingService) SubmitAnswer(
 		renderedImage,
 	)
 	if err != nil {
-		if errors.Is(err, ErrActiveSessionAlreadyAnswered) {
+		if errors.Is(err, ErrQuizActiveSessionAlreadyAnswered) {
 			return nil, ErrHandwritingAlreadyAnswered
 		}
 		return nil, fmt.Errorf("grade handwriting answer: %w", err)

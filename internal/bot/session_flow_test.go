@@ -2,12 +2,10 @@ package bot
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/callback"
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -90,16 +88,16 @@ func TestIsStaleMiniAppCallback(t *testing.T) {
 	}
 }
 
-func TestSessionFlowUsesActiveSessionProgress(t *testing.T) {
+func TestSessionFlowUsesQuizActiveSessionProgress(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
 	trueVal := true
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{
 			ID: sessionID,
 		},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &trueVal},
 				Question:        model.Question{ID: 1},
@@ -110,15 +108,10 @@ func TestSessionFlowUsesActiveSessionProgress(t *testing.T) {
 			},
 		},
 	}
-	raw, err := json.Marshal(state)
-	if err != nil {
-		t.Fatalf("marshal state: %v", err)
-	}
-	rdb := &testRedis{values: map[string]string{
-		config.ActiveSessionWorkingSetRedisKey.Format(sessionID): string(raw),
-	}}
-	active := service.NewActiveSessionService(nil, rdb, nil)
-	sf := NewSessionFlow(&Bot{services: &service.Services{ActiveSession: active}})
+	stateStores := newTestInteractionStores()
+	seedQuizState(stateStores, state)
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
+	sf := NewSessionFlow(&Bot{services: &service.Services{QuizActiveSession: active}})
 
 	idx, err := sf.nextUnansweredQuestionIndex(ctx, sessionID)
 	if err != nil {

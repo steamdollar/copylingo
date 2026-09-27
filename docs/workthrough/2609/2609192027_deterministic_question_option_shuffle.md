@@ -19,7 +19,7 @@
   - `fnv.New64a()`로 `fmt.Sprintf("%d:%d", sessionID, q.ID)` 해시 생성 후 `rand.New(rand.NewSource(...))`로 셔플.
   - 셔플된 배열을 다시 JSON 인코딩하여 `q.Options`에 반영.
 
-### 2) [internal/service/active_session.go](../../internal/service/active_session.go)
+### 2) [internal/service/quiz_active_session.go](../../../internal/service/quiz_active_session.go)
 - `CreateFromDB(ctx, sessionID)`에서 DB 조회 후 Redis 적재 전 `state.Items`의 각 문항에 대해 `state.Items[i].Question.ShuffleOptions(sessionID)` 실행.
 - Redis 캐시 미스로 복구(`Get` $\rightarrow$ `CreateFromDB`) 시에도 동일한 Seed로 동일 순서 복원 보장.
 
@@ -29,7 +29,7 @@
   - 옵션 원소 100% 보존 검증.
   - 서로 다른 sessionID에 대한 순열 다양성 검증.
   - 빈 배열/단일 원소/nil/invalid JSON 엣지 케이스 검증.
-- **[internal/service/active_session_test.go](../../internal/service/active_session_test.go)**: `TestActiveSessionCreateFromDB_ShufflesQuestionOptions`
+- **[internal/service/quiz_active_session_test.go](../../../internal/service/quiz_active_session_test.go)**: `TestActiveSessionCreateFromDB_ShufflesQuestionOptions`
   - 세션 생성 시 셔플 반영 및 동일 세션 재적재 시 순서 보장, 다른 세션 순서 변경 검증.
 
 ---

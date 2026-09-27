@@ -35,25 +35,6 @@ func (m *mockNHKClient) FetchArticleBody(ctx context.Context, newsID string) (st
 	return body, nil
 }
 
-// Mock Content Repository
-type mockContentRepo struct {
-	existing map[string]bool
-	saved    []model.Content
-	saveErr  error
-}
-
-func (m *mockContentRepo) ExistsByURL(ctx context.Context, url string) (bool, error) {
-	return m.existing[url], nil
-}
-
-func (m *mockContentRepo) Create(ctx context.Context, content *model.Content) error {
-	if m.saveErr != nil {
-		return m.saveErr
-	}
-	m.saved = append(m.saved, *content)
-	return nil
-}
-
 // Mock Fetcher
 type mockFetcher struct {
 	name     string
@@ -218,40 +199,6 @@ func TestPassThroughProcessor_Process(t *testing.T) {
 	}
 	if c.SourceType != model.ContentSourceNews {
 		t.Errorf("expected source type news, got %s", c.SourceType)
-	}
-}
-
-func TestContentSaver_Save(t *testing.T) {
-	repo := &mockContentRepo{
-		existing: map[string]bool{
-			"https://existing.com": true,
-		},
-		saved: make([]model.Content, 0),
-	}
-
-	saver := NewContentSaver(repo)
-
-	contents := []model.Content{
-		{SourceURL: "https://new1.com", Title: "New 1"},
-		{SourceURL: "https://existing.com", Title: "Existing"},
-		{SourceURL: "https://new2.com", Title: "New 2"},
-	}
-
-	result, err := saver.Save(context.Background(), contents)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if result.Saved != 2 {
-		t.Errorf("expected 2 saved, got %d", result.Saved)
-	}
-
-	if result.Duplicates != 1 {
-		t.Errorf("expected 1 duplicate, got %d", result.Duplicates)
-	}
-
-	if len(repo.saved) != 2 {
-		t.Errorf("expected 2 items in repo, got %d", len(repo.saved))
 	}
 }
 

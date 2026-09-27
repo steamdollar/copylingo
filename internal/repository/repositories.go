@@ -6,16 +6,16 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Repositories holds all repository instances.
+// Repositories holds the DB adapters for their shared pool.
 type Repositories struct {
 	User               *UserRepository
 	Content            *ContentRepository
 	Material           *MaterialRepository
+	MaterialPreference *MaterialPreferenceRepository
 	Question           *QuestionRepository
 	Session            *SessionRepository
 	SessionQuestion    *SessionQuestionRepository
-	SessionMaterial    *SessionMaterialRepository
-	ActiveSession      *ActiveSessionRepository
+	QuizActiveSession  *QuizActiveSessionRepository
 	StudyActiveSession *StudyActiveSessionRepository
 	Tip                *TipRepository
 }
@@ -26,11 +26,11 @@ func NewRepositories(db *sqlx.DB) *Repositories {
 		User:               NewUserRepository(db),
 		Content:            NewContentRepository(db),
 		Material:           NewMaterialRepository(db),
+		MaterialPreference: NewMaterialPreferenceRepository(db),
 		Question:           NewQuestionRepository(db),
 		Session:            NewSessionRepository(db),
 		SessionQuestion:    NewSessionQuestionRepository(db),
-		SessionMaterial:    NewSessionMaterialRepository(db),
-		ActiveSession:      NewActiveSessionRepository(db),
+		QuizActiveSession:  NewQuizActiveSessionRepository(db),
 		StudyActiveSession: NewStudyActiveSessionRepository(db),
 		Tip:                NewTipRepository(db),
 	}

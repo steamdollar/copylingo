@@ -20,14 +20,14 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 	editMessageID *int, sessionID, questionIdx int) {
 
 	// get active session from redis
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get active session state",
 			"event", "telegram.question.session_lookup_failed",
 			"session_id", sessionID,
 			"error", err,
 		)
-		sf.showActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
 
@@ -47,14 +47,14 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 	}
 
 	// set current question index at redis
-	if err := sf.bot.services.ActiveSession.SetCurrentIndex(ctx, sessionID, questionIdx); err != nil {
+	if err := sf.bot.services.QuizActiveSession.SetCurrentIndex(ctx, sessionID, questionIdx); err != nil {
 		slog.ErrorContext(ctx, "Failed to set active session index",
 			"event", "telegram.question.index_update_failed",
 			"session_id", sessionID,
 			"question_index", questionIdx,
 			"error", err,
 		)
-		sf.showActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
 
@@ -71,11 +71,23 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 	if done {
 		return
 	}
+	// Keep the current question intact; changing its linked material setting
+	// only affects which questions future sessions may select.
+	if question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
+		if keyboard == nil {
+			keyboard = &tgbotapi.InlineKeyboardMarkup{}
+		}
+		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				"⚙️ 연결 자료 설정",
+				fmt.Sprintf(config.FormatQuestionPolicy, sessionID, question.ID),
+			),
+		))
+	}
 
-	// record question start time at redis for session timeout handling
-	sf.bot.rdb.Set(ctx,
-		config.SessionQuestionStartRedisKey.Format(sessionID),
-		time.Now().UnixMilli(), 30*time.Minute)
+	if sf.bot.timing != nil {
+		_ = sf.bot.timing.RecordQuestionStart(ctx, sessionID, time.Now())
+	}
 
 	// err handling after rendering question
 	if editMessageID != nil {
@@ -126,6 +138,11 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 				{newCallbackButton("제출 후 다음 문제 →", nextData)},
 			},
 		}
+		if question.MaterialID != nil && sf.bot.services != nil && sf.bot.services.MaterialPreference != nil {
+			replyMarkup.InlineKeyboard = append(replyMarkup.InlineKeyboard, []webAppButton{
+				newCallbackButton("⚙️ 연결 자료 설정", fmt.Sprintf(config.FormatQuestionPolicy, sessionID, question.ID)),
+			})
+		}
 		if editMessageID != nil {
 			// Web App 버튼은 별도 메시지로 두는 편이 Mini App 왕복 흐름을 추적하기 쉽다.
 			// 이전 메시지는 재사용하지 않고 짧은 안내 문구로 축약한다.
@@ -142,15 +159,17 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 			)
 			return "", nil, true
 		}
-		key := config.HandwritingMessageRedisKey.Format(sessionID, question.ID)
-		val := fmt.Sprintf("%d:%d", chatID, msgID)
-		if err := sf.bot.rdb.Set(ctx, key, val, time.Hour).Err(); err != nil {
-			slog.ErrorContext(ctx, "Failed to cache handwriting message ID",
-				"event", "telegram.question.handwriting_cache_failed",
-				"session_id", sessionID,
-				"question_id", question.ID,
-				"error", err,
-			)
+		if sf.bot.messages != nil {
+			err := sf.bot.messages.SaveHandwritingMessage(ctx, sessionID, question.ID,
+				model.TelegramMessageRef{ChatID: chatID, MessageID: msgID})
+			if err != nil {
+				slog.ErrorContext(ctx, "Failed to cache handwriting message ID",
+					"event", "telegram.question.handwriting_cache_failed",
+					"session_id", sessionID,
+					"question_id", question.ID,
+					"error", err,
+				)
+			}
 		}
 		return "", nil, true
 
@@ -177,8 +196,10 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		return text + "\n\n" + wordOrderText, keyboard, false
 
 	case model.QuestionFillBlank, model.QuestionSubjective:
-		sf.bot.rdb.Set(ctx, config.UserActiveQuestionRedisKey.Format(chatID),
-			fmt.Sprintf("%d:%d", sessionID, questionIdx), 1*time.Hour)
+		if sf.bot.input != nil {
+			_ = sf.bot.input.SetActiveQuestion(ctx, chatID,
+				model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIdx})
+		}
 		if question.Type == model.QuestionSubjective {
 			text += "\n\n⌨️ 정답을 자유롭게 텍스트로 입력해 주세요"
 		} else {
@@ -298,7 +319,7 @@ func (sf *SessionFlow) sendListeningAudio(ctx context.Context, chatID int64, q *
 }
 
 func (sf *SessionFlow) isQuestionAnswered(ctx context.Context, sessionID, questionIdx int) bool {
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
 	if err != nil || questionIdx < 0 || questionIdx >= len(state.Items) {
 		return false
 	}
@@ -306,7 +327,7 @@ func (sf *SessionFlow) isQuestionAnswered(ctx context.Context, sessionID, questi
 }
 
 func (sf *SessionFlow) nextUnansweredQuestionIndex(ctx context.Context, sessionID int) (int, error) {
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		return 0, err
 	}

@@ -17,18 +17,18 @@ func (m *mockGraderUserRepo) UpdateStreak(ctx context.Context, userID int64) err
 	return m.updateStreakFn(ctx, userID)
 }
 
-type mockGraderActiveSession struct {
-	getFn          func(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
+type mockGraderQuizActiveSession struct {
+	getFn          func(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
 	recordAnswerFn func(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
-	flushFn        func(ctx context.Context, sessionID int, userID int64) (*SessionResult, error)
+	flushFn        func(ctx context.Context, sessionID int, userID int64) (*QuizSessionResult, error)
 	deleteFn       func(ctx context.Context, sessionID int) error
 }
 
-func (m *mockGraderActiveSession) Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
+func (m *mockGraderQuizActiveSession) Get(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error) {
 	return m.getFn(ctx, sessionID)
 }
 
-func (m *mockGraderActiveSession) RecordAnswer(
+func (m *mockGraderQuizActiveSession) RecordAnswer(
 	ctx context.Context,
 	sessionID, questionID int,
 	userAnswer string,
@@ -37,11 +37,15 @@ func (m *mockGraderActiveSession) RecordAnswer(
 	return m.recordAnswerFn(ctx, sessionID, questionID, userAnswer, isCorrect)
 }
 
-func (m *mockGraderActiveSession) Flush(ctx context.Context, sessionID int, userID int64) (*SessionResult, error) {
+func (m *mockGraderQuizActiveSession) Flush(
+	ctx context.Context,
+	sessionID int,
+	userID int64,
+) (*QuizSessionResult, error) {
 	return m.flushFn(ctx, sessionID, userID)
 }
 
-func (m *mockGraderActiveSession) Delete(ctx context.Context, sessionID int) error {
+func (m *mockGraderQuizActiveSession) Delete(ctx context.Context, sessionID int) error {
 	return m.deleteFn(ctx, sessionID)
 }
 
@@ -103,8 +107,8 @@ func TestGradeAnswer_Correct(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+	active := &mockGraderQuizActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
 			return activeStateForQuestion(sessionID, model.Question{
 				ID:            questionID,
 				CorrectAnswer: "apple",
@@ -137,8 +141,8 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+	active := &mockGraderQuizActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
 			return activeStateForQuestion(sessionID, model.Question{
 				ID:            questionID,
 				CorrectAnswer: "apple",
@@ -168,8 +172,8 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+	active := &mockGraderQuizActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
 			return activeStateForQuestion(sessionID, model.Question{
 				ID:            questionID,
 				CorrectAnswer: "I'm a student",
@@ -208,8 +212,8 @@ func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+	active := &mockGraderQuizActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
 			return activeStateForQuestion(sessionID, model.Question{
 				ID:            questionID,
 				CorrectAnswer: "I'm a student",
@@ -239,8 +243,8 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+	active := &mockGraderQuizActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
 			return activeStateForQuestion(sessionID, model.Question{
 				ID:            questionID,
 				CorrectAnswer: "あ",
@@ -270,8 +274,8 @@ func TestGradeAnswer_AlreadyAnswered(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+	active := &mockGraderQuizActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
 			return activeStateForQuestion(sessionID, model.Question{
 				ID:            questionID,
 				CorrectAnswer: "apple",
@@ -282,7 +286,7 @@ func TestGradeAnswer_AlreadyAnswered(t *testing.T) {
 
 	grader := NewGraderService(nil, active, nil)
 	_, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "apple")
-	if !errors.Is(err, ErrActiveSessionAlreadyAnswered) {
+	if !errors.Is(err, ErrQuizActiveSessionAlreadyAnswered) {
 		t.Fatalf("expected ErrActiveSessionAlreadyAnswered, got %v", err)
 	}
 }
@@ -293,8 +297,8 @@ func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 	questionID := 1
 	expectedErr := errors.New("record answer failed")
 
-	active := &mockGraderActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.ActiveSessionState, error) {
+	active := &mockGraderQuizActiveSession{
+		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
 			return activeStateForQuestion(sessionID, model.Question{
 				ID:            questionID,
 				CorrectAnswer: "apple",
@@ -319,12 +323,12 @@ func TestCompleteSession_FlushStreakAndDelete(t *testing.T) {
 	userID := int64(12345)
 	deleteCalled := false
 
-	active := &mockGraderActiveSession{
-		flushFn: func(ctx context.Context, sid int, uid int64) (*SessionResult, error) {
+	active := &mockGraderQuizActiveSession{
+		flushFn: func(ctx context.Context, sid int, uid int64) (*QuizSessionResult, error) {
 			if sid != sessionID || uid != userID {
 				t.Fatalf("unexpected flush args sid=%d uid=%d", sid, uid)
 			}
-			return &SessionResult{TotalQuestions: 3, CorrectCount: 2}, nil
+			return &QuizSessionResult{TotalQuestions: 3, CorrectCount: 2}, nil
 		},
 		deleteFn: func(ctx context.Context, sid int) error {
 			if sid != sessionID {
@@ -356,7 +360,7 @@ func TestCompleteSession_FlushStreakAndDelete(t *testing.T) {
 	}
 }
 
-func activeStateForQuestion(sessionID int, question model.Question, answered bool) *model.ActiveSessionState {
+func activeStateForQuestion(sessionID int, question model.Question, answered bool) *model.QuizActiveSessionState {
 	var userAnswer *string
 	var isCorrect *bool
 	if answered {
@@ -365,13 +369,13 @@ func activeStateForQuestion(sessionID int, question model.Question, answered boo
 		userAnswer = &answer
 		isCorrect = &correct
 	}
-	return &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	return &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{
 			ID:     sessionID,
 			UserID: 1,
 		},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{
 					ID:         100,

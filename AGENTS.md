@@ -80,6 +80,7 @@ A user request falls into one of these, and the deliverable and procedure differ
   2. **Plan**: for non-trivial work, agree the plan with the user before implementing.
   3. **Implement**: follow the `internal/` layer structure and coding conventions (§5).
   4. **Verify**: `make test` is **required** for code/migration/config changes. For docs-only work, record the skip reason in the workthrough.
+     - **Go formatting before tests/handoff**: every agent must apply `goparams` to the Go files it created or edited, following [the agent formatting procedure](docs/CONVENTIONS.md#agent-go-formatting). Editor save hooks do not run for agent file writes. Repeat this step after subsequent Go edits; do not defer formatting to the user's next save.
      - For changes that must take effect in the local runtime (Go server, Mini App static assets, config), after verifying, **consult the [`Makefile`](Makefile) target manifest (header comment) to pick the right restart target** and restart the relevant instance — e.g. App with `make restart-app`, then confirm `http://localhost:8080/health`.
      - Restart DB/Redis/Tunnel only when you changed that component directly (`make restart-db` / `make restart-redis`).
   5. **Close**:

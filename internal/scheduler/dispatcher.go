@@ -7,12 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
+
+const maxUnfinishedSessions = 3
 
 type pushJob struct {
 	user            model.User
@@ -21,25 +20,22 @@ type pushJob struct {
 }
 
 type sessionDispatcher struct {
-	cfg      *config.Config
 	services *service.Services
 	bot      sessionPusher
-	rdb      redis.Cmdable
+	claims   pushClaims
 	limiter  *rateLimiter
 	workers  int
 }
 
 func newSessionDispatcher(
-	cfg *config.Config,
 	services *service.Services,
 	bot sessionPusher,
-	rdb redis.Cmdable,
+	claims pushClaims,
 ) *sessionDispatcher {
 	return &sessionDispatcher{
-		cfg:      cfg,
 		services: services,
 		bot:      bot,
-		rdb:      rdb,
+		claims:   claims,
 		limiter:  newRateLimiter(25), // 25 msg/sec rate limit (Telegram safety margin)
 		workers:  4,
 	}
@@ -110,11 +106,10 @@ func (d *sessionDispatcher) dispatchUser(
 	slot model.SessionSlot,
 	unfinishedCount int,
 ) error {
-	// 1. Redis Idempotency Key check
-	if d.rdb != nil {
+	// Claim today's user/slot dispatch through the narrow scheduler storage contract.
+	if d.claims != nil {
 		today := time.Now().Format("2006-01-02")
-		lockKey := fmt.Sprintf("copylingo:push:lock:%d:%s:%s", user.ID, slot, today)
-		acquired, err := d.rdb.SetNX(ctx, lockKey, "1", 24*time.Hour).Result()
+		acquired, err := d.claims.TryClaim(ctx, user.ID, slot, today)
 		if err != nil {
 			slog.WarnContext(ctx, "Redis idempotency lock check error; proceeding",
 				"event", "scheduler.lock.error",
@@ -132,13 +127,8 @@ func (d *sessionDispatcher) dispatchUser(
 		}
 	}
 
-	// 2. Unfinished session backlog cap check (ADR-045)
-	maxBacklog := 3
-	if d.cfg != nil && d.cfg.Schedule.MaxUnfinishedSessions > 0 {
-		maxBacklog = d.cfg.Schedule.MaxUnfinishedSessions
-	}
-
-	if unfinishedCount >= maxBacklog {
+	// Each user with three unfinished sessions gets a reminder before another session is built.
+	if unfinishedCount >= maxUnfinishedSessions {
 		reminded, err := d.remindUnfinishedSession(ctx, user.ID)
 		if err != nil {
 			return err
@@ -171,12 +161,13 @@ func (d *sessionDispatcher) buildAndPushStudy(
 	if d.services == nil || d.services.StudySession == nil {
 		return fmt.Errorf("study session service unavailable")
 	}
-	session, err := d.services.StudySession.BuildStudySessionWithProfile(
+	session, err := d.services.StudySession.BuildStudySession(
 		ctx,
 		user.ID,
 		user.Language,
 		user.ProficiencyLevel,
 		profile,
+		0,
 	)
 	if err != nil {
 		return fmt.Errorf("build study session user_id=%d: %w", user.ID, err)

@@ -6,18 +6,19 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/model"
 )
 
 func TestHandleExit(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	mRdb := &testRedis{values: map[string]string{}}
+	mRdb := newTestInteractionStores()
+	chatID := int64(12345)
+	_ = mRdb.SetActiveQuestion(context.Background(), chatID, model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 2})
 	b := &Bot{
-		api: mAPI,
-		rdb: mRdb,
+		api:   mAPI,
+		input: mRdb,
 	}
 
-	chatID := int64(12345)
 	msg := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: chatID},
 	}
@@ -25,11 +26,8 @@ func TestHandleExit(t *testing.T) {
 	ctx := context.Background()
 	b.handleExit(ctx, msg)
 
-	// Verify Redis key deletion
-	expectedKey := config.UserActiveQuestionRedisKey.Format(chatID)
-	_, deleted := mRdb.values[expectedKey]
-	if deleted {
-		t.Errorf("expected Redis key %s to be deleted, but it still exists", expectedKey)
+	if question, _ := mRdb.GetActiveQuestion(context.Background(), chatID); question != nil {
+		t.Error("active text question still exists")
 	}
 
 	// Verify message sent

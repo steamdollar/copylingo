@@ -33,9 +33,9 @@ active session lookup이 단순히 첫 번째 question ID를 반환하면 중복
 
 ### 진행 중 세션 복구
 
-- `internal/model/active_session.go`
+- `internal/model/quiz_active_session.go`
   - `CurrentItemByQuestionID`를 추가해 Redis `CurrentIndex`의 문항만 답변 대상으로 인정한다.
-- `internal/service/active_session.go`, `internal/service/grader.go`
+- `internal/service/quiz_active_session.go`, `internal/service/grader.go`
   - 답변 기록과 grader lookup을 current-item 기준으로 변경한다.
 - `internal/bot/session_answer.go`
   - Telegram callback 및 text answer lookup을 current-item 기준으로 변경한다.
@@ -48,7 +48,7 @@ callback format과 DB schema는 변경하지 않았다.
 
 - `internal/service/session_builder_test.go`
   - review/new fetch에서 중복 ID가 반환돼도 세션에는 고유 ID만 저장되는지 검증한다.
-- `internal/service/active_session_test.go`
+- `internal/service/quiz_active_session_test.go`
   - 두 번째 duplicate occurrence가 현재 문항이면 해당 row만 답변 처리되는지 검증한다.
   - stale callback이 뒤쪽 duplicate occurrence를 대신 소비하지 않는지 검증한다.
 - `internal/service/handwriting_test.go`

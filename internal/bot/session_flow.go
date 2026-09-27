@@ -256,6 +256,10 @@ func (sf *SessionFlow) HandleAnswerCallback(ctx context.Context, cb *tgbotapi.Ca
 		sf.handleAskLLMQuestion(ctx, cb, sessionID, parts[3])
 		return
 	}
+	if parts[2] == "policy" || parts[2] == "exclude" {
+		sf.handleQuizMaterialPreference(ctx, cb, parts)
+		return
+	}
 
 	questionID, err := strconv.Atoi(parts[2])
 	if err != nil {
@@ -286,14 +290,13 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 	if err != nil {
 		return
 	}
-	if sf.bot.rdb == nil {
+	if sf.bot.input == nil {
 		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
 		return
 	}
 
-	key := config.UserLLMPendingRedisKey.Format(cb.From.ID)
-	val := fmt.Sprintf("q:%d:%d", sessionID, questionID)
-	if err := sf.bot.rdb.Set(ctx, key, val, llmModeTTL).Err(); err != nil {
+	input := model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion, SessionID: sessionID, QuestionID: questionID}
+	if err := sf.bot.input.SetLLMPending(ctx, cb.From.ID, input); err != nil {
 		slog.ErrorContext(ctx, "Failed to activate in-quiz LLM mode",
 			"event", "telegram.llm.quiz_activate_failed",
 			"session_id", sessionID,
@@ -311,7 +314,7 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 	// Redis is the source of truth while a quiz is in progress. Recovering from
 	// DB unconditionally here would overwrite answers already recorded in the
 	// working set when the user presses an old/repeated start button.
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to load active session state before start",
 			"event", "telegram.session.active_state_lookup_failed",
@@ -344,7 +347,7 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 	// StartSession so the Redis copy also reflects the in_progress transition;
 	// an already in-progress working set must never be replaced from DB.
 	if wasPending {
-		state, err = sf.bot.services.ActiveSession.CreateFromDB(ctx, sessionID)
+		state, err = sf.bot.services.QuizActiveSession.CreateFromDB(ctx, sessionID)
 		if err != nil {
 			slog.ErrorContext(ctx, "Failed to refresh active session after start",
 				"event", "telegram.session.active_state_refresh_failed",
@@ -356,9 +359,9 @@ func (sf *SessionFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQu
 		}
 	}
 
-	// redis에 k-v로 시작 시간 기록
-	key := config.SessionQuestionStartRedisKey.Format(sessionID)
-	sf.bot.rdb.Set(ctx, key, time.Now().UnixMilli(), 30*time.Minute)
+	if sf.bot.timing != nil {
+		_ = sf.bot.timing.RecordQuestionStart(ctx, sessionID, time.Now())
+	}
 
 	editMessageID := cb.Message.MessageID
 	sf.showQuestion(ctx, cb.Message.Chat.ID, &editMessageID, sessionID, state.NextUnansweredIndex())
@@ -369,8 +372,8 @@ func (sf *SessionFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQ
 	// session working set. Drafts are ephemeral and must not survive a finished
 	// session, including when the user reached the result screen via a retry.
 	var wordOrderQuestionIDs []int
-	if sf.bot.services != nil && sf.bot.services.ActiveSession != nil {
-		if state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID); err == nil &&
+	if sf.bot.services != nil && sf.bot.services.QuizActiveSession != nil {
+		if state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID); err == nil &&
 			cb != nil && cb.From != nil && state.Session.UserID == cb.From.ID {
 			for _, item := range state.Items {
 				if item.Question.Type == model.QuestionWordOrder {

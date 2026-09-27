@@ -98,7 +98,7 @@ func (r *QuestionRepository) GetNewQuestions(
 }
 
 var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
-		WITH selected_material_counts AS (
+		WITH %s, selected_material_counts AS (
 			SELECT material_id, COUNT(*) AS question_count
 			FROM questions
 			WHERE id = ANY(COALESCE($5::int[], '{}')) AND material_id IS NOT NULL
@@ -107,6 +107,7 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 		eligible AS (
 			SELECT
 				q.id, q.material_id, q.item_type,
+				COALESCE(preference.review_mode = 'maintenance', FALSE) AS is_maintenance_check,
 				CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END AS material_priority,
 				ump.last_studied_at,
 				q.difficulty,
@@ -119,10 +120,16 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 			LEFT JOIN user_question_progress uqp
 				ON uqp.question_id = q.id
 				AND uqp.user_id = $1
+			LEFT JOIN user_material_preferences preference
+				ON preference.user_id = $1 AND preference.material_id = q.material_id
 			WHERE q.language = $2 AND q.proficiency_level = ANY($3)
 			AND ($4 = '' OR q.category = $4)
 			AND NOT (q.id = ANY(COALESCE($5::int[], '{}')))
 			AND uqp.question_id IS NULL
+			%s
+			AND (preference.review_mode IS DISTINCT FROM 'maintenance' OR NOT EXISTS (
+				SELECT 1 FROM selected_material_counts selected WHERE selected.material_id = q.material_id
+			))
 			-- Listening questions are only servable once their audio has been generated.
 			AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
 			-- Reading questions become new candidates only after the user studied
@@ -152,7 +159,7 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 				ELSE 1 END AS kanji_recall_rank
 			FROM material_rounds r
 		)
-		SELECT %s
+		SELECT %s, candidate.is_maintenance_check
 		FROM questions q
 		JOIN candidates candidate ON candidate.id = q.id
 		WHERE q.item_type IS DISTINCT FROM 'vocab_kanji_recall'
@@ -164,7 +171,7 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 			candidate.difficulty ASC,
 			candidate.random_order
 		LIMIT $6
-	`, questionCatalogColumns)
+	`, maintenanceQuizCandidatesCTE("$3"), quizMaterialPreferenceGate, questionCatalogColumns)
 
 // GetListeningNeedingAudio returns listening questions that have a script but no
 // generated audio yet, oldest first, so the pre-generation pipeline can fill them
@@ -229,9 +236,10 @@ func (r *QuestionRepository) GetDueReviews(
 }
 
 var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
-		WITH candidates AS (
+		WITH %s, candidates AS (
 			SELECT
 				q.id,
+				COALESCE(preference.review_mode = 'maintenance', FALSE) AS is_maintenance_check,
 				CASE WHEN q.proficiency_level = $6 THEN 0 ELSE 1 END AS level_priority,
 				CASE WHEN ump.material_id IS NOT NULL THEN 0 ELSE 1 END AS material_priority,
 				uqp.next_review_at,
@@ -256,16 +264,19 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
 				ON ump.material_id = q.material_id
 				AND ump.user_id = $1
 				AND ump.times_studied > 0
+			LEFT JOIN user_material_preferences preference
+				ON preference.user_id = $1 AND preference.material_id = q.material_id
 			WHERE uqp.user_id = $1
 			  AND uqp.next_review_at IS NOT NULL
 			  AND uqp.next_review_at <= NOW()
 			  AND q.language = $2
 			  AND q.proficiency_level = ANY($3)
+			  %s
 			  AND (COALESCE(cardinality($7::text[]), 0) = 0 OR q.category = ANY($7))
 			  AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
 			  AND (q.category <> 'reading' OR ump.material_id IS NOT NULL)
 		)
-		SELECT %s
+		SELECT %s, candidate.is_maintenance_check
 		FROM questions q
 		JOIN candidates candidate ON candidate.id = q.id
 		WHERE (q.item_type IS DISTINCT FROM 'vocab_kanji_recall'
@@ -276,7 +287,7 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
 			candidate.material_priority,
 			candidate.next_review_at ASC
 		LIMIT $4
-	`, questionCatalogColumns)
+	`, maintenanceQuizCandidatesCTE("$3"), quizMaterialPreferenceGate, questionCatalogColumns)
 
 // GetDueReviewCount returns the number of questions due for review.
 func (r *QuestionRepository) GetDueReviewCount(
@@ -286,18 +297,25 @@ func (r *QuestionRepository) GetDueReviewCount(
 	levels []string,
 ) (int, error) {
 	var count int
-	err := r.db.GetContext(ctx, &count, `
-		SELECT COUNT(*)
-		FROM user_question_progress uqp
-		JOIN questions q ON q.id = uqp.question_id
-		WHERE uqp.user_id = $1
-		  AND uqp.next_review_at IS NOT NULL
-		  AND uqp.next_review_at <= NOW()
-		  AND q.language = $2
-		  AND q.proficiency_level = ANY($3)
-	`, userID, language, pq.Array(levels))
+	err := r.db.GetContext(ctx, &count, dueReviewCountQuery, userID, language, pq.Array(levels))
 	return count, err
 }
+
+var dueReviewCountQuery = `
+	WITH ` + maintenanceQuizCandidatesCTE("$3") + `
+	SELECT COUNT(*)
+	FROM user_question_progress uqp
+	JOIN questions q ON q.id = uqp.question_id
+	LEFT JOIN user_material_progress ump
+		ON ump.user_id = $1 AND ump.material_id = q.material_id AND ump.times_studied > 0
+	LEFT JOIN user_material_preferences preference
+		ON preference.user_id = $1 AND preference.material_id = q.material_id
+	WHERE uqp.user_id = $1
+		AND uqp.next_review_at IS NOT NULL AND uqp.next_review_at <= NOW()
+		AND q.language = $2 AND q.proficiency_level = ANY($3)
+		AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
+		AND (q.category <> 'reading' OR ump.material_id IS NOT NULL)
+	` + quizMaterialPreferenceGate
 
 func buildQuestionBatchInsertQuery(questions []*model.Question) (string, []any) {
 	query, args := buildQuestionBatchBaseQuery(questions)

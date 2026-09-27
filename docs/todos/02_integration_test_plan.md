@@ -117,9 +117,9 @@ package repository
 - `IncrementServed` / `IncrementCorrect`
 
 ### `internal/repository/active_session_repo_integration_test.go`
-대상 [active_session_repo.go](../../internal/repository/active_session_repo.go) — **트랜잭션 로직이라 최우선**:
-- `LoadActiveSession`: sessions + session_questions + questions JOIN 결과를 `ActiveSessionState`로 올바르게 조립하는지(아이템 수, 정답 여부, 문제 본문 매핑)
-- `FlushActiveSession`: 트랜잭션으로 `markSessionCompleted` + `flushSessionQuestions` + `flushQuestions`가 모두 반영되는지, 중간 실패 시 롤백되는지(가능하면 일부러 위반 데이터로 실패 유도)
+대상 [quiz_active_session_repo.go](../../internal/repository/quiz_active_session_repo.go) — **트랜잭션 로직이라 최우선**:
+- `LoadQuizActiveSession`: sessions + session_questions + questions JOIN 결과를 `QuizActiveSessionState`로 올바르게 조립하는지(아이템 수, 정답 여부, 문제 본문 매핑)
+- `FlushQuizActiveSession`: 트랜잭션으로 `markSessionCompleted` + `flushSessionQuestions` + `flushQuestions`가 모두 반영되는지, 중간 실패 시 롤백되는지(가능하면 일부러 위반 데이터로 실패 유도)
 - 완료 처리 멱등성(이미 completed면 중복 처리 안 함)
 
 ### `internal/repository/content_repo_integration_test.go`, `tip_repo_integration_test.go`

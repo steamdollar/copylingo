@@ -39,8 +39,8 @@
 ### 1. Repository SSOT
 
 1. [ ] **S1 — README navigation 정합화**: [README.md:254](../../README.md)에서 존재하지 않는 `docs/ADR.md`, `docs/HISTORY.md`, `CURRENT_TASK.md` 링크와 구식 workflow를 현재 SSOT인 `STATUS.md`, `docs/adr/`, `docs/workthrough/`로 교체한다.
-2. [ ] **S2 — example LLM API key 정합화**: [.env.example:10](../../.env.example)의 `COPYLINGO_OPENAI_API_KEY`를 실제 runtime key인 `COPYLINGO_LLM_API_KEY`와 맞추고 [docker-compose.yml:89](../../docker-compose.yml), [README.md:100](../../README.md)의 명칭과 교차 확인한다.
-3. [ ] **S3 — legacy local audio 경로 정리**: [config.yaml:31](../../config.yaml), [docker-compose.yml:101](../../docker-compose.yml), [.dockerignore:11](../../.dockerignore)에 남은 `./data/audio`가 ADR-032 이후에도 필요한 compatibility path인지 먼저 확인한 뒤, 불필요하면 설정·mount·ignore를 함께 제거한다.
+2. [x] **S2 — example LLM API key 정합화**: [.env.example](../../.env.example)의 키를 실제 runtime key인 `COPYLINGO_LLM_API_KEY`로 맞추고 [docker-compose.yml](../../docker-compose.yml), [README.md](../../README.md)의 명칭과 교차 확인했다.
+3. [ ] **S3 — legacy local audio 경로 정리**: `config.yaml`의 미사용 `tts.audio_dir`는 제거했다. [docker-compose.yml](../../docker-compose.yml)의 `./data/audio` mount와 [.dockerignore](../../.dockerignore)의 ignore가 ADR-032 이후에도 필요한지 확인한 뒤 정리한다.
 4. [ ] **S4 — orphan TODO backlog 정합화**: [STATUS.md:25](../../STATUS.md)에 없는 [02_integration_test_plan.md:1](../todos/02_integration_test_plan.md), [03_e2e_test_plan.md:1](../todos/03_e2e_test_plan.md)을 현재 backlog로 등록할지, archive할지, 폐기할지 결정하여 TODO SSOT를 하나로 만든다.
 5. [ ] **S5 — ROADMAP 역할 정합화**: [ROADMAP.md:4](../../ROADMAP.md)의 오래된 날짜·경로·phase 상태는 즉시 임의 수정하지 않고, `ROADMAP.md`는 milestone 완료 때만 갱신한다는 project rule과 충돌하지 않는 정리 방식을 먼저 결정한다.
 

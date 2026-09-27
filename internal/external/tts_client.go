@@ -44,6 +44,7 @@ type GeminiTTSClient struct {
 	baseURL    string // native API base, e.g. https://generativelanguage.googleapis.com/v1beta
 	model      string
 	voice      string
+	voiceB     string
 	transcode  transcoder
 }
 
@@ -55,8 +56,9 @@ func NewTTSClient(cfg *config.Config) *GeminiTTSClient {
 		httpClient: &http.Client{Timeout: ttsHTTPTimeout},
 		apiKey:     cfg.LLM.APIKey,
 		baseURL:    geminiNativeBaseURL(cfg.LLM.BaseURL),
-		model:      cfg.TTS.Model,
-		voice:      cfg.TTS.VoiceName,
+		model:      cfg.LLM.TTSModel,
+		voice:      cfg.LLM.TTSVoiceName,
+		voiceB:     cfg.LLM.TTSVoiceNameB,
 		transcode:  ffmpegPCMToOGG,
 	}
 }
@@ -115,6 +117,16 @@ type ttsGenerationConfig struct {
 }
 
 type ttsSpeechConfig struct {
+	VoiceConfig             *ttsVoiceConfig             `json:"voiceConfig,omitempty"`
+	MultiSpeakerVoiceConfig *ttsMultiSpeakerVoiceConfig `json:"multiSpeakerVoiceConfig,omitempty"`
+}
+
+type ttsMultiSpeakerVoiceConfig struct {
+	SpeakerVoiceConfigs []ttsSpeakerVoiceConfig `json:"speakerVoiceConfigs"`
+}
+
+type ttsSpeakerVoiceConfig struct {
+	Speaker     string         `json:"speaker"`
 	VoiceConfig ttsVoiceConfig `json:"voiceConfig"`
 }
 
@@ -141,15 +153,43 @@ type ttsResponse struct {
 
 // generatePCM performs the native generateContent call and returns decoded raw PCM.
 func (c *GeminiTTSClient) generatePCM(ctx context.Context, text string) ([]byte, error) {
+	speechConfig := ttsSpeechConfig{
+		VoiceConfig: &ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: c.voice}},
+	}
+	if turns := dialogueTurns(text); len(turns) > 0 {
+		if c.voiceB == "" {
+			return nil, ErrTTSConfigMissing
+		}
+		// Speaker labels match the two configured voices and are instructions, not spoken text.
+		var dialogue strings.Builder
+		dialogue.WriteString("Read this Japanese dialogue. Speak only the lines, not the speaker labels.\n")
+		for index, turn := range turns {
+			speaker := "A"
+			if index%2 == 1 {
+				speaker = "B"
+			}
+			fmt.Fprintf(&dialogue, "%s: %s\n", speaker, turn)
+		}
+		text = dialogue.String()
+		speechConfig = ttsSpeechConfig{MultiSpeakerVoiceConfig: &ttsMultiSpeakerVoiceConfig{
+			SpeakerVoiceConfigs: []ttsSpeakerVoiceConfig{
+				{
+					Speaker:     "A",
+					VoiceConfig: ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: c.voice}},
+				},
+				{
+					Speaker:     "B",
+					VoiceConfig: ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: c.voiceB}},
+				},
+			},
+		}}
+	}
+
 	reqBody := ttsRequest{
 		Contents: []ttsContent{{Parts: []ttsPart{{Text: text}}}},
 		GenerationConfig: ttsGenerationConfig{
 			ResponseModalities: []string{"AUDIO"},
-			SpeechConfig: ttsSpeechConfig{
-				VoiceConfig: ttsVoiceConfig{
-					PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: c.voice},
-				},
-			},
+			SpeechConfig:       speechConfig,
 		},
 	}
 
@@ -194,6 +234,24 @@ func (c *GeminiTTSClient) generatePCM(ctx context.Context, text string) ([]byte,
 		return nil, fmt.Errorf("tts decode base64 audio: %w", err)
 	}
 	return pcm, nil
+}
+
+// Only wholly quoted, alternating turns are treated as a two-person dialogue.
+func dialogueTurns(script string) []string {
+	script = strings.TrimSpace(script)
+	if !strings.HasPrefix(script, "「") || !strings.HasSuffix(script, "」") {
+		return nil
+	}
+	turns := strings.Split(strings.TrimSuffix(strings.TrimPrefix(script, "「"), "」"), "」「")
+	if len(turns) < 2 {
+		return nil
+	}
+	for _, turn := range turns {
+		if strings.TrimSpace(turn) == "" || strings.ContainsAny(turn, "「」") {
+			return nil
+		}
+	}
+	return turns
 }
 
 // extractTTSAudioData pulls the first inline audio payload out of the response.

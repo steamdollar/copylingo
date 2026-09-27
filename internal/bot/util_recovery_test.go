@@ -37,13 +37,19 @@ func TestRefreshStaleMiniAppMessages_EmptyBaseURL(t *testing.T) {
 func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	store := &sessionListStore{inProgress: nil}
 	sb := service.NewSessionBuilderService(nil, store, nil, nil)
 	cfg := &config.Config{}
 	cfg.Server.PublicBaseURL = "https://x.trycloudflare.com"
 	b := &Bot{
-		api: mAPI, rdb: rdb, cfg: cfg,
+		api:      mAPI,
+		input:    stateStores,
+		drafts:   stateStores,
+		messages: stateStores,
+		recovery: stateStores,
+		timing:   stateStores,
+		cfg:      cfg,
 		services: &service.Services{SessionBuilder: sb},
 	}
 

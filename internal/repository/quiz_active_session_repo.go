@@ -13,13 +13,13 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// ActiveSessionRepository loads and flushes Redis-backed question session state.
-type ActiveSessionRepository struct {
+// QuizActiveSessionRepository loads and flushes Redis-backed question session state.
+type QuizActiveSessionRepository struct {
 	db *sqlx.DB
 }
 
-func NewActiveSessionRepository(db *sqlx.DB) *ActiveSessionRepository {
-	return &ActiveSessionRepository{db: db}
+func NewQuizActiveSessionRepository(db *sqlx.DB) *QuizActiveSessionRepository {
+	return &QuizActiveSessionRepository{db: db}
 }
 
 type questionSessionWithStateRow struct {
@@ -62,10 +62,10 @@ type questionSessionWithStateRow struct {
 }
 
 // LoadQuestionSessionWithStateBySessionID loads the full ordered question session state in one DB round-trip.
-func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
+func (r *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
-) (*model.ActiveSessionState, error) {
+) (*model.QuizActiveSessionState, error) {
 	var rows []questionSessionWithStateRow
 	if err := r.db.SelectContext(ctx, &rows, `
 		SELECT
@@ -128,8 +128,8 @@ func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	}
 
 	first := rows[0]
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{
 			ID:             first.SessionID,
 			UserID:         first.UserID,
@@ -142,13 +142,13 @@ func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 			CompletedAt:    first.CompletedAt,
 			CreatedAt:      first.SessionCreatedAt,
 		},
-		Items:        make([]model.ActiveSessionQuestion, 0, len(rows)),
+		Items:        make([]model.QuizActiveSessionQuestion, 0, len(rows)),
 		UpdatedAt:    time.Now(),
 		CurrentIndex: 0,
 	}
 
 	for _, row := range rows {
-		state.Items = append(state.Items, model.ActiveSessionQuestion{
+		state.Items = append(state.Items, model.QuizActiveSessionQuestion{
 			SessionQuestion: model.SessionQuestion{
 				ID:            row.SessionQuestionID,
 				SessionID:     row.SessionID,
@@ -192,8 +192,8 @@ func (r *ActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	return state, nil
 }
 
-// FlushActiveSession persists the question session state in a single DB transaction.
-func (r *ActiveSessionRepository) FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error {
+// FlushQuizActiveSession persists the question session state in a single DB transaction.
+func (r *QuizActiveSessionRepository) FlushQuizActiveSession(ctx context.Context, state *model.QuizActiveSessionState) error {
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("ActiveSessionRepository.FlushActiveSession begin session_id=%d: %w", state.Session.ID, err)
@@ -217,6 +217,9 @@ func (r *ActiveSessionRepository) FlushActiveSession(ctx context.Context, state 
 		if err := flushQuestionProgress(ctx, tx, state.Items); err != nil {
 			return err
 		}
+		if err := flushQuizMaterialPreferences(ctx, tx, state.Session.ID); err != nil {
+			return err
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -226,7 +229,49 @@ func (r *ActiveSessionRepository) FlushActiveSession(ctx context.Context, state 
 	return nil
 }
 
-func markSessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.ActiveSessionState) (bool, error) {
+// The persisted session answers are authoritative. Updating preferences in the
+// completion transaction keeps retries idempotent and makes any wrong variant
+// override correct variants of the same material.
+func flushQuizMaterialPreferences(ctx context.Context, tx *sqlx.Tx, sessionID int) error {
+	if _, err := tx.ExecContext(ctx, quizMaterialPreferencesCompletionQuery, sessionID, model.MaxMaintenanceDays); err != nil {
+		return fmt.Errorf("ActiveSessionRepository.flushQuizMaterialPreferences session_id=%d: %w", sessionID, err)
+	}
+	return nil
+}
+
+const quizMaterialPreferencesCompletionQuery = `
+	WITH material_results AS (
+		SELECT s.user_id, s.created_at, s.completed_at, q.material_id,
+			BOOL_AND(sq.is_correct) AS all_correct
+		FROM sessions s
+		JOIN session_questions sq ON sq.session_id = s.id
+		JOIN questions q ON q.id = sq.question_id
+		WHERE s.id = $1 AND s.status = 'completed'
+			AND sq.is_correct IS NOT NULL AND q.material_id IS NOT NULL
+		GROUP BY s.user_id, s.created_at, s.completed_at, q.material_id
+	), restored AS (
+		DELETE FROM user_material_preferences preference
+		USING material_results result
+		WHERE preference.user_id = result.user_id AND preference.material_id = result.material_id
+			AND preference.review_mode = 'maintenance'
+			AND result.created_at >= preference.next_check_at
+			AND result.created_at >= preference.updated_at
+			AND NOT result.all_correct
+		RETURNING preference.material_id
+	)
+	UPDATE user_material_preferences preference
+	SET check_interval_days = LEAST(preference.check_interval_days * 2, $2),
+		next_check_at = result.completed_at + LEAST(preference.check_interval_days * 2, $2) * INTERVAL '1 day',
+		updated_at = NOW()
+	FROM material_results result
+	WHERE preference.user_id = result.user_id AND preference.material_id = result.material_id
+		AND preference.review_mode = 'maintenance'
+		AND result.created_at >= preference.next_check_at
+		AND result.created_at >= preference.updated_at
+		AND result.all_correct
+`
+
+func markSessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.QuizActiveSessionState) (bool, error) {
 	correctCount := state.CorrectCount()
 	res, err := tx.ExecContext(ctx, `
 		UPDATE sessions
@@ -252,7 +297,7 @@ func markSessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.ActiveS
 	return rows > 0, nil
 }
 
-func flushSessionQuestions(ctx context.Context, tx *sqlx.Tx, items []model.ActiveSessionQuestion) error {
+func flushSessionQuestions(ctx context.Context, tx *sqlx.Tx, items []model.QuizActiveSessionQuestion) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -287,7 +332,7 @@ type questionProgressFlushRow struct {
 	CorrectDelta int
 }
 
-func flushQuestionProgress(ctx context.Context, tx *sqlx.Tx, items []model.ActiveSessionQuestion) error {
+func flushQuestionProgress(ctx context.Context, tx *sqlx.Tx, items []model.QuizActiveSessionQuestion) error {
 	query, args, count := buildQuestionProgressUpsert(items)
 	if count == 0 {
 		return nil
@@ -298,7 +343,7 @@ func flushQuestionProgress(ctx context.Context, tx *sqlx.Tx, items []model.Activ
 	return nil
 }
 
-func buildQuestionProgressUpsert(items []model.ActiveSessionQuestion) (string, []any, int) {
+func buildQuestionProgressUpsert(items []model.QuizActiveSessionQuestion) (string, []any, int) {
 	rowsByID := make(map[int]*questionProgressFlushRow)
 	ids := make([]int, 0, len(items))
 	for _, item := range items {

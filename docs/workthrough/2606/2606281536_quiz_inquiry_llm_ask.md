@@ -25,7 +25,7 @@ Quiz 답변 시 원본 문제 메시지를 `editMessage`로 덮어써 결과(정
 | 파일 | 변경 |
 |------|------|
 | `internal/config/constants.go` | `FormatQuestionAskLLM = "q:%d:ask:%d"` 추가. `UserLLMPendingRedisKey` 값 규약 doc 갱신("1" or "q:sid:qid"). |
-| `internal/model/active_session.go` | `ItemByQuestionID(questionID)` 추가 — CurrentIndex 무관하게 문제 조회(답변 후 index 이동 대비). |
+| `internal/model/quiz_active_session.go` | `ItemByQuestionID(questionID)` 추가 — CurrentIndex 무관하게 문제 조회(답변 후 index 이동 대비). |
 | `internal/bot/session_answer.go` | `processAnswerText`에 `from *tgbotapi.User` 파라미터 추가. 결과 텍스트에 `📝 {prompt}` prepend. owner면 `🤖 이 문제 질문` 버튼 row 추가. 두 호출부(`processAnswer`=`cb.From`, `HandleTextInput`=`msg.From`) 갱신. |
 | `internal/bot/session_flow.go` | `HandleAnswerCallback`에 `parts[2]=="ask"` 분기 + `handleAskLLMQuestion` 추가(owner 재검증 → pending에 컨텍스트 토큰 Set). |
 | `internal/bot/llm_question.go` | `handleLLMQuestion`이 `GetDel().Result()`로 pending 값을 읽어 컨텍스트 분기. `loadQuizQuestionContext` 헬퍼 추가(토큰 파싱 → active session에서 문제 로드 → 컨텍스트 블록 조립, miss 시 "" → plain fallback). |

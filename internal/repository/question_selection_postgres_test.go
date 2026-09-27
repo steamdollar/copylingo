@@ -31,6 +31,7 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 	}
 	defer tx.Rollback()
 	for _, statement := range []string{
+		temporaryMaterialPreferencesTable,
 		`CREATE TEMP TABLE questions (
 			id integer PRIMARY KEY, question_key text, content_id integer, material_id integer,
 			type text NOT NULL DEFAULT 'multiple_choice', item_type text,

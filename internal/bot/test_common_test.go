@@ -2,11 +2,10 @@ package bot
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
@@ -42,49 +41,215 @@ func (m *mockBotAPI) GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.Updat
 
 func (m *mockBotAPI) StopReceivingUpdates() {}
 
-type testRedis struct {
-	redis.Cmdable
-	values map[string]string
+type testInteractionStores struct {
+	quiz         *testQuizSessionStore
+	study        *testStudySessionStore
+	pending      map[int64]model.PendingLLMInput
+	active       map[int64]model.ActiveQuestionRef
+	drafts       map[draftKey][]int
+	messages     map[handwritingMessageKey]model.TelegramMessageRef
+	fingerprints map[int]string
+	starts       map[int]time.Time
 }
 
-func (f *testRedis) Get(ctx context.Context, key string) *redis.StringCmd {
-	val, ok := f.values[key]
+type draftKey struct{ sessionID, questionID int }
+type handwritingMessageKey struct{ sessionID, questionID int }
+
+type testQuizSessionStore struct {
+	states map[int]*model.QuizActiveSessionState
+}
+type testStudySessionStore struct {
+	states map[int]*model.StudyActiveSessionState
+}
+
+func newTestInteractionStores() *testInteractionStores {
+	return &testInteractionStores{
+		quiz:         &testQuizSessionStore{states: map[int]*model.QuizActiveSessionState{}},
+		study:        &testStudySessionStore{states: map[int]*model.StudyActiveSessionState{}},
+		pending:      map[int64]model.PendingLLMInput{},
+		active:       map[int64]model.ActiveQuestionRef{},
+		drafts:       map[draftKey][]int{},
+		messages:     map[handwritingMessageKey]model.TelegramMessageRef{},
+		fingerprints: map[int]string{},
+		starts:       map[int]time.Time{},
+	}
+}
+
+func seedQuizState(stores *testInteractionStores, state *model.QuizActiveSessionState) {
+	clone, err := cloneTestState(state)
+	if err != nil {
+		panic(err)
+	}
+	stores.quiz.states[state.Session.ID] = clone
+}
+
+func seedStudyState(stores *testInteractionStores, state *model.StudyActiveSessionState) {
+	clone, err := cloneTestState(state)
+	if err != nil {
+		panic(err)
+	}
+	stores.study.states[state.Session.ID] = clone
+}
+
+func cloneTestState[T any](state *T) (*T, error) {
+	if state == nil {
+		return nil, nil
+	}
+	raw, err := json.Marshal(state)
+	if err != nil {
+		return nil, err
+	}
+	var clone T
+	if err := json.Unmarshal(raw, &clone); err != nil {
+		return nil, err
+	}
+	return &clone, nil
+}
+
+func (s *testInteractionStores) stateStores() StateStores {
+	return StateStores{Input: s, Drafts: s, Messages: s, Recovery: s, Timing: s}
+}
+
+func (s *testQuizSessionStore) Load(_ context.Context, sessionID int) (*model.QuizActiveSessionState, error) {
+	state, ok := s.states[sessionID]
 	if !ok {
-		return redis.NewStringResult("", redis.Nil)
+		return nil, model.ErrSessionStoreNotFound
 	}
-	return redis.NewStringResult(val, nil)
+	return cloneTestState(state)
 }
 
-func (f *testRedis) GetDel(ctx context.Context, key string) *redis.StringCmd {
-	val, ok := f.values[key]
+func (s *testQuizSessionStore) Save(_ context.Context, sessionID int, state *model.QuizActiveSessionState) error {
+	clone, err := cloneTestState(state)
+	if err != nil {
+		return err
+	}
+	s.states[sessionID] = clone
+	return nil
+}
+
+func (s *testQuizSessionStore) Delete(_ context.Context, sessionID int) error {
+	delete(s.states, sessionID)
+	return nil
+}
+
+func (s *testStudySessionStore) Load(_ context.Context, sessionID int) (*model.StudyActiveSessionState, error) {
+	state, ok := s.states[sessionID]
 	if !ok {
-		return redis.NewStringResult("", redis.Nil)
+		return nil, model.ErrSessionStoreNotFound
 	}
-	delete(f.values, key)
-	return redis.NewStringResult(val, nil)
+	return cloneTestState(state)
 }
 
-func (f *testRedis) Set(ctx context.Context, key string, value any, expiration time.Duration) *redis.StatusCmd {
-	switch v := value.(type) {
-	case []byte:
-		f.values[key] = string(v)
-	case string:
-		f.values[key] = v
-	default:
-		f.values[key] = fmt.Sprint(v)
+func (s *testStudySessionStore) Save(_ context.Context, sessionID int, state *model.StudyActiveSessionState) error {
+	clone, err := cloneTestState(state)
+	if err != nil {
+		return err
 	}
-	return redis.NewStatusResult("OK", nil)
+	s.states[sessionID] = clone
+	return nil
 }
 
-func (f *testRedis) Del(ctx context.Context, keys ...string) *redis.IntCmd {
-	var deleted int64
-	for _, key := range keys {
-		if _, ok := f.values[key]; ok {
-			delete(f.values, key)
-			deleted++
-		}
+func (s *testStudySessionStore) Delete(_ context.Context, sessionID int) error {
+	delete(s.states, sessionID)
+	return nil
+}
+
+func (s *testInteractionStores) SetLLMPending(_ context.Context, userID int64, input model.PendingLLMInput) error {
+	s.pending[userID] = input
+	return nil
+}
+
+func (s *testInteractionStores) TakeLLMPending(_ context.Context, userID int64) (model.PendingLLMInput, bool, error) {
+	input, ok := s.pending[userID]
+	delete(s.pending, userID)
+	return input, ok, nil
+}
+
+func (s *testInteractionStores) DeleteLLMPending(_ context.Context, userID int64) error {
+	delete(s.pending, userID)
+	return nil
+}
+
+func (s *testInteractionStores) GetActiveQuestion(_ context.Context, chatID int64) (*model.ActiveQuestionRef, error) {
+	question, ok := s.active[chatID]
+	if !ok {
+		return nil, nil
 	}
-	return redis.NewIntResult(deleted, nil)
+	return &question, nil
+}
+
+func (s *testInteractionStores) SetActiveQuestion(
+	_ context.Context,
+	chatID int64,
+	question model.ActiveQuestionRef,
+) error {
+	s.active[chatID] = question
+	return nil
+}
+
+func (s *testInteractionStores) DeleteActiveQuestion(_ context.Context, chatID int64) error {
+	delete(s.active, chatID)
+	return nil
+}
+
+func (s *testInteractionStores) ClearInput(_ context.Context, chatID int64, userID *int64) error {
+	delete(s.active, chatID)
+	if userID != nil {
+		delete(s.pending, *userID)
+	}
+	return nil
+}
+
+func (s *testInteractionStores) GetWordOrderDraft(_ context.Context, sessionID, questionID int) ([]int, error) {
+	selection, ok := s.drafts[draftKey{sessionID, questionID}]
+	if !ok {
+		return nil, nil
+	}
+	return append([]int(nil), selection...), nil
+}
+
+func (s *testInteractionStores) SetWordOrderDraft(_ context.Context, sessionID, questionID int, selection []int) error {
+	s.drafts[draftKey{sessionID, questionID}] = append([]int(nil), selection...)
+	return nil
+}
+
+func (s *testInteractionStores) DeleteWordOrderDraft(_ context.Context, sessionID, questionID int) error {
+	delete(s.drafts, draftKey{sessionID, questionID})
+	return nil
+}
+
+func (s *testInteractionStores) SaveHandwritingMessage(
+	_ context.Context,
+	sessionID, questionID int,
+	ref model.TelegramMessageRef,
+) error {
+	s.messages[handwritingMessageKey{sessionID, questionID}] = ref
+	return nil
+}
+
+func (s *testInteractionStores) GetHandwritingMessage(
+	_ context.Context,
+	sessionID, questionID int,
+) (*model.TelegramMessageRef, error) {
+	ref, ok := s.messages[handwritingMessageKey{sessionID, questionID}]
+	if !ok {
+		return nil, nil
+	}
+	return &ref, nil
+}
+
+func (s *testInteractionStores) GetMiniAppFingerprint(_ context.Context, sessionID int) (string, error) {
+	return s.fingerprints[sessionID], nil
+}
+
+func (s *testInteractionStores) SetMiniAppFingerprint(_ context.Context, sessionID int, fingerprint string) error {
+	s.fingerprints[sessionID] = fingerprint
+	return nil
+}
+
+func (s *testInteractionStores) RecordQuestionStart(_ context.Context, sessionID int, startedAt time.Time) error {
+	s.starts[sessionID] = startedAt
+	return nil
 }
 
 type mockSRS struct {

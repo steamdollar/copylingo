@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
@@ -22,12 +23,20 @@ func (b *Bot) handleSettingsCommand(ctx context.Context, msg *tgbotapi.Message) 
 	}
 
 	text := buildSettingsOverviewText(user)
-	keyboard := buildSettingsKeyboard(user)
+	keyboard := b.settingsKeyboard(user)
 	b.SendMessageWithKeyboard(msg.Chat.ID, text, keyboard)
 }
 
 // handleSettingsCallback routes callbacks related to push schedule & timezone settings.
 func (b *Bot) handleSettingsCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
+		return
+	}
+	parts := strings.Split(cb.Data, ":")
+	if len(parts) >= 2 && (parts[1] == "materials" || parts[1] == "restore") {
+		b.handleMaterialPreferencesCallback(ctx, cb)
+		return
+	}
 	user, err := b.services.User.GetUser(ctx, cb.From.ID, cb.From.UserName)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get user for settings callback", slog.Any("error", err))
@@ -116,7 +125,7 @@ func (b *Bot) handleSettingsCallback(ctx context.Context, cb *tgbotapi.CallbackQ
 
 func (b *Bot) renderSettingsView(ctx context.Context, cb *tgbotapi.CallbackQuery, u *model.User) {
 	text := buildSettingsOverviewText(u)
-	keyboard := buildSettingsKeyboard(u)
+	keyboard := b.settingsKeyboard(u)
 	if cb.Message != nil {
 		b.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
 	}
@@ -310,6 +319,9 @@ func buildTimezoneKeyboard() tgbotapi.InlineKeyboardMarkup {
 func formatSlotTime(t *string) string {
 	if t == nil || *t == "" {
 		return "🔕 꺼짐"
+	}
+	if parsed, err := time.Parse(time.RFC3339, *t); err == nil {
+		return parsed.Format("15:04")
 	}
 	return *t
 }

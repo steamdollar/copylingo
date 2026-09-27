@@ -79,132 +79,36 @@ func TestLoadLLMDefaults(t *testing.T) {
 	if got, want := cfg.LLM.Model, "gemini-3.5-flash-lite"; got != want {
 		t.Fatalf("LLM.Model = %q, want %q", got, want)
 	}
+	if got, want := cfg.LLM.TTSModel, "gemini-2.5-flash-preview-tts"; got != want {
+		t.Fatalf("LLM.TTSModel = %q, want %q", got, want)
+	}
+	if got, want := cfg.LLM.TTSVoiceName, "Kore"; got != want {
+		t.Fatalf("LLM.TTSVoiceName = %q, want %q", got, want)
+	}
+	if got, want := cfg.LLM.TTSVoiceNameB, "Puck"; got != want {
+		t.Fatalf("LLM.TTSVoiceNameB = %q, want %q", got, want)
+	}
 }
 
-func TestLoadScheduleDefaults(t *testing.T) {
+func TestLoadLLMTTSEnvOverrides(t *testing.T) {
 	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
+	t.Setenv("COPYLINGO_LLM_TTS_MODEL", "test-tts-model")
+	t.Setenv("COPYLINGO_LLM_TTS_VOICE_NAME", "Puck")
+	t.Setenv("COPYLINGO_LLM_TTS_VOICE_NAME_B", "Zephyr")
 	t.Chdir(t.TempDir())
 
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-
-	if got, want := cfg.Schedule.MorningPushCron.String(), "0 12 * * *"; got != want {
-		t.Fatalf("Schedule.MorningPushCron = %q, want %q", got, want)
+	if got, want := cfg.LLM.TTSModel, "test-tts-model"; got != want {
+		t.Fatalf("LLM.TTSModel = %q, want %q", got, want)
 	}
-	if got, want := cfg.Schedule.StudyPushCron.String(), "0 8 * * *"; got != want {
-		t.Fatalf("Schedule.StudyPushCron = %q, want %q", got, want)
+	if got, want := cfg.LLM.TTSVoiceName, "Puck"; got != want {
+		t.Fatalf("LLM.TTSVoiceName = %q, want %q", got, want)
 	}
-	if got, want := cfg.Schedule.AfternoonStudyPushCron.String(), "30 16 * * *"; got != want {
-		t.Fatalf("Schedule.AfternoonStudyPushCron = %q, want %q", got, want)
-	}
-	if cfg.Schedule.StudyPushCron.IsZero() {
-		t.Fatal("Schedule.StudyPushCron IsZero() = true, want false")
-	}
-	if got, want := cfg.Schedule.MaxUnfinishedSessions, 3; got != want {
-		t.Fatalf("Schedule.MaxUnfinishedSessions = %d, want %d", got, want)
-	}
-}
-
-func TestLoadScheduleFileOverridesDefaults(t *testing.T) {
-	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
-	t.Chdir(t.TempDir())
-
-	if err := os.WriteFile(
-		"config.yaml",
-		[]byte("schedule:\n  morning_push_cron: '0 13 * * *'\n  study_push_cron: '0 9 * * *'\n"),
-		0o600,
-	); err != nil {
-		t.Fatalf("write config.yaml: %v", err)
-	}
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	if got, want := cfg.Schedule.MorningPushCron.String(), "0 13 * * *"; got != want {
-		t.Fatalf("Schedule.MorningPushCron = %q, want file value %q", got, want)
-	}
-	if got, want := cfg.Schedule.StudyPushCron.String(), "0 9 * * *"; got != want {
-		t.Fatalf("Schedule.StudyPushCron = %q, want file value %q", got, want)
-	}
-}
-
-func TestLoadScheduleEnvOverrides(t *testing.T) {
-	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
-	t.Setenv("COPYLINGO_SCHEDULE_AFTERNOON_STUDY_PUSH_CRON", "0 17 * * *")
-	t.Chdir(t.TempDir())
-
-	if err := os.WriteFile(
-		"config.yaml",
-		[]byte("schedule:\n  afternoon_study_push_cron: '0 16 * * *'\n"),
-		0o600,
-	); err != nil {
-		t.Fatalf("write config.yaml: %v", err)
-	}
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-
-	if got, want := cfg.Schedule.AfternoonStudyPushCron.String(), "0 17 * * *"; got != want {
-		t.Fatalf("Schedule.AfternoonStudyPushCron = %q, want %q", got, want)
-	}
-}
-
-func TestLoadScheduleMaxUnfinishedSessionsEnvOverride(t *testing.T) {
-	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
-	t.Setenv("COPYLINGO_SCHEDULE_MAX_UNFINISHED_SESSIONS", "2")
-	t.Chdir(t.TempDir())
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if got, want := cfg.Schedule.MaxUnfinishedSessions, 2; got != want {
-		t.Fatalf("Schedule.MaxUnfinishedSessions = %d, want %d", got, want)
-	}
-}
-
-func TestLoadRejectsInvalidMaxUnfinishedSessions(t *testing.T) {
-	for _, value := range []string{"0", "-1", "4"} {
-		t.Run(value, func(t *testing.T) {
-			t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
-			t.Setenv("COPYLINGO_SCHEDULE_MAX_UNFINISHED_SESSIONS", value)
-			t.Chdir(t.TempDir())
-
-			if _, err := Load(); err == nil {
-				t.Fatal("Load() error = nil, want validation error")
-			}
-		})
-	}
-}
-
-func TestLoadRejectsInvalidScheduleCron(t *testing.T) {
-	t.Setenv("COPYLINGO_TELEGRAM_TOKEN", "test-token")
-	t.Setenv("COPYLINGO_SCHEDULE_STUDY_PUSH_CRON", "not-a-cron")
-	t.Chdir(t.TempDir())
-
-	if _, err := Load(); err == nil {
-		t.Fatal("Load() error = nil, want validation error")
-	}
-}
-
-func TestCronExprAllowsEmpty(t *testing.T) {
-	if err := CronExpr(" ").Validate("schedule.content_collect_cron"); err != nil {
-		t.Fatalf("Validate() error = %v, want nil", err)
-	}
-	if !CronExpr(" ").IsZero() {
-		t.Fatal("CronExpr(\" \").IsZero() = false, want true")
-	}
-}
-
-func TestCronExprValidateRejectsInvalid(t *testing.T) {
-	if err := CronExpr("not-a-cron").Validate("schedule.study_push_cron"); err == nil {
-		t.Fatal("Validate() error = nil, want error for invalid cron")
+	if got, want := cfg.LLM.TTSVoiceNameB, "Zephyr"; got != want {
+		t.Fatalf("LLM.TTSVoiceNameB = %q, want %q", got, want)
 	}
 }
 

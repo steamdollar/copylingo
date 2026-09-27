@@ -10,11 +10,14 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type mockHandwritingActiveSession struct {
-	getFn func(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
+type mockHandwritingQuizActiveSession struct {
+	getFn func(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
 }
 
-func (m *mockHandwritingActiveSession) Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error) {
+func (m *mockHandwritingQuizActiveSession) Get(
+	ctx context.Context,
+	sessionID int,
+) (*model.QuizActiveSessionState, error) {
 	return m.getFn(ctx, sessionID)
 }
 
@@ -45,8 +48,8 @@ func TestSubmitAnswer_Success(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockHandwritingActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+	active := &mockHandwritingQuizActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
 			return handwritingState(userID, sessionID, model.Question{
 				ID:            questionID,
 				Type:          model.QuestionKanaHandwriting,
@@ -101,8 +104,8 @@ func TestSubmitAnswer_WrongSavesRenderedImage(t *testing.T) {
 	failedHandwritingImageDir = imageDir
 	defer func() { failedHandwritingImageDir = previousImageDir }()
 
-	active := &mockHandwritingActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+	active := &mockHandwritingQuizActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
 			return handwritingState(userID, sessionID, model.Question{
 				ID:            questionID,
 				Type:          model.QuestionKanaHandwriting,
@@ -147,8 +150,8 @@ func TestSubmitAnswer_WrongSavesRenderedImage(t *testing.T) {
 
 func TestSubmitAnswer_Unauthorized(t *testing.T) {
 	ctx := context.Background()
-	active := &mockHandwritingActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+	active := &mockHandwritingQuizActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
 			return handwritingState(456, 10, model.Question{ID: 1, Type: model.QuestionKanaHandwriting}, false), nil
 		},
 	}
@@ -163,8 +166,8 @@ func TestSubmitAnswer_Unauthorized(t *testing.T) {
 func TestSubmitAnswer_InvalidQuestionType(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
-	active := &mockHandwritingActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+	active := &mockHandwritingQuizActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
 			return handwritingState(userID, 10, model.Question{ID: 1, Type: model.QuestionMultipleChoice}, false), nil
 		},
 	}
@@ -179,8 +182,8 @@ func TestSubmitAnswer_InvalidQuestionType(t *testing.T) {
 func TestSubmitAnswer_AlreadyAnswered(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
-	active := &mockHandwritingActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+	active := &mockHandwritingQuizActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
 			return handwritingState(userID, 10, model.Question{ID: 1, Type: model.QuestionKanaHandwriting}, true), nil
 		},
 	}
@@ -203,7 +206,7 @@ func TestSubmitAnswer_UsesCurrentDuplicateOccurrence(t *testing.T) {
 		Type:          model.QuestionKanaHandwriting,
 		CorrectAnswer: "あ",
 	}, true)
-	state.Items = append(state.Items, model.ActiveSessionQuestion{
+	state.Items = append(state.Items, model.QuizActiveSessionQuestion{
 		SessionQuestion: model.SessionQuestion{ID: 101, SessionID: sessionID, QuestionID: questionID},
 		Question: model.Question{
 			ID:            questionID,
@@ -213,8 +216,8 @@ func TestSubmitAnswer_UsesCurrentDuplicateOccurrence(t *testing.T) {
 	})
 	state.CurrentIndex = 1
 
-	active := &mockHandwritingActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.ActiveSessionState, error) {
+	active := &mockHandwritingQuizActiveSession{
+		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
 			return state, nil
 		},
 	}
@@ -239,7 +242,12 @@ func TestSubmitAnswer_UsesCurrentDuplicateOccurrence(t *testing.T) {
 	}
 }
 
-func handwritingState(userID int64, sessionID int, question model.Question, answered bool) *model.ActiveSessionState {
+func handwritingState(
+	userID int64,
+	sessionID int,
+	question model.Question,
+	answered bool,
+) *model.QuizActiveSessionState {
 	state := activeStateForQuestion(sessionID, question, answered)
 	state.Session.UserID = userID
 	return state

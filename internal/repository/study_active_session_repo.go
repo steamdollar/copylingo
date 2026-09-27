@@ -56,7 +56,8 @@ func (r *StudyActiveSessionRepository) LoadStudySessionWithStateBySessionID(
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
 	var rows []studySessionWithStateRow
-	if err := r.db.SelectContext(ctx,
+	if err := r.db.SelectContext(
+		ctx,
 		&rows,
 		`
 			SELECT
@@ -111,14 +112,20 @@ func (r *StudyActiveSessionRepository) LoadStudySessionWithStateBySessionID(
 
 	session := studySessionFromRow(rows[0])
 	state := &model.StudyActiveSessionState{
-		Version:      model.StudyActiveSessionStateVersion,
-		Session:      session,
-		Items:        make([]model.StudySessionMaterial, 0, len(rows)),
+		Session: session,
+		Items: make(
+			[]model.StudySessionMaterial,
+			0,
+			len(rows),
+		),
 		UpdatedAt:    time.Now(),
 		CurrentIndex: 0,
 	}
 	for _, row := range rows {
-		state.Items = append(state.Items, studySessionMaterialFromRow(row))
+		state.Items = append(
+			state.Items,
+			studySessionMaterialFromRow(row),
+		)
 	}
 	state.RecountStudied()
 	state.CaptureInitiallyStudied()
@@ -145,7 +152,10 @@ func (r *StudyActiveSessionRepository) FlushStudyActiveSession(
 	ctx context.Context,
 	state *model.StudyActiveSessionState,
 ) error {
-	tx, err := r.db.BeginTxx(ctx, nil)
+	tx, err := r.db.BeginTxx(
+		ctx,
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf(
 			"StudyActiveSessionRepository.FlushStudyActiveSession begin session_id=%d: %w",
@@ -161,15 +171,34 @@ func (r *StudyActiveSessionRepository) FlushStudyActiveSession(
 		}
 	}()
 
-	flushed, err := markStudySessionCompleted(ctx, tx, state)
+	flushed, err := markStudySessionCompleted(
+		ctx,
+		tx,
+		state,
+	)
 	if err != nil {
 		return err
 	}
 	if flushed {
-		if err := flushStudySessionMaterials(ctx, tx, state.Items); err != nil {
+		if err := flushStudySessionMaterials(
+			ctx,
+			tx,
+			state.Items,
+		); err != nil {
 			return err
 		}
-		if err := flushUserMaterialProgress(ctx, tx, state); err != nil {
+		if err := flushUserMaterialProgress(
+			ctx,
+			tx,
+			state,
+		); err != nil {
+			return err
+		}
+		if err := flushStudyMaterialPreferences(
+			ctx,
+			tx,
+			state.Session.ID,
+		); err != nil {
 			return err
 		}
 	}
@@ -182,6 +211,41 @@ func (r *StudyActiveSessionRepository) FlushStudyActiveSession(
 		)
 	}
 	committed = true
+	return nil
+}
+
+// Viewing a fallback card postpones the shared check without counting as a
+// successful Quiz or increasing the maintenance interval.
+func flushStudyMaterialPreferences(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	sessionID int,
+) error {
+	if _, err := tx.ExecContext(
+		ctx,
+		`
+		UPDATE user_material_preferences preference
+		SET next_check_at = s.completed_at + preference.check_interval_days * INTERVAL '1 day',
+			updated_at = NOW()
+		FROM sessions s
+		WHERE s.id = $1 AND s.status = 'completed' AND s.mode = 'study'
+			AND preference.user_id = s.user_id AND preference.review_mode = 'maintenance'
+			AND s.created_at >= preference.next_check_at
+			AND s.created_at >= preference.updated_at
+			AND EXISTS (
+				SELECT 1 FROM session_materials sm
+				WHERE sm.session_id = s.id AND sm.material_id = preference.material_id
+					AND sm.studied_at IS NOT NULL
+			)
+	`,
+		sessionID,
+	); err != nil {
+		return fmt.Errorf(
+			"StudyActiveSessionRepository.flushStudyMaterialPreferences session_id=%d: %w",
+			sessionID,
+			err,
+		)
+	}
 	return nil
 }
 
@@ -210,12 +274,21 @@ func studySessionMaterialFromRow(row studySessionWithStateRow) model.StudySessio
 	}
 }
 
-func markStudySessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.StudyActiveSessionState) (bool, error) {
-	res, err := tx.ExecContext(ctx, `
+func markStudySessionCompleted(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	state *model.StudyActiveSessionState,
+) (bool, error) {
+	res, err := tx.ExecContext(
+		ctx,
+		`
 		UPDATE sessions
 		SET status = $2, correct_count = 0, completed_at = NOW()
 		WHERE id = $1 AND status <> $2
-	`, state.Session.ID, model.SessionCompleted)
+	`,
+		state.Session.ID,
+		model.SessionCompleted,
+	)
 	if err != nil {
 		return false, fmt.Errorf(
 			"StudyActiveSessionRepository.markStudySessionCompleted session_id=%d: %w",
@@ -235,11 +308,22 @@ func markStudySessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.St
 	return rows > 0, nil
 }
 
-func flushStudySessionMaterials(ctx context.Context, tx *sqlx.Tx, items []model.StudySessionMaterial) error {
-	studied := make([]model.SessionMaterial, 0, len(items))
+func flushStudySessionMaterials(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	items []model.StudySessionMaterial,
+) error {
+	studied := make(
+		[]model.SessionMaterial,
+		0,
+		len(items),
+	)
 	for _, item := range items {
 		if item.SessionMaterial.StudiedAt != nil {
-			studied = append(studied, item.SessionMaterial)
+			studied = append(
+				studied,
+				item.SessionMaterial,
+			)
 		}
 	}
 	if len(studied) == 0 {
@@ -247,47 +331,88 @@ func flushStudySessionMaterials(ctx context.Context, tx *sqlx.Tx, items []model.
 	}
 
 	var values strings.Builder
-	args := make([]any, 0, len(studied)*2)
+	args := make(
+		[]any,
+		0,
+		len(studied)*2,
+	)
 	for i, item := range studied {
 		if i > 0 {
 			values.WriteString(",")
 		}
 		base := i * 2
-		values.WriteString(fmt.Sprintf("($%d,$%d)", base+1, base+2))
-		args = append(args, item.ID, item.StudiedAt)
+		values.WriteString(fmt.Sprintf(
+			"($%d,$%d)",
+			base+1,
+			base+2,
+		))
+		args = append(
+			args,
+			item.ID,
+			item.StudiedAt,
+		)
 	}
 
-	query := fmt.Sprintf(`
+	query := fmt.Sprintf(
+		`
 		UPDATE session_materials AS sm
 		SET studied_at = COALESCE(sm.studied_at, v.studied_at::timestamptz)
 		FROM (VALUES %s) AS v(id, studied_at)
 		WHERE sm.id = v.id::int
-	`, values.String())
-	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("StudyActiveSessionRepository.flushStudySessionMaterials count=%d: %w", len(studied), err)
+	`,
+		values.String(),
+	)
+	if _, err := tx.ExecContext(
+		ctx,
+		query,
+		args...,
+	); err != nil {
+		return fmt.Errorf(
+			"StudyActiveSessionRepository.flushStudySessionMaterials count=%d: %w",
+			len(studied),
+			err,
+		)
 	}
 	return nil
 }
 
-func flushUserMaterialProgress(ctx context.Context, tx *sqlx.Tx, state *model.StudyActiveSessionState) error {
+func flushUserMaterialProgress(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	state *model.StudyActiveSessionState,
+) error {
 	materialIDs := state.NewlyStudiedMaterialIDs()
 	if len(materialIDs) == 0 {
 		return nil
 	}
 
 	var values strings.Builder
-	args := make([]any, 0, len(materialIDs)+1)
-	args = append(args, state.Session.UserID)
+	args := make(
+		[]any,
+		0,
+		len(materialIDs)+1,
+	)
+	args = append(
+		args,
+		state.Session.UserID,
+	)
 	for i, materialID := range materialIDs {
 		if i > 0 {
 			values.WriteString(",")
 		}
 		placeholder := i + 2
-		values.WriteString(fmt.Sprintf("($%d)", placeholder))
-		args = append(args, materialID)
+		values.WriteString(fmt.Sprintf(
+			"($%d)",
+			placeholder,
+		))
+		args = append(
+			args,
+			materialID,
+		)
 	}
 
-	query := fmt.Sprintf(`
+	query := fmt.Sprintf(
+		`
 		INSERT INTO user_material_progress (
 			user_id, material_id, ease_factor, interval_days, repetitions,
 			next_review_at, last_studied_at, times_studied
@@ -313,9 +438,19 @@ func flushUserMaterialProgress(ctx context.Context, tx *sqlx.Tx, state *model.St
 			last_studied_at = NOW(),
 			times_studied = user_material_progress.times_studied + 1,
 			updated_at = NOW()
-	`, values.String())
-	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("StudyActiveSessionRepository.flushUserMaterialProgress count=%d: %w", len(materialIDs), err)
+	`,
+		values.String(),
+	)
+	if _, err := tx.ExecContext(
+		ctx,
+		query,
+		args...,
+	); err != nil {
+		return fmt.Errorf(
+			"StudyActiveSessionRepository.flushUserMaterialProgress count=%d: %w",
+			len(materialIDs),
+			err,
+		)
 	}
 	return nil
 }

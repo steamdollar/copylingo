@@ -84,22 +84,21 @@ func TestHandwritingCellCountExcludesSokuon(t *testing.T) {
 
 func TestQuestionNavigation(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	active := service.NewActiveSessionService(nil, rdb, nil)
-	sf := NewSessionFlow(&Bot{services: &service.Services{ActiveSession: active}})
+	stateStores := newTestInteractionStores()
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
+	sf := NewSessionFlow(&Bot{services: &service.Services{QuizActiveSession: active}})
 
 	trueVal := true
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: 10},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &trueVal}},
 			{SessionQuestion: model.SessionQuestion{QuestionID: 2}},
 			{SessionQuestion: model.SessionQuestion{QuestionID: 3}},
 		},
 	}
-	raw, _ := json.Marshal(state)
-	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(10)] = string(raw)
+	seedQuizState(stateStores, state)
 
 	t.Run("isQuestionAnswered", func(t *testing.T) {
 		if !sf.isQuestionAnswered(ctx, 10, 0) {
@@ -166,10 +165,10 @@ func TestBuildMCQKeyboardLayout(t *testing.T) {
 func TestRenderByType(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{Server: config.ServerConfig{PublicBaseURL: "https://ex.com"}},
 	}
 	sf := NewSessionFlow(b)
@@ -204,10 +203,9 @@ func TestRenderByType(t *testing.T) {
 		if kb != nil {
 			t.Error("expected no keyboard for subjective")
 		}
-		// Check Redis state for text input capture
-		val := rdb.values[config.UserActiveQuestionRedisKey.Format(123)]
-		if val != "10:0" {
-			t.Errorf("expected Redis value 10:0, got %q", val)
+		if got, ok := stateStores.active[123]; !ok ||
+			got != (model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 0}) {
+			t.Errorf("active question = %+v, want session 10 index 0", got)
 		}
 	})
 
@@ -266,11 +264,11 @@ func TestRenderByType_Listening(t *testing.T) {
 	ctx := context.Background()
 	repo := &fakeAudioRepo{}
 	store := &fakeStore{bytes: []byte("ogg-bytes")}
-	audio := service.NewAudioService(repo, fakeSynth{}, store, "Kore")
+	audio := service.NewAudioService(repo, fakeSynth{}, store, "Kore", "Puck")
 
 	t.Run("cached file_id fast path", func(t *testing.T) {
 		mAPI := &mockBotAPI{}
-		b := &Bot{api: mAPI, rdb: &testRedis{values: map[string]string{}}, services: &service.Services{Audio: audio}}
+		b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
 		sf := NewSessionFlow(b)
 		q := model.Question{
 			ID:          5,
@@ -304,7 +302,7 @@ func TestRenderByType_Listening(t *testing.T) {
 	t.Run("no file_id fetches store, uploads, caches file_id", func(t *testing.T) {
 		store.getCalls = 0
 		mAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
-		b := &Bot{api: mAPI, rdb: &testRedis{values: map[string]string{}}, services: &service.Services{Audio: audio}}
+		b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
 		sf := NewSessionFlow(b)
 		q := model.Question{
 			ID:        9,
@@ -327,7 +325,7 @@ func TestRenderByType_Listening(t *testing.T) {
 
 	t.Run("no audio available degrades softly", func(t *testing.T) {
 		mAPI := &mockBotAPI{}
-		b := &Bot{api: mAPI, rdb: &testRedis{values: map[string]string{}}, services: &service.Services{Audio: audio}}
+		b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
 		sf := NewSessionFlow(b)
 		q := model.Question{
 			ID:      1,
@@ -352,22 +350,25 @@ func TestRenderByType_Listening(t *testing.T) {
 func TestShowQuestion_Finish(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
-	active := service.NewActiveSessionService(nil, rdb, nil)
+	stateStores := newTestInteractionStores()
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
 	b := &Bot{
 		api:      mAPI,
-		rdb:      rdb,
-		services: &service.Services{ActiveSession: active},
+		input:    stateStores,
+		drafts:   stateStores,
+		messages: stateStores,
+		recovery: stateStores,
+		timing:   stateStores,
+		services: &service.Services{QuizActiveSession: active},
 	}
 	sf := NewSessionFlow(b)
 
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: 10},
-		Items:   []model.ActiveSessionQuestion{{}}, // 1 item
+		Items:   []model.QuizActiveSessionQuestion{{}}, // 1 item
 	}
-	raw, _ := json.Marshal(state)
-	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(10)] = string(raw)
+	seedQuizState(stateStores, state)
 
 	// Index 1 on 1 item session -> should show finish
 	sf.showQuestion(ctx, 123, nil, 10, 1)

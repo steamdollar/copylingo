@@ -5,10 +5,6 @@ import (
 	"log"
 	"strings"
 	"time"
-
-	"github.com/joho/godotenv"
-	"github.com/robfig/cron/v3"
-	"github.com/spf13/viper"
 )
 
 type Config struct {
@@ -17,9 +13,7 @@ type Config struct {
 	Redis    RedisConfig    `mapstructure:"redis"`
 	Telegram TelegramConfig `mapstructure:"telegram"`
 	LLM      LLMConfig      `mapstructure:"llm"`
-	TTS      TTSConfig      `mapstructure:"tts"`
 	Storage  StorageConfig  `mapstructure:"storage"`
-	Schedule ScheduleConfig `mapstructure:"schedule"`
 	Logging  LoggingConfig  `mapstructure:"logging"`
 }
 
@@ -56,24 +50,14 @@ type TelegramConfig struct {
 	Debug bool   `mapstructure:"debug"`
 }
 
-// LLMConfig는 시스템 전반의 LLM(거대 언어 모델) 설정을 담당
-// 구조체명은 LLMConfig이며 통신에 표준 go-openai 패키지를 사용할 수 있도록 호환 계층을 둠
-// 이는 Google API가 'OpenAI 호환 모드(Compatibility Layer)'를 지원하기 때문에 가능
-// BaseURL을 구글 측 엔드포인트로 덮어씌우게 되면, 향후 다른 LLM(Gemini, GPT-4o, Claude 등)으로
-// 마이그레이션이 필요할 때 로직 코드 수정 전혀 없이 환경변수(BaseURL, API Key)만으로 즉각 교체할 수 있어 유지보수성이 극대화
+// Chat uses the OpenAI-compatible endpoint; TTS uses Gemini's native endpoint.
 type LLMConfig struct {
-	APIKey  string `mapstructure:"api_key"`
-	Model   string `mapstructure:"model"`    // gemini-3.5-flash-lite
-	BaseURL string `mapstructure:"base_url"` // https://generativelanguage.googleapis.com/v1beta/openai/
-}
-
-type TTSConfig struct {
-	Enabled      bool   `mapstructure:"enabled"`
-	Model        string `mapstructure:"model"`         // Gemini native TTS model, e.g. gemini-2.5-flash-preview-tts (ADR-031). Swappable; a gemini-3.1-flash-tts-preview also exists.
-	CredPath     string `mapstructure:"cred_path"`     // (legacy GCP) credentials JSON path; unused by the Gemini native path.
-	AudioDir     string `mapstructure:"audio_dir"`     // (legacy local FS) superseded by object storage (ADR-032); kept for backward compatibility.
-	LanguageCode string `mapstructure:"language_code"` // ja-JP
-	VoiceName    string `mapstructure:"voice_name"`    // Gemini prebuilt voice, e.g. Kore / Puck / Zephyr. Part of the content-addressed key.
+	APIKey        string `mapstructure:"api_key"`
+	Model         string `mapstructure:"model"`            // Chat model.
+	BaseURL       string `mapstructure:"base_url"`         // OpenAI-compatible endpoint.
+	TTSModel      string `mapstructure:"tts_model"`        // Gemini native TTS model (ADR-031).
+	TTSVoiceName  string `mapstructure:"tts_voice_name"`   // Voice A; also used for single-speaker audio.
+	TTSVoiceNameB string `mapstructure:"tts_voice_name_b"` // Voice B for dialogue audio.
 }
 
 // StorageConfig configures the S3-compatible object store that holds TTS audio
@@ -89,223 +73,11 @@ type StorageConfig struct {
 	UsePathStyle bool   `mapstructure:"use_path_style"` // true for MinIO (path-style addressing); false for AWS S3 virtual-hosted style.
 }
 
-// CronExpr는 cron expression을 표현하는 도메인 타입.
-// config 계층에서 값의 의미를 드러내고, Validate로 실제 scheduler library와
-// 동일한 문법(cron.ParseStandard)으로 invalid expression을 fail-fast 검증한다.
-type CronExpr string
-
-func (c CronExpr) String() string {
-	return string(c)
-}
-
-func (c CronExpr) IsZero() bool {
-	return strings.TrimSpace(string(c)) == ""
-}
-
-// Validate는 non-empty cron expression만 검증한다.
-// 빈 값은 통과시켜 기존 backward compatibility(빈 cron이면 job 등록 skip)를 유지한다.
-func (c CronExpr) Validate(name string) error {
-	if c.IsZero() {
-		return nil
-	}
-	if _, err := cron.ParseStandard(c.String()); err != nil {
-		return fmt.Errorf("%s is invalid cron expression %q: %w", name, c.String(), err)
-	}
-	return nil
-}
-
-type ScheduleConfig struct {
-	MaxUnfinishedSessions  int      `mapstructure:"max_unfinished_sessions"`   // 사용자별 자동 세션 미완료 상한
-	ContentCollectCron     CronExpr `mapstructure:"content_collect_cron"`      // 콘텐츠 수집 크론
-	DynamicPushCron        CronExpr `mapstructure:"dynamic_push_cron"`         // 30분 단위 개인화 푸시 크론
-	MorningBuildCron       CronExpr `mapstructure:"morning_build_cron"`        // 오전 세션 빌드 크론 (legacy 키)
-	MorningPushCron        CronExpr `mapstructure:"morning_push_cron"`         // 정오 Quiz 세션 푸시 크론 (legacy 키)
-	StudyPushCron          CronExpr `mapstructure:"study_push_cron"`           // 아침 Study 세션 푸시 크론
-	AfternoonStudyPushCron CronExpr `mapstructure:"afternoon_study_push_cron"` // 오후 Study 세션 푸시 크론
-	EveningBuildCron       CronExpr `mapstructure:"evening_build_cron"`        // 저녁 세션 빌드 크론 (legacy 키)
-	EveningPushCron        CronExpr `mapstructure:"evening_push_cron"`         // 저녁 Quiz 세션 푸시 크론 (legacy 키)
-}
-
-// validate는 모든 cron expression 필드를 fail-fast 검증한다.
-func (s *ScheduleConfig) validate() error {
-	if s.MaxUnfinishedSessions < 1 || s.MaxUnfinishedSessions > 3 {
-		return fmt.Errorf("schedule.max_unfinished_sessions must be between 1 and 3")
-	}
-	checks := []struct {
-		name string
-		expr CronExpr
-	}{
-		{name: "schedule.content_collect_cron", expr: s.ContentCollectCron},
-		{name: "schedule.dynamic_push_cron", expr: s.DynamicPushCron},
-		{name: "schedule.morning_build_cron", expr: s.MorningBuildCron},
-		{name: "schedule.morning_push_cron", expr: s.MorningPushCron},
-		{name: "schedule.study_push_cron", expr: s.StudyPushCron},
-		{name: "schedule.afternoon_study_push_cron", expr: s.AfternoonStudyPushCron},
-		{name: "schedule.evening_build_cron", expr: s.EveningBuildCron},
-		{name: "schedule.evening_push_cron", expr: s.EveningPushCron},
-	}
-	for _, check := range checks {
-		if err := check.expr.Validate(check.name); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 type LoggingConfig struct {
 	Dir           string `mapstructure:"dir"`
 	Level         string `mapstructure:"level"`
 	RetentionDays int    `mapstructure:"retention_days"`
 	Timezone      string `mapstructure:"timezone"`
-}
-
-// Load reads config from file and environment variables.
-func Load() (*Config, error) {
-	viper.Reset()
-
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("./config")
-	viper.AddConfigPath("/etc/copylingo")
-
-	// Load .env file if it exists
-	dotEnv, _ := godotenv.Read()
-	_ = godotenv.Load()
-
-	// Environment variable overrides: COPYLINGO_DB_HOST, COPYLINGO_TELEGRAM_TOKEN, etc.
-	viper.SetEnvPrefix("COPYLINGO")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
-	if err := bindEnv(); err != nil {
-		return nil, err
-	}
-
-	// Defaults
-	viper.SetDefault("server.port", 8080)
-	viper.SetDefault("server.mode", "debug")
-	viper.SetDefault("server.public_base_url", "")
-	viper.SetDefault("db.host", "localhost")
-	viper.SetDefault("db.port", 5432)
-	viper.SetDefault("db.user", "copylingo")
-	viper.SetDefault("db.password", "copylingo")
-	viper.SetDefault("db.dbname", "copylingo")
-	viper.SetDefault("db.sslmode", "disable")
-	viper.SetDefault("redis.addr", "localhost:6379")
-	viper.SetDefault("redis.password", "")
-	viper.SetDefault("redis.db", 0)
-	viper.SetDefault("telegram.debug", false)
-
-	// llm
-	viper.SetDefault("llm.model", "gemini-3.5-flash-lite") // default to LLM model
-	viper.SetDefault(
-		"llm.base_url",
-		"https://generativelanguage.googleapis.com/v1beta/openai/",
-	) // LLM compatibility layer
-	// tts
-	viper.SetDefault("tts.enabled", true)
-	viper.SetDefault("tts.model", "gemini-2.5-flash-preview-tts") // ADR-031; swap via env if the preview id changes.
-	viper.SetDefault("tts.audio_dir", "./data/audio")
-	viper.SetDefault("tts.language_code", "ja-JP")
-	viper.SetDefault("tts.voice_name", "Kore") // Gemini prebuilt voice (ADR-031).
-
-	// storage (S3-compatible object store; local defaults target the MinIO container)
-	viper.SetDefault("storage.endpoint", "http://localhost:9000")
-	viper.SetDefault("storage.region", "ap-northeast-2")
-	viper.SetDefault("storage.bucket", "copylingo-audio")
-	viper.SetDefault("storage.access_key", "minioadmin")
-	viper.SetDefault("storage.secret_key", "minioadmin")
-	viper.SetDefault("storage.use_path_style", true)
-
-	// session schedule
-	viper.SetDefault("schedule.max_unfinished_sessions", 3)
-	viper.SetDefault("schedule.content_collect_cron", "0 3 * * *")        // 매일 03:00
-	viper.SetDefault("schedule.morning_build_cron", "30 7 * * *")         // 매일 07:30 - 오전 세션 빌드 (legacy 키)
-	viper.SetDefault("schedule.morning_push_cron", "0 12 * * *")          // 매일 12:00 - 정오 Quiz 세션 푸시 (legacy 키)
-	viper.SetDefault("schedule.study_push_cron", "0 8 * * *")             // 매일 08:00 - 아침 Study 세션 푸시
-	viper.SetDefault("schedule.afternoon_study_push_cron", "30 16 * * *") // 매일 16:30
-	viper.SetDefault("schedule.evening_build_cron", "30 20 * * *")        // 매일 20:30 - 저녁 세션 빌드 (legacy 키)
-	viper.SetDefault("schedule.evening_push_cron", "0 21 * * *")          // 매일 21:00 - 저녁 Quiz 세션 푸시 (legacy 키)
-
-	// logging
-	viper.SetDefault("logging.dir", "./logs")
-	viper.SetDefault("logging.level", "INFO")
-	viper.SetDefault("logging.retention_days", 30)
-	viper.SetDefault("logging.timezone", "Asia/Seoul")
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("failed to read config file: %w", err)
-		}
-		// Config file not found is OK — use defaults + env vars
-	}
-
-	if publicBaseURL := strings.TrimSpace(dotEnv["COPYLINGO_SERVER_PUBLIC_BASE_URL"]); publicBaseURL != "" {
-		viper.Set("server.public_base_url", publicBaseURL)
-	}
-
-	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
-	if err := cfg.validate(); err != nil {
-		return nil, fmt.Errorf("config validation failed: %w", err)
-	}
-
-	return &cfg, nil
-}
-
-func bindEnv() error {
-	keys := []string{
-		"server.port",
-		"server.mode",
-		"server.public_base_url",
-		"db.host",
-		"db.port",
-		"db.user",
-		"db.password",
-		"db.dbname",
-		"db.sslmode",
-		"redis.addr",
-		"redis.password",
-		"redis.db",
-		"telegram.token",
-		"telegram.debug",
-		"llm.api_key",
-		"llm.model",
-		"llm.base_url",
-		"tts.enabled",
-		"tts.model",
-		"tts.cred_path",
-		"tts.audio_dir",
-		"tts.language_code",
-		"tts.voice_name",
-		"storage.endpoint",
-		"storage.region",
-		"storage.bucket",
-		"storage.access_key",
-		"storage.secret_key",
-		"storage.use_path_style",
-		"schedule.max_unfinished_sessions",
-		"schedule.content_collect_cron",
-		"schedule.morning_build_cron",
-		"schedule.morning_push_cron",
-		"schedule.study_push_cron",
-		"schedule.afternoon_study_push_cron",
-		"schedule.evening_build_cron",
-		"schedule.evening_push_cron",
-		"logging.dir",
-		"logging.level",
-		"logging.retention_days",
-		"logging.timezone",
-	}
-	for _, key := range keys {
-		if err := viper.BindEnv(key); err != nil {
-			return fmt.Errorf("bind env %s: %w", key, err)
-		}
-	}
-	return nil
 }
 
 func (c *Config) validate() error {
@@ -320,6 +92,7 @@ func (c *Config) validate() error {
 	}
 	switch strings.ToUpper(strings.TrimSpace(c.Logging.Level)) {
 	case "DEBUG", "INFO", "WARN", "ERROR":
+		log.Println("log level: " + c.Logging.Level)
 	default:
 		return fmt.Errorf("logging.level must be one of DEBUG, INFO, WARN, ERROR")
 	}
@@ -328,9 +101,6 @@ func (c *Config) validate() error {
 	}
 	if _, err := time.LoadLocation(c.Logging.Timezone); err != nil {
 		return fmt.Errorf("logging.timezone is invalid: %w", err)
-	}
-	if err := c.Schedule.validate(); err != nil {
-		return err
 	}
 	return nil
 }

@@ -29,30 +29,154 @@ const countUnfinishedQuery = `
 	  AND status IN ('in_progress', 'pending')
 `
 
+const createSessionQuery = `
+	INSERT INTO sessions (user_id, type, mode, status, total_questions)
+	VALUES ($1, $2, $3, $4, $5)
+	RETURNING id
+`
+
 func NewSessionRepository(db *sqlx.DB) *SessionRepository {
 	return &SessionRepository{db: db}
 }
 
-func (r *SessionRepository) CreateSession(ctx context.Context, s *model.Session) error {
-	if !s.Mode.IsValid() {
-		return fmt.Errorf("SessionRepository.CreateSession user_id=%d type=%s invalid mode=%q",
-			s.UserID, s.Type, s.Mode)
+func (r *SessionRepository) CreateSession(
+	ctx context.Context,
+	s *model.Session,
+) error {
+	sessionID, err := insertSession(
+		ctx,
+		r.db,
+		s,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"SessionRepository.CreateSession user_id=%d type=%s mode=%s: %w",
+			s.UserID,
+			s.Type,
+			s.Mode,
+			err,
+		)
 	}
-	if err := r.db.QueryRowContext(ctx, `
-		INSERT INTO sessions (user_id, type, mode, status, total_questions)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id
-	`, s.UserID, s.Type, s.Mode, s.Status, s.TotalQuestions).Scan(&s.ID); err != nil {
-		return fmt.Errorf("SessionRepository.CreateSession user_id=%d type=%s mode=%s: %w",
-			s.UserID, s.Type, s.Mode, err)
+	s.ID = sessionID
+	return nil
+}
+
+// CreateSessionInTx returns the generated ID without publishing it on the model before commit.
+func (r *SessionRepository) CreateSessionInTx(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	session *model.Session,
+) (int, error) {
+	sessionID, err := insertSession(
+		ctx,
+		tx,
+		session,
+	)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"SessionRepository.CreateSessionInTx user_id=%d type=%s mode=%s: %w",
+			session.UserID,
+			session.Type,
+			session.Mode,
+			err,
+		)
+	}
+	return sessionID, nil
+}
+
+type sessionRowQueryer interface {
+	QueryRowContext(
+		ctx context.Context,
+		query string,
+		args ...any,
+	) *sql.Row
+}
+
+func insertSession(
+	ctx context.Context,
+	queryer sessionRowQueryer,
+	session *model.Session,
+) (int, error) {
+	if !session.Mode.IsValid() {
+		return 0, fmt.Errorf(
+			"invalid mode=%q",
+			session.Mode,
+		)
+	}
+	var sessionID int
+	if err := queryer.QueryRowContext(
+		ctx,
+		createSessionQuery,
+		session.UserID,
+		session.Type,
+		session.Mode,
+		session.Status,
+		session.TotalQuestions,
+	).Scan(&sessionID); err != nil {
+		return 0, err
+	}
+	return sessionID, nil
+}
+
+// CreateSessionMaterialsInTx inserts ordered material links on the caller's transaction.
+func (r *SessionRepository) CreateSessionMaterialsInTx(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	sessionID int,
+	materialIDs []int,
+) error {
+	if len(materialIDs) == 0 {
+		return fmt.Errorf(
+			"SessionRepository.CreateSessionMaterialsInTx session_id=%d empty materials",
+			sessionID,
+		)
+	}
+	// Preserve the selected material order in the session join rows.
+	sessionMaterials := make(
+		[]model.SessionMaterial,
+		len(materialIDs),
+	)
+	for order, materialID := range materialIDs {
+		sessionMaterials[order] = model.SessionMaterial{
+			SessionID:     sessionID,
+			MaterialID:    materialID,
+			MaterialOrder: order,
+		}
+	}
+	if _, err := tx.NamedExecContext(
+		ctx,
+		`
+		INSERT INTO session_materials (session_id, material_id, material_order)
+		VALUES (:session_id, :material_id, :material_order)
+	`,
+		sessionMaterials,
+	); err != nil {
+		return fmt.Errorf(
+			"SessionRepository.CreateSessionMaterialsInTx session_id=%d count=%d: %w",
+			sessionID,
+			len(sessionMaterials),
+			err,
+		)
 	}
 	return nil
 }
 
-func (r *SessionRepository) GetByID(ctx context.Context, id int) (*model.Session, error) {
+func (r *SessionRepository) GetByID(
+	ctx context.Context,
+	id int,
+) (*model.Session, error) {
 	s := &model.Session{}
-	if err := r.db.GetContext(ctx, s, `SELECT * FROM sessions WHERE id = $1`, id); err != nil {
-		return nil, fmt.Errorf("SessionRepository.GetByID id=%d: %w", id, err)
+	if err := r.db.GetContext(
+		ctx,
+		s,
+		`SELECT * FROM sessions WHERE id = $1`,
+		id,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"SessionRepository.GetByID id=%d: %w",
+			id,
+			err,
+		)
 	}
 	return s, nil
 }
@@ -60,42 +184,81 @@ func (r *SessionRepository) GetByID(ctx context.Context, id int) (*model.Session
 // GetOldestUnfinished returns the highest-priority unfinished session for a user.
 // In-progress sessions take precedence over pending sessions; within a status,
 // the oldest created session is returned. A missing session is not an error.
-func (r *SessionRepository) GetOldestUnfinished(ctx context.Context, userID int64) (*model.Session, error) {
+func (r *SessionRepository) GetOldestUnfinished(
+	ctx context.Context,
+	userID int64,
+) (*model.Session, error) {
 	s := &model.Session{}
-	if err := r.db.GetContext(ctx, s, getOldestUnfinishedQuery, userID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	if err := r.db.GetContext(
+		ctx,
+		s,
+		getOldestUnfinishedQuery,
+		userID,
+	); err != nil {
+		if errors.Is(
+			err,
+			sql.ErrNoRows,
+		) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("SessionRepository.GetOldestUnfinished user_id=%d: %w", userID, err)
+		return nil, fmt.Errorf(
+			"SessionRepository.GetOldestUnfinished user_id=%d: %w",
+			userID,
+			err,
+		)
 	}
 	return s, nil
 }
 
 // CountUnfinished returns the number of pending and in-progress sessions for a user.
 // Both quiz and study sessions are included in the count.
-func (r *SessionRepository) CountUnfinished(ctx context.Context, userID int64) (int, error) {
+func (r *SessionRepository) CountUnfinished(
+	ctx context.Context,
+	userID int64,
+) (int, error) {
 	var count int
-	if err := r.db.GetContext(ctx, &count, countUnfinishedQuery, userID); err != nil {
-		return 0, fmt.Errorf("SessionRepository.CountUnfinished user_id=%d: %w", userID, err)
+	if err := r.db.GetContext(
+		ctx,
+		&count,
+		countUnfinishedQuery,
+		userID,
+	); err != nil {
+		return 0, fmt.Errorf(
+			"SessionRepository.CountUnfinished user_id=%d: %w",
+			userID,
+			err,
+		)
 	}
 	return count, nil
 }
 
 // CountUnfinishedBatch returns the number of pending/in-progress sessions for multiple users in a single query.
-func (r *SessionRepository) CountUnfinishedBatch(ctx context.Context, userIDs []int64) (map[int64]int, error) {
-	counts := make(map[int64]int, len(userIDs))
+func (r *SessionRepository) CountUnfinishedBatch(
+	ctx context.Context,
+	userIDs []int64,
+) (map[int64]int, error) {
+	counts := make(
+		map[int64]int,
+		len(userIDs),
+	)
 	if len(userIDs) == 0 {
 		return counts, nil
 	}
 
-	query, args, err := sqlx.In(`
+	query, args, err := sqlx.In(
+		`
 		SELECT user_id, COUNT(*) as count
 		FROM sessions
 		WHERE user_id IN (?) AND status IN ('in_progress', 'pending')
 		GROUP BY user_id
-	`, userIDs)
+	`,
+		userIDs,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("SessionRepository.CountUnfinishedBatch sqlx.In: %w", err)
+		return nil, fmt.Errorf(
+			"SessionRepository.CountUnfinishedBatch sqlx.In: %w",
+			err,
+		)
 	}
 	query = r.db.Rebind(query)
 
@@ -104,8 +267,16 @@ func (r *SessionRepository) CountUnfinishedBatch(ctx context.Context, userIDs []
 		Count  int   `db:"count"`
 	}
 	var results []userCount
-	if err := r.db.SelectContext(ctx, &results, query, args...); err != nil {
-		return nil, fmt.Errorf("SessionRepository.CountUnfinishedBatch select: %w", err)
+	if err := r.db.SelectContext(
+		ctx,
+		&results,
+		query,
+		args...,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"SessionRepository.CountUnfinishedBatch select: %w",
+			err,
+		)
 	}
 
 	for _, rc := range results {
@@ -120,13 +291,23 @@ func (r *SessionRepository) GetSessionsByStatus(
 	status config.SessionStatus,
 ) ([]model.Session, error) {
 	var sessions []model.Session
-	if err := r.db.SelectContext(ctx, &sessions, `
+	if err := r.db.SelectContext(
+		ctx,
+		&sessions,
+		`
 		SELECT * FROM sessions
 		WHERE user_id = $1 AND status = $2
 		ORDER BY started_at DESC NULLS LAST, created_at DESC
-	`, userID, status); err != nil {
-		return nil, fmt.Errorf("SessionRepository.GetSessionsByStatus user_id=%d status=%s: %w",
-			userID, status, err)
+	`,
+		userID,
+		status,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"SessionRepository.GetSessionsByStatus user_id=%d status=%s: %w",
+			userID,
+			status,
+			err,
+		)
 	}
 	return sessions, nil
 }
@@ -134,57 +315,114 @@ func (r *SessionRepository) GetSessionsByStatus(
 // ListInProgress returns all in-progress sessions for all users.
 func (r *SessionRepository) ListInProgress(ctx context.Context) ([]model.Session, error) {
 	var sessions []model.Session
-	if err := r.db.SelectContext(ctx, &sessions, `
+	if err := r.db.SelectContext(
+		ctx,
+		&sessions,
+		`
 		SELECT * FROM sessions
 		WHERE status = 'in_progress' AND mode = 'quiz'
 		ORDER BY started_at DESC NULLS LAST, created_at DESC
-	`); err != nil {
-		return nil, fmt.Errorf("SessionRepository.ListInProgress: %w", err)
+	`,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"SessionRepository.ListInProgress: %w",
+			err,
+		)
 	}
 	return sessions, nil
 }
 
 // Start marks a session as in_progress.
-func (r *SessionRepository) Start(ctx context.Context, id int) error {
-	result, err := r.db.ExecContext(ctx, `
+func (r *SessionRepository) Start(
+	ctx context.Context,
+	id int,
+) error {
+	result, err := r.db.ExecContext(
+		ctx,
+		`
 		UPDATE sessions SET status = 'in_progress', started_at = NOW() WHERE id = $1
-	`, id)
+	`,
+		id,
+	)
 	if err != nil {
-		return fmt.Errorf("SessionRepository.Start id=%d: %w", id, err)
+		return fmt.Errorf(
+			"SessionRepository.Start id=%d: %w",
+			id,
+			err,
+		)
 	}
 	if rows, err := result.RowsAffected(); err != nil {
-		return fmt.Errorf("SessionRepository.Start id=%d rows affected: %w", id, err)
+		return fmt.Errorf(
+			"SessionRepository.Start id=%d rows affected: %w",
+			id,
+			err,
+		)
 	} else if rows == 0 {
-		return fmt.Errorf("SessionRepository.Start id=%d: session not found", id)
+		return fmt.Errorf(
+			"SessionRepository.Start id=%d: session not found",
+			id,
+		)
 	}
 	return nil
 }
 
-func (r *SessionRepository) Complete(ctx context.Context, id int, correctCount int) error {
-	result, err := r.db.ExecContext(ctx, `
+func (r *SessionRepository) Complete(
+	ctx context.Context,
+	id int,
+	correctCount int,
+) error {
+	result, err := r.db.ExecContext(
+		ctx,
+		`
 		UPDATE sessions SET
 			status = 'completed', correct_count = $2, completed_at = NOW()
 		WHERE id = $1
-	`, id, correctCount)
+	`,
+		id,
+		correctCount,
+	)
 	if err != nil {
-		return fmt.Errorf("SessionRepository.Complete id=%d: %w", id, err)
+		return fmt.Errorf(
+			"SessionRepository.Complete id=%d: %w",
+			id,
+			err,
+		)
 	}
 	if rows, err := result.RowsAffected(); err != nil {
-		return fmt.Errorf("SessionRepository.Complete id=%d rows affected: %w", id, err)
+		return fmt.Errorf(
+			"SessionRepository.Complete id=%d rows affected: %w",
+			id,
+			err,
+		)
 	} else if rows == 0 {
-		return fmt.Errorf("SessionRepository.Complete id=%d: session not found", id)
+		return fmt.Errorf(
+			"SessionRepository.Complete id=%d: session not found",
+			id,
+		)
 	}
 	return nil
 }
 
-func (r *SessionRepository) GetTodaySessions(ctx context.Context, userID int64) ([]model.Session, error) {
+func (r *SessionRepository) GetTodaySessions(
+	ctx context.Context,
+	userID int64,
+) ([]model.Session, error) {
 	var sessions []model.Session
-	if err := r.db.SelectContext(ctx, &sessions, `
+	if err := r.db.SelectContext(
+		ctx,
+		&sessions,
+		`
 		SELECT * FROM sessions
 		WHERE user_id = $1 AND created_at::date = CURRENT_DATE
 		ORDER BY created_at
-	`, userID); err != nil {
-		return nil, fmt.Errorf("SessionRepository.GetTodaySessions user_id=%d: %w", userID, err)
+	`,
+		userID,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"SessionRepository.GetTodaySessions user_id=%d: %w",
+			userID,
+			err,
+		)
 	}
 	return sessions, nil
 }

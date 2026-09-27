@@ -32,12 +32,22 @@
 
 - [ ] Cloudflare Tunnel(cloudflared/trycloudflare) Korea-block 노출 대응 — 손글씨 Mini App ingress가 Cloudflare 의존이라 한국 재차단 시 통째 중단 위험(현시점 도달은 정상). **(Case A 선결: 자체 도메인+named tunnel vs 비-CF ingress vs accept+monitor 미결)** see [docs/todos/cloudflare_korea_tunnel_risk.md](docs/todos/cloudflare_korea_tunnel_risk.md)
 
-- [ ] Tip 및 Audio Top-up 시스템 유지보수 Cron 분리 — 세션 발송과 무관한 시스템 차원의 Tip 보충 및 청해 음성 사전 생성 작업을 독립 Cron으로 분리. see [docs/todos/decouple_tip_audio_topup_cron.md](docs/todos/decouple_tip_audio_topup_cron.md)
-
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-28 | Study Redis 진행 상태의 불필요한 version 필드·검사 제거 (ADR-063) | [2609280008_remove_study_session_version.md](docs/workthrough/2609/2609280008_remove_study_session_version.md) |
+| 2026-09-27 | Quiz·Study Redis 진행 상태의 `workingSetStore` 포장 제거, 저장소 직접 호출 및 손상 상태 검사 통합 (ADR-062) | [2609272349_simplify_session_working_set.md](docs/workthrough/2609/2609272349_simplify_session_working_set.md) |
+| 2026-09-27 | Study 세션 생성의 트랜잭션 경계를 서비스 `WithinTx`로 이동하고 세션·자료 INSERT 분리 (ADR-061) | [2609272139_study_service_transaction_boundary.md](docs/workthrough/2609/2609272139_study_service_transaction_boundary.md) |
+| 2026-09-27 | Study 세션·자료 연결 INSERT를 단일 PostgreSQL 트랜잭션으로 묶어 실패 시 세션 행 롤백 | [2609272049_study_session_atomic_create.md](docs/workthrough/2609/2609272049_study_session_atomic_create.md) |
+| 2026-09-27 | Study 세션 자료 연결 저장을 SessionRepository로 통합하고 분리 저장소·주입 제거 | [2609272030_study_session_repository_merge.md](docs/workthrough/2609/2609272030_study_session_repository_merge.md) |
+| 2026-09-27 | VS Code 저장 시 Go 매개변수·인자별 줄바꿈 적용, 길이와 무관하게 2개 이상인 목록 자동 정리 | [2609271942_vscode_parameter_format.md](docs/workthrough/2609/2609271942_vscode_parameter_format.md) |
+| 2026-09-26 | 아키텍처 단순화 설계와 1단계 완료: Redis 저장 구현 분리·기능별 계약 주입·기존 데이터 호환 유지 (ADR-059·060, 9/27 파일·저장 타입·생성자 정리와 Quiz/Study 이름 구분, 2·3단계 미착수) | [2609262045_redis_access_boundary.md](docs/workthrough/2609/2609262045_redis_access_boundary.md) |
+| 2026-09-26 | 서버 시작·콘텐츠 저장의 서비스 경계 정리 및 서버 파일 분리, 미사용 파이프라인 초기화 제거·자동 수집 비활성 유지 (ADR-057·058) | [2609261832_server_startup_service_boundary.md](docs/workthrough/2609/2609261832_server_startup_service_boundary.md) |
+| 2026-09-26 | 신규 청해 대화 음성에 A/B 두 화자 적용, 기존 음성 유지 (ADR-056) | [2609261820_two_voice_listening_new_audio.md](docs/workthrough/2609/2609261820_two_voice_listening_new_audio.md) |
+| 2026-09-26 | 미사용 설정·환경변수 및 설정 파일 정리, TTS 활성화 설정 제거·LLM 설정 통합 (ADR-054·055) | [2609261707_config_env_cleanup.md](docs/workthrough/2609/2609261707_config_env_cleanup.md) |
+| 2026-09-26 | 사용자별 30분 cron만 유지, 전역 발송·자동 수집 cron과 상한 설정 제거, 미완료 세션 3개 재알림 규칙 유지 (ADR-052·053) | [2609261755_single_push_cron.md](docs/workthrough/2609/2609261755_single_push_cron.md) |
+| 2026-09-25 | Study·Quiz 자료 유지 복습·제외 메뉴와 목록/복원, 공통 기한·자료별 유지 문제 제한·결과별 간격 전환, 소유권 검증과 기존 세션 보존 (ADR-051) | [2609251103_user_material_preferences.md](docs/workthrough/2609/2609251103_user_material_preferences.md) |
 | 2026-09-20 | JLPT N4 vocab_paraphrase(유의 표현) 부실 해설 전수 개편 (120문항 문장 해석·정답 근거·4개 선지 개별 어휘 뜻 보강 및 DB 반영) | [2609202045_fix_vocab_paraphrase_explanations.md](docs/workthrough/2609/2609202045_fix_vocab_paraphrase_explanations.md) |
 | 2026-09-19 | 정규 Quiz 현재 레벨 최소 80%·최근 Study 자료 분산 우선, 독해·청해 예약 및 추가 복습 현재 레벨 우선 (ADR-050) | [2609192240_quiz_current_level_focus.md](docs/workthrough/2609/2609192240_quiz_current_level_focus.md) |
 | 2026-09-19 | Study 복습 부족분을 현재 레벨 우선 신규 단어로 보충해 아침 20·저녁 24개 유지, 신규 문법·독해 상한과 SRS 간격 보존 (ADR-049) | [2609192206_study_new_vocabulary_topup.md](docs/workthrough/2609/2609192206_study_new_vocabulary_topup.md) |

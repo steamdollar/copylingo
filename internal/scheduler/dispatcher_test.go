@@ -2,47 +2,61 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
 
-type mockRedisForDispatcher struct {
-	redis.Cmdable
-	mu     sync.Mutex
-	values map[string]string
+type mockPushClaims struct {
+	claimed bool
+	err     error
+	calls   []pushClaimCall
 }
 
-func newMockRedis() *mockRedisForDispatcher {
-	return &mockRedisForDispatcher{values: make(map[string]string)}
+type pushClaimCall struct {
+	userID int64
+	slot   model.SessionSlot
+	today  string
 }
 
-func (m *mockRedisForDispatcher) SetNX(
-	ctx context.Context,
-	key string,
-	value any,
-	expiration time.Duration,
-) *redis.BoolCmd {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.values[key]; ok {
-		return redis.NewBoolResult(false, nil)
+func (m *mockPushClaims) TryClaim(_ context.Context, userID int64, slot model.SessionSlot, today string) (bool, error) {
+	m.calls = append(m.calls, pushClaimCall{userID: userID, slot: slot, today: today})
+	if m.err != nil {
+		return false, m.err
 	}
-	m.values[key] = fmt.Sprint(value)
-	return redis.NewBoolResult(true, nil)
+	if m.claimed {
+		return false, nil
+	}
+	m.claimed = true
+	return true, nil
 }
 
 type mockDispatcherPusher struct {
 	mu          sync.Mutex
 	quizPushes  []int64
 	studyPushes []int64
+}
+
+type schedulerSessionQueryRepoStub struct {
+	session         *model.Session
+	err             error
+	unfinishedCount int
+}
+
+func (r *schedulerSessionQueryRepoStub) GetOldestUnfinished(context.Context, int64) (*model.Session, error) {
+	return r.session, r.err
+}
+
+func (r *schedulerSessionQueryRepoStub) CountUnfinished(context.Context, int64) (int, error) {
+	return r.unfinishedCount, r.err
+}
+
+func (r *schedulerSessionQueryRepoStub) CountUnfinishedBatch(context.Context, []int64) (map[int64]int, error) {
+	return nil, r.err
 }
 
 func (p *mockDispatcherPusher) PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error {
@@ -61,7 +75,7 @@ func (p *mockDispatcherPusher) PushStudySession(ctx context.Context, chatID int6
 
 func TestDispatcher_RedisIdempotency(t *testing.T) {
 	ctx := context.Background()
-	rdb := newMockRedis()
+	claims := &mockPushClaims{}
 	pusher := &mockDispatcherPusher{}
 
 	// Stub session query returning an unfinished session so reminder succeeds
@@ -71,11 +85,7 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 		SessionQuery: service.NewSessionQueryService(sqStub),
 	}
 
-	cfg := &config.Config{
-		Schedule: config.ScheduleConfig{MaxUnfinishedSessions: 3},
-	}
-
-	d := newSessionDispatcher(cfg, services, pusher, rdb)
+	d := newSessionDispatcher(services, pusher, claims)
 	user := model.User{ID: 1001, Language: "ja", ProficiencyLevel: "N5"}
 
 	// 1st dispatch: Should acquire lock and push
@@ -93,6 +103,33 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 	if len(pusher.studyPushes) != 1 {
 		t.Fatalf("studyPushes = %d after duplicate, want 1 (skipped)", len(pusher.studyPushes))
 	}
+	if len(claims.calls) != 2 || claims.calls[0] != claims.calls[1] {
+		t.Fatalf("claim calls = %+v, want two identical user/slot/date claims", claims.calls)
+	}
+	if claims.calls[0].userID != user.ID || claims.calls[0].slot != model.SessionSlotMorningStudy {
+		t.Fatalf("claim call = %+v, want user %d and slot %s", claims.calls[0], user.ID, model.SessionSlotMorningStudy)
+	}
+	if _, err := time.Parse("2006-01-02", claims.calls[0].today); err != nil {
+		t.Fatalf("claim date = %q, want YYYY-MM-DD: %v", claims.calls[0].today, err)
+	}
+}
+
+func TestDispatcher_ClaimErrorFailsOpen(t *testing.T) {
+	claims := &mockPushClaims{err: errors.New("redis unavailable")}
+	pusher := &mockDispatcherPusher{}
+	services := &service.Services{
+		SessionQuery: service.NewSessionQueryService(&schedulerSessionQueryRepoStub{
+			session: &model.Session{ID: 10, Mode: model.SessionModeStudy},
+		}),
+	}
+	d := newSessionDispatcher(services, pusher, claims)
+
+	if err := d.dispatchUser(context.Background(), model.User{ID: 1001}, model.SessionSlotMorningStudy, 3); err != nil {
+		t.Fatalf("dispatchUser() error = %v, want fail-open success", err)
+	}
+	if len(pusher.studyPushes) != 1 {
+		t.Fatalf("study pushes = %d, want 1 after claim error", len(pusher.studyPushes))
+	}
 }
 
 func TestDispatcher_BacklogRemind(t *testing.T) {
@@ -105,11 +142,7 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 		SessionQuery: service.NewSessionQueryService(sqStub),
 	}
 
-	cfg := &config.Config{
-		Schedule: config.ScheduleConfig{MaxUnfinishedSessions: 3},
-	}
-
-	d := newSessionDispatcher(cfg, services, pusher, nil)
+	d := newSessionDispatcher(services, pusher, nil)
 	user := model.User{ID: 2002, Language: "ja", ProficiencyLevel: "N5"}
 
 	// Unfinished count = 3 >= max (3): Should remind rather than build
@@ -144,11 +177,7 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 		SessionQuery: service.NewSessionQueryService(sqStub),
 	}
 
-	cfg := &config.Config{
-		Schedule: config.ScheduleConfig{MaxUnfinishedSessions: 3},
-	}
-
-	d := newSessionDispatcher(cfg, services, pusher, nil)
+	d := newSessionDispatcher(services, pusher, nil)
 	// Higher limiter rate for fast testing
 	d.limiter = newRateLimiter(500)
 	defer d.limiter.Stop()

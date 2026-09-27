@@ -53,35 +53,6 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 	}
 }
 
-func TestValidateStudySessionPlan(t *testing.T) {
-	valid := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
-		{Category: model.MaterialCategoryVocabulary, NewCount: 2, ReviewCount: 1},
-		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 0},
-	}}
-	if err := validateStudySessionPlan(valid); err != nil {
-		t.Fatalf("validateStudySessionPlan(valid) error = %v", err)
-	}
-
-	for name, plan := range map[string]model.StudySessionPlan{
-		"negative": {Quotas: []model.StudyMaterialQuota{{
-			Category: model.MaterialCategoryVocabulary, NewCount: -1,
-		}}},
-		"unsupported": {Quotas: []model.StudyMaterialQuota{{
-			Category: model.MaterialCategoryKana, NewCount: 1,
-		}}},
-		"duplicate": {Quotas: []model.StudyMaterialQuota{
-			{Category: model.MaterialCategoryVocabulary, NewCount: 1},
-			{Category: model.MaterialCategoryVocabulary, ReviewCount: 1},
-		}},
-	} {
-		t.Run(name, func(t *testing.T) {
-			if err := validateStudySessionPlan(plan); err == nil {
-				t.Fatalf("validateStudySessionPlan(%s) error = nil", name)
-			}
-		})
-	}
-}
-
 func TestStudySessionMaterialsQueryUsesQuotaBucketsAndFallbacks(t *testing.T) {
 	for _, want := range []string{
 		"jsonb_to_recordset($5::jsonb)",
@@ -125,7 +96,7 @@ func TestStudySessionMaterialsQueryPolicyGuards(t *testing.T) {
 // This test is opt-in because the default repository tests do not require a
 // running database. It uses only temporary tables inside a rolled-back
 // transaction, so it cannot alter the configured database.
-func TestGetForStudySessionPostgres(t *testing.T) {
+func TestGetMaterialsByPlanPostgres(t *testing.T) {
 	dsn := os.Getenv("COPYLINGO_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("COPYLINGO_TEST_DATABASE_URL is not set")
@@ -147,6 +118,9 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 	defer tx.Rollback()
 
 	for _, statement := range []string{
+		temporaryMaterialPreferencesTable,
+		temporaryPreferenceQuestionsTable,
+		`CREATE TEMP TABLE user_question_progress (user_id bigint, question_id integer, next_review_at timestamptz) ON COMMIT DROP`,
 		`CREATE TEMP TABLE materials (
 			id integer PRIMARY KEY, material_key text NOT NULL, content_id integer,
 			category text NOT NULL, language text NOT NULL, proficiency_level text NOT NULL,
@@ -155,7 +129,7 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 		) ON COMMIT DROP`,
 		`CREATE TEMP TABLE user_material_progress (
 			user_id bigint NOT NULL, material_id integer NOT NULL,
-			next_review_at timestamptz, PRIMARY KEY (user_id, material_id)
+			next_review_at timestamptz, times_studied integer NOT NULL DEFAULT 1, PRIMARY KEY (user_id, material_id)
 		) ON COMMIT DROP`,
 		`CREATE TEMP TABLE sessions (
 			id integer PRIMARY KEY, user_id bigint NOT NULL, mode text NOT NULL, status text NOT NULL
@@ -198,7 +172,7 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 1},
 		{Category: model.MaterialCategoryReading, NewCount: 1},
 	}}
-	got, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, morning)
+	got, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, morning)
 	if err != nil {
 		t.Fatalf("morning selection failed: %v", err)
 	}
@@ -228,7 +202,7 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
 		{Category: model.MaterialCategoryReading, ReviewCount: 2},
 	}}
-	eveningMaterials, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, evening)
+	eveningMaterials, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, evening)
 	if err != nil {
 		t.Fatalf("evening selection failed: %v", err)
 	}
@@ -296,7 +270,7 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 			},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
-				materials, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, tt.plan)
+				materials, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, tt.plan)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -343,7 +317,7 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 	fallbackPlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, NewCount: 4},
 	}}
-	fallback, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, fallbackPlan)
+	fallback, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, fallbackPlan)
 	if err != nil {
 		t.Fatalf("same-category fallback failed: %v", err)
 	}
@@ -367,7 +341,7 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 		{Category: model.MaterialCategoryVocabulary, ReviewCount: 0},
 		{Category: model.MaterialCategoryGrammar, NewCount: 2},
 	}}
-	otherDue, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, otherDuePlan)
+	otherDue, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, otherDuePlan)
 	if err != nil {
 		t.Fatalf("other-category fallback failed: %v", err)
 	}
@@ -383,7 +357,7 @@ func TestGetForStudySessionPostgres(t *testing.T) {
 	scarcePlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, ReviewCount: 10},
 	}}
-	scarce, err := repo.GetForStudySession(ctx, 42, "ja", "N4", levels, scarcePlan)
+	scarce, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, scarcePlan)
 	if err != nil {
 		t.Fatalf("scarce selection failed: %v", err)
 	}

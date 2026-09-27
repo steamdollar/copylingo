@@ -133,7 +133,7 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 func TestStartStudy_ResumeInProgress(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	mSessionStore := &mockSessionStore{
 		getSessionsByStatusFn: func(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
 			if status == config.SessionStatusInProgress {
@@ -142,14 +142,14 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 			return nil, nil
 		},
 	}
-	active := service.NewActiveSessionService(nil, rdb, nil)
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
 	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder: sb,
-			ActiveSession:  active,
+			SessionBuilder:    sb,
+			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -163,10 +163,10 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 	}
 
 	// Setup active session state
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: 10},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				Question: model.Question{
 					Prompt:  "Q1",
@@ -177,8 +177,7 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 			},
 		},
 	}
-	raw, _ := json.Marshal(state)
-	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(10)] = string(raw)
+	seedQuizState(stateStores, state)
 
 	sf.StartStudy(ctx, cb)
 
@@ -332,18 +331,18 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 func TestHandleSessionCallback(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	mSessionStore := &mockSessionStore{
 		startFn: func(ctx context.Context, id int) error { return nil },
 	}
 	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
-	active := service.NewActiveSessionService(nil, rdb, nil)
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder: sb,
-			ActiveSession:  active,
+			SessionBuilder:    sb,
+			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -356,7 +355,7 @@ func TestHandleSessionCallback(t *testing.T) {
 				MessageID: 456,
 			},
 		}
-		// ActiveSession.CreateFromDB will fail because sessionStore.GetByID is nil.
+		// QuizActiveSession.CreateFromDB will fail because sessionStore.GetByID is nil.
 		// Let's just mock StartSession and see it logs and returns.
 		// Wait, startSession calls showQuestion which needs active session.
 		// I'll skip deep testing here as it requires complex mocks,
@@ -368,7 +367,7 @@ func TestHandleSessionCallback(t *testing.T) {
 func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	startCalls := 0
 	mSessionStore := &mockSessionStore{
 		startFn: func(ctx context.Context, id int) error {
@@ -377,23 +376,23 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 		},
 	}
 	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
-	active := service.NewActiveSessionService(nil, rdb, nil)
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder: sb,
-			ActiveSession:  active,
+			SessionBuilder:    sb,
+			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)
 
 	sessionID := 31
 	answered := true
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID, UserID: 123, Mode: model.SessionModeQuiz},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &answered},
 				Question:        model.Question{ID: 1, Prompt: "첫 문제", Type: model.QuestionMultipleChoice},
@@ -409,7 +408,7 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 	cb := cbWithMessage("session:31:start", 123, 456, 123)
 
 	sf.HandleSessionCallback(ctx, cb)
@@ -438,33 +437,33 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 }
 
 type quizStartActiveRepo struct {
-	state *model.ActiveSessionState
+	state *model.QuizActiveSessionState
 }
 
 func (r *quizStartActiveRepo) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
-) (*model.ActiveSessionState, error) {
+) (*model.QuizActiveSessionState, error) {
 	return r.state, nil
 }
 
-func (r *quizStartActiveRepo) FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error {
+func (r *quizStartActiveRepo) FlushQuizActiveSession(ctx context.Context, state *model.QuizActiveSessionState) error {
 	return nil
 }
 
 func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
-	dbState := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	stateStores := newTestInteractionStores()
+	dbState := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{
 			ID:     32,
 			UserID: 123,
 			Mode:   model.SessionModeQuiz,
 			Status: model.SessionPending,
 		},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1},
 				Question: model.Question{
@@ -483,16 +482,16 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 			return nil
 		},
 	}
-	active := service.NewActiveSessionService(repo, rdb, nil)
+	active := service.NewQuizActiveSessionService(repo, stateStores.quiz, nil)
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder: service.NewSessionBuilderService(nil, store, nil, nil),
-			ActiveSession:  active,
+			SessionBuilder:    service.NewSessionBuilderService(nil, store, nil, nil),
+			QuizActiveSession: active,
 		},
 	}
-	storeActiveState(t, rdb, 32, dbState)
+	storeActiveState(t, stateStores, 32, dbState)
 
 	NewSessionFlow(b).HandleSessionCallback(ctx, cbWithMessage("session:32:start", 123, 456, 123))
 

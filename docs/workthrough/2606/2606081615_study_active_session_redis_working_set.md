@@ -22,7 +22,7 @@ Question Session은 Redis Active Session Working Set에 답변 진행 상태를 
 - `internal/service/working_set.go`
   - Redis Working Set 공통 저장소를 추가했다.
   - state validation, Redis miss, corrupt state 삭제, marshal/unmarshal 처리를 공통화했다.
-- `internal/service/active_session.go`
+- `internal/service/quiz_active_session.go`
   - 기존 Quiz Active Session의 Redis 직접 접근 로직을 `workingSetStore[model.ActiveSessionState]`로 교체했다.
   - 외부 동작은 유지했다.
 - `internal/model/study_active_session.go`

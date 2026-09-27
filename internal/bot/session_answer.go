@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -22,7 +21,7 @@ func (sf *SessionFlow) processAnswer(
 	sessionID, questionID int,
 	optionIdx int,
 ) {
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		return
 	}
@@ -54,28 +53,30 @@ func (sf *SessionFlow) processAnswer(
 
 // HandleTextInput intercepts text messages if there is an active text question.
 func (sf *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Message) bool {
-	key := config.UserActiveQuestionRedisKey.Format(msg.Chat.ID)
-	activeQuestionState, err := sf.bot.rdb.Get(ctx, key).Result()
-	if err != nil {
+	if sf.bot.input == nil {
 		return false
 	}
-
-	parts := strings.Split(activeQuestionState, ":")
-	if len(parts) != 2 {
+	activeQuestion, err := sf.bot.input.GetActiveQuestion(ctx, msg.Chat.ID)
+	if err != nil || activeQuestion == nil {
 		return false
 	}
-	sessionID, _ := strconv.Atoi(parts[0])
-	questionIdx, _ := strconv.Atoi(parts[1])
+	_ = sf.bot.input.DeleteActiveQuestion(ctx, msg.Chat.ID)
 
-	sf.bot.rdb.Del(ctx, key)
-
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
-	if err != nil || questionIdx >= len(state.Items) {
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, activeQuestion.SessionID)
+	if err != nil || activeQuestion.QuestionIndex >= len(state.Items) {
 		return false
 	}
-	questionID := state.Items[questionIdx].SessionQuestion.QuestionID
+	questionID := state.Items[activeQuestion.QuestionIndex].SessionQuestion.QuestionID
 
-	sf.processAnswerText(ctx, msg.Chat.ID, msg.From, sessionID, questionID, strings.TrimSpace(msg.Text), nil)
+	sf.processAnswerText(
+		ctx,
+		msg.Chat.ID,
+		msg.From,
+		activeQuestion.SessionID,
+		questionID,
+		strings.TrimSpace(msg.Text),
+		nil,
+	)
 	return true
 }
 
@@ -91,13 +92,13 @@ func (sf *SessionFlow) processAnswerText(
 		slog.Int("session_id", sessionID),
 		slog.Int("question_id", questionID),
 	)
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get active session for answer",
 			"event", "telegram.answer.session_lookup_failed",
 			"error", err,
 		)
-		sf.showActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
 	item, currentIdx, ok := state.CurrentItemByQuestionID(questionID)
@@ -137,14 +138,14 @@ func (sf *SessionFlow) processAnswerText(
 			errMsg := tgbotapi.NewMessage(chatID, "⚠️ 시스템 설정 문제로 현재 AI 주관식 채점이 불가능합니다. 임시로 오답 처리하고 넘어갑니다.")
 			sf.bot.api.Send(errMsg)
 			isCorrect = false
-			if recordErr := sf.bot.services.ActiveSession.RecordAnswer(
+			if recordErr := sf.bot.services.QuizActiveSession.RecordAnswer(
 				ctx,
 				sessionID,
 				questionID,
 				selectedAnswer,
 				false,
 			); recordErr != nil {
-				if errors.Is(recordErr, service.ErrActiveSessionAlreadyAnswered) {
+				if errors.Is(recordErr, service.ErrQuizActiveSessionAlreadyAnswered) {
 					sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
 					return
 				}
@@ -154,7 +155,7 @@ func (sf *SessionFlow) processAnswerText(
 				)
 				return
 			}
-		} else if errors.Is(err, service.ErrActiveSessionAlreadyAnswered) {
+		} else if errors.Is(err, service.ErrQuizActiveSessionAlreadyAnswered) {
 			sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
 			return
 		} else {
@@ -202,6 +203,14 @@ func (sf *SessionFlow) processAnswerText(
 			fmt.Sprintf(config.FormatQuestionAskLLM, sessionID, questionID)))
 	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(row)
+	if question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
+		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				"⚙️ 연결 자료 설정",
+				fmt.Sprintf(config.FormatQuestionPolicy, sessionID, questionID),
+			),
+		))
+	}
 
 	if editMessageID != nil {
 		sf.bot.EditMessage(chatID, *editMessageID, text, &keyboard)
@@ -222,7 +231,7 @@ func (sf *SessionFlow) redirectToNextUnansweredQuestion(
 ) {
 	nextIdx, err := sf.nextUnansweredQuestionIndex(ctx, sessionID)
 	if err != nil {
-		sf.showActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
 		return
 	}
 	sf.showQuestion(ctx, chatID, editMessageID, sessionID, nextIdx)

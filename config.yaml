@@ -23,14 +23,9 @@ telegram:
 llm:
   api_key: ""  # Set via env: COPYLINGO_LLM_API_KEY
   model: gemini-3.5-flash-lite
-
-tts:
-  enabled: true
-  model: gemini-2.5-flash-preview-tts  # Gemini native TTS (ADR-031); reuses llm.api_key
-  cred_path: ""        # (legacy GCP) unused by the Gemini native path
-  audio_dir: ./data/audio  # (legacy local FS) superseded by object storage (ADR-032)
-  language_code: ja-JP
-  voice_name: Kore     # Gemini prebuilt voice (Kore/Puck/Zephyr/...)
+  tts_model: gemini-2.5-flash-preview-tts  # Gemini native TTS (ADR-031); reuses llm.api_key
+  tts_voice_name: Kore                     # Gemini prebuilt voice (Kore/Puck/Zephyr/...)
+  tts_voice_name_b: Puck                   # Speaker B in listening dialogues
 
 storage:               # S3-compatible object store for TTS audio (ADR-032)
   endpoint: http://localhost:9000  # MinIO; empty => AWS S3 default endpoint
@@ -39,18 +34,6 @@ storage:               # S3-compatible object store for TTS audio (ADR-032)
   access_key: minioadmin           # override via env in prod
   secret_key: minioadmin           # override via env in prod
   use_path_style: true             # true for MinIO, false for AWS S3
-
-schedule:
-  max_unfinished_sessions: 3         # 사용자별 자동 세션 미완료 상한 (1~3)
-  content_collect_cron: "0 3 * * *"    # 매일 03:00 - 콘텐츠 수집
-  dynamic_push_cron: "*/30 * * * *"    # 30분 단위 개인화 푸시 엔진 (ADR-048)
-  # Legacy crons below are superseded by dynamic_push_cron and kept empty for backward compatibility
-  morning_build_cron: ""
-  morning_push_cron: ""
-  study_push_cron: ""
-  afternoon_study_push_cron: ""
-  evening_build_cron: ""
-  evening_push_cron: ""
 
 logging:
   dir: ./logs

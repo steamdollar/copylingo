@@ -42,9 +42,9 @@
 
 ### 3. Dependency Wiring
 
-1. [internal/repository/repositories.go:10](../../internal/repository/repositories.go) — `SessionMaterialRepository`와 `StudyActiveSessionRepository`가 각각 생성/active 경로로 등록되는지 확인한다.
+1. [internal/repository/repositories.go:10](../../internal/repository/repositories.go) — `SessionRepository`와 `StudyActiveSessionRepository`가 각각 생성/active 경로로 등록되는지 확인한다.
 2. [internal/service/services.go:11](../../internal/service/services.go) — `StudySessionService`와 `StudyActiveSessionService`가 별도 service로 유지되는지 확인한다.
-3. [internal/service/services.go:38](../../internal/service/services.go) — 생성 service는 Material/Session/SessionMaterial repo를 받고 active service는 StudyActiveSession/Session repo와 Redis를 받는지 확인한다.
+3. [internal/service/services.go:38](../../internal/service/services.go) — 생성 service는 Material/Session repo를 받고 active service는 StudyActiveSession/Session repo와 Redis를 받는지 확인한다.
 4. [internal/config/constants.go:62](../../internal/config/constants.go) — Study callback data format이 `start`, `next`, `finish` action을 모두 표현하는지 확인한다.
 5. [internal/config/constants.go:84](../../internal/config/constants.go) — Study Redis Working Set key가 Quiz key와 별도 namespace인지 확인한다.
 6. [internal/bot/handler.go:68](../../internal/bot/handler.go) — Bot 생성 시 기존 Quiz flow와 별도로 `StudyFlow`가 초기화되는지 확인한다.
@@ -56,15 +56,15 @@
 3. [internal/repository/material_repo.go:20](../../internal/repository/material_repo.go) — Material 후보가 user language/level, `vocabulary` category, due/new 조건, pending/in_progress 중복 제외 조건으로 선택되는지 확인한다.
 4. [internal/service/study_session.go:43](../../internal/service/study_session.go) — `BuildStudySession`이 Material 조회 후 없으면 session을 만들지 않는지 확인한다.
 5. [internal/service/study_session.go:53](../../internal/service/study_session.go) — 생성되는 parent session이 `type='study'`, `mode='study'`, `status='pending'`인지 확인한다.
-6. [internal/repository/session_repo.go:20](../../internal/repository/session_repo.go) — `CreateSession`이 `SessionMode` validation 후 explicit `mode` insert를 수행하는지 확인한다.
-7. [internal/repository/session_material_repo.go:22](../../internal/repository/session_material_repo.go) — 생성 직후 ordered `session_materials`만 batch insert하고 진행 상태 write는 하지 않는지 확인한다.
+6. [internal/repository/session_repo.go:56](../../internal/repository/session_repo.go) — `CreateStudySession`이 트랜잭션에서 `sessions`를 저장하고 생성된 ID로 ordered `session_materials`를 batch insert하는지 확인한다.
+7. [internal/repository/session_repo.go:56](../../internal/repository/session_repo.go) — 자료 연결 저장이 실패하면 세션 행도 롤백되고 진행 상태 write는 하지 않는지 확인한다.
 
 ### 5. Working Set Generalization
 
 1. [internal/service/working_set.go:13](../../internal/service/working_set.go) — Redis dependency interface가 공통 Working Set에 필요한 최소 연산만 요구하는지 확인한다.
 2. [internal/service/working_set.go:49](../../internal/service/working_set.go) — Redis miss, corrupt JSON, validator failure 시 오류와 delete 정책이 일관적인지 확인한다.
 3. [internal/service/working_set.go:78](../../internal/service/working_set.go) — JSON marshal과 TTL 저장이 Quiz/Study에서 공통으로 쓰이는지 확인한다.
-4. [internal/service/active_session.go:47](../../internal/service/active_session.go) — 기존 Quiz `ActiveSessionService`가 `workingSetStore[ActiveSessionState]`를 쓰되 answer/SRS domain behavior는 유지하는지 확인한다.
+4. [internal/service/quiz_active_session.go:47](../../internal/service/quiz_active_session.go) — 기존 Quiz `ActiveSessionService`가 `workingSetStore[ActiveSessionState]`를 쓰되 answer/SRS domain behavior는 유지하는지 확인한다.
 5. [internal/service/study_active_session.go:41](../../internal/service/study_active_session.go) — Study `StudyActiveSessionService`가 같은 store를 `StudyActiveSessionState` 타입으로 사용하는지 확인한다.
 6. [internal/service/study_active_session.go:207](../../internal/service/study_active_session.go) — Study Working Set key가 `StudySessionWorkingSetRedisKey`로 분리되는지 확인한다.
 
@@ -73,7 +73,7 @@
 1. [internal/bot/handler.go:298](../../internal/bot/handler.go) — Telegram callback dispatch가 `study:` prefix를 `StudyFlow`로 넘기는지 확인한다.
 2. [internal/bot/study_flow.go:38](../../internal/bot/study_flow.go) — Study callback parser가 `study:{session_id}:start|next|finish`를 action별로 분기하는지 확인한다.
 3. [internal/service/study_active_session.go:63](../../internal/service/study_active_session.go) — start 시 DB load, owner/mode 검증, pending session start, Redis save 순서를 확인한다.
-4. [internal/service/study_active_session.go:101](../../internal/service/study_active_session.go) — DB load 후 Redis state version, current index, initially studied set을 재구성하는지 확인한다.
+4. [internal/service/study_active_session.go:101](../../internal/service/study_active_session.go) — DB load 후 current index와 initially studied set을 재구성하는지 확인한다.
 5. [internal/service/study_active_session.go:135](../../internal/service/study_active_session.go) — Redis miss 복구 시 owner/mode 검증 뒤 Working Set을 저장하는지 확인한다.
 6. [internal/service/study_active_session.go:156](../../internal/service/study_active_session.go) — `MarkStudied`가 DB write 없이 Redis state만 갱신하는지 확인한다.
 7. [internal/model/study_active_session.go:63](../../internal/model/study_active_session.go) — model method가 이미 studied 된 card를 중복 mark하지 않는지 확인한다.
@@ -114,7 +114,7 @@
 - `[UNKNOWN: ...]` 항목 없음.
 - 새로 생성되는 Study Session부터 Vocabulary-only 8개 정책이 적용된다. 이미 생성된 pending/in_progress `session_materials`는 기존 Material을 유지한다.
 - `StudySessionService`는 생성 전용이다. 진행 상태 변경은 `StudyActiveSessionService`가 Redis Working Set에서 처리한다.
-- `SessionMaterialRepository`는 현재 생성 직후 child row insert만 담당한다. card별 direct DB mark/progress write path는 제거됐다.
+- `SessionRepository.CreateStudySession`은 parent/child row를 한 트랜잭션에서 저장한다. card별 direct DB mark/progress write path는 제거됐다.
 - card 이동 중에는 Redis Working Set만 갱신한다. `session_materials.studied_at`와 `user_material_progress`는 완료 시 transaction으로 flush된다.
 - completed session 재완료 callback은 DB flush를 건너뛰어 progress 중복 증가를 막는다.
 - `sessions.mode`는 DB default가 아니라 `SessionRepository.CreateSession`에서 application enum validation으로 강제된다.

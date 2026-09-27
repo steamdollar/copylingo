@@ -1,7 +1,5 @@
 package config
 
-import "fmt"
-
 // session status
 type SessionStatus string
 
@@ -73,64 +71,30 @@ var LLMAllowedTelegramUserIDs = [...]int64{
 
 // Callback Data Formats (for Sprintf)
 const (
-	FormatSessionStart   = "session:%d:start"
-	FormatSessionFinish  = "session:%d:finish"
-	FormatQuestionAnswer = "q:%d:%d:%d"
-	FormatQuestionNext   = "q:%d:next:%d"
-	FormatQuestionAskLLM = "q:%d:ask:%d"
+	FormatSessionStart      = "session:%d:start"
+	FormatSessionFinish     = "session:%d:finish"
+	FormatQuestionAnswer    = "q:%d:%d:%d"
+	FormatQuestionNext      = "q:%d:next:%d"
+	FormatQuestionAskLLM    = "q:%d:ask:%d"
+	FormatQuestionPolicy    = "q:%d:policy:%d"
+	FormatQuestionPolicySet = "q:%d:policy:%d:%s"
 	// Word-order callbacks carry the session/question identity and the action;
 	// a select action also carries the original option index. Keeping this
 	// compact leaves ample room under Telegram's 64-byte callback limit.
-	FormatWordOrderSelect = "q:%d:wo:%d:a:%d"
-	FormatWordOrderUndo   = "q:%d:wo:%d:u"
-	FormatWordOrderReset  = "q:%d:wo:%d:r"
-	FormatWordOrderSubmit = "q:%d:wo:%d:s"
-	FormatStudyStart      = "study:%d:start"
-	FormatStudyNext       = "study:%d:next:%d"
-	FormatStudyPrev       = "study:%d:prev:%d"
-	FormatStudyFinish     = "study:%d:finish:%d"
-	FormatStudyAskLLM     = "study:%d:ask:%d"
-)
-
-type RedisKeyFormat string
-
-func (k RedisKeyFormat) Format(args ...any) string {
-	return fmt.Sprintf(string(k), args...)
-}
-
-// Redis Key Patterns
-const (
-	// SessionQuestionStartRedisKey stores when the currently displayed question was shown.
-	// Value: Unix milliseconds. Used for per-question timing/observability.
-	SessionQuestionStartRedisKey RedisKeyFormat = "session:%d:question_start"
-
-	// ActiveSessionWorkingSetRedisKey stores the full in-progress session working set.
-	// Value: JSON-encoded model.ActiveSessionState containing session metadata,
-	// ordered session_questions, question copies, progress, current index, and timestamps.
-	ActiveSessionWorkingSetRedisKey RedisKeyFormat = "session:%d:working_set"
-
-	// StudySessionWorkingSetRedisKey stores the full in-progress study session working set.
-	// Value: JSON-encoded model.StudyActiveSessionState containing session metadata,
-	// ordered session_materials, material copies, progress, current index, and timestamps.
-	StudySessionWorkingSetRedisKey RedisKeyFormat = "study_session:%d:working_set"
-
-	// UserActiveQuestionRedisKey tracks the text-answer question currently waiting for a chat reply.
-	// Value: "session_id:question_index". Used by fill-blank/subjective text input handling.
-	UserActiveQuestionRedisKey RedisKeyFormat = "user:%d:active_question"
-
-	// UserLLMPendingRedisKey tracks that the next plain-text message should be routed to LLM question mode.
-	// Value: "1" for a plain /llm question, "q:{session_id}:{question_id}" for a quiz question, or
-	// "study:{session_id}:{material_order}" for a study material. Used by one-shot contextual LLM questions.
-	UserLLMPendingRedisKey RedisKeyFormat = "user:%d:llm_pending"
-
-	// HandwritingMessageRedisKey stores the Telegram message that contains a handwriting Mini App button.
-	// Value: "chat_id:message_id". Used to remove stale inline buttons after Mini App submission.
-	HandwritingMessageRedisKey RedisKeyFormat = "handwriting:msg:%d:%d"
-
-	// WordOrderDraftRedisKey stores a JSON array of original option indices for
-	// one active session question. Its TTL matches the active session working
-	// set; the draft never lives inside ActiveSessionState.
-	WordOrderDraftRedisKey RedisKeyFormat = "session:%d:word_order:%d:draft"
+	FormatWordOrderSelect     = "q:%d:wo:%d:a:%d"
+	FormatWordOrderUndo       = "q:%d:wo:%d:u"
+	FormatWordOrderReset      = "q:%d:wo:%d:r"
+	FormatWordOrderSubmit     = "q:%d:wo:%d:s"
+	FormatStudyStart          = "study:%d:start"
+	FormatStudyNext           = "study:%d:next:%d"
+	FormatStudyPrev           = "study:%d:prev:%d"
+	FormatStudyFinish         = "study:%d:finish:%d"
+	FormatStudyAskLLM         = "study:%d:ask:%d"
+	FormatStudyPolicy         = "study:%d:policy:%d"
+	FormatStudyPolicySet      = "study:%d:policy:%d:%s"
+	FormatStudyCard           = "study:%d:card:%d"
+	FormatMaterialPreferences = "settings:materials:%d"
+	FormatMaterialRestore     = "settings:restore:%d:%d"
 )
 
 // Mini App routes

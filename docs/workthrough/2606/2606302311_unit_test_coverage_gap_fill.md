@@ -27,7 +27,7 @@
 
 | 파일(신규) | 대상 | 커버한 분기 |
 |---|---|---|
-| `internal/model/active_session_test.go` | `ActiveSessionState` 7개 메서드 | RecountAnswered(답/미답/혼합/빈), CurrentItemByQuestionID(현재일치/불일치/범위밖), ItemByQuestionID(발견/미발견), ItemAt(경계 4종), NextUnansweredIndex, CorrectCount, WrongAnswers(순서/빈슬라이스 non-nil) |
+| `internal/model/quiz_active_session_test.go` | `ActiveSessionState` 7개 메서드 | RecountAnswered(답/미답/혼합/빈), CurrentItemByQuestionID(현재일치/불일치/범위밖), ItemByQuestionID(발견/미발견), ItemAt(경계 4종), NextUnansweredIndex, CorrectCount, WrongAnswers(순서/빈슬라이스 non-nil) |
 | `internal/model/study_active_session_test.go` | `StudyActiveSessionState` 7개 메서드 | RecountStudied, CaptureInitiallyStudied, ItemByOrder(발견/미발견), ItemAt, NextUnstudiedIndex, MarkStudied(정상/이미학습/미지order), NewlyStudiedMaterialIDs(초기학습제외/nil맵/빈결과) |
 | `internal/model/question_test.go`(기존에 추가) | `Question.GetOptions` | JSONB 배열파싱/빈배열/타입불일치 에러/nil options 에러 |
 | `internal/model/session_test.go`(신규) | `SessionMode.IsValid` | quiz/study/빈/미지 |
@@ -48,7 +48,7 @@
 
 | 파일(기존에 추가) | 대상 | 커버한 분기 |
 |---|---|---|
-| `internal/service/active_session_test.go` | `SetCurrentIndex`, `Delete`, `Flush`, `save`, `validateActiveSessionState` | SetCurrentIndex(정상/음수/길이초과/Get전파), Flush(user mismatch/nil repo/repo error), Delete(정상/redis del 에러), save(redis set 에러), validate(version mismatch→Corrupt) |
+| `internal/service/quiz_active_session_test.go` | `SetCurrentIndex`, `Delete`, `Flush`, `save`, `validateActiveSessionState` | SetCurrentIndex(정상/음수/길이초과/Get전파), Flush(user mismatch/nil repo/repo error), Delete(정상/redis del 에러), save(redis set 에러), validate(version mismatch→Corrupt) |
 | `internal/service/study_active_session_test.go` | `Start`, `CreateFromDB`, `Get`, `GetOwned`, `MarkStudied`, `Delete`, `validateStudyOwnerAndMode` | Start(completed 조기반환/pending+starter없음/user mismatch/nil repo), CreateFromDB(정상/load 에러), Get(DB 복구), GetOwned(miss→DB load/user mismatch/mode mismatch), MarkStudied(미지 order), Delete |
 | `internal/service/srs_test.go` | `GetDueReviews`, `GetDueCount` | 정상 반환/에러 전파(passthrough이지만 0%였음) |
 

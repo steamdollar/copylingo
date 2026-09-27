@@ -7,23 +7,43 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jmoiron/sqlx"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
+	"github.com/lsj/copylingo/internal/testutil"
 )
 
 type mockUserRepo struct {
-	getOrCreateFn func(ctx context.Context, id int64, username string) (*model.User, error)
+	getOrCreateFn func(
+		ctx context.Context,
+		id int64,
+		username string,
+	) (*model.User, error)
 }
 
-func (m *mockUserRepo) GetOrCreate(ctx context.Context, id int64, username string) (*model.User, error) {
-	return m.getOrCreateFn(ctx, id, username)
+func (m *mockUserRepo) GetOrCreate(
+	ctx context.Context,
+	id int64,
+	username string,
+) (*model.User, error) {
+	return m.getOrCreateFn(
+		ctx,
+		id,
+		username,
+	)
 }
-func (m *mockUserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) { return nil, nil }
-func (m *mockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error)      { return nil, nil }
-func (m *mockUserRepo) GetActiveTimezones(ctx context.Context) ([]string, error)   { return nil, nil }
+func (m *mockUserRepo) GetByID(
+	ctx context.Context,
+	id int64,
+) (*model.User, error) {
+	return nil, nil
+}
+func (m *mockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error)    { return nil, nil }
+func (m *mockUserRepo) GetActiveTimezones(ctx context.Context) ([]string, error) { return nil, nil }
 
 func (m *mockUserRepo) GetUsersBySlot(
 	ctx context.Context,
@@ -42,7 +62,11 @@ func (m *mockUserRepo) UpdateSlotTime(
 ) error {
 	return nil
 }
-func (m *mockUserRepo) UpdateTimezone(ctx context.Context, userID int64, timezone string) error {
+func (m *mockUserRepo) UpdateTimezone(
+	ctx context.Context,
+	userID int64,
+	timezone string,
+) error {
 	return nil
 }
 
@@ -51,9 +75,11 @@ type mockSRSRepo struct{}
 func (m *mockSRSRepo) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, currentLevel string,
+	language,
+	currentLevel string,
 	levels []string,
-	limit, kanjiRecallLimit int,
+	limit,
+	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	return nil, nil
@@ -69,13 +95,27 @@ func (m *mockSRSRepo) GetDueReviewCount(
 }
 
 type mockStatsRepo struct {
-	getTodayStatsFn func(ctx context.Context, userID int64) (*model.UserStats, error)
+	getTodayStatsFn func(
+		ctx context.Context,
+		userID int64,
+	) (*model.UserStats, error)
 }
 
-func (m *mockStatsRepo) GetTodayStats(ctx context.Context, userID int64) (*model.UserStats, error) {
-	return m.getTodayStatsFn(ctx, userID)
+func (m *mockStatsRepo) GetTodayStats(
+	ctx context.Context,
+	userID int64,
+) (*model.UserStats, error) {
+	return m.getTodayStatsFn(
+		ctx,
+		userID,
+	)
 }
-func (m *mockStatsRepo) SaveDailyStats(ctx context.Context, stats *model.UserStats) error { return nil }
+func (m *mockStatsRepo) SaveDailyStats(
+	ctx context.Context,
+	stats *model.UserStats,
+) error {
+	return nil
+}
 
 type commandStudyMaterialStore struct {
 	materials []model.Material
@@ -86,17 +126,21 @@ type commandStudyMaterialStore struct {
 	limit     int
 }
 
-func (s *commandStudyMaterialStore) GetForStudySession(
+func (s *commandStudyMaterialStore) GetMaterialsByPlan(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language,
+	level string,
 	levels []string,
 	plan model.StudySessionPlan,
 ) ([]model.Material, error) {
 	s.userID = userID
 	s.language = language
 	_ = level
-	s.levels = append([]string(nil), levels...)
+	s.levels = append(
+		[]string(nil),
+		levels...,
+	)
 	s.limit = plan.TotalMaterialCount()
 	if s.err != nil {
 		return nil, s.err
@@ -105,56 +149,75 @@ func (s *commandStudyMaterialStore) GetForStudySession(
 }
 
 type commandStudySessionStore struct {
-	nextID  int
-	created []*model.Session
-	err     error
+	nextID             int
+	created            []*model.Session
+	createdMaterialIDs []int
+	err                error
 }
 
-func (s *commandStudySessionStore) CreateSession(ctx context.Context, session *model.Session) error {
-	if s.err != nil {
-		return s.err
-	}
-	session.ID = s.nextID
-	s.created = append(s.created, session)
-	return nil
-}
-
-type commandStudySessionMaterialStore struct {
-	created []model.SessionMaterial
-	err     error
-}
-
-func (s *commandStudySessionMaterialStore) CreateSessionMaterials(
+func (s *commandStudySessionStore) CreateSessionInTx(
 	ctx context.Context,
-	sms []model.SessionMaterial,
-) error {
+	tx *sqlx.Tx,
+	session *model.Session,
+) (int, error) {
 	if s.err != nil {
-		return s.err
+		return 0, s.err
 	}
-	s.created = append(s.created, sms...)
+	s.created = append(
+		s.created,
+		session,
+	)
+	return s.nextID, nil
+}
+
+func (s *commandStudySessionStore) CreateSessionMaterialsInTx(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	sessionID int,
+	materialIDs []int,
+) error {
+	s.createdMaterialIDs = append(
+		s.createdMaterialIDs,
+		materialIDs...,
+	)
 	return nil
 }
+
+var botTestDB = testutil.TransactionDB()
 
 type llmTipCandidateStore struct {
 	created []*model.TipCandidate
 	err     error
 }
 
-func (s *llmTipCandidateStore) Create(ctx context.Context, candidate *model.TipCandidate) error {
-	return s.CreateCandidate(ctx, candidate)
+func (s *llmTipCandidateStore) Create(
+	ctx context.Context,
+	candidate *model.TipCandidate,
+) error {
+	return s.CreateCandidate(
+		ctx,
+		candidate,
+	)
 }
 
-func (s *llmTipCandidateStore) CreateCandidate(ctx context.Context, candidate *model.TipCandidate) error {
+func (s *llmTipCandidateStore) CreateCandidate(
+	ctx context.Context,
+	candidate *model.TipCandidate,
+) error {
 	if s.err != nil {
 		return s.err
 	}
-	s.created = append(s.created, candidate)
+	s.created = append(
+		s.created,
+		candidate,
+	)
 	return nil
 }
 
 func (s *llmTipCandidateStore) ListActive(
 	ctx context.Context,
-	language, level string,
+	language,
+	level string,
 	limit int,
 ) ([]model.Tip, error) {
 	return nil, nil
@@ -174,7 +237,12 @@ func TestLanguageDisplayName(t *testing.T) {
 
 	for _, tt := range tests {
 		if got := languageDisplayName(tt.code); got != tt.want {
-			t.Errorf("languageDisplayName(%q) = %q, want %q", tt.code, got, tt.want)
+			t.Errorf(
+				"languageDisplayName(%q) = %q, want %q",
+				tt.code,
+				got,
+				tt.want,
+			)
 		}
 	}
 }
@@ -183,52 +251,62 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	b := &Bot{api: mAPI}
 
-	t.Run("Message update", func(t *testing.T) {
-		update := tgbotapi.Update{
-			Message: &tgbotapi.Message{
-				Text: "/start",
-				Entities: []tgbotapi.MessageEntity{
-					{Type: "bot_command", Offset: 0, Length: 6},
-				},
-				Chat: &tgbotapi.Chat{ID: 123},
-			},
-		}
-		b.handleUpdate(update)
-		if len(mAPI.sentMessages) == 0 {
-			t.Fatal("expected message sent for /start")
-		}
-	})
-
-	t.Run("Callback update", func(t *testing.T) {
-		mAPI.sentMessages = nil
-		update := tgbotapi.Update{
-			CallbackQuery: &tgbotapi.CallbackQuery{
-				ID:   "1",
-				Data: "menu:main",
+	t.Run(
+		"Message update",
+		func(t *testing.T) {
+			update := tgbotapi.Update{
 				Message: &tgbotapi.Message{
+					Text: "/start",
+					Entities: []tgbotapi.MessageEntity{
+						{Type: "bot_command", Offset: 0, Length: 6},
+					},
 					Chat: &tgbotapi.Chat{ID: 123},
 				},
-				From: &tgbotapi.User{ID: 456},
-			},
-		}
+			}
+			b.handleUpdate(update)
+			if len(mAPI.sentMessages) == 0 {
+				t.Fatal("expected message sent for /start")
+			}
+		},
+	)
 
-		// Setup dependencies for showMainMenu
-		mUserRepo := &mockUserRepo{
-			getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
-				return &model.User{ID: id, Language: "jp", ProficiencyLevel: "n5"}, nil
-			},
-		}
-		mSRSRepo := &mockSRSRepo{}
-		b.services = &service.Services{
-			User: service.NewUserService(mUserRepo),
-			SRS:  service.NewSRSService(mSRSRepo),
-		}
+	t.Run(
+		"Callback update",
+		func(t *testing.T) {
+			mAPI.sentMessages = nil
+			update := tgbotapi.Update{
+				CallbackQuery: &tgbotapi.CallbackQuery{
+					ID:   "1",
+					Data: "menu:main",
+					Message: &tgbotapi.Message{
+						Chat: &tgbotapi.Chat{ID: 123},
+					},
+					From: &tgbotapi.User{ID: 456},
+				},
+			}
 
-		b.handleUpdate(update)
-		if len(mAPI.sentMessages) == 0 {
-			t.Fatal("expected message sent for callback menu:main")
-		}
-	})
+			// Setup dependencies for showMainMenu
+			mUserRepo := &mockUserRepo{
+				getOrCreateFn: func(
+					ctx context.Context,
+					id int64,
+					username string,
+				) (*model.User, error) {
+					return &model.User{ID: id, Language: "jp", ProficiencyLevel: "n5"}, nil
+				},
+			}
+			mSRSRepo := &mockSRSRepo{}
+			b.services = &service.Services{
+				User: service.NewUserService(mUserRepo),
+				SRS:  service.NewSRSService(mSRSRepo),
+			}
+
+			b.handleUpdate(update)
+			if len(mAPI.sentMessages) == 0 {
+				t.Fatal("expected message sent for callback menu:main")
+			}
+		},
+	)
 }
 
 func TestHandleHelp(t *testing.T) {
@@ -239,14 +317,26 @@ func TestHandleHelp(t *testing.T) {
 		Chat: &tgbotapi.Chat{ID: 123},
 	}
 
-	b.handleHelp(ctx, msg)
+	b.handleHelp(
+		ctx,
+		msg,
+	)
 
 	if len(mAPI.sentMessages) != 1 {
-		t.Fatalf("expected 1 message, got %d", len(mAPI.sentMessages))
+		t.Fatalf(
+			"expected 1 message, got %d",
+			len(mAPI.sentMessages),
+		)
 	}
 	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "도움말") {
-		t.Errorf("expected help text, got %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"도움말",
+	) {
+		t.Errorf(
+			"expected help text, got %q",
+			sent.Text,
+		)
 	}
 }
 
@@ -262,37 +352,72 @@ func TestHandleMessage_UnknownCommand(t *testing.T) {
 		},
 	}
 
-	b.handleMessage(ctx, msg)
+	b.handleMessage(
+		ctx,
+		msg,
+	)
 
 	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "알 수 없는 명령어") {
-		t.Errorf("expected unknown command message, got %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"알 수 없는 명령어",
+	) {
+		t.Errorf(
+			"expected unknown command message, got %q",
+			sent.Text,
+		)
 	}
 }
 
 func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
 	api := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	b := &Bot{
-		api: api,
-		rdb: rdb,
+		api:   api,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 	}
 
 	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
-	b.handleMessage(context.Background(), commandMessage("/llm", allowedUserID, 456, "learner"))
+	b.handleMessage(
+		context.Background(),
+		commandMessage(
+			"/llm",
+			allowedUserID,
+			456,
+			"learner",
+		),
+	)
 
-	if got := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; got != "1" {
-		t.Fatalf("LLM pending key = %q, want 1", got)
+	if got := stateStores.pending[allowedUserID]; got.Kind != model.PendingLLMPlain {
+		t.Fatalf(
+			"LLM pending input = %+v, want plain",
+			got,
+		)
 	}
 	if len(api.sentMessages) != 1 {
-		t.Fatalf("sent messages = %d, want 1", len(api.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 1",
+			len(api.sentMessages),
+		)
 	}
 	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "LLM mode 활성화") {
-		t.Fatalf("message text = %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"LLM mode 활성화",
+	) {
+		t.Fatalf(
+			"message text = %q",
+			sent.Text,
+		)
 	}
-	if !keyboardHasCallback(sent, config.ActionLLMCancel) {
-		t.Fatalf("activation message does not include %q callback", config.ActionLLMCancel)
+	if !keyboardHasCallback(
+		sent,
+		config.ActionLLMCancel,
+	) {
+		t.Fatalf(
+			"activation message does not include %q callback",
+			config.ActionLLMCancel,
+		)
 	}
 }
 
@@ -300,69 +425,119 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 	api := &mockBotAPI{}
 	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
 	otherUserID := allowedUserID + 1
-	rdb := &testRedis{values: map[string]string{
-		config.UserLLMPendingRedisKey.Format(allowedUserID): "1",
-		config.UserLLMPendingRedisKey.Format(otherUserID):   "1",
-	}}
-	b := &Bot{api: api, rdb: rdb}
+	stateStores := newTestInteractionStores()
+	_ = stateStores.SetLLMPending(
+		context.Background(),
+		allowedUserID,
+		model.PendingLLMInput{Kind: model.PendingLLMPlain},
+	)
+	_ = stateStores.SetLLMPending(
+		context.Background(),
+		otherUserID,
+		model.PendingLLMInput{Kind: model.PendingLLMPlain},
+	)
+	b := &Bot{api: api, input: stateStores}
 
-	b.handleCallback(context.Background(), &tgbotapi.CallbackQuery{
-		ID:   "cancel-llm",
-		Data: config.ActionLLMCancel,
-		From: &tgbotapi.User{ID: allowedUserID},
-		Message: &tgbotapi.Message{
-			Chat: &tgbotapi.Chat{ID: 456},
+	b.handleCallback(
+		context.Background(),
+		&tgbotapi.CallbackQuery{
+			ID:   "cancel-llm",
+			Data: config.ActionLLMCancel,
+			From: &tgbotapi.User{ID: allowedUserID},
+			Message: &tgbotapi.Message{
+				Chat: &tgbotapi.Chat{ID: 456},
+			},
 		},
-	})
+	)
 
-	if _, ok := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; ok {
+	if _, ok := stateStores.pending[allowedUserID]; ok {
 		t.Fatal("invoking user's LLM pending key still exists")
 	}
-	if got := rdb.values[config.UserLLMPendingRedisKey.Format(otherUserID)]; got != "1" {
-		t.Fatalf("other user's LLM pending value = %q, want 1", got)
+	if got := stateStores.pending[otherUserID]; got.Kind != model.PendingLLMPlain {
+		t.Fatalf(
+			"other user's LLM pending value = %+v, want plain",
+			got,
+		)
 	}
 	if len(api.sentMessages) != 1 {
-		t.Fatalf("sent messages = %d, want 1", len(api.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 1",
+			len(api.sentMessages),
+		)
 	}
 	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "LLM mode를 취소했습니다") {
-		t.Fatalf("message text = %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"LLM mode를 취소했습니다",
+	) {
+		t.Fatalf(
+			"message text = %q",
+			sent.Text,
+		)
 	}
 	if got := callbackType(config.ActionLLMCancel); got != "llm" {
-		t.Fatalf("callback type = %q, want llm", got)
+		t.Fatalf(
+			"callback type = %q, want llm",
+			got,
+		)
 	}
 }
 
 func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {
 	api := &mockBotAPI{}
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	b := &Bot{
-		api: api,
-		rdb: rdb,
+		api:   api,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 	}
 
-	b.handleMessage(context.Background(), commandMessage("/llm", config.LLMAllowedTelegramUserIDs[0]+1, 456, "learner"))
+	b.handleMessage(
+		context.Background(),
+		commandMessage(
+			"/llm",
+			config.LLMAllowedTelegramUserIDs[0]+1,
+			456,
+			"learner",
+		),
+	)
 
-	if len(rdb.values) != 0 {
-		t.Fatalf("redis values = %+v, want empty", rdb.values)
+	if len(stateStores.pending) != 0 {
+		t.Fatalf(
+			"pending inputs = %+v, want empty",
+			stateStores.pending,
+		)
 	}
 	if len(api.sentMessages) != 0 {
-		t.Fatalf("sent messages = %d, want 0", len(api.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 0",
+			len(api.sentMessages),
+		)
 	}
 }
 
 func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.T) {
 	api := &mockBotAPI{}
 	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
-	rdb := &testRedis{values: map[string]string{
-		config.UserLLMPendingRedisKey.Format(allowedUserID): "1",
-	}}
+	stateStores := newTestInteractionStores()
+	_ = stateStores.SetLLMPending(
+		context.Background(),
+		allowedUserID,
+		model.PendingLLMInput{Kind: model.PendingLLMPlain},
+	)
 	tipStore := &llmTipCandidateStore{}
 	userRepo := &mockUserRepo{
-		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+		getOrCreateFn: func(
+			ctx context.Context,
+			id int64,
+			username string,
+		) (*model.User, error) {
 			if id != allowedUserID || username != "learner" {
-				t.Fatalf("GetUser args = (%d, %s), want (%d, learner)",
-					id, username, allowedUserID)
+				t.Fatalf(
+					"GetUser args = (%d, %s), want (%d, learner)",
+					id,
+					username,
+					allowedUserID,
+				)
 			}
 			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N4"}, nil
 		},
@@ -373,11 +548,14 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 		cfg: &config.Config{LLM: config.LLMConfig{
 			Model: "test-model",
 		}},
-		rdb: rdb,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
 			LLM: service.NewLLMService(&mockLLM{
-				answerFn: func(ctx context.Context, question string) (string, error) {
+				answerFn: func(
+					ctx context.Context,
+					question string,
+				) (string, error) {
 					gotQuestion = question
 					return "honoo는 불꽃이고 <tag>는 escape 대상입니다.", nil
 				},
@@ -386,54 +564,92 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 		},
 	}
 
-	b.handleMessage(context.Background(),
-		plainMessage("hi, honowo의 차이가 뭐야?", allowedUserID, 456, "learner"))
+	b.handleMessage(
+		context.Background(),
+		plainMessage(
+			"hi, honowo의 차이가 뭐야?",
+			allowedUserID,
+			456,
+			"learner",
+		),
+	)
 
 	if gotQuestion != "hi, honowo의 차이가 뭐야?" {
-		t.Fatalf("question = %q", gotQuestion)
+		t.Fatalf(
+			"question = %q",
+			gotQuestion,
+		)
 	}
-	if _, ok := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; ok {
+	if _, ok := stateStores.pending[allowedUserID]; ok {
 		t.Fatal("LLM pending key still exists")
 	}
 	if len(tipStore.created) != 1 {
-		t.Fatalf("tip candidates = %d, want 1", len(tipStore.created))
+		t.Fatalf(
+			"tip candidates = %d, want 1",
+			len(tipStore.created),
+		)
 	}
 	candidate := tipStore.created[0]
 	if candidate.UserID != allowedUserID || candidate.Username != "learner" ||
 		candidate.Language != "ja" || candidate.ProficiencyLevel != "N4" ||
 		candidate.Question != "hi, honowo의 차이가 뭐야?" {
-		t.Fatalf("candidate = %+v", candidate)
+		t.Fatalf(
+			"candidate = %+v",
+			candidate,
+		)
 	}
 	if candidate.SourceModel == nil || *candidate.SourceModel != "test-model" {
-		t.Fatalf("source model = %#v, want test-model", candidate.SourceModel)
+		t.Fatalf(
+			"source model = %#v, want test-model",
+			candidate.SourceModel,
+		)
 	}
 	if len(api.sentMessages) != 2 {
-		t.Fatalf("sent messages = %d, want 2", len(api.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 2",
+			len(api.sentMessages),
+		)
 	}
 	answer := api.sentMessages[1].(tgbotapi.MessageConfig)
-	if !strings.Contains(answer.Text, "&lt;tag&gt;") {
-		t.Fatalf("answer text was not escaped: %q", answer.Text)
+	if !strings.Contains(
+		answer.Text,
+		"&lt;tag&gt;",
+	) {
+		t.Fatalf(
+			"answer text was not escaped: %q",
+			answer.Text,
+		)
 	}
 }
 
 func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 	api := &mockBotAPI{}
 	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
-	rdb := &testRedis{values: map[string]string{
-		config.UserLLMPendingRedisKey.Format(allowedUserID): "1",
-	}}
+	stateStores := newTestInteractionStores()
+	_ = stateStores.SetLLMPending(
+		context.Background(),
+		allowedUserID,
+		model.PendingLLMInput{Kind: model.PendingLLMPlain},
+	)
 	userRepo := &mockUserRepo{
-		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+		getOrCreateFn: func(
+			ctx context.Context,
+			id int64,
+			username string,
+		) (*model.User, error) {
 			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	}
 	b := &Bot{
-		api: api,
-		rdb: rdb,
+		api:   api,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
 			LLM: service.NewLLMService(&mockLLM{
-				answerFn: func(ctx context.Context, question string) (string, error) {
+				answerFn: func(
+					ctx context.Context,
+					question string,
+				) (string, error) {
 					return "", errors.New("provider failed")
 				},
 			}),
@@ -441,17 +657,34 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 		},
 	}
 
-	b.handleMessage(context.Background(), plainMessage("honoo가 뭐야?", allowedUserID, 456, "learner"))
+	b.handleMessage(
+		context.Background(),
+		plainMessage(
+			"honoo가 뭐야?",
+			allowedUserID,
+			456,
+			"learner",
+		),
+	)
 
-	if _, ok := rdb.values[config.UserLLMPendingRedisKey.Format(allowedUserID)]; ok {
+	if _, ok := stateStores.pending[allowedUserID]; ok {
 		t.Fatal("LLM pending key still exists after answer failure")
 	}
 	if len(api.sentMessages) != 2 {
-		t.Fatalf("sent messages = %d, want 2", len(api.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 2",
+			len(api.sentMessages),
+		)
 	}
 	failure := api.sentMessages[1].(tgbotapi.MessageConfig)
-	if !strings.Contains(failure.Text, "다시 질문하려면 /llm") {
-		t.Fatalf("failure text = %q", failure.Text)
+	if !strings.Contains(
+		failure.Text,
+		"다시 질문하려면 /llm",
+	) {
+		t.Fatalf(
+			"failure text = %q",
+			failure.Text,
+		)
 	}
 }
 
@@ -459,9 +692,17 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	ctx := context.Background()
 	api := &mockBotAPI{}
 	userRepo := &mockUserRepo{
-		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+		getOrCreateFn: func(
+			ctx context.Context,
+			id int64,
+			username string,
+		) (*model.User, error) {
 			if id != 123 || username != "learner" {
-				t.Fatalf("GetUser args = (%d, %s), want (123, learner)", id, username)
+				t.Fatalf(
+					"GetUser args = (%d, %s), want (123, learner)",
+					id,
+					username,
+				)
 			}
 			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
@@ -473,61 +714,103 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 		},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	sessionMaterialStore := &commandStudySessionMaterialStore{}
 	b := &Bot{
 		api: api,
 		services: &service.Services{
-			User:         service.NewUserService(userRepo),
-			StudySession: service.NewStudySessionService(materialStore, sessionStore, sessionMaterialStore),
+			User: service.NewUserService(userRepo),
+			StudySession: service.NewStudySessionService(
+				materialStore,
+				sessionStore,
+				botTestDB,
+			),
 		},
 	}
 
-	b.handleMessage(ctx, commandMessage("/study", 123, 456, "learner"))
+	b.handleMessage(
+		ctx,
+		commandMessage(
+			"/study",
+			123,
+			456,
+			"learner",
+		),
+	)
 
 	if materialStore.userID != 123 || materialStore.language != "ja" ||
 		!slices.Equal(
 			materialStore.levels,
 			[]string{"N5", "N4"},
 		) || materialStore.limit != service.DefaultStudySessionMaterialCount {
-		t.Fatalf("GetForStudySession args = (%d, %s, %v, %d), want user/language/levels and default limit %d",
-			materialStore.userID, materialStore.language, materialStore.levels, materialStore.limit,
-			service.DefaultStudySessionMaterialCount)
+		t.Fatalf(
+			"GetMaterialsByPlan args = (%d, %s, %v, %d), want user/language/levels and default limit %d",
+			materialStore.userID,
+			materialStore.language,
+			materialStore.levels,
+			materialStore.limit,
+			service.DefaultStudySessionMaterialCount,
+		)
 	}
 	if len(sessionStore.created) != 1 {
-		t.Fatalf("created sessions = %d, want 1", len(sessionStore.created))
+		t.Fatalf(
+			"created sessions = %d, want 1",
+			len(sessionStore.created),
+		)
 	}
 	session := sessionStore.created[0]
 	if session.UserID != 123 || session.Type != model.SessionStudy ||
 		session.Mode != model.SessionModeStudy || session.Status != model.SessionPending ||
 		session.TotalQuestions != 2 {
-		t.Fatalf("created session = %+v", session)
+		t.Fatalf(
+			"created session = %+v",
+			session,
+		)
 	}
-	if len(sessionMaterialStore.created) != 2 {
-		t.Fatalf("created session materials = %d, want 2", len(sessionMaterialStore.created))
-	}
-	if sessionMaterialStore.created[0].SessionID != 321 ||
-		sessionMaterialStore.created[0].MaterialID != 10 ||
-		sessionMaterialStore.created[0].MaterialOrder != 0 ||
-		sessionMaterialStore.created[1].MaterialID != 11 ||
-		sessionMaterialStore.created[1].MaterialOrder != 1 {
-		t.Fatalf("created session materials = %+v", sessionMaterialStore.created)
+	if !slices.Equal(
+		sessionStore.createdMaterialIDs,
+		[]int{10, 11},
+	) {
+		t.Fatalf(
+			"created material IDs = %v, want [10 11]",
+			sessionStore.createdMaterialIDs,
+		)
 	}
 
 	if len(api.sentMessages) != 1 {
-		t.Fatalf("sent messages = %d, want 1", len(api.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 1",
+			len(api.sentMessages),
+		)
 	}
 	msg, ok := api.sentMessages[0].(tgbotapi.MessageConfig)
 	if !ok {
-		t.Fatalf("sent message type = %T, want MessageConfig", api.sentMessages[0])
+		t.Fatalf(
+			"sent message type = %T, want MessageConfig",
+			api.sentMessages[0],
+		)
 	}
-	if !strings.Contains(msg.Text, "Study Session이 도착했습니다") {
-		t.Fatalf("message text = %q", msg.Text)
+	if !strings.Contains(
+		msg.Text,
+		"Study Session이 도착했습니다",
+	) {
+		t.Fatalf(
+			"message text = %q",
+			msg.Text,
+		)
 	}
-	if got := onlyMessageCallbackData(t, msg); got != "study:321:start" {
-		t.Fatalf("callback data = %q, want study:321:start", got)
+	if got := onlyMessageCallbackData(
+		t,
+		msg,
+	); got != "study:321:start" {
+		t.Fatalf(
+			"callback data = %q, want study:321:start",
+			got,
+		)
 	}
 	if msg.ChatID != 456 {
-		t.Fatalf("chat ID = %d, want 456", msg.ChatID)
+		t.Fatalf(
+			"chat ID = %d, want 456",
+			msg.ChatID,
+		)
 	}
 }
 
@@ -540,15 +823,34 @@ func TestHandleStudyCommandUsesRequestedLimit(t *testing.T) {
 		},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(api, nil, materialStore, sessionStore, &commandStudySessionMaterialStore{})
+	b := botWithStudyCommandDeps(
+		api,
+		nil,
+		materialStore,
+		sessionStore,
+	)
 
-	b.handleStudy(context.Background(), commandMessage("/study 20", 123, 456, "learner"))
+	b.handleStudy(
+		context.Background(),
+		commandMessage(
+			"/study 20",
+			123,
+			456,
+			"learner",
+		),
+	)
 
 	if materialStore.limit != 20 {
-		t.Fatalf("limit = %d, want 20", materialStore.limit)
+		t.Fatalf(
+			"limit = %d, want 20",
+			materialStore.limit,
+		)
 	}
 	if len(sessionStore.created) != 1 {
-		t.Fatalf("created sessions = %d, want 1", len(sessionStore.created))
+		t.Fatalf(
+			"created sessions = %d, want 1",
+			len(sessionStore.created),
+		)
 	}
 }
 
@@ -558,60 +860,145 @@ func TestHandleStudyCommandRejectsInvalidLimit(t *testing.T) {
 		materials: []model.Material{{ID: 10, Category: model.MaterialCategoryVocabulary}},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(api, nil, materialStore, sessionStore, &commandStudySessionMaterialStore{})
+	b := botWithStudyCommandDeps(
+		api,
+		nil,
+		materialStore,
+		sessionStore,
+	)
 
-	b.handleStudy(context.Background(), commandMessage("/study 999", 123, 456, "learner"))
+	b.handleStudy(
+		context.Background(),
+		commandMessage(
+			"/study 999",
+			123,
+			456,
+			"learner",
+		),
+	)
 
 	if materialStore.limit != 0 {
-		t.Fatalf("limit = %d, want 0 because material lookup should not run", materialStore.limit)
+		t.Fatalf(
+			"limit = %d, want 0 because material lookup should not run",
+			materialStore.limit,
+		)
 	}
 	if len(sessionStore.created) != 0 {
-		t.Fatalf("created sessions = %d, want 0", len(sessionStore.created))
+		t.Fatalf(
+			"created sessions = %d, want 0",
+			len(sessionStore.created),
+		)
 	}
 	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "사용법: /study") {
-		t.Fatalf("message text = %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"사용법: /study",
+	) {
+		t.Fatalf(
+			"message text = %q",
+			sent.Text,
+		)
 	}
 }
 
 func TestHandleStudyCommandNoMaterials(t *testing.T) {
 	api := &mockBotAPI{}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(api, nil, &commandStudyMaterialStore{}, sessionStore, nil)
+	b := botWithStudyCommandDeps(
+		api,
+		nil,
+		&commandStudyMaterialStore{},
+		sessionStore,
+	)
 
-	b.handleStudy(context.Background(), commandMessage("/study", 123, 456, "learner"))
+	b.handleStudy(
+		context.Background(),
+		commandMessage(
+			"/study",
+			123,
+			456,
+			"learner",
+		),
+	)
 
 	if len(sessionStore.created) != 0 {
-		t.Fatalf("created sessions = %d, want 0", len(sessionStore.created))
+		t.Fatalf(
+			"created sessions = %d, want 0",
+			len(sessionStore.created),
+		)
 	}
 	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "학습 가능한 Study Material이 없습니다") {
-		t.Fatalf("message text = %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"학습 가능한 Study Material이 없습니다",
+	) {
+		t.Fatalf(
+			"message text = %q",
+			sent.Text,
+		)
 	}
 }
 
 func TestHandleStudyCommandUserLookupFailure(t *testing.T) {
 	api := &mockBotAPI{}
-	b := botWithStudyCommandDeps(api, errors.New("lookup failed"), &commandStudyMaterialStore{}, nil, nil)
+	b := botWithStudyCommandDeps(
+		api,
+		errors.New("lookup failed"),
+		&commandStudyMaterialStore{},
+		nil,
+	)
 
-	b.handleStudy(context.Background(), commandMessage("/study", 123, 456, "learner"))
+	b.handleStudy(
+		context.Background(),
+		commandMessage(
+			"/study",
+			123,
+			456,
+			"learner",
+		),
+	)
 
 	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "사용자 정보를 확인할 수 없습니다") {
-		t.Fatalf("message text = %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"사용자 정보를 확인할 수 없습니다",
+	) {
+		t.Fatalf(
+			"message text = %q",
+			sent.Text,
+		)
 	}
 }
 
 func TestHandleStudyCommandBuildFailure(t *testing.T) {
 	api := &mockBotAPI{}
 	materialStore := &commandStudyMaterialStore{err: errors.New("material failed")}
-	b := botWithStudyCommandDeps(api, nil, materialStore, nil, nil)
+	b := botWithStudyCommandDeps(
+		api,
+		nil,
+		materialStore,
+		nil,
+	)
 
-	b.handleStudy(context.Background(), commandMessage("/study", 123, 456, "learner"))
+	b.handleStudy(
+		context.Background(),
+		commandMessage(
+			"/study",
+			123,
+			456,
+			"learner",
+		),
+	)
 
 	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "Study Session 생성 중 오류") {
-		t.Fatalf("message text = %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"Study Session 생성 중 오류",
+	) {
+		t.Fatalf(
+			"message text = %q",
+			sent.Text,
+		)
 	}
 }
 
@@ -623,16 +1010,38 @@ func TestHandleStudyCommandPushFailure(t *testing.T) {
 		},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(api, nil, materialStore, sessionStore, &commandStudySessionMaterialStore{})
+	b := botWithStudyCommandDeps(
+		api,
+		nil,
+		materialStore,
+		sessionStore,
+	)
 
-	b.handleStudy(context.Background(), commandMessage("/study", 123, 456, "learner"))
+	b.handleStudy(
+		context.Background(),
+		commandMessage(
+			"/study",
+			123,
+			456,
+			"learner",
+		),
+	)
 
 	if len(api.sentMessages) != 2 {
-		t.Fatalf("sent messages = %d, want 2", len(api.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 2",
+			len(api.sentMessages),
+		)
 	}
 	fallback := api.sentMessages[1].(tgbotapi.MessageConfig)
-	if !strings.Contains(fallback.Text, "Study Session 발송에 실패했습니다") {
-		t.Fatalf("fallback text = %q", fallback.Text)
+	if !strings.Contains(
+		fallback.Text,
+		"Study Session 발송에 실패했습니다",
+	) {
+		t.Fatalf(
+			"fallback text = %q",
+			fallback.Text,
+		)
 	}
 }
 
@@ -641,7 +1050,6 @@ func botWithStudyCommandDeps(
 	userErr error,
 	materialStore *commandStudyMaterialStore,
 	sessionStore *commandStudySessionStore,
-	sessionMaterialStore *commandStudySessionMaterialStore,
 ) *Bot {
 	if materialStore == nil {
 		materialStore = &commandStudyMaterialStore{}
@@ -649,12 +1057,12 @@ func botWithStudyCommandDeps(
 	if sessionStore == nil {
 		sessionStore = &commandStudySessionStore{nextID: 321}
 	}
-	if sessionMaterialStore == nil {
-		sessionMaterialStore = &commandStudySessionMaterialStore{}
-	}
-
 	userRepo := &mockUserRepo{
-		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+		getOrCreateFn: func(
+			ctx context.Context,
+			id int64,
+			username string,
+		) (*model.User, error) {
 			if userErr != nil {
 				return nil, userErr
 			}
@@ -664,15 +1072,27 @@ func botWithStudyCommandDeps(
 	return &Bot{
 		api: api,
 		services: &service.Services{
-			User:         service.NewUserService(userRepo),
-			StudySession: service.NewStudySessionService(materialStore, sessionStore, sessionMaterialStore),
+			User: service.NewUserService(userRepo),
+			StudySession: service.NewStudySessionService(
+				materialStore,
+				sessionStore,
+				botTestDB,
+			),
 		},
 	}
 }
 
-func commandMessage(text string, userID, chatID int64, username string) *tgbotapi.Message {
+func commandMessage(
+	text string,
+	userID,
+	chatID int64,
+	username string,
+) *tgbotapi.Message {
 	commandLength := len(text)
-	if idx := strings.IndexByte(text, ' '); idx >= 0 {
+	if idx := strings.IndexByte(
+		text,
+		' ',
+	); idx >= 0 {
 		commandLength = idx
 	}
 	return &tgbotapi.Message{
@@ -685,7 +1105,12 @@ func commandMessage(text string, userID, chatID int64, username string) *tgbotap
 	}
 }
 
-func plainMessage(text string, userID, chatID int64, username string) *tgbotapi.Message {
+func plainMessage(
+	text string,
+	userID,
+	chatID int64,
+	username string,
+) *tgbotapi.Message {
 	return &tgbotapi.Message{
 		Text: text,
 		From: &tgbotapi.User{ID: userID, UserName: username},
@@ -693,14 +1118,23 @@ func plainMessage(text string, userID, chatID int64, username string) *tgbotapi.
 	}
 }
 
-func onlyMessageCallbackData(t *testing.T, msg tgbotapi.MessageConfig) string {
+func onlyMessageCallbackData(
+	t *testing.T,
+	msg tgbotapi.MessageConfig,
+) string {
 	t.Helper()
 	markup, ok := msg.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
 	if !ok {
-		t.Fatalf("reply markup type = %T, want InlineKeyboardMarkup", msg.ReplyMarkup)
+		t.Fatalf(
+			"reply markup type = %T, want InlineKeyboardMarkup",
+			msg.ReplyMarkup,
+		)
 	}
 	if len(markup.InlineKeyboard) != 1 || len(markup.InlineKeyboard[0]) != 1 {
-		t.Fatalf("unexpected reply markup: %+v", markup)
+		t.Fatalf(
+			"unexpected reply markup: %+v",
+			markup,
+		)
 	}
 	data := markup.InlineKeyboard[0][0].CallbackData
 	if data == nil {

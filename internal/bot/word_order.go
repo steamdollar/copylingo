@@ -2,29 +2,17 @@ package bot
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/redis/go-redis/v9"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
-
-// Keep drafts alive for exactly as long as the active-session working set.
-// Drafts are intentionally separate keys so a tap does not rewrite the full
-// ActiveSessionState blob.
-const wordOrderDraftTTL = 24 * time.Hour
-
-func wordOrderDraftKey(sessionID, questionID int) string {
-	return config.WordOrderDraftRedisKey.Format(sessionID, questionID)
-}
 
 func wordOrderShuffleOrder(sessionID, questionID, count int) []int {
 	if count <= 0 {
@@ -51,39 +39,31 @@ func validWordOrderSelection(selection []int, optionCount int) bool {
 }
 
 func (sf *SessionFlow) getWordOrderDraft(ctx context.Context, sessionID, questionID, optionCount int) ([]int, error) {
-	if sf.bot == nil || sf.bot.rdb == nil {
+	if sf.bot == nil || sf.bot.drafts == nil {
 		return nil, nil
 	}
-	raw, err := sf.bot.rdb.Get(ctx, wordOrderDraftKey(sessionID, questionID)).Result()
+	selection, err := sf.bot.drafts.GetWordOrderDraft(ctx, sessionID, questionID)
 	if err != nil {
-		if err == redis.Nil {
-			return nil, nil
-		}
 		return nil, err
 	}
-	var selection []int
-	if err := json.Unmarshal([]byte(raw), &selection); err != nil || !validWordOrderSelection(selection, optionCount) {
+	if !validWordOrderSelection(selection, optionCount) {
 		// A corrupt/stale draft must not make a question impossible to answer.
-		_ = sf.bot.rdb.Del(ctx, wordOrderDraftKey(sessionID, questionID)).Err()
+		_ = sf.bot.drafts.DeleteWordOrderDraft(ctx, sessionID, questionID)
 		return nil, nil
 	}
 	return selection, nil
 }
 
 func (sf *SessionFlow) setWordOrderDraft(ctx context.Context, sessionID, questionID int, selection []int) error {
-	if sf.bot == nil || sf.bot.rdb == nil {
+	if sf.bot == nil || sf.bot.drafts == nil {
 		return fmt.Errorf("word order draft redis is unavailable")
 	}
-	raw, err := json.Marshal(selection)
-	if err != nil {
-		return err
-	}
-	return sf.bot.rdb.Set(ctx, wordOrderDraftKey(sessionID, questionID), raw, wordOrderDraftTTL).Err()
+	return sf.bot.drafts.SetWordOrderDraft(ctx, sessionID, questionID, selection)
 }
 
 func (sf *SessionFlow) deleteWordOrderDraft(ctx context.Context, sessionID, questionID int) {
-	if sf.bot != nil && sf.bot.rdb != nil {
-		_ = sf.bot.rdb.Del(ctx, wordOrderDraftKey(sessionID, questionID)).Err()
+	if sf.bot != nil && sf.bot.drafts != nil {
+		_ = sf.bot.drafts.DeleteWordOrderDraft(ctx, sessionID, questionID)
 	}
 }
 
@@ -167,11 +147,12 @@ func (sf *SessionFlow) wordOrderCurrentItem(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
 	sessionID, questionID int,
-) (*model.ActiveSessionState, *model.ActiveSessionQuestion, bool) {
-	if cb == nil || cb.From == nil || sf.bot == nil || sf.bot.services == nil || sf.bot.services.ActiveSession == nil {
+) (*model.QuizActiveSessionState, *model.QuizActiveSessionQuestion, bool) {
+	if cb == nil || cb.From == nil || sf.bot == nil || sf.bot.services == nil ||
+		sf.bot.services.QuizActiveSession == nil {
 		return nil, nil, false
 	}
-	state, err := sf.bot.services.ActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
 	if err != nil || state.Session.UserID != cb.From.ID {
 		return nil, nil, false
 	}
@@ -289,5 +270,13 @@ func (sf *SessionFlow) handleWordOrderCallback(ctx context.Context, cb *tgbotapi
 	}
 	text := wordOrderUpdatedText(cb.Message.Text, item.Question.Prompt, options, selection)
 	kb := wordOrderKeyboard(sessionID, questionID, options, selection)
+	if item.Question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
+		kb.InlineKeyboard = append(kb.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				"⚙️ 연결 자료 설정",
+				fmt.Sprintf(config.FormatQuestionPolicy, sessionID, questionID),
+			),
+		))
+	}
 	sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, kb)
 }

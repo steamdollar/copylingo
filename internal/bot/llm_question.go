@@ -5,17 +5,13 @@ import (
 	"fmt"
 	"html"
 	"log/slog"
-	"strconv"
 	"strings"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
-
-const llmModeTTL = 10 * time.Minute
 
 func (b *Bot) handleLLM(ctx context.Context, msg *tgbotapi.Message) {
 	if !b.isLLMAllowed(msg.From) {
@@ -26,13 +22,12 @@ func (b *Bot) handleLLM(ctx context.Context, msg *tgbotapi.Message) {
 		)
 		return
 	}
-	if b.rdb == nil {
+	if b.input == nil {
 		b.SendMessage(msg.Chat.ID, "❌ LLM mode를 활성화할 수 없습니다.")
 		return
 	}
 
-	key := config.UserLLMPendingRedisKey.Format(msg.From.ID)
-	if err := b.rdb.Set(ctx, key, "1", llmModeTTL).Err(); err != nil {
+	if err := b.input.SetLLMPending(ctx, msg.From.ID, model.PendingLLMInput{Kind: model.PendingLLMPlain}); err != nil {
 		slog.ErrorContext(ctx, "Failed to activate LLM mode",
 			"event", "telegram.llm.activate_failed",
 			"user_id", msg.From.ID,
@@ -57,13 +52,12 @@ func (b *Bot) handleLLMCancel(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
 		return
 	}
-	if b.rdb == nil {
+	if b.input == nil {
 		b.SendMessage(cb.Message.Chat.ID, "❌ LLM mode를 취소할 수 없습니다.")
 		return
 	}
 
-	key := config.UserLLMPendingRedisKey.Format(cb.From.ID)
-	if err := b.rdb.Del(ctx, key).Err(); err != nil {
+	if err := b.input.DeleteLLMPending(ctx, cb.From.ID); err != nil {
 		slog.ErrorContext(ctx, "Failed to cancel LLM mode",
 			"event", "telegram.llm.cancel_failed",
 			"user_id", cb.From.ID,
@@ -76,12 +70,11 @@ func (b *Bot) handleLLMCancel(ctx context.Context, cb *tgbotapi.CallbackQuery) {
 }
 
 func (b *Bot) handleLLMQuestion(ctx context.Context, msg *tgbotapi.Message) bool {
-	if msg.From == nil || b.rdb == nil {
+	if msg.From == nil || b.input == nil {
 		return false
 	}
-	key := config.UserLLMPendingRedisKey.Format(msg.From.ID)
-	pendingVal, err := b.rdb.GetDel(ctx, key).Result()
-	if err != nil {
+	pendingInput, found, err := b.input.TakeLLMPending(ctx, msg.From.ID)
+	if err != nil || !found {
 		return false
 	}
 
@@ -117,9 +110,9 @@ func (b *Bot) handleLLMQuestion(ctx context.Context, msg *tgbotapi.Message) bool
 	b.SendMessage(msg.Chat.ID, "🤖 AI가 답변을 생성 중입니다...")
 	// in-quiz "ask" 버튼 경로면 그 문제의 원문/정답/해설/사용자 답을 프롬프트에 실어준다.
 	llmPrompt := question
-	if quizContext := b.loadQuizQuestionContext(ctx, pendingVal); quizContext != "" {
+	if quizContext := b.loadQuizQuestionContext(ctx, pendingInput); quizContext != "" {
 		llmPrompt = quizContext + "\n\n위 문제에 대한 사용자의 질문에 답해 주세요.\n[질문] " + question
-	} else if studyContext := b.loadStudyMaterialContext(ctx, pendingVal, msg.From.ID); studyContext != "" {
+	} else if studyContext := b.loadStudyMaterialContext(ctx, pendingInput, msg.From.ID); studyContext != "" {
 		llmPrompt = studyContext + "\n\n위 Study Material에 대한 사용자의 질문에 답해 주세요.\n[질문] " + question
 	}
 	answer, err := b.services.LLM.AnswerLearningQuestion(ctx, llmPrompt)
@@ -138,31 +131,19 @@ func (b *Bot) handleLLMQuestion(ctx context.Context, msg *tgbotapi.Message) bool
 	return true
 }
 
-// loadQuizQuestionContext renders the just-answered question's context block for the in-quiz
-// LLM "ask" flow. pendingVal is the UserLLMPendingRedisKey value: "1" (plain /llm) yields no
-// context; "q:{sessionID}:{questionID}" loads the question from the active session. Returns ""
-// on any miss (expired session, bad token) so the caller falls back to a plain LLM answer.
-func (b *Bot) loadQuizQuestionContext(ctx context.Context, pendingVal string) string {
-	if pendingVal == "" || pendingVal == "1" {
+// The Redis adapter turns stored tokens into typed input; invalid tokens remain plain questions.
+func (b *Bot) loadQuizQuestionContext(ctx context.Context, input model.PendingLLMInput) string {
+	if input.Kind != model.PendingLLMQuizQuestion {
 		return ""
 	}
-	parts := strings.Split(pendingVal, ":")
-	if len(parts) != 3 || parts[0] != "q" {
+	if b.services == nil || b.services.QuizActiveSession == nil {
 		return ""
 	}
-	sessionID, err1 := strconv.Atoi(parts[1])
-	questionID, err2 := strconv.Atoi(parts[2])
-	if err1 != nil || err2 != nil {
-		return ""
-	}
-	if b.services == nil || b.services.ActiveSession == nil {
-		return ""
-	}
-	state, err := b.services.ActiveSession.Get(ctx, sessionID)
+	state, err := b.services.QuizActiveSession.Get(ctx, input.SessionID)
 	if err != nil {
 		return ""
 	}
-	item, ok := state.ItemByQuestionID(questionID)
+	item, ok := state.ItemByQuestionID(input.QuestionID)
 	if !ok {
 		return ""
 	}
@@ -179,22 +160,16 @@ func (b *Bot) loadQuizQuestionContext(ctx context.Context, pendingVal string) st
 // loadStudyMaterialContext resolves a pending Study Material token into a
 // user-owned active-session card. Invalid, stale, or completed session tokens
 // intentionally fall back to a plain LLM question.
-func (b *Bot) loadStudyMaterialContext(ctx context.Context, pendingVal string, userID int64) string {
-	parts := strings.Split(pendingVal, ":")
-	if len(parts) != 3 || parts[0] != "study" {
-		return ""
-	}
-	sessionID, err1 := strconv.Atoi(parts[1])
-	materialOrder, err2 := strconv.Atoi(parts[2])
-	if err1 != nil || err2 != nil || b.services == nil || b.services.StudyActiveSession == nil {
+func (b *Bot) loadStudyMaterialContext(ctx context.Context, input model.PendingLLMInput, userID int64) string {
+	if input.Kind != model.PendingLLMStudyMaterial || b.services == nil || b.services.StudyActiveSession == nil {
 		return ""
 	}
 
-	state, err := b.services.StudyActiveSession.GetOwned(ctx, sessionID, userID)
+	state, err := b.services.StudyActiveSession.GetOwned(ctx, input.SessionID, userID)
 	if err != nil || state.Session.Status == model.SessionCompleted {
 		return ""
 	}
-	item, idx, ok := state.ItemByOrder(materialOrder)
+	item, idx, ok := state.ItemByOrder(input.MaterialOrder)
 	if !ok {
 		return ""
 	}

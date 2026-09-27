@@ -25,29 +25,29 @@ type graderUserRepo interface {
 	UpdateStreak(ctx context.Context, userID int64) error
 }
 
-type graderActiveSession interface {
-	Get(ctx context.Context, sessionID int) (*model.ActiveSessionState, error)
+type graderQuizActiveSession interface {
+	Get(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
 	RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
-	Flush(ctx context.Context, sessionID int, userID int64) (*SessionResult, error)
+	Flush(ctx context.Context, sessionID int, userID int64) (*QuizSessionResult, error)
 	Delete(ctx context.Context, sessionID int) error
 }
 
 // GraderService handles answer grading and result processing.
 type GraderService struct {
-	userRepo      graderUserRepo
-	activeSession graderActiveSession
-	llm           graderLLM
+	userRepo          graderUserRepo
+	quizActiveSession graderQuizActiveSession
+	llm               graderLLM
 }
 
 func NewGraderService(
 	userRepo graderUserRepo,
-	activeSession graderActiveSession,
+	quizActiveSession graderQuizActiveSession,
 	llm graderLLM,
 ) *GraderService {
 	return &GraderService{
-		userRepo:      userRepo,
-		activeSession: activeSession,
-		llm:           llm,
+		userRepo:          userRepo,
+		quizActiveSession: quizActiveSession,
+		llm:               llm,
 	}
 }
 
@@ -57,7 +57,7 @@ func (g *GraderService) GradeAnswer(
 	sessionID, questionID int,
 	userAnswer string,
 ) (bool, string, error) {
-	question, err := g.questionFromActiveSession(ctx, sessionID, questionID)
+	question, err := g.questionFromQuizActiveSession(ctx, sessionID, questionID)
 	if err != nil {
 		return false, "", err
 	}
@@ -107,7 +107,7 @@ func (g *GraderService) GradeHandwriting(
 	sessionID, questionID int,
 	renderedImage []byte,
 ) (bool, string, error) {
-	question, err := g.questionFromActiveSession(ctx, sessionID, questionID)
+	question, err := g.questionFromQuizActiveSession(ctx, sessionID, questionID)
 	if err != nil {
 		return false, "", err
 	}
@@ -174,18 +174,18 @@ func (g *GraderService) recordGradingResult(
 	userAnswer string,
 	isCorrect bool,
 ) error {
-	if g.activeSession == nil {
-		return ErrActiveSessionDependencyMissing
+	if g.quizActiveSession == nil {
+		return ErrQuizActiveSessionDependencyMissing
 	}
-	return g.activeSession.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect)
+	return g.quizActiveSession.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect)
 }
 
 // CompleteSession finalizes a session with results.
-func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, userID int64) (*SessionResult, error) {
-	if g.activeSession == nil {
-		return nil, ErrActiveSessionDependencyMissing
+func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, userID int64) (*QuizSessionResult, error) {
+	if g.quizActiveSession == nil {
+		return nil, ErrQuizActiveSessionDependencyMissing
 	}
-	result, err := g.activeSession.Flush(ctx, sessionID, userID)
+	result, err := g.quizActiveSession.Flush(ctx, sessionID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -195,21 +195,21 @@ func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, user
 		return nil, err
 	}
 
-	if err := g.activeSession.Delete(ctx, sessionID); err != nil {
+	if err := g.quizActiveSession.Delete(ctx, sessionID); err != nil {
 		return nil, err
 	}
 
 	return result, nil
 }
 
-func (g *GraderService) questionFromActiveSession(
+func (g *GraderService) questionFromQuizActiveSession(
 	ctx context.Context,
 	sessionID, questionID int,
 ) (*model.Question, error) {
-	if g.activeSession == nil {
-		return nil, ErrActiveSessionDependencyMissing
+	if g.quizActiveSession == nil {
+		return nil, ErrQuizActiveSessionDependencyMissing
 	}
-	state, err := g.activeSession.Get(ctx, sessionID)
+	state, err := g.quizActiveSession.Get(ctx, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (g *GraderService) questionFromActiveSession(
 	if !ok {
 		return nil, fmt.Errorf(
 			"%w session_id=%d question_id=%d",
-			ErrActiveSessionQuestionNotFound,
+			ErrQuizActiveSessionQuestionNotFound,
 			sessionID,
 			questionID,
 		)
@@ -225,7 +225,7 @@ func (g *GraderService) questionFromActiveSession(
 	if item.SessionQuestion.IsCorrect != nil {
 		return nil, fmt.Errorf(
 			"%w session_id=%d question_id=%d",
-			ErrActiveSessionAlreadyAnswered,
+			ErrQuizActiveSessionAlreadyAnswered,
 			sessionID,
 			questionID,
 		)

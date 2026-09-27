@@ -21,47 +21,101 @@ type StudyFlow struct {
 	bot *Bot
 }
 
+type studySessionPushMessage struct {
+	text        string
+	startButton string
+}
+
+// Keep the push text and button label together for future UI locale selection.
+var studySessionPushMessages = map[string]studySessionPushMessage{
+	"ko": {
+		text: "📚 <b>Study Session이 도착했습니다!</b>\n\n" +
+			"현재 레벨에 맞춘 Study Material을 짧게 훑고 가세요.",
+		startButton: "▶️ 시작하기",
+	},
+}
+
 func NewStudyFlow(bot *Bot) *StudyFlow {
 	return &StudyFlow{bot: bot}
 }
 
-func (sf *StudyFlow) PushSession(ctx context.Context, chatID int64, sessionID int) error {
-	text := "📚 <b>Study Session이 도착했습니다!</b>\n\n현재 레벨에 맞춘 Study Material을 짧게 훑고 가세요."
+func (sf *StudyFlow) PushSession(
+	ctx context.Context,
+	chatID int64,
+	sessionID int,
+) error {
+	message := studySessionPushMessages["ko"]
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("▶️ 시작하기", fmt.Sprintf(config.FormatStudyStart, sessionID)),
+			tgbotapi.NewInlineKeyboardButtonData(
+				message.startButton,
+				fmt.Sprintf(
+					config.FormatStudyStart,
+					sessionID,
+				),
+			),
 		),
 	)
-	return sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
+	return sf.bot.SendMessageWithKeyboard(
+		chatID,
+		message.text,
+		keyboard,
+	)
 }
 
-func (sf *StudyFlow) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
-	if cb.Message == nil {
+func (sf *StudyFlow) HandleCallback(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+) {
+	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
 		return
 	}
 
-	parts := strings.Split(cb.Data, ":")
+	// e.g. "study:42:next:3"
+	parts := strings.Split(
+		cb.Data,
+		":",
+	)
 	if len(parts) < 3 {
 		return
 	}
 
 	sessionID, err := strconv.Atoi(parts[1])
 	if err != nil {
-		slog.WarnContext(ctx, "Invalid study session ID in callback",
-			"event", "telegram.study.invalid_session_id",
-			"callback_type", parts[0],
+		slog.WarnContext(
+			ctx,
+			"Invalid study session ID in callback",
+			"event",
+			"telegram.study.invalid_session_id",
+			"callback_type",
+			parts[0],
 		)
 		return
 	}
 
 	switch parts[2] {
+	case "policy", "card":
+		sf.handleMaterialPreference(
+			ctx,
+			cb,
+			parts,
+		)
 	case "start":
-		sf.startSession(ctx, cb, sessionID)
+		sf.startSession(
+			ctx,
+			cb,
+			sessionID,
+		)
 	case "ask":
 		if len(parts) < 4 {
 			return
 		}
-		sf.handleAskLLMQuestion(ctx, cb, sessionID, parts[3])
+		sf.handleAskLLMQuestion(
+			ctx,
+			cb,
+			sessionID,
+			parts[3],
+		)
 	case "next":
 		if len(parts) < 4 {
 			return
@@ -70,7 +124,12 @@ func (sf *StudyFlow) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQu
 		if err != nil {
 			return
 		}
-		sf.nextMaterial(ctx, cb, sessionID, currentOrder)
+		sf.nextMaterial(
+			ctx,
+			cb,
+			sessionID,
+			currentOrder,
+		)
 	case "prev":
 		if len(parts) < 4 {
 			return
@@ -79,7 +138,12 @@ func (sf *StudyFlow) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQu
 		if err != nil {
 			return
 		}
-		sf.prevMaterial(ctx, cb, sessionID, currentOrder)
+		sf.prevMaterial(
+			ctx,
+			cb,
+			sessionID,
+			currentOrder,
+		)
 	case "finish":
 		if len(parts) < 4 {
 			return
@@ -88,26 +152,48 @@ func (sf *StudyFlow) HandleCallback(ctx context.Context, cb *tgbotapi.CallbackQu
 		if err != nil {
 			return
 		}
-		sf.finishSession(ctx, cb, sessionID, currentOrder)
+		sf.finishSession(
+			ctx,
+			cb,
+			sessionID,
+			currentOrder,
+		)
 	}
 }
 
-func (sf *StudyFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID int) {
-	state, err := sf.bot.services.StudyActiveSession.Start(ctx, sessionID, cb.From.ID)
+func (sf *StudyFlow) startSession(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	sessionID int,
+) {
+	state, err := sf.bot.services.StudyActiveSession.Start(
+		ctx,
+		sessionID,
+		cb.From.ID,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to start study active session",
-			"event", "telegram.study.active_start_failed",
-			"session_id", sessionID,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to start study active session",
+			"event",
+			"telegram.study.active_start_failed",
+			"session_id",
+			sessionID,
+			"error",
+			err,
 		)
-		sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID,
+		sf.bot.EditMessage(
+			cb.Message.Chat.ID,
+			cb.Message.MessageID,
 			"❌ Study Session을 시작하지 못했습니다.",
 			mainMenuKeyboard(),
 		)
 		return
 	}
 	if state.Session.Status == model.SessionCompleted {
-		sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID,
+		sf.bot.EditMessage(
+			cb.Message.Chat.ID,
+			cb.Message.MessageID,
 			"✅ 이미 완료한 Study Session입니다.",
 			mainMenuKeyboard(),
 		)
@@ -115,64 +201,152 @@ func (sf *StudyFlow) startSession(ctx context.Context, cb *tgbotapi.CallbackQuer
 	}
 
 	nextOrder := nextUnstudiedMaterialOrder(state)
-	sf.showMaterial(ctx, cb.Message.Chat.ID, &cb.Message.MessageID, state, nextOrder)
+	sf.showMaterial(
+		ctx,
+		cb.Message.Chat.ID,
+		&cb.Message.MessageID,
+		state,
+		nextOrder,
+	)
 }
 
-func (sf *StudyFlow) nextMaterial(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, currentOrder int) {
-	state, err := sf.bot.services.StudyActiveSession.MarkStudied(ctx, sessionID, cb.From.ID, currentOrder)
+func (sf *StudyFlow) nextMaterial(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	sessionID,
+	currentOrder int,
+) {
+	state, err := sf.bot.services.StudyActiveSession.MarkStudied(
+		ctx,
+		sessionID,
+		cb.From.ID,
+		currentOrder,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to mark study material",
-			"event", "telegram.study.material_mark_failed",
-			"session_id", sessionID,
-			"material_order", currentOrder,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to mark study material",
+			"event",
+			"telegram.study.material_mark_failed",
+			"session_id",
+			sessionID,
+			"material_order",
+			currentOrder,
+			"error",
+			err,
 		)
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ Study 진행 상태를 저장하지 못했습니다.")
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ Study 진행 상태를 저장하지 못했습니다.",
+		)
 		return
 	}
 
-	sf.showMaterial(ctx, cb.Message.Chat.ID, &cb.Message.MessageID, state, currentOrder+1)
+	sf.showMaterial(
+		ctx,
+		cb.Message.Chat.ID,
+		&cb.Message.MessageID,
+		state,
+		currentOrder+1,
+	)
 }
 
 // prevMaterial re-shows an already-seen card; it never mutates studied state.
-func (sf *StudyFlow) prevMaterial(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, currentOrder int) {
-	state, err := sf.bot.services.StudyActiveSession.GetOwned(ctx, sessionID, cb.From.ID)
+func (sf *StudyFlow) prevMaterial(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	sessionID,
+	currentOrder int,
+) {
+	state, err := sf.bot.services.StudyActiveSession.GetOwned(
+		ctx,
+		sessionID,
+		cb.From.ID,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to load study session for prev material",
-			"event", "telegram.study.material_prev_failed",
-			"session_id", sessionID,
-			"material_order", currentOrder,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to load study session for prev material",
+			"event",
+			"telegram.study.material_prev_failed",
+			"session_id",
+			sessionID,
+			"material_order",
+			currentOrder,
+			"error",
+			err,
 		)
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ Study 진행 상태를 불러오지 못했습니다.")
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ Study 진행 상태를 불러오지 못했습니다.",
+		)
 		return
 	}
 
-	sf.showMaterial(ctx, cb.Message.Chat.ID, &cb.Message.MessageID, state, currentOrder-1)
+	sf.showMaterial(
+		ctx,
+		cb.Message.Chat.ID,
+		&cb.Message.MessageID,
+		state,
+		currentOrder-1,
+	)
 }
 
-func (sf *StudyFlow) finishSession(ctx context.Context, cb *tgbotapi.CallbackQuery, sessionID, currentOrder int) {
-	if _, err := sf.bot.services.StudyActiveSession.MarkStudied(ctx, sessionID, cb.From.ID, currentOrder); err != nil {
-		slog.ErrorContext(ctx, "Failed to mark final study material",
-			"event", "telegram.study.final_material_mark_failed",
-			"session_id", sessionID,
-			"material_order", currentOrder,
-			"error", err,
+func (sf *StudyFlow) finishSession(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	sessionID,
+	currentOrder int,
+) {
+	if _, err := sf.bot.services.StudyActiveSession.MarkStudied(
+		ctx,
+		sessionID,
+		cb.From.ID,
+		currentOrder,
+	); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to mark final study material",
+			"event",
+			"telegram.study.final_material_mark_failed",
+			"session_id",
+			sessionID,
+			"material_order",
+			currentOrder,
+			"error",
+			err,
 		)
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ Study 완료 상태를 저장하지 못했습니다.")
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ Study 완료 상태를 저장하지 못했습니다.",
+		)
 		return
 	}
-	if err := sf.bot.services.StudyActiveSession.Complete(ctx, sessionID, cb.From.ID); err != nil {
-		slog.ErrorContext(ctx, "Failed to complete study session",
-			"event", "telegram.study.complete_failed",
-			"session_id", sessionID,
-			"error", err,
+	if err := sf.bot.services.StudyActiveSession.Complete(
+		ctx,
+		sessionID,
+		cb.From.ID,
+	); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to complete study session",
+			"event",
+			"telegram.study.complete_failed",
+			"session_id",
+			sessionID,
+			"error",
+			err,
 		)
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ Study Session을 완료하지 못했습니다.")
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ Study Session을 완료하지 못했습니다.",
+		)
 		return
 	}
 
-	sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID,
+	sf.bot.EditMessage(
+		cb.Message.Chat.ID,
+		cb.Message.MessageID,
 		"✅ <b>Study Session 완료!</b>\n\n학습한 Material 이력이 저장됐습니다.",
 		mainMenuKeyboard(),
 	)
@@ -187,36 +361,66 @@ func (sf *StudyFlow) showMaterial(
 ) {
 	items := state.Items
 	if len(items) == 0 {
-		sf.bot.SendMessage(chatID, "⚠️ 표시할 Study Material이 없습니다.")
+		sf.bot.SendMessage(
+			chatID,
+			"⚠️ 표시할 Study Material이 없습니다.",
+		)
 		return
 	}
 	if materialOrder < 0 {
 		materialOrder = 0
 	}
 	if materialOrder >= len(items) {
-		if err := sf.bot.services.StudyActiveSession.Complete(ctx, state.Session.ID, state.Session.UserID); err != nil {
-			slog.ErrorContext(ctx, "Failed to auto-complete study session",
-				"event", "telegram.study.auto_complete_failed",
-				"session_id", state.Session.ID,
-				"error", err,
+		if err := sf.bot.services.StudyActiveSession.Complete(
+			ctx,
+			state.Session.ID,
+			state.Session.UserID,
+		); err != nil {
+			slog.ErrorContext(
+				ctx,
+				"Failed to auto-complete study session",
+				"event",
+				"telegram.study.auto_complete_failed",
+				"session_id",
+				state.Session.ID,
+				"error",
+				err,
 			)
 		}
-		sf.bot.SendMessage(chatID, "✅ Study Session을 완료했습니다.")
+		sf.bot.SendMessage(
+			chatID,
+			"✅ Study Session을 완료했습니다.",
+		)
 		return
 	}
-	idx := studyMaterialIndexByOrder(items, materialOrder)
+	idx := studyMaterialIndexByOrder(
+		items,
+		materialOrder,
+	)
 	if idx == -1 {
-		slog.WarnContext(ctx, "Study material order not found",
-			"event", "telegram.study.material_order_missing",
-			"session_id", state.Session.ID,
-			"material_order", materialOrder,
+		slog.WarnContext(
+			ctx,
+			"Study material order not found",
+			"event",
+			"telegram.study.material_order_missing",
+			"session_id",
+			state.Session.ID,
+			"material_order",
+			materialOrder,
 		)
-		sf.bot.SendMessage(chatID, "⚠️ Study Material 순서를 찾지 못했습니다.")
+		sf.bot.SendMessage(
+			chatID,
+			"⚠️ Study Material 순서를 찾지 못했습니다.",
+		)
 		return
 	}
 
 	item := items[idx]
-	text := renderStudyMaterial(item.Material, idx, len(items))
+	text := renderStudyMaterial(
+		item.Material,
+		idx,
+		len(items),
+	)
 	keyboard := studyMaterialKeyboard(
 		state.Session.ID,
 		item.SessionMaterial.MaterialOrder,
@@ -224,44 +428,105 @@ func (sf *StudyFlow) showMaterial(
 		idx == len(items)-1,
 		sf.bot.isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
 	)
+	if sf.bot.services != nil && sf.bot.services.MaterialPreference != nil {
+		keyboard.InlineKeyboard = append(
+			keyboard.InlineKeyboard,
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					"⚙️ 학습 설정",
+					fmt.Sprintf(
+						config.FormatStudyPolicy,
+						state.Session.ID,
+						item.SessionMaterial.MaterialID,
+					),
+				),
+			),
+		)
+	}
 
 	if editMessageID != nil {
-		sf.bot.EditMessage(chatID, *editMessageID, text, &keyboard)
+		sf.bot.EditMessage(
+			chatID,
+			*editMessageID,
+			text,
+			&keyboard,
+		)
 		return
 	}
-	sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
+	sf.bot.SendMessageWithKeyboard(
+		chatID,
+		text,
+		keyboard,
+	)
 }
 
 func studyMaterialKeyboard(
-	sessionID, materialOrder int,
-	isFirst, isLast, showAskLLM bool,
+	sessionID,
+	materialOrder int,
+	isFirst,
+	isLast,
+	showAskLLM bool,
 ) tgbotapi.InlineKeyboardMarkup {
-	buttons := make([]tgbotapi.InlineKeyboardButton, 0, 2)
+	buttons := make(
+		[]tgbotapi.InlineKeyboardButton,
+		0,
+		2,
+	)
 	if !isFirst {
-		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
-			"← 이전",
-			fmt.Sprintf(config.FormatStudyPrev, sessionID, materialOrder),
-		))
+		buttons = append(
+			buttons,
+			tgbotapi.NewInlineKeyboardButtonData(
+				"← 이전",
+				fmt.Sprintf(
+					config.FormatStudyPrev,
+					sessionID,
+					materialOrder,
+				),
+			),
+		)
 	}
 	if isLast {
-		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
-			"✅ 완료",
-			fmt.Sprintf(config.FormatStudyFinish, sessionID, materialOrder),
-		))
+		buttons = append(
+			buttons,
+			tgbotapi.NewInlineKeyboardButtonData(
+				"✅ 완료",
+				fmt.Sprintf(
+					config.FormatStudyFinish,
+					sessionID,
+					materialOrder,
+				),
+			),
+		)
 	} else {
-		buttons = append(buttons, tgbotapi.NewInlineKeyboardButtonData(
-			"다음 →",
-			fmt.Sprintf(config.FormatStudyNext, sessionID, materialOrder),
-		))
+		buttons = append(
+			buttons,
+			tgbotapi.NewInlineKeyboardButtonData(
+				"다음 →",
+				fmt.Sprintf(
+					config.FormatStudyNext,
+					sessionID,
+					materialOrder,
+				),
+			),
+		)
 	}
 	rows := [][]tgbotapi.InlineKeyboardButton{
 		tgbotapi.NewInlineKeyboardRow(buttons...),
 	}
 	if showAskLLM {
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🤖 질문",
-				fmt.Sprintf(config.FormatStudyAskLLM, sessionID, materialOrder)),
-		))
+		rows = append(
+			rows,
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					"🤖 질문",
+					fmt.Sprintf(
+						config.FormatStudyAskLLM,
+						sessionID,
+						materialOrder,
+					),
+				),
+			),
+		)
 	}
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -282,44 +547,85 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 	if err != nil {
 		return
 	}
-	if sf.bot.rdb == nil || sf.bot.services == nil || sf.bot.services.StudyActiveSession == nil {
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
+	if sf.bot.input == nil || sf.bot.services == nil || sf.bot.services.StudyActiveSession == nil {
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ LLM 질문을 활성화할 수 없습니다.",
+		)
 		return
 	}
 
-	state, err := sf.bot.services.StudyActiveSession.GetOwned(ctx, sessionID, cb.From.ID)
+	state, err := sf.bot.services.StudyActiveSession.GetOwned(
+		ctx,
+		sessionID,
+		cb.From.ID,
+	)
 	if err != nil || state.Session.Status == model.SessionCompleted {
-		slog.WarnContext(ctx, "Rejected study LLM question activation",
-			"event", "telegram.llm.study_activate_rejected",
-			"session_id", sessionID,
-			"material_order", materialOrder,
-			"error", err,
+		slog.WarnContext(
+			ctx,
+			"Rejected study LLM question activation",
+			"event",
+			"telegram.llm.study_activate_rejected",
+			"session_id",
+			sessionID,
+			"material_order",
+			materialOrder,
+			"error",
+			err,
 		)
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ 현재 Study Material의 질문을 준비할 수 없습니다.")
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ 현재 Study Material의 질문을 준비할 수 없습니다.",
+		)
 		return
 	}
 	if _, _, ok := state.ItemByOrder(materialOrder); !ok {
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ Study Material을 찾을 수 없습니다.")
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ Study Material을 찾을 수 없습니다.",
+		)
 		return
 	}
 
-	key := config.UserLLMPendingRedisKey.Format(cb.From.ID)
-	val := fmt.Sprintf("study:%d:%d", sessionID, materialOrder)
-	if err := sf.bot.rdb.Set(ctx, key, val, llmModeTTL).Err(); err != nil {
-		slog.ErrorContext(ctx, "Failed to activate in-study LLM mode",
-			"event", "telegram.llm.study_activate_failed",
-			"session_id", sessionID,
-			"material_order", materialOrder,
-			"error", err,
+	input := model.PendingLLMInput{
+		Kind:          model.PendingLLMStudyMaterial,
+		SessionID:     sessionID,
+		MaterialOrder: materialOrder,
+	}
+	if err := sf.bot.input.SetLLMPending(
+		ctx,
+		cb.From.ID,
+		input,
+	); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to activate in-study LLM mode",
+			"event",
+			"telegram.llm.study_activate_failed",
+			"session_id",
+			sessionID,
+			"material_order",
+			materialOrder,
+			"error",
+			err,
 		)
-		sf.bot.SendMessage(cb.Message.Chat.ID, "❌ LLM 질문을 활성화할 수 없습니다.")
+		sf.bot.SendMessage(
+			cb.Message.Chat.ID,
+			"❌ LLM 질문을 활성화할 수 없습니다.",
+		)
 		return
 	}
-	sf.bot.SendMessageWithKeyboard(cb.Message.Chat.ID,
-		"🤖 이 Study Material에 대해 궁금한 점을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.", llmCancelKeyboard())
+	sf.bot.SendMessageWithKeyboard(
+		cb.Message.Chat.ID,
+		"🤖 이 Study Material에 대해 궁금한 점을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.",
+		llmCancelKeyboard(),
+	)
 }
 
-func studyMaterialIndexByOrder(items []model.StudySessionMaterial, materialOrder int) int {
+func studyMaterialIndexByOrder(
+	items []model.StudySessionMaterial,
+	materialOrder int,
+) int {
 	for idx, item := range items {
 		if item.SessionMaterial.MaterialOrder == materialOrder {
 			return idx
@@ -343,10 +649,21 @@ type vocabularyStudyPayload struct {
 	PartOfSpeech string `json:"part_of_speech"`
 }
 
-func renderStudyMaterial(material model.Material, idx, total int) string {
-	header := fmt.Sprintf("📚 <b>Study Session</b>\n\n<b>%d/%d · %s</b>\n\n",
-		idx+1, total, escapeHTML(materialCategoryLabel(material.Category)))
-	title := fmt.Sprintf("<b>%s</b>", escapeHTML(material.Title))
+func renderStudyMaterial(
+	material model.Material,
+	idx,
+	total int,
+) string {
+	header := fmt.Sprintf(
+		"📚 <b>Study Session</b>\n\n<b>%d/%d · %s</b>\n\n",
+		idx+1,
+		total,
+		escapeHTML(materialCategoryLabel(material.Category)),
+	)
+	title := fmt.Sprintf(
+		"<b>%s</b>",
+		escapeHTML(material.Title),
+	)
 
 	switch material.Category {
 	case model.MaterialCategoryVocabulary:
@@ -362,27 +679,61 @@ func renderStudyMaterial(material model.Material, idx, total int) string {
 
 func renderVocabularyPayload(payload json.RawMessage) string {
 	var vocab vocabularyStudyPayload
-	if err := json.Unmarshal(payload, &vocab); err != nil {
+	if err := json.Unmarshal(
+		payload,
+		&vocab,
+	); err != nil {
 		return renderGenericPayload(payload)
 	}
 
-	lines := make([]string, 0, 4)
+	lines := make(
+		[]string,
+		0,
+		4,
+	)
 	if strings.TrimSpace(vocab.Kana) != "" {
-		lines = append(lines, fmt.Sprintf("읽기: <b>%s</b>", escapeHTML(vocab.Kana)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"읽기: <b>%s</b>",
+				escapeHTML(vocab.Kana),
+			),
+		)
 	}
 	if strings.TrimSpace(vocab.Kanji) != "" {
-		lines = append(lines, fmt.Sprintf("표기: <b>%s</b>", escapeHTML(vocab.Kanji)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"표기: <b>%s</b>",
+				escapeHTML(vocab.Kanji),
+			),
+		)
 	}
 	if strings.TrimSpace(vocab.MeaningKo) != "" {
-		lines = append(lines, fmt.Sprintf("의미: <b>%s</b>", escapeHTML(vocab.MeaningKo)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"의미: <b>%s</b>",
+				escapeHTML(vocab.MeaningKo),
+			),
+		)
 	}
 	if strings.TrimSpace(vocab.PartOfSpeech) != "" {
-		lines = append(lines, fmt.Sprintf("품사: <b>%s</b>", escapeHTML(vocab.PartOfSpeech)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"품사: <b>%s</b>",
+				escapeHTML(vocab.PartOfSpeech),
+			),
+		)
 	}
 	if len(lines) == 0 {
 		return ""
 	}
-	return "\n\n" + strings.Join(lines, "\n")
+	return "\n\n" + strings.Join(
+		lines,
+		"\n",
+	)
 }
 
 type grammarStudyPayload struct {
@@ -396,30 +747,70 @@ type grammarStudyPayload struct {
 
 func renderGrammarPayload(payload json.RawMessage) string {
 	var grammar grammarStudyPayload
-	if err := json.Unmarshal(payload, &grammar); err != nil {
+	if err := json.Unmarshal(
+		payload,
+		&grammar,
+	); err != nil {
 		return renderGenericPayload(payload)
 	}
 
-	lines := make([]string, 0, 4)
+	lines := make(
+		[]string,
+		0,
+		4,
+	)
 	if strings.TrimSpace(grammar.MeaningKo) != "" {
-		lines = append(lines, fmt.Sprintf("의미: <b>%s</b>", escapeHTML(grammar.MeaningKo)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"의미: <b>%s</b>",
+				escapeHTML(grammar.MeaningKo),
+			),
+		)
 	}
 	if strings.TrimSpace(grammar.ExplanationKo) != "" {
-		lines = append(lines, fmt.Sprintf("설명: %s", escapeHTML(grammar.ExplanationKo)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"설명: %s",
+				escapeHTML(grammar.ExplanationKo),
+			),
+		)
 	}
 	if strings.TrimSpace(grammar.Example) != "" {
-		lines = append(lines, fmt.Sprintf("예문: <b>%s</b>", escapeHTML(grammar.Example)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"예문: <b>%s</b>",
+				escapeHTML(grammar.Example),
+			),
+		)
 	}
 	if strings.TrimSpace(grammar.ExampleReading) != "" {
-		lines = append(lines, fmt.Sprintf("읽기: %s", escapeHTML(grammar.ExampleReading)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"읽기: %s",
+				escapeHTML(grammar.ExampleReading),
+			),
+		)
 	}
 	if strings.TrimSpace(grammar.TranslationKo) != "" {
-		lines = append(lines, fmt.Sprintf("해석: %s", escapeHTML(grammar.TranslationKo)))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"해석: %s",
+				escapeHTML(grammar.TranslationKo),
+			),
+		)
 	}
 	if len(lines) == 0 {
 		return ""
 	}
-	return "\n\n" + strings.Join(lines, "\n")
+	return "\n\n" + strings.Join(
+		lines,
+		"\n",
+	)
 }
 
 type readingStudyVocabulary struct {
@@ -439,38 +830,82 @@ type readingStudyPayload struct {
 // stay out — they surface only in the quiz explanation (ADR-036).
 func renderReadingPayload(payload json.RawMessage) string {
 	var reading readingStudyPayload
-	if err := json.Unmarshal(payload, &reading); err != nil {
+	if err := json.Unmarshal(
+		payload,
+		&reading,
+	); err != nil {
 		return renderGenericPayload(payload)
 	}
 
-	sections := make([]string, 0, 3)
+	sections := make(
+		[]string,
+		0,
+		3,
+	)
 	if strings.TrimSpace(reading.Passage) != "" {
-		sections = append(sections, fmt.Sprintf("<b>%s</b>", escapeHTML(reading.Passage)))
+		sections = append(
+			sections,
+			fmt.Sprintf(
+				"<b>%s</b>",
+				escapeHTML(reading.Passage),
+			),
+		)
 	}
 	if strings.TrimSpace(reading.Reading) != "" {
-		sections = append(sections, fmt.Sprintf("읽기: %s", escapeHTML(reading.Reading)))
+		sections = append(
+			sections,
+			fmt.Sprintf(
+				"읽기: %s",
+				escapeHTML(reading.Reading),
+			),
+		)
 	}
-	vocabLines := make([]string, 0, len(reading.KeyVocabulary))
+	vocabLines := make(
+		[]string,
+		0,
+		len(reading.KeyVocabulary),
+	)
 	for _, vocab := range reading.KeyVocabulary {
 		if strings.TrimSpace(vocab.Surface) == "" {
 			continue
 		}
-		line := fmt.Sprintf("・<b>%s</b>", escapeHTML(vocab.Surface))
+		line := fmt.Sprintf(
+			"・<b>%s</b>",
+			escapeHTML(vocab.Surface),
+		)
 		if strings.TrimSpace(vocab.Reading) != "" && vocab.Reading != vocab.Surface {
-			line += fmt.Sprintf(" (%s)", escapeHTML(vocab.Reading))
+			line += fmt.Sprintf(
+				" (%s)",
+				escapeHTML(vocab.Reading),
+			)
 		}
 		if strings.TrimSpace(vocab.MeaningKo) != "" {
-			line += fmt.Sprintf(" — %s", escapeHTML(vocab.MeaningKo))
+			line += fmt.Sprintf(
+				" — %s",
+				escapeHTML(vocab.MeaningKo),
+			)
 		}
-		vocabLines = append(vocabLines, line)
+		vocabLines = append(
+			vocabLines,
+			line,
+		)
 	}
 	if len(vocabLines) > 0 {
-		sections = append(sections, "핵심 어휘:\n"+strings.Join(vocabLines, "\n"))
+		sections = append(
+			sections,
+			"핵심 어휘:\n"+strings.Join(
+				vocabLines,
+				"\n",
+			),
+		)
 	}
 	if len(sections) == 0 {
 		return ""
 	}
-	return "\n\n" + strings.Join(sections, "\n\n")
+	return "\n\n" + strings.Join(
+		sections,
+		"\n\n",
+	)
 }
 
 func renderGenericPayload(payload json.RawMessage) string {
@@ -478,7 +913,12 @@ func renderGenericPayload(payload json.RawMessage) string {
 		return ""
 	}
 	var out bytes.Buffer
-	if err := json.Indent(&out, payload, "", "  "); err != nil {
+	if err := json.Indent(
+		&out,
+		payload,
+		"",
+		"  ",
+	); err != nil {
 		return ""
 	}
 	return "\n\n<pre>" + escapeHTML(out.String()) + "</pre>"

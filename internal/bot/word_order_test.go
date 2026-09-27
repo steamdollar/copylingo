@@ -14,24 +14,24 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-func newWordOrderFixture(t *testing.T, options []string) (*SessionFlow, *testRedis, *mockBotAPI) {
+func newWordOrderFixture(t *testing.T, options []string) (*SessionFlow, *testInteractionStores, *mockBotAPI) {
 	t.Helper()
-	rdb := &testRedis{values: map[string]string{}}
-	active := service.NewActiveSessionService(nil, rdb, &mockSRS{})
+	stateStores := newTestInteractionStores()
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, &mockSRS{})
 	grader := service.NewGraderService(nil, active, &mockLLM{})
 	api := &mockBotAPI{}
 	b := &Bot{
-		api: api,
-		rdb: rdb,
+		api:   api,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			ActiveSession: active,
-			Grader:        grader,
+			QuizActiveSession: active,
+			Grader:            grader,
 		},
 	}
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: 7, UserID: 42},
-		Items: []model.ActiveSessionQuestion{{
+		Items: []model.QuizActiveSessionQuestion{{
 			SessionQuestion: model.SessionQuestion{QuestionID: 99},
 			Question: model.Question{
 				ID:            99,
@@ -42,8 +42,8 @@ func newWordOrderFixture(t *testing.T, options []string) (*SessionFlow, *testRed
 			},
 		}},
 	}
-	storeActiveState(t, rdb, 7, state)
-	return NewSessionFlow(b), rdb, api
+	storeActiveState(t, stateStores, 7, state)
+	return NewSessionFlow(b), stateStores, api
 }
 
 func mustTestJSON(t *testing.T, value any) []byte {
@@ -55,15 +55,11 @@ func mustTestJSON(t *testing.T, value any) []byte {
 	return raw
 }
 
-func draftSelection(t *testing.T, rdb *testRedis) []int {
+func draftSelection(t *testing.T, stateStores *testInteractionStores) []int {
 	t.Helper()
-	raw := rdb.values[config.WordOrderDraftRedisKey.Format(7, 99)]
-	if raw == "" {
-		return nil
-	}
-	var selection []int
-	if err := json.Unmarshal([]byte(raw), &selection); err != nil {
-		t.Fatalf("decode draft: %v", err)
+	selection, err := stateStores.GetWordOrderDraft(context.Background(), 7, 99)
+	if err != nil {
+		t.Fatalf("get draft: %v", err)
 	}
 	return selection
 }
@@ -91,7 +87,7 @@ func TestWordOrderShuffleDeterministic(t *testing.T) {
 }
 
 func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
-	sf, rdb, api := newWordOrderFixture(t, []string{"私", "は", "私", "です。"})
+	sf, stateStores, api := newWordOrderFixture(t, []string{"私", "は", "私", "です。"})
 	ctx := context.Background()
 	text, _, done := sf.renderByType(ctx, 42, nil, 7, 0, 1, model.Question{
 		ID:      99,
@@ -109,19 +105,19 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 	}
 	selectChunk(0)
 	selectChunk(2)
-	if got := draftSelection(t, rdb); !sameInts(got, []int{0, 2}) {
+	if got := draftSelection(t, stateStores); !sameInts(got, []int{0, 2}) {
 		t.Fatalf("repeated chunks must use original indices, got %v", got)
 	}
 	selectChunk(0)
-	if got := draftSelection(t, rdb); !sameInts(got, []int{0, 2}) {
+	if got := draftSelection(t, stateStores); !sameInts(got, []int{0, 2}) {
 		t.Fatalf("duplicate tap changed draft: %v", got)
 	}
 	sf.handleWordOrderCallback(ctx, cbWithMessage(fmt.Sprintf(config.FormatWordOrderUndo, 7, 99), 42, 1, 42))
-	if got := draftSelection(t, rdb); !sameInts(got, []int{0}) {
+	if got := draftSelection(t, stateStores); !sameInts(got, []int{0}) {
 		t.Fatalf("undo selection = %v, want [0]", got)
 	}
 	sf.handleWordOrderCallback(ctx, cbWithMessage(fmt.Sprintf(config.FormatWordOrderReset, 7, 99), 42, 1, 42))
-	if _, ok := rdb.values[wordOrderDraftKey(7, 99)]; ok {
+	if _, ok := stateStores.drafts[draftKey{7, 99}]; ok {
 		t.Fatal("reset must delete the draft key")
 	}
 	if len(api.sentMessages) == 0 {
@@ -130,7 +126,7 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 }
 
 func TestWordOrderRejectsStaleOwnerAndIndex(t *testing.T) {
-	sf, rdb, _ := newWordOrderFixture(t, []string{"私", "は", "です。"})
+	sf, stateStores, _ := newWordOrderFixture(t, []string{"私", "は", "です。"})
 	ctx := context.Background()
 	for _, cb := range []*tgbotapi.CallbackQuery{
 		cbWithMessage(fmtWordOrderSelect(7, 99, 99), 42, 1, 42), // invalid index
@@ -139,29 +135,29 @@ func TestWordOrderRejectsStaleOwnerAndIndex(t *testing.T) {
 	} {
 		sf.handleWordOrderCallback(ctx, cb)
 	}
-	if len(rdb.values) != 1 {
-		t.Fatalf("stale/invalid callbacks changed Redis: %#v", rdb.values)
+	if len(stateStores.drafts) != 0 {
+		t.Fatalf("stale/invalid callbacks changed word-order drafts: %#v", stateStores.drafts)
 	}
 }
 
 func TestWordOrderSubmitExactAndIdempotent(t *testing.T) {
-	sf, rdb, api := newWordOrderFixture(t, []string{"私", "は", "学生", "です。"})
+	sf, stateStores, api := newWordOrderFixture(t, []string{"私", "は", "学生", "です。"})
 	ctx := context.Background()
 	for i := 0; i < 4; i++ {
 		sf.handleWordOrderCallback(ctx, cbWithMessage(fmtWordOrderSelect(7, 99, i), 42, 1, 42))
 	}
-	if got := draftSelection(t, rdb); !sameInts(got, []int{0, 1, 2, 3}) {
+	if got := draftSelection(t, stateStores); !sameInts(got, []int{0, 1, 2, 3}) {
 		t.Fatalf("complete draft = %v", got)
 	}
 	sf.handleWordOrderCallback(ctx, cbWithMessage(fmt.Sprintf(config.FormatWordOrderSubmit, 7, 99), 42, 1, 42))
-	state, err := sf.bot.services.ActiveSession.Get(ctx, 7)
+	state, err := sf.bot.services.QuizActiveSession.Get(ctx, 7)
 	if err != nil {
 		t.Fatalf("active session get: %v", err)
 	}
 	if state.Items[0].SessionQuestion.UserAnswer == nil || *state.Items[0].SessionQuestion.UserAnswer != "私は学生です。" {
 		t.Fatalf("submitted answer = %v", state.Items[0].SessionQuestion.UserAnswer)
 	}
-	if _, ok := rdb.values[wordOrderDraftKey(7, 99)]; ok {
+	if _, ok := stateStores.drafts[draftKey{7, 99}]; ok {
 		t.Fatal("submit must delete the draft")
 	}
 	messageCount := len(api.sentMessages)

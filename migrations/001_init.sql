@@ -1,5 +1,5 @@
 -- CopyLingo Initial Schema (Multi-language Support)
--- 10 tables: users, contents, materials, user_material_progress, questions (with SRS), sessions, session_materials, session_questions, tips, tip_candidates
+-- Shared catalogs, per-user progress/preferences, sessions and learning tips.
 
 -----------------------------------------------------------
 -- users
@@ -90,6 +90,22 @@ CREATE TABLE IF NOT EXISTS user_material_progress (
 CREATE INDEX IF NOT EXISTS idx_user_material_progress_due
     ON user_material_progress(user_id, next_review_at)
     WHERE next_review_at IS NOT NULL;
+
+-----------------------------------------------------------
+-- user_material_preferences (explicit per-user policy; no row means normal)
+-----------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_material_preferences (
+    user_id             BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    material_id         INT NOT NULL REFERENCES materials(id),
+    review_mode         TEXT NOT NULL CHECK (review_mode IN ('maintenance', 'excluded')),
+    next_check_at       TIMESTAMPTZ,
+    check_interval_days INT NOT NULL DEFAULT 30 CHECK (check_interval_days BETWEEN 30 AND 180),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, material_id),
+    CHECK ((review_mode = 'maintenance' AND next_check_at IS NOT NULL)
+        OR (review_mode = 'excluded' AND next_check_at IS NULL))
+);
 
 -----------------------------------------------------------
 -- questions (shared generated learning-question catalog)

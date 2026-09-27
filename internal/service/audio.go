@@ -42,18 +42,18 @@ type AudioService struct {
 	questions audioServiceRepo
 	tts       audioSynthesizer
 	store     audioObjectStore
-	voice     string // recorded into the content-addressed key
+	voiceKey  string // both configured voices identify newly generated audio
 }
 
 // NewAudioService wires the service with its repo, TTS client, object store, and
-// the configured voice name.
+// configured voices. The second voice changes the key for future clips only.
 func NewAudioService(
 	questions audioServiceRepo,
 	tts audioSynthesizer,
 	store audioObjectStore,
-	voice string,
+	voiceA, voiceB string,
 ) *AudioService {
-	return &AudioService{questions: questions, tts: tts, store: store, voice: voice}
+	return &AudioService{questions: questions, tts: tts, store: store, voiceKey: voiceA + "-" + voiceB}
 }
 
 // TopUpAudio synthesizes audio for up to AudioGeneratePerCycle listening questions
@@ -78,7 +78,7 @@ func (s *AudioService) TopUpAudio(ctx context.Context, language, level string) e
 			continue
 		}
 		script := *q.AudioScript
-		key := external.AudioKey(q.Language, s.voice, script)
+		key := external.AudioKey(q.Language, s.voiceKey, script)
 
 		exists, err := s.store.Exists(ctx, key)
 		if err != nil {

@@ -16,7 +16,7 @@ func (sf *SessionFlow) showSessionFetchError(cb *tgbotapi.CallbackQuery) {
 	)
 }
 
-func (sf *SessionFlow) showActiveSessionUnavailable(chatID int64, editMessageID *int) {
+func (sf *SessionFlow) showQuizActiveSessionUnavailable(chatID int64, editMessageID *int) {
 	text := "⚠️ 진행 중 세션 상태가 만료되었습니다. 새 세션을 다시 시작해 주세요."
 	if editMessageID != nil {
 		sf.bot.EditMessage(chatID, *editMessageID, text, nil)

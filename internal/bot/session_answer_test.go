@@ -15,19 +15,19 @@ import (
 
 func TestHandleTextInput(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	mSRS := &mockSRS{}
-	active := service.NewActiveSessionService(nil, rdb, mSRS)
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, mSRS)
 	mLLM := &mockLLM{}
 	grader := service.NewGraderService(nil, active, mLLM)
 
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			ActiveSession: active,
-			Grader:        grader,
+			QuizActiveSession: active,
+			Grader:            grader,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -46,27 +46,25 @@ func TestHandleTextInput(t *testing.T) {
 
 	t.Run("active question state exists", func(t *testing.T) {
 		sessionID := 10
-		rdb.values[config.UserActiveQuestionRedisKey.Format(chatID)] = "10:0"
+		_ = stateStores.SetActiveQuestion(ctx, chatID, model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: 0})
 
-		state := &model.ActiveSessionState{
-			Version: model.ActiveSessionStateVersion,
+		state := &model.QuizActiveSessionState{
+			Version: model.QuizActiveSessionStateVersion,
 			Session: model.Session{ID: sessionID},
-			Items: []model.ActiveSessionQuestion{
+			Items: []model.QuizActiveSessionQuestion{
 				{
 					SessionQuestion: model.SessionQuestion{QuestionID: 1},
 					Question:        model.Question{ID: 1, CorrectAnswer: "apple", Type: model.QuestionMultipleChoice},
 				},
 			},
 		}
-		raw, _ := json.Marshal(state)
-		rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
+		seedQuizState(stateStores, state)
 
 		if !sf.HandleTextInput(ctx, msg) {
 			t.Error("expected HandleTextInput to return true")
 		}
 
-		// Verify Redis state cleared
-		if _, ok := rdb.values[config.UserActiveQuestionRedisKey.Format(chatID)]; ok {
+		if question, _ := stateStores.GetActiveQuestion(ctx, chatID); question != nil {
 			t.Error("expected active question key to be deleted")
 		}
 
@@ -79,28 +77,28 @@ func TestHandleTextInput(t *testing.T) {
 
 func TestProcessAnswerText_Correct(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	mSRS := &mockSRS{}
-	active := service.NewActiveSessionService(nil, rdb, mSRS)
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, mSRS)
 	mLLM := &mockLLM{}
 	grader := service.NewGraderService(nil, active, mLLM)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			ActiveSession: active,
-			Grader:        grader,
+			QuizActiveSession: active,
+			Grader:            grader,
 		},
 	}
 	sf := NewSessionFlow(b)
 
 	sessionID := 10
 	questionID := 1
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
 				Question: model.Question{
@@ -112,8 +110,7 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 			},
 		},
 	}
-	raw, _ := json.Marshal(state)
-	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
+	seedQuizState(stateStores, state)
 
 	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "apple", nil)
 
@@ -128,14 +125,14 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 
 func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	active := service.NewActiveSessionService(nil, rdb, nil)
+	stateStores := newTestInteractionStores()
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			ActiveSession: active,
+			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -143,18 +140,17 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 	trueVal := true
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID, IsCorrect: &trueVal},
 				Question:        model.Question{ID: questionID},
 			},
 		},
 	}
-	raw, _ := json.Marshal(state)
-	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
+	seedQuizState(stateStores, state)
 
 	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "apple", nil)
 
@@ -169,25 +165,25 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 
 func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	active := service.NewActiveSessionService(nil, rdb, nil)
+	stateStores := newTestInteractionStores()
+	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{},
 		services: &service.Services{
-			ActiveSession: active,
+			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)
 
 	sessionID := 11
 	firstAnswered := true
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &firstAnswered},
 				Question:        model.Question{ID: 1, Prompt: "첫 문제", Type: model.QuestionMultipleChoice},
@@ -203,8 +199,7 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 			},
 		},
 	}
-	raw, _ := json.Marshal(state)
-	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
+	seedQuizState(stateStores, state)
 
 	sf.processAnswer(ctx, cbWithMessage("q:11:1:0", 123, 456, 123), sessionID, 1, 0)
 

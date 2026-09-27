@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+
 	"github.com/lsj/copylingo/internal/config"
 )
 
@@ -67,7 +68,6 @@ func TestTruncate(t *testing.T) {
 		{"안녕하세요", 5, "안녕하세요"},
 		{"日本語です", 3, "日本語..."},
 	}
-
 
 	for _, tt := range tests {
 		t.Run(tt.s, func(t *testing.T) {
@@ -144,7 +144,7 @@ func TestShowSessionFetchError(t *testing.T) {
 	}
 }
 
-func TestShowActiveSessionUnavailable(t *testing.T) {
+func TestShowQuizActiveSessionUnavailable(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	b := &Bot{api: mAPI}
 	sf := NewSessionFlow(b)
@@ -152,7 +152,7 @@ func TestShowActiveSessionUnavailable(t *testing.T) {
 	t.Run("with editMessageID", func(t *testing.T) {
 		mAPI.sentMessages = nil
 		editID := 789
-		sf.showActiveSessionUnavailable(123, &editID)
+		sf.showQuizActiveSessionUnavailable(123, &editID)
 
 		if len(mAPI.sentMessages) != 1 {
 			t.Fatalf("expected 1 message, got %d", len(mAPI.sentMessages))
@@ -168,7 +168,7 @@ func TestShowActiveSessionUnavailable(t *testing.T) {
 
 	t.Run("without editMessageID", func(t *testing.T) {
 		mAPI.sentMessages = nil
-		sf.showActiveSessionUnavailable(123, nil)
+		sf.showQuizActiveSessionUnavailable(123, nil)
 
 		if len(mAPI.sentMessages) != 1 {
 			t.Fatalf("expected 1 message, got %d", len(mAPI.sentMessages))

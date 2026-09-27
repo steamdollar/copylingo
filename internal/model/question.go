@@ -110,6 +110,9 @@ type Question struct {
 	AudioFileID      *string          `db:"audio_file_id"     json:"audio_file_id,omitempty"` // listening: cached Telegram file_id (ADR-032)
 	Difficulty       int              `db:"difficulty"        json:"difficulty"`
 	CreatedAt        time.Time        `db:"created_at"        json:"created_at"`
+	// IsMaintenanceCheck is a transient, user-scoped selection hint. It is never
+	// written to the shared catalog or serialized into session/cache payloads.
+	IsMaintenanceCheck bool `db:"is_maintenance_check" json:"-"`
 }
 
 // GetOptions parses the JSONB options field into a string slice.

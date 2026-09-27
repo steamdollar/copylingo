@@ -2,11 +2,8 @@ package model
 
 import "time"
 
-const StudyActiveSessionStateVersion = 1
-
 // StudyActiveSessionState is the Redis working state for an in-progress study session.
 type StudyActiveSessionState struct {
-	Version int `json:"version"`
 	// Session is copied from the sessions table and flushed back on complete.
 	Session Session `json:"session"`
 	// Items are copied from session_materials + materials and mutated in Redis
@@ -63,7 +60,10 @@ func (s *StudyActiveSessionState) NextUnstudiedIndex() int {
 	return len(s.Items)
 }
 
-func (s *StudyActiveSessionState) MarkStudied(materialOrder int, studiedAt time.Time) bool {
+func (s *StudyActiveSessionState) MarkStudied(
+	materialOrder int,
+	studiedAt time.Time,
+) bool {
 	_, idx, ok := s.ItemByOrder(materialOrder)
 	if !ok || s.Items[idx].SessionMaterial.StudiedAt != nil {
 		return false
@@ -76,7 +76,10 @@ func (s *StudyActiveSessionState) MarkStudied(materialOrder int, studiedAt time.
 }
 
 func (s *StudyActiveSessionState) NewlyStudiedMaterialIDs() []int {
-	ids := make([]int, 0)
+	ids := make(
+		[]int,
+		0,
+	)
 	for _, item := range s.Items {
 		if item.SessionMaterial.StudiedAt == nil {
 			continue
@@ -85,7 +88,10 @@ func (s *StudyActiveSessionState) NewlyStudiedMaterialIDs() []int {
 		if s.InitiallyStudiedMaterialIDs[materialID] {
 			continue
 		}
-		ids = append(ids, materialID)
+		ids = append(
+			ids,
+			materialID,
+		)
 	}
 	return ids
 }

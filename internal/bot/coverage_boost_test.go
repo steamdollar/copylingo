@@ -16,14 +16,16 @@ import (
 
 // --- helpers ---------------------------------------------------------------
 
-// storeActiveState marshals state into the testRedis working-set key.
-func storeActiveState(t *testing.T, rdb *testRedis, sessionID int, state *model.ActiveSessionState) {
+// storeActiveState seeds the typed active-session test store.
+func storeActiveState(
+	t *testing.T,
+	stateStores *testInteractionStores,
+	sessionID int,
+	state *model.QuizActiveSessionState,
+) {
 	t.Helper()
-	raw, err := json.Marshal(state)
-	if err != nil {
-		t.Fatalf("marshal active state: %v", err)
-	}
-	rdb.values[config.ActiveSessionWorkingSetRedisKey.Format(sessionID)] = string(raw)
+	state.Session.ID = sessionID
+	seedQuizState(stateStores, state)
 }
 
 // graderUserRepoStub satisfies the grader's user repo (UpdateStreak).
@@ -44,26 +46,30 @@ type activeRepoStub struct {
 func (a *activeRepoStub) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
-) (*model.ActiveSessionState, error) {
+) (*model.QuizActiveSessionState, error) {
 	return nil, nil
 }
-func (a *activeRepoStub) FlushActiveSession(ctx context.Context, state *model.ActiveSessionState) error {
+func (a *activeRepoStub) FlushQuizActiveSession(ctx context.Context, state *model.QuizActiveSessionState) error {
 	a.flushed = true
 	return nil
 }
 
-// botWithActive wires a Bot whose ActiveSession + Grader use the given repo/redis.
-func botWithActive(rdb *testRedis, repo *activeRepoStub, userRepo *graderUserRepoStub) (*Bot, *mockBotAPI) {
+// botWithActive wires a Bot whose QuizActiveSession + Grader use the given repo/redis.
+func botWithActive(
+	stateStores *testInteractionStores,
+	repo *activeRepoStub,
+	userRepo *graderUserRepoStub,
+) (*Bot, *mockBotAPI) {
 	mAPI := &mockBotAPI{}
-	active := service.NewActiveSessionService(repo, rdb, &mockSRS{})
+	active := service.NewQuizActiveSessionService(repo, stateStores.quiz, &mockSRS{})
 	grader := service.NewGraderService(userRepo, active, &mockLLM{})
 	b := &Bot{
-		api: mAPI,
-		rdb: rdb,
+		api:   mAPI,
+		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{},
 		services: &service.Services{
-			ActiveSession: active,
-			Grader:        grader,
+			QuizActiveSession: active,
+			Grader:            grader,
 		},
 	}
 	return b, mAPI
@@ -99,20 +105,20 @@ func collectText(msgs []tgbotapi.Chattable) string {
 
 func TestFinishSession_Summary(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
 	userRepo := &graderUserRepoStub{}
-	b, mAPI := botWithActive(rdb, repo, userRepo)
+	b, mAPI := botWithActive(stateStores, repo, userRepo)
 	sf := NewSessionFlow(b)
 
 	sessionID := 10
 	userID := int64(999)
 	correct := true
 	wrong := false
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID, UserID: userID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &correct},
 				Question:        model.Question{ID: 1, Type: model.QuestionMultipleChoice},
@@ -128,7 +134,7 @@ func TestFinishSession_Summary(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	cb := cbWithMessage("session:10:finish", 123, 456, userID)
 	sf.finishSession(ctx, cb, sessionID)
@@ -155,26 +161,26 @@ func TestFinishSession_Summary(t *testing.T) {
 
 func TestHandleSessionCallback_Finish(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
 	userRepo := &graderUserRepoStub{}
-	b, mAPI := botWithActive(rdb, repo, userRepo)
+	b, mAPI := botWithActive(stateStores, repo, userRepo)
 	sf := NewSessionFlow(b)
 
 	sessionID := 11
 	userID := int64(7)
 	correct := true
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID, UserID: userID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &correct},
 				Question:        model.Question{ID: 1, Type: model.QuestionMultipleChoice},
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	sf.HandleSessionCallback(ctx, cbWithMessage("session:11:finish", 123, 456, userID))
 
@@ -188,7 +194,7 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 
 func TestHandleSessionCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	b, _ := botWithActive(&testRedis{values: map[string]string{}}, &activeRepoStub{}, &graderUserRepoStub{})
+	b, _ := botWithActive(newTestInteractionStores(), &activeRepoStub{}, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	// fewer than 3 parts -> early return, must not panic
@@ -201,18 +207,18 @@ func TestHandleSessionCallback_BadData(t *testing.T) {
 
 func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
-	b, mAPI := botWithActive(rdb, repo, &graderUserRepoStub{})
+	b, mAPI := botWithActive(stateStores, repo, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	sessionID := 20
 	questionID := 5
 	opts, _ := json.Marshal([]string{"apple", "banana"})
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
 				Question: model.Question{
@@ -222,7 +228,7 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	// q:{session}:{question}:{optionIdx} -> select option 0 ("apple", correct)
 	data := "q:20:5:0"
@@ -236,22 +242,22 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 
 func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	b, mAPI := botWithActive(rdb, &activeRepoStub{}, &graderUserRepoStub{})
+	stateStores := newTestInteractionStores()
+	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	sessionID := 21
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1}, // unanswered
 				Question:        model.Question{ID: 1, Type: model.QuestionKanaHandwriting},
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	// q:{session}:next:{idx} with current question unanswered -> prompt to submit first
 	sf.HandleAnswerCallback(ctx, cbWithMessage("q:21:next:0", 123, 456, 1))
@@ -264,7 +270,7 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 
 func TestHandleAnswerCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	b, _ := botWithActive(&testRedis{values: map[string]string{}}, &activeRepoStub{}, &graderUserRepoStub{})
+	b, _ := botWithActive(newTestInteractionStores(), &activeRepoStub{}, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	// fewer than 4 parts -> early return, no panic
@@ -277,16 +283,16 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 
 func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	b, mAPI := botWithActive(rdb, &activeRepoStub{}, &graderUserRepoStub{})
+	stateStores := newTestInteractionStores()
+	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	sessionID := 30
 	opts, _ := json.Marshal([]string{"A", "B", "C", "D"})
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1},
 				Question: model.Question{
@@ -298,7 +304,7 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	sf.showQuestion(ctx, 123, nil, sessionID, 0)
 
@@ -324,19 +330,19 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 
 func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	b, mAPI := botWithActive(rdb, &activeRepoStub{}, &graderUserRepoStub{})
+	stateStores := newTestInteractionStores()
+	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	sessionID := 31
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{SessionQuestion: model.SessionQuestion{QuestionID: 1}, Question: model.Question{ID: 1}},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	// questionIdx beyond items -> finish button branch
 	sf.showQuestion(ctx, 123, nil, sessionID, 5)
@@ -349,22 +355,22 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 
 func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	b, mAPI := botWithActive(rdb, &activeRepoStub{}, &graderUserRepoStub{})
+	stateStores := newTestInteractionStores()
+	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	sessionID := 32
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1},
 				Question:        model.Question{ID: 1, Type: model.QuestionSubjective, Prompt: "Translate"},
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	sf.showQuestion(ctx, 123, nil, sessionID, 0)
 
@@ -372,9 +378,8 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 	if !strings.Contains(text, "텍스트로 입력") {
 		t.Errorf("expected subjective input prompt, got %q", text)
 	}
-	// active-question marker should be stored in redis for text routing
-	if _, ok := rdb.values[config.UserActiveQuestionRedisKey.Format(123)]; !ok {
-		t.Error("expected active question key to be stored for subjective question")
+	if _, ok := stateStores.active[123]; !ok {
+		t.Error("expected active question to be stored for subjective question")
 	}
 }
 
@@ -382,15 +387,15 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 
 func TestProcessAnswerText_Wrong(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
-	b, mAPI := botWithActive(rdb, &activeRepoStub{}, &graderUserRepoStub{})
+	stateStores := newTestInteractionStores()
+	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
 	sf := NewSessionFlow(b)
 
 	sessionID, questionID := 40, 1
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
 				Question: model.Question{
@@ -402,7 +407,7 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "banana", nil)
 
@@ -417,9 +422,9 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 
 func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 	ctx := context.Background()
-	rdb := &testRedis{values: map[string]string{}}
+	stateStores := newTestInteractionStores()
 	mAPI := &mockBotAPI{}
-	active := service.NewActiveSessionService(&activeRepoStub{}, rdb, &mockSRS{})
+	active := service.NewQuizActiveSessionService(&activeRepoStub{}, stateStores.quiz, &mockSRS{})
 	// LLM returns AI-unavailable error
 	llm := &mockLLM{
 		gradeFn: func(ctx context.Context, prompt, correctAnswer, userAnswer string) (external.GradeResult, error) {
@@ -428,16 +433,22 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 	}
 	grader := service.NewGraderService(&graderUserRepoStub{}, active, llm)
 	b := &Bot{
-		api: mAPI, rdb: rdb, cfg: &config.Config{},
-		services: &service.Services{ActiveSession: active, Grader: grader},
+		api:      mAPI,
+		input:    stateStores,
+		drafts:   stateStores,
+		messages: stateStores,
+		recovery: stateStores,
+		timing:   stateStores,
+		cfg:      &config.Config{},
+		services: &service.Services{QuizActiveSession: active, Grader: grader},
 	}
 	sf := NewSessionFlow(b)
 
 	sessionID, questionID := 41, 1
-	state := &model.ActiveSessionState{
-		Version: model.ActiveSessionStateVersion,
+	state := &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID},
-		Items: []model.ActiveSessionQuestion{
+		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
 				Question: model.Question{
@@ -449,7 +460,7 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, rdb, sessionID, state)
+	storeActiveState(t, stateStores, sessionID, state)
 
 	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "answer", nil)
 

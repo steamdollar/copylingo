@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -88,11 +89,59 @@ func TestSynthesize_Success(t *testing.T) {
 		gotBody.GenerationConfig.ResponseModalities[0] != "AUDIO" {
 		t.Errorf("responseModalities = %v, want [AUDIO]", gotBody.GenerationConfig.ResponseModalities)
 	}
-	if gotBody.GenerationConfig.SpeechConfig.VoiceConfig.PrebuiltVoiceConfig.VoiceName != "Kore" {
+	if gotBody.GenerationConfig.SpeechConfig.VoiceConfig == nil ||
+		gotBody.GenerationConfig.SpeechConfig.VoiceConfig.PrebuiltVoiceConfig.VoiceName != "Kore" {
 		t.Errorf(
-			"voiceName = %q, want Kore",
-			gotBody.GenerationConfig.SpeechConfig.VoiceConfig.PrebuiltVoiceConfig.VoiceName,
+			"voiceConfig = %+v, want Kore",
+			gotBody.GenerationConfig.SpeechConfig.VoiceConfig,
 		)
+	}
+	if gotBody.GenerationConfig.SpeechConfig.MultiSpeakerVoiceConfig != nil {
+		t.Error("single-speaker request includes multi-speaker config")
+	}
+}
+
+func TestSynthesize_DialogueUsesTwoVoices(t *testing.T) {
+	var gotBody ttsRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		fmt.Fprint(
+			w,
+			`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"audio/L16;rate=24000","data":"YQ=="}}]}}]}`,
+		)
+	}))
+	defer srv.Close()
+
+	c := &GeminiTTSClient{
+		httpClient: srv.Client(),
+		apiKey:     "test-key",
+		baseURL:    srv.URL,
+		model:      "tts-model",
+		voice:      "Kore",
+		voiceB:     "Puck",
+		transcode:  func(_ context.Context, pcm []byte) ([]byte, error) { return pcm, nil },
+	}
+	if _, err := c.Synthesize(context.Background(), "「どこへ行きますか。」「駅へ行きます。」「わかりました。」"); err != nil {
+		t.Fatalf("Synthesize dialogue: %v", err)
+	}
+
+	config := gotBody.GenerationConfig.SpeechConfig
+	if config.VoiceConfig != nil || config.MultiSpeakerVoiceConfig == nil {
+		t.Fatalf("speech config = %+v, want only multi-speaker config", config)
+	}
+	speakers := config.MultiSpeakerVoiceConfig.SpeakerVoiceConfigs
+	if len(speakers) != 2 || speakers[0].Speaker != "A" || speakers[1].Speaker != "B" ||
+		speakers[0].VoiceConfig.PrebuiltVoiceConfig.VoiceName != "Kore" ||
+		speakers[1].VoiceConfig.PrebuiltVoiceConfig.VoiceName != "Puck" {
+		t.Fatalf("speaker voices = %+v, want A=Kore, B=Puck", speakers)
+	}
+	text := gotBody.Contents[0].Parts[0].Text
+	for _, turn := range []string{"A: どこへ行きますか。", "B: 駅へ行きます。", "A: わかりました。"} {
+		if !strings.Contains(text, turn) {
+			t.Errorf("dialogue prompt %q missing %q", text, turn)
+		}
 	}
 }
 

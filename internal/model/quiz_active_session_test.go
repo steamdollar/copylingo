@@ -7,22 +7,22 @@ import (
 // boolPtr is a local helper for building *bool fields.
 func boolPtr(b bool) *bool { return &b }
 
-// activeStateWith builds an ActiveSessionState from is_correct markers.
+// activeStateWith builds an QuizActiveSessionState from is_correct markers.
 // nil = unanswered, true/false = answered correct/wrong. QuestionID is index+1.
-func activeStateWith(marks ...*bool) *ActiveSessionState {
-	items := make([]ActiveSessionQuestion, 0, len(marks))
+func activeStateWith(marks ...*bool) *QuizActiveSessionState {
+	items := make([]QuizActiveSessionQuestion, 0, len(marks))
 	for i, m := range marks {
-		items = append(items, ActiveSessionQuestion{
+		items = append(items, QuizActiveSessionQuestion{
 			SessionQuestion: SessionQuestion{
 				QuestionID: i + 1,
 				IsCorrect:  m,
 			},
 		})
 	}
-	return &ActiveSessionState{Items: items}
+	return &QuizActiveSessionState{Items: items}
 }
 
-func TestActiveSessionState_RecountAnswered(t *testing.T) {
+func TestQuizActiveSessionState_RecountAnswered(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -51,7 +51,7 @@ func TestActiveSessionState_RecountAnswered(t *testing.T) {
 	}
 }
 
-func TestActiveSessionState_CurrentItemByQuestionID(t *testing.T) {
+func TestQuizActiveSessionState_CurrentItemByQuestionID(t *testing.T) {
 	t.Parallel()
 
 	s := activeStateWith(nil, nil, nil) // QuestionIDs 1,2,3
@@ -81,7 +81,7 @@ func TestActiveSessionState_CurrentItemByQuestionID(t *testing.T) {
 	})
 }
 
-func TestActiveSessionState_ItemByQuestionID(t *testing.T) {
+func TestQuizActiveSessionState_ItemByQuestionID(t *testing.T) {
 	t.Parallel()
 
 	s := activeStateWith(nil, nil, nil)
@@ -101,7 +101,7 @@ func TestActiveSessionState_ItemByQuestionID(t *testing.T) {
 	})
 }
 
-func TestActiveSessionState_ItemAt(t *testing.T) {
+func TestQuizActiveSessionState_ItemAt(t *testing.T) {
 	t.Parallel()
 
 	s := activeStateWith(nil, nil)
@@ -134,7 +134,7 @@ func TestActiveSessionState_ItemAt(t *testing.T) {
 	}
 }
 
-func TestActiveSessionState_NextUnansweredIndex(t *testing.T) {
+func TestQuizActiveSessionState_NextUnansweredIndex(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -159,7 +159,7 @@ func TestActiveSessionState_NextUnansweredIndex(t *testing.T) {
 	}
 }
 
-func TestActiveSessionState_CorrectCount(t *testing.T) {
+func TestQuizActiveSessionState_CorrectCount(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -183,7 +183,7 @@ func TestActiveSessionState_CorrectCount(t *testing.T) {
 	}
 }
 
-func TestActiveSessionState_WrongAnswers(t *testing.T) {
+func TestQuizActiveSessionState_WrongAnswers(t *testing.T) {
 	t.Parallel()
 
 	t.Run("collects only wrong answers in order", func(t *testing.T) {

@@ -42,7 +42,7 @@
 2. [internal/model/question.go:8](../../internal/model/question.go) — `QuestionType`, `Skill`, `QuestionCategory`가 문제 렌더링/분류의 기준이다.
 3. [internal/model/session.go:5](../../internal/model/session.go) — `SessionType`, `SessionMode`, `SessionStatus`로 Quiz와 Study를 구분한다.
 4. [internal/model/material.go:8](../../internal/model/material.go) — Study Session의 학습 단위인 `Material`과 user progress 모델을 확인한다.
-5. [internal/model/active_session.go:5](../../internal/model/active_session.go) — Quiz 진행 중 Redis working set의 in-memory shape를 본다.
+5. [internal/model/quiz_active_session.go:5](../../internal/model/quiz_active_session.go) — Quiz 진행 중 Redis working set의 in-memory shape를 본다.
 6. [internal/model/study_active_session.go:5](../../internal/model/study_active_session.go) — Study 진행 중 Redis working set의 in-memory shape를 본다.
 
 ### 4. Dependency Wiring
@@ -59,16 +59,16 @@
 2. [internal/repository/question_repo.go:44](../../internal/repository/question_repo.go) — 새 문제 조회와 due review 조회 조건을 확인한다.
 3. [internal/repository/session_repo.go:21](../../internal/repository/session_repo.go) — `sessions` row 생성과 status 전이를 확인한다.
 4. [internal/repository/session_question_repo.go:12](../../internal/repository/session_question_repo.go) — `session_questions` 생성/조회가 Quiz item 순서를 만든다.
-5. [internal/service/active_session.go:47](../../internal/service/active_session.go) — 진행 중 Quiz 상태를 Redis working set으로 관리한다.
-6. [internal/repository/active_session_repo.go:63](../../internal/repository/active_session_repo.go) — DB에서 full session state를 한 번에 load한다.
-7. [internal/repository/active_session_repo.go:178](../../internal/repository/active_session_repo.go) — 완료 시 session/question/SRS 상태를 transaction으로 flush한다.
+5. [internal/service/quiz_active_session.go:47](../../internal/service/quiz_active_session.go) — 진행 중 Quiz 상태를 Redis working set으로 관리한다.
+6. [internal/repository/quiz_active_session_repo.go:63](../../internal/repository/quiz_active_session_repo.go) — DB에서 full session state를 한 번에 load한다.
+7. [internal/repository/quiz_active_session_repo.go:178](../../internal/repository/quiz_active_session_repo.go) — 완료 시 session/question/SRS 상태를 transaction으로 flush한다.
 8. [internal/service/grader.go:45](../../internal/service/grader.go) — 답안 채점과 active session 기록 경로를 확인한다.
 
 ### 6. Study Session Flow
 
 1. [internal/service/study_session.go:43](../../internal/service/study_session.go) — 정오 Study Session이 8개 Material을 골라 `sessions`와 `session_materials`를 만든다.
 2. [internal/repository/material_repo.go:21](../../internal/repository/material_repo.go) — due/new vocabulary material selection SQL을 본다.
-3. [internal/repository/session_material_repo.go:21](../../internal/repository/session_material_repo.go) — Study Session의 ordered material join row 생성 지점이다.
+3. [internal/repository/session_repo.go:56](../../internal/repository/session_repo.go) — Study Session과 ordered material join row를 한 트랜잭션으로 생성하는 지점이다.
 4. [internal/service/study_active_session.go:34](../../internal/service/study_active_session.go) — Study 진행 상태의 Redis working set 책임을 확인한다.
 5. [internal/repository/study_active_session_repo.go:54](../../internal/repository/study_active_session_repo.go) — DB에서 Study Session과 Material snapshot을 load한다.
 6. [internal/repository/study_active_session_repo.go:140](../../internal/repository/study_active_session_repo.go) — 완료 시 studied_at과 user_material_progress를 flush한다.
@@ -99,7 +99,7 @@
 
 1. [internal/service/study_active_session_test.go:1](../../internal/service/study_active_session_test.go) — Study Redis working set과 completion edge case를 먼저 확인한다.
 2. [internal/repository/study_active_session_repo_test.go:1](../../internal/repository/study_active_session_repo_test.go) — Study flush transaction과 progress update 검증을 본다.
-3. [internal/service/active_session_test.go:1](../../internal/service/active_session_test.go) — Quiz Redis working set의 answer/flush behavior를 확인한다.
+3. [internal/service/quiz_active_session_test.go:1](../../internal/service/quiz_active_session_test.go) — Quiz Redis working set의 answer/flush behavior를 확인한다.
 4. [internal/bot/session_flow_test.go:1](../../internal/bot/session_flow_test.go) — Telegram Quiz interaction flow의 사용자-facing behavior를 본다.
 5. [internal/bot/study_flow_test.go:1](../../internal/bot/study_flow_test.go) — Telegram Study interaction flow의 callback behavior를 본다.
 6. [internal/miniapp/handler_test.go:1](../../internal/miniapp/handler_test.go) — Mini App HTTP boundary의 auth/error mapping을 확인한다.

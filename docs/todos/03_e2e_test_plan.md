@@ -16,7 +16,7 @@
 - **외부 텔레그램 API** = `mockBotAPI`(전송 메시지 캡처) — 이미 [handler_test.go](../../internal/bot/handler_test.go)에 존재, 재사용
 - **외부 LLM** = `mockLLM`(결정적 응답) — 이미 [grader_test.go](../../internal/service/grader_test.go)에 존재, 재사용
 - **DB** = ephemeral Postgres — `02_integration_test_plan.md`의 **testcontainers-go 하니스 재사용**(postgres:16-alpine 컨테이너 자동 기동)
-- **Redis** = 둘 중 택1: ① testcontainers redis 모듈(`.../modules/redis`)로 실 Redis 컨테이너(완전 hermetic, 권장) ② in-memory fake `sessionFlowRedis`([session_flow_test.go](../../internal/bot/session_flow_test.go)) (가볍지만 Redis 동작 일부만 모사)
+- **Redis** = 격리된 Redis 컨테이너에 `redisstore` 구현을 연결한다. 기능별 저장 인터페이스의 in-memory fake는 단위 테스트에서 사용하며, 실제 키·직렬화·원자적 명령을 확인할 E2E에서는 실 Redis 저장 구현을 사용한다.
 
 즉 e2e = "외부 경계(텔레그램/LLM)만 mock, 내부(service+repo+DB+redis)는 전부 실물"로 시나리오를 관통한다.
 
@@ -31,10 +31,10 @@
 ### 공용 하니스 — **패키지 배치 주의**
 
 > ⚠️ **확인된 제약 두 가지가 e2e 패키지 위치를 결정한다:**
-> 1. `service.NewServices(repos, cfg, rdb)`는 내부에서 `external.NewLLMClient(cfg)`를 `service.NewLLMService(...)`로 감싸 **LLMService를 직접 생성**한다 → `NewServices`로는 mockLLM 주입 불가. **개별 생성자로 직접 조립**해야 한다(예: `service.NewGraderService(repos.User, activeSvc, mockLLM)`, `service.NewActiveSessionService(repos.ActiveSession, rdb, srs)` 등 — 시그니처는 services.go 참조).
+> 1. `service.NewServices(repos, cfg, service.SessionStores{Quiz: quizStore, Study: studyStore})`는 내부에서 `external.NewLLMClient(cfg)`를 `service.NewLLMService(...)`로 감싸 **LLMService를 직접 생성**한다 → `NewServices`로는 mockLLM 주입 불가. **개별 생성자로 직접 조립**해야 한다(예: `service.NewGraderService(repos.User, activeSvc, mockLLM)`, `service.NewActiveSessionService(repos.ActiveSession, redisstore.NewQuizSessions(realRedis), srs)` 등 — 시그니처는 services.go 참조).
 > 2. `Bot` struct의 필드는 모두 **unexported**이고, `bot.New(...)`는 실제 텔레그램 토큰으로 `tgbotapi.NewBotAPI`를 호출(네트워크) → 외부 `test/e2e` 패키지에서는 mock api를 끼운 Bot을 만들 수 없다.
 >
-> **따라서 권장 배치:** bot 경유 시나리오(E2E-1/2/4)는 **`package bot` 내부에 `//go:build e2e` 파일**로 둔다(예: `internal/bot/e2e_session_test.go`). 그래야 `&Bot{api: &mockBotAPI{}, rdb: realRedis, services: 직접조립}` + `NewSessionFlow(b)` 가 가능하고 기존 `mockBotAPI`도 재사용된다. HTTP 전용 시나리오(E2E-3)는 `package miniapp` 내부 `//go:build e2e` 또는 `test/e2e`(핸들러가 exported라 가능)에 둔다.
+> **따라서 권장 배치:** bot 경유 시나리오(E2E-1/2/4)는 **`package bot` 내부에 `//go:build e2e` 파일**로 둔다(예: `internal/bot/e2e_session_test.go`). Bot의 API에 `mockBotAPI`, 서비스에 직접 조립한 서비스, 기능별 상태 저장 필드에 `redisstore.NewInteractions(realRedis)`를 연결하고 `NewSessionFlow(b)`를 사용한다. HTTP 전용 시나리오(E2E-3)는 `package miniapp` 내부 `//go:build e2e` 또는 `test/e2e`(핸들러가 exported라 가능)에 둔다.
 
 ```go
 //go:build e2e
@@ -45,12 +45,15 @@ package bot   // bot 경유 시나리오는 내부 패키지로 둘 것
 //  2. repos := repository.NewRepositories(db)
 //  3. 서비스 "직접" 조립 (NewServices 쓰지 말 것 — LLM mock 주입 위해):
 //        srs    := service.NewSRSService(repos.Question)
-//        active := service.NewActiveSessionService(repos.ActiveSession, realRedis, srs)
+//        active := service.NewActiveSessionService(repos.ActiveSession, redisstore.NewQuizSessions(realRedis), srs)
 //        grader := service.NewGraderService(repos.User, active, mockLLM)      // mockLLM = grader_test.go 재사용
 //        builder:= service.NewSessionBuilderService(repos.Question, repos.Session, repos.SessionQuestion, srs)
 //        svcs   := &service.Services{User: ..., SRS: srs, SessionBuilder: builder,
 //                                    ActiveSession: active, Grader: grader, Handwriting: ..., Analyzer: ..., Tip: ...}
-//  4. b := &Bot{api: &mockBotAPI{}, rdb: realRedis, cfg: &config.Config{...}, services: svcs}
+//  4. interactions := redisstore.NewInteractions(realRedis)
+//     b := &Bot{api: &mockBotAPI{}, cfg: &config.Config{...}, services: svcs,
+//               input: interactions, drafts: interactions, messages: interactions,
+//               recovery: interactions, timing: interactions}
 //     sf := NewSessionFlow(b)
 //  5. 반환: {b, mockAPI, sf, db, redis}
 ```
@@ -83,7 +86,7 @@ package bot   // bot 경유 시나리오는 내부 패키지로 둘 것
 ### E2E-3: 손글씨 제출 (MiniApp HTTP 경로)
 파일: `internal/miniapp/e2e_handwriting_test.go`(`package miniapp`, `//go:build e2e`) 또는 `test/e2e/`
 1. seed: kana 손글씨 문제 1개 + 진행 중 세션 (DB 직접 insert)
-2. `RegisterRoutes(r, cfg, services, rdb, messenger)` 로 gin 엔진 구성 → `httptest.NewServer`/`ServeHTTP`로 `SubmitHandwriting` 엔드포인트 호출 — 유효 Telegram initData(올바른 HMAC 서명) + 이미지 multipart
+2. `RegisterRoutes(r, cfg, services, redisstore.NewInteractions(realRedis), messenger)` 로 gin 엔진 구성 → `httptest.NewServer`/`ServeHTTP`로 `SubmitHandwriting` 엔드포인트 호출 — 유효 Telegram initData(올바른 HMAC 서명)와 JSON stroke 요청
 3. 내부 `Grader`가 mockLLM(결정적)으로 채점 → 200 + 결과 JSON (`SubmitHandwriting` 응답 스키마 확인)
 4. session_questions에 답변/정답 여부가 **DB에 기록**됐는지 검증
 5. 인증 실패(위조 initData / 무서명) → 401, DB 변화 없음 (`InitDataVerifier.Verify` 경유)

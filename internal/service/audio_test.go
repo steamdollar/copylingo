@@ -9,7 +9,11 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-const testVoice = "Kore"
+const (
+	testVoice    = "Kore"
+	testVoiceB   = "Puck"
+	testVoiceKey = "Kore-Puck"
+)
 
 type mockAudioRepo struct {
 	pending     []model.Question
@@ -99,13 +103,13 @@ func TestTopUpAudio_GeneratesMissing(t *testing.T) {
 	}}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioService(repo, synth, store, testVoice)
+	s := NewAudioService(repo, synth, store, testVoice, testVoiceB)
 
 	if err := s.TopUpAudio(context.Background(), "ja", "N5"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	wantKey := external.AudioKey("ja", testVoice, script)
+	wantKey := external.AudioKey("ja", testVoiceKey, script)
 	if synth.calls != 1 {
 		t.Errorf("expected 1 synth call, got %d", synth.calls)
 	}
@@ -120,13 +124,13 @@ func TestTopUpAudio_GeneratesMissing(t *testing.T) {
 // Object already present (dedup) → no Synthesize, no Put, but audio_path still set.
 func TestTopUpAudio_DedupSkipsSynthesis(t *testing.T) {
 	script := "同じスクリプト"
-	key := external.AudioKey("ja", testVoice, script)
+	key := external.AudioKey("ja", testVoiceKey, script)
 	repo := &mockAudioRepo{pending: []model.Question{
 		{ID: 1, Language: "ja", AudioScript: scriptPtr(script)},
 	}}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{key: true}}
-	s := NewAudioService(repo, synth, store, testVoice)
+	s := NewAudioService(repo, synth, store, testVoice, testVoiceB)
 
 	if err := s.TopUpAudio(context.Background(), "ja", "N5"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -150,7 +154,7 @@ func TestTopUpAudio_PerQuestionFailureIsolated(t *testing.T) {
 	}}
 	synth := &mockSynth{synthErr: errors.New("tts down")}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioService(repo, synth, store, testVoice)
+	s := NewAudioService(repo, synth, store, testVoice, testVoiceB)
 
 	if err := s.TopUpAudio(context.Background(), "ja", "N5"); err != nil {
 		t.Fatalf("batch should not error on per-question synth failure, got %v", err)
@@ -171,7 +175,7 @@ func TestTopUpAudio_SkipsEmptyScript(t *testing.T) {
 	}}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioService(repo, synth, store, testVoice)
+	s := NewAudioService(repo, synth, store, testVoice, testVoiceB)
 
 	if err := s.TopUpAudio(context.Background(), "ja", "N5"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -186,7 +190,7 @@ func TestTopUpAudio_EmptyPending(t *testing.T) {
 	repo := &mockAudioRepo{pending: nil}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioService(repo, synth, store, testVoice)
+	s := NewAudioService(repo, synth, store, testVoice, testVoiceB)
 
 	if err := s.TopUpAudio(context.Background(), "ja", "N5"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -199,7 +203,7 @@ func TestTopUpAudio_EmptyPending(t *testing.T) {
 // nil dependencies → ErrTTSConfigMissing (scheduler tolerates and skips).
 func TestTopUpAudio_NilDepsReturnsConfigMissing(t *testing.T) {
 	repo := &mockAudioRepo{}
-	s := NewAudioService(repo, nil, nil, testVoice)
+	s := NewAudioService(repo, nil, nil, testVoice, testVoiceB)
 	if err := s.TopUpAudio(context.Background(), "ja", "N5"); !errors.Is(err, external.ErrTTSConfigMissing) {
 		t.Fatalf("expected ErrTTSConfigMissing, got %v", err)
 	}
@@ -208,7 +212,7 @@ func TestTopUpAudio_NilDepsReturnsConfigMissing(t *testing.T) {
 // CacheFileID delegates to the repo.
 func TestCacheFileID(t *testing.T) {
 	repo := &mockAudioRepo{}
-	s := NewAudioService(repo, &mockSynth{}, &mockStore{}, testVoice)
+	s := NewAudioService(repo, &mockSynth{}, &mockStore{}, testVoice, testVoiceB)
 	if err := s.CacheFileID(context.Background(), 42, "file-xyz"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

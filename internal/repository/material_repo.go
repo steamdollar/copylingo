@@ -44,11 +44,11 @@ func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []strin
 	return materials, nil
 }
 
-// GetForStudySession returns materials according to the per-category new and
+// GetMaterialsByPlan returns materials according to the per-category new and
 // review quotas in plan. New materials prefer the current level, while due
 // reviews remain ordered by oldest due time. Remaining slots are filled with
 // additional new vocabulary after eligible due reviews are exhausted.
-func (r *MaterialRepository) GetForStudySession(
+func (r *MaterialRepository) GetMaterialsByPlan(
 	ctx context.Context,
 	userID int64,
 	language string,
@@ -59,48 +59,26 @@ func (r *MaterialRepository) GetForStudySession(
 	if len(plan.Quotas) == 0 {
 		return nil, nil
 	}
-	if err := validateStudySessionPlan(plan); err != nil {
-		return nil, fmt.Errorf("MaterialRepository.GetForStudySession invalid plan: %w", err)
-	}
 	limit := plan.TotalMaterialCount()
 	if limit == 0 {
 		return nil, nil
 	}
 	quotaJSON, err := json.Marshal(plan.Quotas)
 	if err != nil {
-		return nil, fmt.Errorf("MaterialRepository.GetForStudySession marshal plan: %w", err)
+		return nil, fmt.Errorf("MaterialRepository.GetMaterialsByPlan marshal plan: %w", err)
 	}
 
 	var materials []model.Material
 	if err := r.db.SelectContext(ctx, &materials, studySessionMaterialsQuery,
 		userID, language, level, pq.Array(levels), quotaJSON, limit); err != nil {
-		return nil, fmt.Errorf("MaterialRepository.GetForStudySession user_id=%d language=%s level=%s limit=%d: %w",
+		return nil, fmt.Errorf("MaterialRepository.GetMaterialsByPlan user_id=%d language=%s level=%s limit=%d: %w",
 			userID, language, level, limit, err)
 	}
 	return materials, nil
 }
 
-func validateStudySessionPlan(plan model.StudySessionPlan) error {
-	seen := make(map[model.MaterialCategory]struct{}, len(plan.Quotas))
-	for i, quota := range plan.Quotas {
-		if quota.NewCount < 0 || quota.ReviewCount < 0 {
-			return fmt.Errorf("quota index=%d category=%s has negative count", i, quota.Category)
-		}
-		switch quota.Category {
-		case model.MaterialCategoryVocabulary, model.MaterialCategoryGrammar, model.MaterialCategoryReading:
-		default:
-			return fmt.Errorf("quota index=%d has unsupported category=%s", i, quota.Category)
-		}
-		if _, ok := seen[quota.Category]; ok {
-			return fmt.Errorf("duplicate category=%s", quota.Category)
-		}
-		seen[quota.Category] = struct{}{}
-	}
-	return nil
-}
-
-const studySessionMaterialsQuery = `
-	WITH quotas AS (
+var studySessionMaterialsQuery = `
+	WITH ` + maintenanceQuizCandidatesCTE("$4") + `, quotas AS (
 		SELECT
 			q.category,
 			q.new_count,
@@ -125,8 +103,18 @@ const studySessionMaterialsQuery = `
 		LEFT JOIN user_material_progress ump
 			ON ump.material_id = m.id
 			AND ump.user_id = $1
+		LEFT JOIN user_material_preferences preference
+			ON preference.user_id = $1 AND preference.material_id = m.id
 		WHERE m.language = $2
 			AND m.proficiency_level = ANY($4)
+			AND (preference.material_id IS NULL OR (
+				preference.review_mode = 'maintenance'
+				AND preference.next_check_at <= NOW()
+				AND NOT EXISTS (
+					SELECT 1 FROM maintenance_quiz_candidates candidate
+					WHERE candidate.material_id = m.id
+				)
+			))
 			AND (
 				ump.material_id IS NULL
 				OR ump.next_review_at <= NOW()

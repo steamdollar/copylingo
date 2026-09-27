@@ -2,12 +2,9 @@ package bot
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/lsj/copylingo/internal/callback"
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 )
@@ -40,12 +37,13 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 
 	for _, s := range sessions {
 		// Skip if fingerprint unchanged
-		key := fmt.Sprintf("copylingo:miniapp:last_fingerprint:%d", s.ID)
-		if last, _ := b.rdb.Get(ctx, key).Result(); last == currentFp {
-			continue
+		if b.recovery != nil {
+			if last, _ := b.recovery.GetMiniAppFingerprint(ctx, s.ID); last == currentFp {
+				continue
+			}
 		}
 
-		state, err := b.services.ActiveSession.Get(ctx, s.ID)
+		state, err := b.services.QuizActiveSession.Get(ctx, s.ID)
 		if err != nil {
 			slog.ErrorContext(ctx, "Active session state unavailable during restart recovery",
 				"event", "telegram.restart_recovery.active_state_unavailable",
@@ -65,11 +63,10 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			continue
 		}
 
-		// (a) best-effort: edit old message to strip buttons via HandwritingMessageRedisKey
-		oldKey := config.HandwritingMessageRedisKey.Format(s.ID, q.ID)
-		if val, err := b.rdb.Get(ctx, oldKey).Result(); err == nil {
-			if chatID, msgID, perr := callback.ParseHandwritingMessageRef(val); perr == nil {
-				_ = b.ClearInlineKeyboard(chatID, msgID)
+		// Best-effort: edit the old message to strip its stale buttons.
+		if b.messages != nil {
+			if ref, err := b.messages.GetHandwritingMessage(ctx, s.ID, q.ID); err == nil && ref != nil {
+				_ = b.ClearInlineKeyboard(ref.ChatID, ref.MessageID)
 			}
 		}
 
@@ -82,6 +79,8 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 		b.SendMessage(s.UserID, "🔄 손글씨 링크가 갱신되었습니다. 아래 버튼으로 다시 진행해 주세요.")
 		b.flow.showQuestion(ctx, s.UserID, nil, s.ID, idx)
 
-		_ = b.rdb.Set(ctx, key, currentFp, 24*time.Hour).Err()
+		if b.recovery != nil {
+			_ = b.recovery.SetMiniAppFingerprint(ctx, s.ID, currentFp)
+		}
 	}
 }
