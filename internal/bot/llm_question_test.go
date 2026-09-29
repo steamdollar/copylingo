@@ -84,7 +84,13 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 		messages: stateStores,
 		recovery: stateStores,
 		timing:   stateStores,
-		services: &service.Services{QuizActiveSession: active},
+		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
+			QuizActiveSession: active,
+		},
 	}
 
 	sessionID, questionID := 10, 1
@@ -283,7 +289,6 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 			&mockSRS{},
 		)
 		grader := service.NewGraderService(
-			nil,
 			active,
 			&mockLLM{},
 		)
@@ -294,7 +299,14 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 			messages: stateStores,
 			recovery: stateStores,
 			timing:   stateStores,
-			services: &service.Services{QuizActiveSession: active, Grader: grader},
+			services: &service.Services{
+				Session: newTestSessionService(
+					stateStores,
+					service.SessionDeps{},
+				),
+				QuizActiveSession: active,
+				Grader:            grader,
+			},
 		}
 		return NewSessionFlow(b)
 	}

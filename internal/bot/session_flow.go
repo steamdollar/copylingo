@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/service"
 )
 
 // SessionFlow handles the question-answering interaction flow.
@@ -80,7 +82,7 @@ func (sf *SessionFlow) getPendingSessions(
 	cb *tgbotapi.CallbackQuery,
 ) error {
 	chatID := cb.Message.Chat.ID
-	sessions, err := sf.bot.services.SessionBuilder.GetSessionsByStatus(
+	sessions, err := sf.bot.services.Session.ListByStatus(
 		ctx,
 		cb.From.ID,
 		config.SessionStatusPending,
@@ -173,12 +175,11 @@ func (sf *SessionFlow) getInProgressSessions(
 	cb *tgbotapi.CallbackQuery,
 ) (bool, error) {
 	chatID := cb.Message.Chat.ID
-	inProgressSessions, err := sf.bot.services.SessionBuilder.
-		GetSessionsByStatus(
-			ctx,
-			cb.From.ID,
-			config.SessionStatusInProgress,
-		)
+	inProgressSessions, err := sf.bot.services.Session.ListByStatus(
+		ctx,
+		cb.From.ID,
+		config.SessionStatusInProgress,
+	)
 	if err != nil {
 		return false, err
 	}
@@ -253,13 +254,14 @@ func (sf *SessionFlow) StartReview(
 		return
 	}
 
-	count, _ := sf.bot.services.SRS.GetDueCount(
+	session, err := sf.bot.services.Session.BuildReviewQuiz(
 		ctx,
-		userID,
-		user.Language,
-		user.ProficiencyLevel,
+		*user,
 	)
-	if count == 0 {
+	if errors.Is(
+		err,
+		service.ErrNoDueReviews,
+	) {
 		sf.telegram.EditMessage(
 			chatID,
 			cb.Message.MessageID,
@@ -268,19 +270,6 @@ func (sf *SessionFlow) StartReview(
 		)
 		return
 	}
-
-	limit := count
-	if limit > 15 {
-		limit = 15
-	}
-
-	session, err := sf.bot.services.SessionBuilder.BuildReviewSession(
-		ctx,
-		userID,
-		user.Language,
-		user.ProficiencyLevel,
-		limit,
-	)
 	if err != nil || session == nil {
 		sf.telegram.SendMessage(
 			chatID,
@@ -543,68 +532,31 @@ func (sf *SessionFlow) startSession(
 	cb *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
-	// Redis is the source of truth while a quiz is in progress. Recovering from
-	// DB unconditionally here would overwrite answers already recorded in the
-	// working set when the user presses an old/repeated start button.
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	state, err := sf.bot.services.Session.StartQuiz(
 		ctx,
 		sessionID,
+		cb.From.ID,
 	)
 	if err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to load active session state before start",
-			"event",
-			"telegram.session.active_state_lookup_failed",
-			"session_id",
-			sessionID,
-			"error",
+		switch {
+		case errors.Is(
 			err,
-		)
-		return
-	}
-	if cb.From != nil && state.Session.UserID != 0 && state.Session.UserID != cb.From.ID {
-		slog.WarnContext(
-			ctx,
-			"Rejected session start for non-owner",
-			"event",
-			"telegram.session.start_owner_mismatch",
-			"session_id",
-			sessionID,
-			"user_id",
-			cb.From.ID,
-		)
-		return
-	}
-	wasPending := state.Session.Status == model.SessionPending
-
-	// update session status at db (pending > in progress)
-	if err := sf.bot.
-		services.SessionBuilder.StartSession(
-		ctx,
-		sessionID,
-	); err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to start session",
-			"event",
-			"telegram.session.start_failed",
-			"session_id",
-			sessionID,
-			"error",
+			service.ErrQuizActiveSessionUserMismatch,
+		):
+			slog.WarnContext(
+				ctx,
+				"Rejected session start for non-owner",
+				"event",
+				"telegram.session.start_owner_mismatch",
+				"session_id",
+				sessionID,
+				"user_id",
+				cb.From.ID,
+			)
+		case errors.Is(
 			err,
-		)
-		return
-	}
-	// A DB-backed pending state has no progress to preserve. Reload it after
-	// StartSession so the Redis copy also reflects the in_progress transition;
-	// an already in-progress working set must never be replaced from DB.
-	if wasPending {
-		state, err = sf.bot.services.QuizActiveSession.CreateFromDB(
-			ctx,
-			sessionID,
-		)
-		if err != nil {
+			service.ErrQuizStatePrepareFailed,
+		):
 			slog.ErrorContext(
 				ctx,
 				"Failed to refresh active session after start",
@@ -619,8 +571,19 @@ func (sf *SessionFlow) startSession(
 				cb.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].sessionStatePrepareFailed,
 			)
-			return
+		default:
+			slog.ErrorContext(
+				ctx,
+				"Failed to start session",
+				"event",
+				"telegram.session.start_failed",
+				"session_id",
+				sessionID,
+				"error",
+				err,
+			)
 		}
+		return
 	}
 
 	if sf.bot.timing != nil {
@@ -646,27 +609,7 @@ func (sf *SessionFlow) finishSession(
 	cb *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
-	// Capture word-order draft keys before CompleteSession deletes the active
-	// session working set. Drafts are ephemeral and must not survive a finished
-	// session, including when the user reached the result screen via a retry.
-	var wordOrderQuestionIDs []int
-	if sf.bot.services != nil && sf.bot.services.QuizActiveSession != nil {
-		if state, err := sf.bot.services.QuizActiveSession.Get(
-			ctx,
-			sessionID,
-		); err == nil &&
-			cb != nil && cb.From != nil && state.Session.UserID == cb.From.ID {
-			for _, item := range state.Items {
-				if item.Question.Type == model.QuestionWordOrder {
-					wordOrderQuestionIDs = append(
-						wordOrderQuestionIDs,
-						item.Question.ID,
-					)
-				}
-			}
-		}
-	}
-	result, err := sf.bot.services.Grader.CompleteSession(
+	result, err := sf.bot.services.Session.CompleteQuiz(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -684,7 +627,8 @@ func (sf *SessionFlow) finishSession(
 		)
 		return
 	}
-	for _, questionID := range wordOrderQuestionIDs {
+	// Word-order drafts are ephemeral and must not survive a finished session.
+	for _, questionID := range result.WordOrderQuestionIDs {
 		sf.deleteWordOrderDraft(
 			ctx,
 			sessionID,

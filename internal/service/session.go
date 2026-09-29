@@ -1,0 +1,140 @@
+package service
+
+import (
+	"context"
+
+	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/model"
+)
+
+// SessionStores groups the typed Redis working-set stores for Quiz and Study.
+// They stay separate instances (ADR-059 §8.6) and travel as one Deps field.
+type SessionStores struct {
+	Quiz  QuizSessionStore
+	Study StudySessionStore
+}
+
+// QuestionRepo is the question-bank boundary used for Quiz selection and SRS counts.
+type QuestionRepo interface {
+	GetNewQuestions(
+		ctx context.Context,
+		userID int64,
+		language string,
+		levels []string,
+		category string,
+		excludeIDs []int,
+		limit,
+		kanjiRecallLimit int,
+	) ([]model.Question, error)
+	GetDueReviews(
+		ctx context.Context,
+		userID int64,
+		language,
+		currentLevel string,
+		levels []string,
+		limit,
+		kanjiRecallLimit int,
+		categories ...model.QuestionCategory,
+	) ([]model.Question, error)
+	GetDueReviewCount(
+		ctx context.Context,
+		userID int64,
+		language string,
+		levels []string,
+	) (int, error)
+}
+
+// SessionRepo is the sessions-table boundary shared by both session modes.
+type SessionRepo interface {
+	CreateSession(
+		ctx context.Context,
+		s *model.Session,
+	) error
+	Start(
+		ctx context.Context,
+		id int,
+	) error
+	GetSessionsByStatus(
+		ctx context.Context,
+		userID int64,
+		status config.SessionStatus,
+	) ([]model.Session, error)
+	ListInProgress(ctx context.Context) ([]model.Session, error)
+	GetOldestUnfinished(
+		ctx context.Context,
+		userID int64,
+	) (*model.Session, error)
+	CountUnfinishedBatch(
+		ctx context.Context,
+		userIDs []int64,
+	) (map[int64]int, error)
+}
+
+// SessionQuestionRepo stores the ordered question list of a new Quiz session.
+type SessionQuestionRepo interface {
+	CreateSessionQuestions(
+		ctx context.Context,
+		sqs []model.SessionQuestion,
+	) error
+}
+
+// QuizActiveSessionRepo loads a Quiz working set from DB and flushes it back on completion.
+type QuizActiveSessionRepo interface {
+	LoadQuestionSessionWithStateBySessionID(
+		ctx context.Context,
+		sessionID int,
+	) (*model.QuizActiveSessionState, error)
+	FlushQuizActiveSession(
+		ctx context.Context,
+		state *model.QuizActiveSessionState,
+	) error
+}
+
+// SessionUserRepo updates user-level learning records on Quiz completion.
+type SessionUserRepo interface {
+	UpdateStreak(
+		ctx context.Context,
+		userID int64,
+	) error
+}
+
+// SessionDeps lists every external boundary SessionService touches (ADR-059 §8.3).
+type SessionDeps struct {
+	QuestionRepo          QuestionRepo
+	SessionRepo           SessionRepo
+	SessionQuestionRepo   SessionQuestionRepo
+	QuizActiveSessionRepo QuizActiveSessionRepo
+	UserRepo              SessionUserRepo
+	Stores                SessionStores
+}
+
+// SessionService is the Tier1 entry point for Quiz and Study sessions
+// (ADR-059 §8.6). Callers see only this type; selection, progress, SRS and
+// grading are internal collaborators built here.
+type SessionService struct {
+	sessionRepo  SessionRepo
+	userRepo     SessionUserRepo
+	selection    *SessionBuilderService
+	quizProgress *QuizActiveSessionService
+	srs          *SRSService
+}
+
+func NewSessionService(deps SessionDeps) *SessionService {
+	srs := NewSRSService(deps.QuestionRepo)
+	return &SessionService{
+		sessionRepo: deps.SessionRepo,
+		userRepo:    deps.UserRepo,
+		selection: NewSessionBuilderService(
+			deps.QuestionRepo,
+			deps.SessionRepo,
+			deps.SessionQuestionRepo,
+			srs,
+		),
+		quizProgress: NewQuizActiveSessionService(
+			deps.QuizActiveSessionRepo,
+			deps.Stores.Quiz,
+			srs,
+		),
+		srs: srs,
+	}
+}

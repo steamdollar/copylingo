@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -44,30 +43,12 @@ type questionFetcher interface {
 		limit,
 		kanjiRecallLimit int,
 	) ([]model.Question, error)
-	GetByID(
-		ctx context.Context,
-		id int,
-	) (*model.Question, error)
 }
 
 type sessionStore interface {
 	CreateSession(
 		ctx context.Context,
 		s *model.Session,
-	) error
-	GetByID(
-		ctx context.Context,
-		id int,
-	) (*model.Session, error)
-	GetSessionsByStatus(
-		ctx context.Context,
-		userID int64,
-		status config.SessionStatus,
-	) ([]model.Session, error)
-	ListInProgress(ctx context.Context) ([]model.Session, error)
-	Start(
-		ctx context.Context,
-		id int,
 	) error
 }
 
@@ -76,10 +57,6 @@ type sessionQuestionStore interface {
 		ctx context.Context,
 		sqs []model.SessionQuestion,
 	) error
-	GetBySession(
-		ctx context.Context,
-		sessionID int,
-	) ([]model.SessionQuestion, error)
 }
 
 // SessionBuilderService creates learning sessions with appropriate question mix.
@@ -583,65 +560,4 @@ func sameLevelScope(
 		}
 	}
 	return true
-}
-
-func (s *SessionBuilderService) GetSessionsByStatus(
-	ctx context.Context,
-	userID int64,
-	status config.SessionStatus,
-) ([]model.Session, error) {
-	return s.sessionRepo.GetSessionsByStatus(
-		ctx,
-		userID,
-		status,
-	)
-}
-
-// GetAllInProgressSessions returns all in-progress sessions for all users.
-func (s *SessionBuilderService) GetAllInProgressSessions(ctx context.Context) ([]model.Session, error) {
-	return s.sessionRepo.ListInProgress(ctx)
-}
-
-// GetSession returns a session by ID.
-func (s *SessionBuilderService) GetSession(
-	ctx context.Context,
-	sessionID int,
-) (*model.Session, error) {
-	return s.sessionRepo.GetByID(
-		ctx,
-		sessionID,
-	)
-}
-
-// StartSession marks a session as in_progress.
-func (s *SessionBuilderService) StartSession(
-	ctx context.Context,
-	sessionID int,
-) error {
-	return s.sessionRepo.Start(
-		ctx,
-		sessionID,
-	)
-}
-
-// GetQuestion returns a question by ID.
-func (s *SessionBuilderService) GetQuestion(
-	ctx context.Context,
-	questionID int,
-) (*model.Question, error) {
-	return s.questionRepo.GetByID(
-		ctx,
-		questionID,
-	)
-}
-
-// GetSessionQuestions returns all questions for a session.
-func (s *SessionBuilderService) GetSessionQuestions(
-	ctx context.Context,
-	sessionID int,
-) ([]model.SessionQuestion, error) {
-	return s.sessionQuestionRepo.GetBySession(
-		ctx,
-		sessionID,
-	)
 }

@@ -24,7 +24,6 @@ func TestHandleTextInput(t *testing.T) {
 	)
 	mLLM := &mockLLM{}
 	grader := service.NewGraderService(
-		nil,
 		active,
 		mLLM,
 	)
@@ -34,6 +33,10 @@ func TestHandleTextInput(t *testing.T) {
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
 			QuizActiveSession: active,
 			Grader:            grader,
 		},
@@ -120,7 +123,6 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 	)
 	mLLM := &mockLLM{}
 	grader := service.NewGraderService(
-		nil,
 		active,
 		mLLM,
 	)
@@ -129,6 +131,10 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
 			QuizActiveSession: active,
 			Grader:            grader,
 		},
@@ -198,6 +204,10 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
 			QuizActiveSession: active,
 		},
 	}
@@ -266,6 +276,10 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{},
 		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
 			QuizActiveSession: active,
 		},
 	}

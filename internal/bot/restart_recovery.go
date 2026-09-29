@@ -36,7 +36,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 	}
 	currentFp := callback.MiniAppURLFingerprint(baseURL)
 
-	sessions, err := b.services.SessionBuilder.GetAllInProgressSessions(ctx)
+	sessions, err := b.services.Session.ListInProgressQuizzes(ctx)
 	if err != nil {
 		slog.ErrorContext(
 			ctx,
@@ -60,7 +60,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			}
 		}
 
-		state, err := b.services.QuizActiveSession.Get(
+		state, err := b.services.Session.QuizProgress(
 			ctx,
 			s.ID,
 		)

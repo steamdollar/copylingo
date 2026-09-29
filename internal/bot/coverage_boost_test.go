@@ -31,12 +31,12 @@ func storeActiveState(
 	)
 }
 
-// graderUserRepoStub satisfies the grader's user repo (UpdateStreak).
-type graderUserRepoStub struct {
+// streakRepoStub satisfies SessionService's user repo (UpdateStreak).
+type streakRepoStub struct {
 	updated bool
 }
 
-func (g *graderUserRepoStub) UpdateStreak(
+func (g *streakRepoStub) UpdateStreak(
 	ctx context.Context,
 	userID int64,
 ) error {
@@ -67,7 +67,7 @@ func (a *activeRepoStub) FlushQuizActiveSession(
 func botWithActive(
 	stateStores *testInteractionStores,
 	repo *activeRepoStub,
-	userRepo *graderUserRepoStub,
+	userRepo *streakRepoStub,
 ) (*Bot, *mockBotAPI) {
 	mAPI := &mockBotAPI{}
 	active := service.NewQuizActiveSessionService(
@@ -76,7 +76,6 @@ func botWithActive(
 		&mockSRS{},
 	)
 	grader := service.NewGraderService(
-		userRepo,
 		active,
 		&mockLLM{},
 	)
@@ -85,6 +84,13 @@ func botWithActive(
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{},
 		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{
+					QuizActiveSessionRepo: repo,
+					UserRepo:              userRepo,
+				},
+			),
 			QuizActiveSession: active,
 			Grader:            grader,
 		},
@@ -129,7 +135,7 @@ func TestFinishSession_Summary(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
-	userRepo := &graderUserRepoStub{}
+	userRepo := &streakRepoStub{}
 	b, mAPI := botWithActive(
 		stateStores,
 		repo,
@@ -221,7 +227,7 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
-	userRepo := &graderUserRepoStub{}
+	userRepo := &streakRepoStub{}
 	b, mAPI := botWithActive(
 		stateStores,
 		repo,
@@ -272,7 +278,7 @@ func TestHandleSessionCallback_BadData(t *testing.T) {
 	b, _ := botWithActive(
 		newTestInteractionStores(),
 		&activeRepoStub{},
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -307,7 +313,7 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 	b, mAPI := botWithActive(
 		stateStores,
 		repo,
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -364,7 +370,7 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 	b, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -414,7 +420,7 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 	b, _ := botWithActive(
 		newTestInteractionStores(),
 		&activeRepoStub{},
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -448,7 +454,7 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 	b, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -525,7 +531,7 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 	b, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -571,7 +577,7 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 	b, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -624,7 +630,7 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 	b, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
-		&graderUserRepoStub{},
+		&streakRepoStub{},
 	)
 	sf := NewSessionFlow(b)
 
@@ -703,7 +709,6 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 		},
 	}
 	grader := service.NewGraderService(
-		&graderUserRepoStub{},
 		active,
 		llm,
 	)
@@ -715,7 +720,14 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 		recovery: stateStores,
 		timing:   stateStores,
 		cfg:      &config.Config{},
-		services: &service.Services{QuizActiveSession: active, Grader: grader},
+		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
+			QuizActiveSession: active,
+			Grader:            grader,
+		},
 	}
 	sf := NewSessionFlow(b)
 
@@ -900,10 +912,15 @@ func TestHandleMenu(t *testing.T) {
 			return &model.User{ID: id, StreakDays: 3, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
-	srs := service.NewSRSService(&mockSRSRepo{})
 	b := &Bot{
 		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
-		services: &service.Services{User: userSvc, SRS: srs},
+		services: &service.Services{
+			User: userSvc,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{QuestionRepo: &mockSRSRepo{}},
+			),
+		},
 	}
 
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}

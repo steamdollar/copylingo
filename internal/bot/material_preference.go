@@ -25,7 +25,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 		len(parts) < 4 || len(parts) > 5 || parts[0] != callback.QuestionRoot ||
 		(parts[2] != callback.QuestionActionPolicy &&
 			(parts[2] != callbackActionExclude || len(parts) != 4)) ||
-		sf.bot.services == nil || sf.bot.services.QuizActiveSession == nil || sf.bot.services.MaterialPreference == nil {
+		sf.bot.services == nil || sf.bot.services.Session == nil || sf.bot.services.MaterialPreference == nil {
 		return
 	}
 	sessionID, sessionOK := materialPreferenceInt(
@@ -39,7 +39,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	if !sessionOK || !questionOK {
 		return
 	}
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	state, err := sf.bot.services.Session.QuizProgress(
 		ctx,
 		sessionID,
 	)

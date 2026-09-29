@@ -9,23 +9,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type mockGraderUserRepo struct {
-	updateStreakFn func(
-		ctx context.Context,
-		userID int64,
-	) error
-}
-
-func (m *mockGraderUserRepo) UpdateStreak(
-	ctx context.Context,
-	userID int64,
-) error {
-	return m.updateStreakFn(
-		ctx,
-		userID,
-	)
-}
-
 type mockGraderQuizActiveSession struct {
 	getFn func(
 		ctx context.Context,
@@ -37,15 +20,6 @@ type mockGraderQuizActiveSession struct {
 		questionID int,
 		userAnswer string,
 		isCorrect bool,
-	) error
-	flushFn func(
-		ctx context.Context,
-		sessionID int,
-		userID int64,
-	) (*QuizSessionResult, error)
-	deleteFn func(
-		ctx context.Context,
-		sessionID int,
 	) error
 }
 
@@ -72,28 +46,6 @@ func (m *mockGraderQuizActiveSession) RecordAnswer(
 		questionID,
 		userAnswer,
 		isCorrect,
-	)
-}
-
-func (m *mockGraderQuizActiveSession) Flush(
-	ctx context.Context,
-	sessionID int,
-	userID int64,
-) (*QuizSessionResult, error) {
-	return m.flushFn(
-		ctx,
-		sessionID,
-		userID,
-	)
-}
-
-func (m *mockGraderQuizActiveSession) Delete(
-	ctx context.Context,
-	sessionID int,
-) error {
-	return m.deleteFn(
-		ctx,
-		sessionID,
 	)
 }
 
@@ -250,7 +202,6 @@ func TestGradeAnswer_Correct(t *testing.T) {
 	}
 
 	grader := NewGraderService(
-		nil,
 		active,
 		nil,
 	)
@@ -312,7 +263,6 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 	}
 
 	grader := NewGraderService(
-		nil,
 		active,
 		nil,
 	)
@@ -379,7 +329,6 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 	}
 
 	grader := NewGraderService(
-		nil,
 		active,
 		llm,
 	)
@@ -440,7 +389,6 @@ func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
 	}
 
 	grader := NewGraderService(
-		nil,
 		active,
 		llm,
 	)
@@ -504,7 +452,6 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 	}
 
 	grader := NewGraderService(
-		nil,
 		active,
 		llm,
 	)
@@ -557,7 +504,6 @@ func TestGradeAnswer_AlreadyAnswered(t *testing.T) {
 	}
 
 	grader := NewGraderService(
-		nil,
 		active,
 		nil,
 	)
@@ -611,7 +557,6 @@ func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 	}
 
 	grader := NewGraderService(
-		nil,
 		active,
 		nil,
 	)
@@ -630,84 +575,6 @@ func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 			expectedErr,
 			err,
 		)
-	}
-}
-
-func TestCompleteSession_FlushStreakAndDelete(t *testing.T) {
-	ctx := context.Background()
-	sessionID := 10
-	userID := int64(12345)
-	deleteCalled := false
-
-	active := &mockGraderQuizActiveSession{
-		flushFn: func(
-			ctx context.Context,
-			sid int,
-			uid int64,
-		) (*QuizSessionResult, error) {
-			if sid != sessionID || uid != userID {
-				t.Fatalf(
-					"unexpected flush args sid=%d uid=%d",
-					sid,
-					uid,
-				)
-			}
-			return &QuizSessionResult{TotalQuestions: 3, CorrectCount: 2}, nil
-		},
-		deleteFn: func(
-			ctx context.Context,
-			sid int,
-		) error {
-			if sid != sessionID {
-				t.Fatalf(
-					"unexpected delete session id %d",
-					sid,
-				)
-			}
-			deleteCalled = true
-			return nil
-		},
-	}
-	userRepo := &mockGraderUserRepo{
-		updateStreakFn: func(
-			ctx context.Context,
-			uid int64,
-		) error {
-			if uid != userID {
-				t.Fatalf(
-					"expected userID %d, got %d",
-					userID,
-					uid,
-				)
-			}
-			return nil
-		},
-	}
-
-	grader := NewGraderService(
-		userRepo,
-		active,
-		nil,
-	)
-	result, err := grader.CompleteSession(
-		ctx,
-		sessionID,
-		userID,
-	)
-	if err != nil {
-		t.Fatalf(
-			"CompleteSession failed: %v",
-			err,
-		)
-	}
-	if result.CorrectCount != 2 || result.TotalQuestions != 3 {
-		t.Fatalf(
-			"unexpected result: %+v",
-			result,
-		)
-	}
-	if !deleteCalled {
-		t.Fatal("expected active session state to be deleted")
 	}
 }
 

@@ -579,7 +579,7 @@ func (b *Bot) showMainMenu(
 		lang = user.Language
 		level = user.ProficiencyLevel
 	}
-	reviewCount, _ := b.services.SRS.GetDueCount(
+	reviewCount, _ := b.services.Session.DueReviewCount(
 		ctx,
 		from.ID,
 		lang,
@@ -925,11 +925,9 @@ func (b *Bot) handleTest(
 	}
 
 	// 2. Build a morning session (9 new + 6 review)
-	session, err := b.services.SessionBuilder.BuildMorningSession(
+	session, err := b.services.Session.BuildMorningQuiz(
 		ctx,
-		user.ID,
-		user.Language,
-		user.ProficiencyLevel,
+		*user,
 	)
 	if err != nil {
 		slog.ErrorContext(

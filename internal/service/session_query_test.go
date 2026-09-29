@@ -8,48 +8,64 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type unfinishedSessionRepoStub struct {
-	session         *model.Session
-	err             error
-	userID          int64
-	unfinishedCount int
-	batchCounts     map[int64]int
+// fakeSessionRepo implements SessionRepo for SessionService tests. The
+// embedded nil interface makes an unexpected repository call panic.
+type fakeSessionRepo struct {
+	SessionRepo
+	oldest       *model.Session
+	oldestUserID int64
+	batchCounts  map[int64]int
+	err          error
+	startFn      func(id int) error
+	created      []*model.Session
 }
 
-func (r *unfinishedSessionRepoStub) GetOldestUnfinished(
-	ctx context.Context,
+func (r *fakeSessionRepo) GetOldestUnfinished(
+	_ context.Context,
 	userID int64,
 ) (*model.Session, error) {
-	r.userID = userID
-	return r.session, r.err
+	r.oldestUserID = userID
+	return r.oldest, r.err
 }
 
-func (r *unfinishedSessionRepoStub) CountUnfinished(
-	context.Context,
-	int64,
-) (int, error) {
-	return r.unfinishedCount, r.err
-}
-
-func (r *unfinishedSessionRepoStub) CountUnfinishedBatch(
+func (r *fakeSessionRepo) CountUnfinishedBatch(
 	context.Context,
 	[]int64,
 ) (map[int64]int, error) {
 	return r.batchCounts, r.err
 }
 
-func TestSessionQueryGetOldestUnfinishedPassesThrough(t *testing.T) {
-	want := &model.Session{ID: 42, UserID: 123, Status: model.SessionInProgress}
-	repo := &unfinishedSessionRepoStub{session: want}
-	svc := NewSessionQueryService(repo)
+func (r *fakeSessionRepo) Start(
+	_ context.Context,
+	id int,
+) error {
+	return r.startFn(id)
+}
 
-	got, err := svc.GetOldestUnfinished(
+func (r *fakeSessionRepo) CreateSession(
+	_ context.Context,
+	s *model.Session,
+) error {
+	s.ID = 500 + len(r.created)
+	r.created = append(
+		r.created,
+		s,
+	)
+	return nil
+}
+
+func TestSessionServiceOldestUnfinishedPassesThrough(t *testing.T) {
+	want := &model.Session{ID: 42, UserID: 123, Status: model.SessionInProgress}
+	repo := &fakeSessionRepo{oldest: want}
+	svc := NewSessionService(SessionDeps{SessionRepo: repo})
+
+	got, err := svc.OldestUnfinished(
 		context.Background(),
 		want.UserID,
 	)
 	if err != nil {
 		t.Fatalf(
-			"GetOldestUnfinished failed: %v",
+			"OldestUnfinished failed: %v",
 			err,
 		)
 	}
@@ -60,20 +76,20 @@ func TestSessionQueryGetOldestUnfinishedPassesThrough(t *testing.T) {
 			want,
 		)
 	}
-	if repo.userID != want.UserID {
+	if repo.oldestUserID != want.UserID {
 		t.Fatalf(
 			"userID = %d, want %d",
-			repo.userID,
+			repo.oldestUserID,
 			want.UserID,
 		)
 	}
 }
 
-func TestSessionQueryGetOldestUnfinishedReturnsRepositoryError(t *testing.T) {
+func TestSessionServiceOldestUnfinishedReturnsRepositoryError(t *testing.T) {
 	wantErr := errors.New("query failed")
-	svc := NewSessionQueryService(&unfinishedSessionRepoStub{err: wantErr})
+	svc := NewSessionService(SessionDeps{SessionRepo: &fakeSessionRepo{err: wantErr}})
 
-	_, err := svc.GetOldestUnfinished(
+	_, err := svc.OldestUnfinished(
 		context.Background(),
 		123,
 	)
@@ -89,52 +105,9 @@ func TestSessionQueryGetOldestUnfinishedReturnsRepositoryError(t *testing.T) {
 	}
 }
 
-func TestSessionQueryCountUnfinishedPassesThrough(t *testing.T) {
-	repo := &unfinishedSessionRepoStub{unfinishedCount: 2}
-	svc := NewSessionQueryService(repo)
-
-	got, err := svc.CountUnfinished(
-		context.Background(),
-		123,
-	)
-	if err != nil {
-		t.Fatalf(
-			"CountUnfinished failed: %v",
-			err,
-		)
-	}
-	if got != 2 {
-		t.Fatalf(
-			"count = %d, want 2",
-			got,
-		)
-	}
-}
-
-func TestSessionQueryCountUnfinishedReturnsRepositoryError(t *testing.T) {
-	wantErr := errors.New("query failed")
-	svc := NewSessionQueryService(&unfinishedSessionRepoStub{err: wantErr})
-
-	_, err := svc.CountUnfinished(
-		context.Background(),
-		123,
-	)
-	if !errors.Is(
-		err,
-		wantErr,
-	) {
-		t.Fatalf(
-			"error = %v, want %v",
-			err,
-			wantErr,
-		)
-	}
-}
-
-func TestSessionQueryCountUnfinishedBatchPassesThrough(t *testing.T) {
+func TestSessionServiceCountUnfinishedBatchPassesThrough(t *testing.T) {
 	expected := map[int64]int{1: 2, 2: 0}
-	repo := &unfinishedSessionRepoStub{batchCounts: expected}
-	svc := NewSessionQueryService(repo)
+	svc := NewSessionService(SessionDeps{SessionRepo: &fakeSessionRepo{batchCounts: expected}})
 
 	got, err := svc.CountUnfinishedBatch(
 		context.Background(),

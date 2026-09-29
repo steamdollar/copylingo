@@ -323,8 +323,8 @@ func (s *Scheduler) tick(ctx context.Context) error {
 			}
 
 			var unfinishedCounts map[int64]int
-			if s.services.SessionQuery != nil {
-				counts, err := s.services.SessionQuery.CountUnfinishedBatch(
+			if s.services.Session != nil {
+				counts, err := s.services.Session.CountUnfinishedBatch(
 					ctx,
 					userIDs,
 				)

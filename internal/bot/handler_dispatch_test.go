@@ -70,7 +70,11 @@ func (m *mockUserRepo) UpdateTimezone(
 	return nil
 }
 
-type mockSRSRepo struct{}
+// mockSRSRepo serves due-review queries; the embedded nil QuestionRepo makes
+// any other question-bank call panic.
+type mockSRSRepo struct {
+	service.QuestionRepo
+}
 
 func (m *mockSRSRepo) GetDueReviews(
 	ctx context.Context,
@@ -298,7 +302,10 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 			mSRSRepo := &mockSRSRepo{}
 			b.services = &service.Services{
 				User: service.NewUserService(mUserRepo),
-				SRS:  service.NewSRSService(mSRSRepo),
+				Session: newTestSessionService(
+					nil,
+					service.SessionDeps{QuestionRepo: mSRSRepo},
+				),
 			}
 
 			b.handleUpdate(update)

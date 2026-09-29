@@ -171,34 +171,6 @@ func (s *QuizActiveSessionService) Get(
 	return state, nil
 }
 
-func (s *QuizActiveSessionService) SetCurrentIndex(
-	ctx context.Context,
-	sessionID,
-	idx int,
-) error {
-	state, err := s.Get(
-		ctx,
-		sessionID,
-	)
-	if err != nil {
-		return err
-	}
-	if idx < 0 || idx > len(state.Items) {
-		return fmt.Errorf(
-			"set active session current index session_id=%d idx=%d: %w",
-			sessionID,
-			idx,
-			ErrQuizActiveSessionQuestionNotFound,
-		)
-	}
-	state.CurrentIndex = idx
-	state.UpdatedAt = time.Now()
-	return s.save(
-		ctx,
-		state,
-	)
-}
-
 func (s *QuizActiveSessionService) RecordAnswer(
 	ctx context.Context,
 	sessionID,

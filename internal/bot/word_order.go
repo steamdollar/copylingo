@@ -268,10 +268,10 @@ func (sf *SessionFlow) wordOrderCurrentItem(
 	questionID int,
 ) (*model.QuizActiveSessionState, *model.QuizActiveSessionQuestion, bool) {
 	if cb == nil || cb.From == nil || sf.bot == nil || sf.bot.services == nil ||
-		sf.bot.services.QuizActiveSession == nil {
+		sf.bot.services.Session == nil {
 		return nil, nil, false
 	}
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	state, err := sf.bot.services.Session.QuizProgress(
 		ctx,
 		sessionID,
 	)

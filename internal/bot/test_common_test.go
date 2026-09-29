@@ -118,6 +118,19 @@ func cloneTestState[T any](state *T) (*T, error) {
 	return &clone, nil
 }
 
+// newTestSessionService wires SessionService over test fakes. When stores is
+// non-nil, its Quiz/Study working-set stores back the service; deps left
+// unset stay nil so an unexpected call fails loudly.
+func newTestSessionService(
+	stores *testInteractionStores,
+	deps service.SessionDeps,
+) *service.SessionService {
+	if stores != nil {
+		deps.Stores = service.SessionStores{Quiz: stores.quiz, Study: stores.study}
+	}
+	return service.NewSessionService(deps)
+}
+
 func (s *testInteractionStores) stateStores() StateStores {
 	return StateStores{Input: s, Drafts: s, Messages: s, Recovery: s, Timing: s}
 }

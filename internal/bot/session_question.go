@@ -23,11 +23,11 @@ func (sf *SessionFlow) showQuestion(
 	sessionID,
 	questionIdx int,
 ) {
-
-	// get active session from redis
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	// Loads the working set and moves its cursor to questionIdx in one call.
+	state, err := sf.bot.services.Session.ShowQuizQuestion(
 		ctx,
 		sessionID,
+		questionIdx,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -74,31 +74,6 @@ func (sf *SessionFlow) showQuestion(
 				keyboard,
 			)
 		}
-		return
-	}
-
-	// set current question index at redis
-	if err := sf.bot.services.QuizActiveSession.SetCurrentIndex(
-		ctx,
-		sessionID,
-		questionIdx,
-	); err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to set active session index",
-			"event",
-			"telegram.question.index_update_failed",
-			"session_id",
-			sessionID,
-			"question_index",
-			questionIdx,
-			"error",
-			err,
-		)
-		sf.showQuizActiveSessionUnavailable(
-			chatID,
-			editMessageID,
-		)
 		return
 	}
 
@@ -524,7 +499,7 @@ func (sf *SessionFlow) isQuestionAnswered(
 	sessionID,
 	questionIdx int,
 ) bool {
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	state, err := sf.bot.services.Session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -538,7 +513,7 @@ func (sf *SessionFlow) nextUnansweredQuestionIndex(
 	ctx context.Context,
 	sessionID int,
 ) (int, error) {
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	state, err := sf.bot.services.Session.QuizProgress(
 		ctx,
 		sessionID,
 	)

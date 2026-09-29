@@ -3,35 +3,26 @@ package service
 import (
 	"context"
 
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type unfinishedSessionRepo interface {
-	GetOldestUnfinished(
-		ctx context.Context,
-		userID int64,
-	) (*model.Session, error)
-	CountUnfinished(
-		ctx context.Context,
-		userID int64,
-	) (int, error)
-	CountUnfinishedBatch(
-		ctx context.Context,
-		userIDs []int64,
-	) (map[int64]int, error)
+// Read-only lookups for rendering and scheduling. They never change DB or
+// Redis state beyond the Quiz working-set recovery done by QuizProgress.
+
+// CountUnfinishedBatch returns the number of pending/in-progress sessions of any mode per user.
+func (s *SessionService) CountUnfinishedBatch(
+	ctx context.Context,
+	userIDs []int64,
+) (map[int64]int, error) {
+	return s.sessionRepo.CountUnfinishedBatch(
+		ctx,
+		userIDs,
+	)
 }
 
-// SessionQueryService exposes session lookup operations used by scheduled jobs.
-type SessionQueryService struct {
-	sessionRepo unfinishedSessionRepo
-}
-
-func NewSessionQueryService(sessionRepo unfinishedSessionRepo) *SessionQueryService {
-	return &SessionQueryService{sessionRepo: sessionRepo}
-}
-
-// GetOldestUnfinished returns the user's highest-priority unfinished session.
-func (s *SessionQueryService) GetOldestUnfinished(
+// OldestUnfinished returns the user's highest-priority unfinished session of any mode.
+func (s *SessionService) OldestUnfinished(
 	ctx context.Context,
 	userID int64,
 ) (*model.Session, error) {
@@ -41,24 +32,46 @@ func (s *SessionQueryService) GetOldestUnfinished(
 	)
 }
 
-// CountUnfinished returns the number of pending and in-progress sessions for a user.
-func (s *SessionQueryService) CountUnfinished(
+// ListByStatus returns the user's sessions of any mode in the given status.
+func (s *SessionService) ListByStatus(
 	ctx context.Context,
 	userID int64,
-) (int, error) {
-	return s.sessionRepo.CountUnfinished(
+	status config.SessionStatus,
+) ([]model.Session, error) {
+	return s.sessionRepo.GetSessionsByStatus(
 		ctx,
 		userID,
+		status,
 	)
 }
 
-// CountUnfinishedBatch returns the number of pending/in-progress sessions for multiple users.
-func (s *SessionQueryService) CountUnfinishedBatch(
+// ListInProgressQuizzes returns in-progress Quiz sessions of all users.
+func (s *SessionService) ListInProgressQuizzes(ctx context.Context) ([]model.Session, error) {
+	return s.sessionRepo.ListInProgress(ctx)
+}
+
+// DueReviewCount returns how many SRS items are due for the user's language/level scope.
+func (s *SessionService) DueReviewCount(
 	ctx context.Context,
-	userIDs []int64,
-) (map[int64]int, error) {
-	return s.sessionRepo.CountUnfinishedBatch(
+	userID int64,
+	language,
+	level string,
+) (int, error) {
+	return s.srs.GetDueCount(
 		ctx,
-		userIDs,
+		userID,
+		language,
+		level,
+	)
+}
+
+// QuizProgress returns the Quiz working set, recovering it from DB when Redis has none.
+func (s *SessionService) QuizProgress(
+	ctx context.Context,
+	sessionID int,
+) (*model.QuizActiveSessionState, error) {
+	return s.quizProgress.Get(
+		ctx,
+		sessionID,
 	)
 }

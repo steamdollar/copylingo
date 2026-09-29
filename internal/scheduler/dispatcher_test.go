@@ -49,10 +49,12 @@ type mockDispatcherPusher struct {
 	studyPushes []int64
 }
 
+// schedulerSessionQueryRepoStub serves the unfinished-session queries; the
+// embedded nil SessionRepo makes any other repository call panic.
 type schedulerSessionQueryRepoStub struct {
-	session         *model.Session
-	err             error
-	unfinishedCount int
+	service.SessionRepo
+	session *model.Session
+	err     error
 }
 
 func (r *schedulerSessionQueryRepoStub) GetOldestUnfinished(
@@ -62,18 +64,15 @@ func (r *schedulerSessionQueryRepoStub) GetOldestUnfinished(
 	return r.session, r.err
 }
 
-func (r *schedulerSessionQueryRepoStub) CountUnfinished(
-	context.Context,
-	int64,
-) (int, error) {
-	return r.unfinishedCount, r.err
-}
-
 func (r *schedulerSessionQueryRepoStub) CountUnfinishedBatch(
 	context.Context,
 	[]int64,
 ) (map[int64]int, error) {
 	return nil, r.err
+}
+
+func newSchedulerSessionService(repo *schedulerSessionQueryRepoStub) *service.SessionService {
+	return service.NewSessionService(service.SessionDeps{SessionRepo: repo})
 }
 
 func (p *mockDispatcherPusher) PushSession(
@@ -112,9 +111,9 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 
 	// Stub session query returning an unfinished session so reminder succeeds
 	unfinishedSession := &model.Session{ID: 10, Mode: model.SessionModeStudy}
-	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession, unfinishedCount: 3}
+	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
 	services := &service.Services{
-		SessionQuery: service.NewSessionQueryService(sqStub),
+		Session: newSchedulerSessionService(sqStub),
 	}
 
 	d := newSessionDispatcher(
@@ -191,7 +190,7 @@ func TestDispatcher_ClaimErrorFailsOpen(t *testing.T) {
 	claims := &mockPushClaims{err: errors.New("redis unavailable")}
 	pusher := &mockDispatcherPusher{}
 	services := &service.Services{
-		SessionQuery: service.NewSessionQueryService(&schedulerSessionQueryRepoStub{
+		Session: newSchedulerSessionService(&schedulerSessionQueryRepoStub{
 			session: &model.Session{ID: 10, Mode: model.SessionModeStudy},
 		}),
 	}
@@ -225,9 +224,9 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 	pusher := &mockDispatcherPusher{}
 
 	unfinishedSession := &model.Session{ID: 99, Type: model.SessionMorning, Mode: model.SessionModeQuiz}
-	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession, unfinishedCount: 3}
+	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
 	services := &service.Services{
-		SessionQuery: service.NewSessionQueryService(sqStub),
+		Session: newSchedulerSessionService(sqStub),
 	}
 
 	d := newSessionDispatcher(
@@ -281,9 +280,9 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 	pusher := &mockDispatcherPusher{}
 
 	unfinishedSession := &model.Session{ID: 1, Mode: model.SessionModeStudy}
-	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession, unfinishedCount: 3}
+	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
 	services := &service.Services{
-		SessionQuery: service.NewSessionQueryService(sqStub),
+		Session: newSchedulerSessionService(sqStub),
 	}
 
 	d := newSessionDispatcher(

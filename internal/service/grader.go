@@ -27,13 +27,6 @@ type graderLLM interface {
 	) (external.GradeResult, error)
 }
 
-type graderUserRepo interface {
-	UpdateStreak(
-		ctx context.Context,
-		userID int64,
-	) error
-}
-
 type graderQuizActiveSession interface {
 	Get(
 		ctx context.Context,
@@ -46,31 +39,19 @@ type graderQuizActiveSession interface {
 		userAnswer string,
 		isCorrect bool,
 	) error
-	Flush(
-		ctx context.Context,
-		sessionID int,
-		userID int64,
-	) (*QuizSessionResult, error)
-	Delete(
-		ctx context.Context,
-		sessionID int,
-	) error
 }
 
 // GraderService handles answer grading and result processing.
 type GraderService struct {
-	userRepo          graderUserRepo
 	quizActiveSession graderQuizActiveSession
 	llm               graderLLM
 }
 
 func NewGraderService(
-	userRepo graderUserRepo,
 	quizActiveSession graderQuizActiveSession,
 	llm graderLLM,
 ) *GraderService {
 	return &GraderService{
-		userRepo:          userRepo,
 		quizActiveSession: quizActiveSession,
 		llm:               llm,
 	}
@@ -280,42 +261,6 @@ func (g *GraderService) recordGradingResult(
 		userAnswer,
 		isCorrect,
 	)
-}
-
-// CompleteSession finalizes a session with results.
-func (g *GraderService) CompleteSession(
-	ctx context.Context,
-	sessionID int,
-	userID int64,
-) (*QuizSessionResult, error) {
-	if g.quizActiveSession == nil {
-		return nil, ErrQuizActiveSessionDependencyMissing
-	}
-	result, err := g.quizActiveSession.Flush(
-		ctx,
-		sessionID,
-		userID,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update streak
-	if err := g.userRepo.UpdateStreak(
-		ctx,
-		userID,
-	); err != nil {
-		return nil, err
-	}
-
-	if err := g.quizActiveSession.Delete(
-		ctx,
-		sessionID,
-	); err != nil {
-		return nil, err
-	}
-
-	return result, nil
 }
 
 func (g *GraderService) questionFromQuizActiveSession(

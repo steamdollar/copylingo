@@ -25,7 +25,6 @@ func newWordOrderFixture(
 		&mockSRS{},
 	)
 	grader := service.NewGraderService(
-		nil,
 		active,
 		&mockLLM{},
 	)
@@ -34,6 +33,10 @@ func newWordOrderFixture(
 		telegram: newTelegramClient(api),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
 			QuizActiveSession: active,
 			Grader:            grader,
 		},

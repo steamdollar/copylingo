@@ -259,10 +259,10 @@ func (b *Bot) loadQuizQuestionContext(
 	if input.Kind != model.PendingLLMQuizQuestion {
 		return ""
 	}
-	if b.services == nil || b.services.QuizActiveSession == nil {
+	if b.services == nil || b.services.Session == nil {
 		return ""
 	}
-	state, err := b.services.QuizActiveSession.Get(
+	state, err := b.services.Session.QuizProgress(
 		ctx,
 		input.SessionID,
 	)

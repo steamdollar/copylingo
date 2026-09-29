@@ -8,18 +8,11 @@ import (
 	"github.com/lsj/copylingo/internal/repository"
 )
 
-type SessionStores struct {
-	Quiz  QuizSessionStore
-	Study StudySessionStore
-}
-
 // Services holds all service instances.
 type Services struct {
 	Content            *ContentService
 	User               *UserService
-	SRS                *SRSService
-	SessionBuilder     *SessionBuilderService
-	SessionQuery       *SessionQueryService
+	Session            *SessionService
 	StudySession       *StudySessionService
 	StudyActiveSession *StudyActiveSessionService
 	MaterialPreference *MaterialPreferenceService
@@ -68,29 +61,25 @@ func NewServices(
 		)
 	}
 
-	srsService := NewSRSService(repos.Question)
-	quizActiveSessionService := NewQuizActiveSessionService(
-		repos.QuizActiveSession,
-		stores.Quiz,
-		srsService,
-	)
+	session := NewSessionService(SessionDeps{
+		QuestionRepo:          repos.Question,
+		SessionRepo:           repos.Session,
+		SessionQuestionRepo:   repos.SessionQuestion,
+		QuizActiveSessionRepo: repos.QuizActiveSession,
+		UserRepo:              repos.User,
+		Stores:                stores,
+	})
+	// Transitional (ADR-059 §8 step B): answer and Mini App paths still reach
+	// these Tier2 services directly, so share SessionService's instances.
 	graderService := NewGraderService(
-		repos.User,
-		quizActiveSessionService,
+		session.quizProgress,
 		llm,
 	)
 
 	return &Services{
 		Content: NewContentService(repos.Content),
 		User:    NewUserService(repos.User),
-		SRS:     srsService,
-		SessionBuilder: NewSessionBuilderService(
-			repos.Question,
-			repos.Session,
-			repos.SessionQuestion,
-			srsService,
-		),
-		SessionQuery: NewSessionQueryService(repos.Session),
+		Session: session,
 		StudySession: NewStudySessionService(
 			repos.Material,
 			repos.Session,
@@ -102,10 +91,10 @@ func NewServices(
 			stores.Study,
 		),
 		MaterialPreference: NewMaterialPreferenceService(repos.MaterialPreference),
-		QuizActiveSession:  quizActiveSessionService,
+		QuizActiveSession:  session.quizProgress,
 		Grader:             graderService,
 		Handwriting: NewHandwritingService(
-			quizActiveSessionService,
+			session.quizProgress,
 			graderService,
 			nil,
 		),

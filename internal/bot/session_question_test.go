@@ -147,7 +147,13 @@ func TestQuestionNavigation(t *testing.T) {
 		stateStores.quiz,
 		nil,
 	)
-	sf := NewSessionFlow(&Bot{services: &service.Services{QuizActiveSession: active}})
+	sf := NewSessionFlow(&Bot{services: &service.Services{
+		Session: newTestSessionService(
+			stateStores,
+			service.SessionDeps{},
+		),
+		QuizActiveSession: active,
+	}})
 
 	trueVal := true
 	state := &model.QuizActiveSessionState{
@@ -656,7 +662,13 @@ func TestShowQuestion_Finish(t *testing.T) {
 		messages: stateStores,
 		recovery: stateStores,
 		timing:   stateStores,
-		services: &service.Services{QuizActiveSession: active},
+		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
+			QuizActiveSession: active,
+		},
 	}
 	sf := NewSessionFlow(b)
 

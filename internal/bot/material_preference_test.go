@@ -195,6 +195,10 @@ func newPreferenceQuizBot(t *testing.T) (*Bot, *botMaterialPreferenceRepo, *test
 		timing:   stateStores,
 		cfg:      &config.Config{Server: config.ServerConfig{PublicBaseURL: "https://example.com"}},
 		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
 			QuizActiveSession: service.NewQuizActiveSessionService(
 				nil,
 				stateStores.quiz,

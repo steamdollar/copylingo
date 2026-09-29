@@ -13,7 +13,10 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
+// mockSessionStore implements the sessions-table calls these tests drive; the
+// embedded nil SessionRepo makes any other call panic.
 type mockSessionStore struct {
+	service.SessionRepo
 	getSessionsByStatusFn func(
 		ctx context.Context,
 		userID int64,
@@ -81,16 +84,13 @@ func TestStartStudy_NoSessions(t *testing.T) {
 			return nil, nil
 		},
 	}
-	sb := service.NewSessionBuilderService(
-		nil,
-		mSessionStore,
-		nil,
-		nil,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
-			SessionBuilder: sb,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{SessionRepo: mSessionStore},
+			),
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -144,16 +144,13 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 			return nil, nil
 		},
 	}
-	sb := service.NewSessionBuilderService(
-		nil,
-		mSessionStore,
-		nil,
-		nil,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
-			SessionBuilder: sb,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{SessionRepo: mSessionStore},
+			),
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -217,23 +214,14 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 			return nil, nil
 		},
 	}
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		nil,
-	)
-	sb := service.NewSessionBuilderService(
-		nil,
-		mSessionStore,
-		nil,
-		nil,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder:    sb,
-			QuizActiveSession: active,
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{SessionRepo: mSessionStore},
+			),
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -305,7 +293,6 @@ func TestStartReview_NoneDue(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	mSRSRepo := &mockSRSRepoWithCount{count: 5} // Has due questions
-	srs := service.NewSRSService(mSRSRepo)
 
 	mSessionStore := &mockSessionStore{
 		createSessionFn: func(
@@ -318,12 +305,6 @@ func TestStartReview_NoneDue(t *testing.T) {
 		},
 	}
 	mSQStore := &mockSessionQuestionStore{}
-	sb := service.NewSessionBuilderService(
-		nil,
-		mSessionStore,
-		mSQStore,
-		srs,
-	)
 
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
@@ -335,8 +316,14 @@ func TestStartReview_NoneDue(t *testing.T) {
 			) (*model.User, error) {
 				return &model.User{ID: 123, Language: "ja", ProficiencyLevel: "N5"}, nil
 			}}),
-			SRS:            srs,
-			SessionBuilder: sb,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{
+					QuestionRepo:        mSRSRepo,
+					SessionRepo:         mSessionStore,
+					SessionQuestionRepo: mSQStore,
+				},
+			),
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -412,7 +399,6 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	mSRSRepo := &mockSRSRepoWithCount{count: 0}
-	srs := service.NewSRSService(mSRSRepo)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
@@ -423,7 +409,10 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 			) (*model.User, error) {
 				return &model.User{ID: 123, Language: "ja", ProficiencyLevel: "N5"}, nil
 			}}),
-			SRS: srs,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{QuestionRepo: mSRSRepo},
+			),
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -473,23 +462,15 @@ func TestHandleSessionCallback(t *testing.T) {
 			return nil
 		},
 	}
-	sb := service.NewSessionBuilderService(
-		nil,
-		mSessionStore,
-		nil,
-		nil,
-	)
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		nil,
+	session := newTestSessionService(
+		stateStores,
+		service.SessionDeps{SessionRepo: mSessionStore},
 	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder:    sb,
-			QuizActiveSession: active,
+			Session: session,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -499,6 +480,7 @@ func TestHandleSessionCallback(t *testing.T) {
 		func(t *testing.T) {
 			cb := &tgbotapi.CallbackQuery{
 				Data: "session:10:start",
+				From: &tgbotapi.User{ID: 123},
 				Message: &tgbotapi.Message{
 					Chat:      &tgbotapi.Chat{ID: 123},
 					MessageID: 456,
@@ -531,23 +513,15 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 			return nil
 		},
 	}
-	sb := service.NewSessionBuilderService(
-		nil,
-		mSessionStore,
-		nil,
-		nil,
-	)
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		nil,
+	session := newTestSessionService(
+		stateStores,
+		service.SessionDeps{SessionRepo: mSessionStore},
 	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder:    sb,
-			QuizActiveSession: active,
+			Session: session,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -623,7 +597,7 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 			last.Text,
 		)
 	}
-	resumed, err := active.Get(
+	resumed, err := session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -690,22 +664,18 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 			return nil
 		},
 	}
-	active := service.NewQuizActiveSessionService(
-		repo,
-		stateStores.quiz,
-		nil,
+	session := newTestSessionService(
+		stateStores,
+		service.SessionDeps{
+			SessionRepo:           store,
+			QuizActiveSessionRepo: repo,
+		},
 	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder: service.NewSessionBuilderService(
-				nil,
-				store,
-				nil,
-				nil,
-			),
-			QuizActiveSession: active,
+			Session: session,
 		},
 	}
 	storeActiveState(
@@ -725,7 +695,7 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 		),
 	)
 
-	state, err := active.Get(
+	state, err := session.QuizProgress(
 		ctx,
 		32,
 	)

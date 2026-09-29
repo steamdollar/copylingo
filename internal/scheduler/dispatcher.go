@@ -273,8 +273,8 @@ func (d *sessionDispatcher) buildAndPushQuiz(
 	user model.User,
 	sessionType model.SessionType,
 ) error {
-	if d.services == nil || d.services.SessionBuilder == nil {
-		return fmt.Errorf("session builder service unavailable")
+	if d.services == nil || d.services.Session == nil {
+		return fmt.Errorf("session service unavailable")
 	}
 
 	var session *model.Session
@@ -282,18 +282,14 @@ func (d *sessionDispatcher) buildAndPushQuiz(
 
 	switch sessionType {
 	case model.SessionMorning:
-		session, err = d.services.SessionBuilder.BuildMorningSession(
+		session, err = d.services.Session.BuildMorningQuiz(
 			ctx,
-			user.ID,
-			user.Language,
-			user.ProficiencyLevel,
+			user,
 		)
 	case model.SessionEvening:
-		session, err = d.services.SessionBuilder.BuildEveningSession(
+		session, err = d.services.Session.BuildEveningQuiz(
 			ctx,
-			user.ID,
-			user.Language,
-			user.ProficiencyLevel,
+			user,
 		)
 	default:
 		return fmt.Errorf(
@@ -356,14 +352,14 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 	ctx context.Context,
 	userID int64,
 ) (bool, error) {
-	if d.services == nil || d.services.SessionQuery == nil {
-		return false, fmt.Errorf("session query service unavailable")
+	if d.services == nil || d.services.Session == nil {
+		return false, fmt.Errorf("session service unavailable")
 	}
 	if d.bot == nil {
 		return false, fmt.Errorf("session pusher unavailable")
 	}
 
-	session, err := d.services.SessionQuery.GetOldestUnfinished(
+	session, err := d.services.Session.OldestUnfinished(
 		ctx,
 		userID,
 	)

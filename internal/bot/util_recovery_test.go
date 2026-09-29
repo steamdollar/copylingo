@@ -12,7 +12,7 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// sessionListStore drives GetAllInProgressSessions for refresh tests.
+// sessionListStore drives ListInProgressQuizzes for refresh tests.
 type sessionListStore struct {
 	mockSessionStore
 	inProgress []model.Session
@@ -42,12 +42,6 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	store := &sessionListStore{inProgress: nil}
-	sb := service.NewSessionBuilderService(
-		nil,
-		store,
-		nil,
-		nil,
-	)
 	cfg := &config.Config{}
 	cfg.Server.PublicBaseURL = "https://x.trycloudflare.com"
 	b := &Bot{
@@ -58,7 +52,12 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 		recovery: stateStores,
 		timing:   stateStores,
 		cfg:      cfg,
-		services: &service.Services{SessionBuilder: sb},
+		services: &service.Services{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{SessionRepo: store},
+			),
+		},
 	}
 
 	b.RefreshStaleMiniAppMessages(ctx)
@@ -71,7 +70,10 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	}
 }
 
-type emptyQuestionFetcher struct{}
+// emptyQuestionFetcher has no new questions; due-review calls come from mockSRSRepo.
+type emptyQuestionFetcher struct {
+	mockSRSRepo
+}
 
 func (e *emptyQuestionFetcher) GetNewQuestions(
 	ctx context.Context,
@@ -83,12 +85,6 @@ func (e *emptyQuestionFetcher) GetNewQuestions(
 	limit,
 	kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return nil, nil
-}
-func (e *emptyQuestionFetcher) GetByID(
-	ctx context.Context,
-	id int,
-) (*model.Question, error) {
 	return nil, nil
 }
 
@@ -104,17 +100,19 @@ func TestHandleTest_NoQuestions(t *testing.T) {
 			return &model.User{ID: id, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
-	srs := service.NewSRSService(&mockSRSRepo{})
-	store := &sessionListStore{}
-	sb := service.NewSessionBuilderService(
-		&emptyQuestionFetcher{},
-		store,
-		&mockSessionQuestionStore{},
-		srs,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
-		services: &service.Services{User: userSvc, SessionBuilder: sb},
+		services: &service.Services{
+			User: userSvc,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{
+					QuestionRepo:        &emptyQuestionFetcher{},
+					SessionRepo:         &sessionListStore{},
+					SessionQuestionRepo: &mockSessionQuestionStore{},
+				},
+			),
+		},
 	}
 
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
