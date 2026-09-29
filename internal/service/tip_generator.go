@@ -64,30 +64,6 @@ func NewTipGenerator(
 	return &TipGenerator{tips: tips, llm: llm, model: model}
 }
 
-// newTipGeneratorFromClient adapts the shared external.LLMClient to the tip
-// pipeline. GenerateTips is only on the concrete *DefaultLLMClient, so it asserts
-// and, on failure, stores a true nil LLM (not a typed nil) so TopUpBucket's nil
-// guard works as intended.
-func newTipGeneratorFromClient(
-	tips tipGeneratorRepo,
-	client external.LLMClient,
-	model string,
-) *TipGenerator {
-	concrete, ok := client.(*external.DefaultLLMClient)
-	if !ok {
-		return NewTipGenerator(
-			tips,
-			nil,
-			model,
-		)
-	}
-	return NewTipGenerator(
-		tips,
-		concrete,
-		model,
-	)
-}
-
 // TopUpBucket generates up to TipGeneratePerCycle new tips for the given
 // (language, level) when the active balance is below TipBucketTarget. It is a
 // no-op once the bucket is full, so callers can invoke it every cycle safely.

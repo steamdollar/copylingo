@@ -16,9 +16,8 @@ type Services struct {
 	MaterialPreference *MaterialPreferenceService
 	Analyzer           *AnalyzerService
 	Tip                *TipService
-	TipGenerator       *TipGenerator
+	LLMQuestion        *LLMQuestionService
 	Audio              *AudioService
-	LLM                *LLMService
 }
 
 // NewServices creates all services with the given dependencies.
@@ -28,18 +27,20 @@ func NewServices(
 	cfg *config.Config,
 	stores SessionStores,
 ) *Services {
-	// Share one LLM client between grading (LLMService) and tip generation.
-	// GenerateTips lives on the concrete *DefaultLLMClient (not the LLMClient
-	// interface), so assert to reach it.
+	// One LLM client serves Quiz grading, learner questions and tip generation.
 	llmClient := external.NewLLMClient(cfg)
 	llm := NewLLMService(llmClient)
 
-	// Build the tip generator only when the concrete client is available; a typed
-	// nil would defeat TopUpBucket's nil guard, so leave the field nil otherwise
-	// (the scheduler already tolerates a nil TipGenerator).
-	tipGenerator := newTipGeneratorFromClient(
+	// GenerateTips lives on the concrete *DefaultLLMClient (not the LLMClient
+	// interface). Without it, pass a true nil (not a typed nil) so tip top-up
+	// reports ErrAIConfigMissing instead of calling a nil client.
+	var tipLLM tipGeneratorLLM
+	if concrete, ok := llmClient.(*external.DefaultLLMClient); ok {
+		tipLLM = concrete
+	}
+	tip := NewTipService(
 		repos.Tip,
-		llmClient,
+		tipLLM,
 		cfg.LLM.Model,
 	)
 
@@ -78,9 +79,12 @@ func NewServices(
 			repos.User,
 			repos.SessionQuestion,
 		),
-		Tip:          NewTipService(repos.Tip),
-		TipGenerator: tipGenerator,
-		Audio:        audioService,
-		LLM:          llm,
+		Tip: tip,
+		LLMQuestion: NewLLMQuestionService(
+			llm,
+			tip,
+			cfg.LLM.Model,
+		),
+		Audio: audioService,
 	}
 }

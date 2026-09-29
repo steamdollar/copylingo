@@ -18,7 +18,10 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
+// mockTipRepo serves ListActive; the embedded nil TipRepo makes any other
+// tips-table call panic.
 type mockTipRepo struct {
+	service.TipRepo
 	listActiveFn func(
 		ctx context.Context,
 		language,
@@ -114,7 +117,11 @@ func TestListTips(t *testing.T) {
 					}, nil
 				},
 			}
-			tipSvc := service.NewTipService(repo)
+			tipSvc := service.NewTipService(
+				repo,
+				nil,
+				"",
+			)
 			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 			w := httptest.NewRecorder()
@@ -190,7 +197,11 @@ func TestListTips(t *testing.T) {
 					return nil, nil
 				},
 			}
-			tipSvc := service.NewTipService(repo)
+			tipSvc := service.NewTipService(
+				repo,
+				nil,
+				"",
+			)
 			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 			w := httptest.NewRecorder()
@@ -231,7 +242,11 @@ func TestListTips(t *testing.T) {
 					return nil, errors.New("db down")
 				},
 			}
-			tipSvc := service.NewTipService(repo)
+			tipSvc := service.NewTipService(
+				repo,
+				nil,
+				"",
+			)
 			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 			w := httptest.NewRecorder()
@@ -268,7 +283,11 @@ func TestListTips(t *testing.T) {
 					return []model.Tip{}, nil
 				},
 			}
-			tipSvc := service.NewTipService(repo)
+			tipSvc := service.NewTipService(
+				repo,
+				nil,
+				"",
+			)
 			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
 			w := httptest.NewRecorder()

@@ -408,11 +408,11 @@ func (s *Scheduler) topUpTips(
 	ctx context.Context,
 	users []model.User,
 ) {
-	if s.services == nil || s.services.TipGenerator == nil {
+	if s.services == nil || s.services.Tip == nil {
 		return
 	}
 	for _, p := range distinctLangLevelPairs(users) {
-		if err := s.services.TipGenerator.TopUpBucket(
+		if err := s.services.Tip.TopUpBucket(
 			ctx,
 			p.Language,
 			p.Level,

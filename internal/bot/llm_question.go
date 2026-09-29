@@ -157,7 +157,7 @@ func (b *Bot) handleLLMQuestion(
 		)
 		return true
 	}
-	if b.services == nil || b.services.User == nil || b.services.LLM == nil || b.services.Tip == nil {
+	if b.services == nil || b.services.User == nil || b.services.LLMQuestion == nil {
 		b.telegram.SendMessage(
 			msg.Chat.ID,
 			messages.questionUnavailable,
@@ -212,9 +212,13 @@ func (b *Bot) handleLLMQuestion(
 			question,
 		)
 	}
-	answer, err := b.services.LLM.AnswerLearningQuestion(
+	// The service also keeps the Q&A as a tip candidate for curation.
+	answer, err := b.services.LLMQuestion.Answer(
 		ctx,
+		*user,
+		msg.From.UserName,
 		llmPrompt,
+		question,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -233,14 +237,6 @@ func (b *Bot) handleLLMQuestion(
 		)
 		return true
 	}
-	b.createTipCandidate(
-		ctx,
-		user,
-		msg.From.UserName,
-		question,
-		answer,
-	)
-
 	b.telegram.SendMessage(
 		msg.Chat.ID,
 		fmt.Sprintf(
@@ -320,52 +316,6 @@ func (b *Bot) loadStudyMaterialContext(
 		item.Material.Title,
 		materialText,
 	)
-}
-
-func (b *Bot) createTipCandidate(
-	ctx context.Context,
-	user *model.User,
-	username,
-	question,
-	answer string,
-) {
-	if b.services == nil || b.services.Tip == nil {
-		return
-	}
-
-	var sourceModel *string
-	if b.cfg != nil && strings.TrimSpace(b.cfg.LLM.Model) != "" {
-		modelName := b.cfg.LLM.Model
-		sourceModel = &modelName
-	}
-	candidate := &model.TipCandidate{
-		UserID:           user.ID,
-		Username:         username,
-		Language:         user.Language,
-		ProficiencyLevel: user.ProficiencyLevel,
-		Question:         question,
-		Answer:           answer,
-		SourceModel:      sourceModel,
-	}
-	if err := b.services.Tip.CreateCandidate(
-		ctx,
-		candidate,
-	); err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to create tip candidate",
-			"event",
-			"telegram.llm.tip_candidate_create_failed",
-			"user_id",
-			user.ID,
-			"language",
-			user.Language,
-			"level",
-			user.ProficiencyLevel,
-			"error",
-			err,
-		)
-	}
 }
 
 func (b *Bot) isLLMAllowed(from *tgbotapi.User) bool {

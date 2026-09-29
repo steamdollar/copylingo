@@ -11,7 +11,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 	"github.com/lsj/copylingo/internal/testutil"
@@ -192,19 +191,12 @@ func (s *commandStudySessionStore) CreateSessionMaterialsInTx(
 
 var botTestDB = testutil.TransactionDB()
 
+// llmTipCandidateStore records tip candidates; the embedded nil TipRepo
+// makes any other tips-table call panic.
 type llmTipCandidateStore struct {
+	service.TipRepo
 	created []*model.TipCandidate
 	err     error
-}
-
-func (s *llmTipCandidateStore) Create(
-	ctx context.Context,
-	candidate *model.TipCandidate,
-) error {
-	return s.CreateCandidate(
-		ctx,
-		candidate,
-	)
 }
 
 func (s *llmTipCandidateStore) CreateCandidate(
@@ -555,22 +547,26 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 	var gotQuestion string
 	b := &Bot{
 		telegram: newTelegramClient(api),
-		cfg: &config.Config{LLM: config.LLMConfig{
-			Model: "test-model",
-		}},
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
-			LLM: service.NewLLMService(&mockLLM{
-				answerFn: func(
-					ctx context.Context,
-					question string,
-				) (string, error) {
-					gotQuestion = question
-					return "honoo는 불꽃이고 <tag>는 escape 대상입니다.", nil
+			LLMQuestion: service.NewLLMQuestionService(
+				&mockLLM{
+					answerFn: func(
+						ctx context.Context,
+						question string,
+					) (string, error) {
+						gotQuestion = question
+						return "honoo는 불꽃이고 <tag>는 escape 대상입니다.", nil
+					},
 				},
-			}),
-			Tip: service.NewTipService(tipStore),
+				service.NewTipService(
+					tipStore,
+					nil,
+					"",
+				),
+				"test-model",
+			),
 		},
 	}
 
@@ -655,15 +651,22 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
-			LLM: service.NewLLMService(&mockLLM{
-				answerFn: func(
-					ctx context.Context,
-					question string,
-				) (string, error) {
-					return "", errors.New("provider failed")
+			LLMQuestion: service.NewLLMQuestionService(
+				&mockLLM{
+					answerFn: func(
+						ctx context.Context,
+						question string,
+					) (string, error) {
+						return "", errors.New("provider failed")
+					},
 				},
-			}),
-			Tip: service.NewTipService(&llmTipCandidateStore{}),
+				service.NewTipService(
+					&llmTipCandidateStore{},
+					nil,
+					"",
+				),
+				"test-model",
+			),
 		},
 	}
 
