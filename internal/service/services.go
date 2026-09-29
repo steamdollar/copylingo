@@ -29,7 +29,7 @@ func NewServices(
 ) *Services {
 	// One LLM client serves Quiz grading, learner questions and tip generation.
 	llmClient := external.NewLLMClient(cfg)
-	llm := NewLLMService(llmClient)
+	llm := newLLMService(llmClient)
 
 	// GenerateTips lives on the concrete *DefaultLLMClient (not the LLMClient
 	// interface). Without it, pass a true nil (not a typed nil) so tip top-up

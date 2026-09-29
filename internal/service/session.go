@@ -173,18 +173,18 @@ type SessionDeps struct {
 type SessionService struct {
 	sessionRepo    SessionRepo
 	userRepo       SessionUserRepo
-	selection      *SessionBuilderService
-	quizProgress   *QuizActiveSessionService
-	srs            *SRSService
-	grader         *GraderService
+	selection      *sessionBuilderService
+	quizProgress   *quizActiveSessionService
+	srs            *srsService
+	grader         *graderService
 	strokeRenderer StrokeRenderer
-	studyBuilder   *StudySessionService
-	studyProgress  *StudyActiveSessionService
+	studyBuilder   *studySessionService
+	studyProgress  *studyActiveSessionService
 }
 
 func NewSessionService(deps SessionDeps) *SessionService {
-	srs := NewSRSService(deps.QuestionRepo)
-	quizProgress := NewQuizActiveSessionService(
+	srs := newSRSService(deps.QuestionRepo)
+	quizProgress := newQuizActiveSessionService(
 		deps.QuizActiveSessionRepo,
 		deps.Stores.Quiz,
 		srs,
@@ -192,7 +192,7 @@ func NewSessionService(deps SessionDeps) *SessionService {
 	return &SessionService{
 		sessionRepo: deps.SessionRepo,
 		userRepo:    deps.UserRepo,
-		selection: NewSessionBuilderService(
+		selection: newSessionBuilderService(
 			deps.QuestionRepo,
 			deps.SessionRepo,
 			deps.SessionQuestionRepo,
@@ -200,17 +200,17 @@ func NewSessionService(deps SessionDeps) *SessionService {
 		),
 		quizProgress: quizProgress,
 		srs:          srs,
-		grader: NewGraderService(
+		grader: newGraderService(
 			quizProgress,
 			deps.LLM,
 		),
 		strokeRenderer: NewDefaultPNGStrokeRenderer(),
-		studyBuilder: NewStudySessionService(
+		studyBuilder: newStudySessionService(
 			deps.MaterialRepo,
 			deps.SessionRepo,
 			deps.DB,
 		),
-		studyProgress: NewStudyActiveSessionService(
+		studyProgress: newStudyActiveSessionService(
 			deps.StudyActiveSessionRepo,
 			deps.SessionRepo,
 			deps.Stores.Study,

@@ -97,7 +97,7 @@ func TestMaintenanceMaterialCapAcrossNewCurrentAndDueAdjacentQueries(t *testing.
 					return result, nil
 				}}
 				var selected []int
-				builder := NewSessionBuilderService(
+				builder := newSessionBuilderService(
 					fetcher,
 					&mockSessionStore{
 						createSessionFn: func(

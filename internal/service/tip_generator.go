@@ -20,7 +20,7 @@ const (
 	TipPromptVersion = "v1"
 )
 
-// tipGeneratorRepo is the inline repository contract TipGenerator depends on,
+// tipGeneratorRepo is the inline repository contract tipGenerator depends on,
 // kept narrow so the service layer can be unit-tested with a mock.
 type tipGeneratorRepo interface {
 	CountActive(
@@ -34,7 +34,7 @@ type tipGeneratorRepo interface {
 	) error
 }
 
-// tipGeneratorLLM is the inline LLM contract TipGenerator depends on.
+// tipGeneratorLLM is the inline LLM contract tipGenerator depends on.
 type tipGeneratorLLM interface {
 	GenerateTips(
 		ctx context.Context,
@@ -45,29 +45,29 @@ type tipGeneratorLLM interface {
 	) ([]external.GeneratedTip, error)
 }
 
-// TipGenerator fills the (language, level) tip bucket toward TipBucketTarget by
+// tipGenerator fills the (language, level) tip bucket toward TipBucketTarget by
 // calling the LLM, one category per cycle. It owns no transaction with session
 // building — a failure here never affects session push.
-type TipGenerator struct {
+type tipGenerator struct {
 	tips  tipGeneratorRepo
 	llm   tipGeneratorLLM
 	model string // cfg.LLM.Model, recorded as the tip's source_model
 }
 
-// NewTipGenerator wires the generator with its repository, LLM client, and the
+// newTipGenerator wires the generator with its repository, LLM client, and the
 // configured model name used for source_model attribution.
-func NewTipGenerator(
+func newTipGenerator(
 	tips tipGeneratorRepo,
 	llm tipGeneratorLLM,
 	model string,
-) *TipGenerator {
-	return &TipGenerator{tips: tips, llm: llm, model: model}
+) *tipGenerator {
+	return &tipGenerator{tips: tips, llm: llm, model: model}
 }
 
 // TopUpBucket generates up to TipGeneratePerCycle new tips for the given
 // (language, level) when the active balance is below TipBucketTarget. It is a
 // no-op once the bucket is full, so callers can invoke it every cycle safely.
-func (g *TipGenerator) TopUpBucket(
+func (g *tipGenerator) TopUpBucket(
 	ctx context.Context,
 	language,
 	level string,

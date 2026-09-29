@@ -123,7 +123,7 @@ func TestScheduleAnswer(t *testing.T) {
 					IntervalDays: tt.initialInt,
 					EaseFactor:   tt.initialEase,
 				}
-				NewSRSService(nil).ScheduleAnswer(
+				newSRSService(nil).ScheduleAnswer(
 					progress,
 					tt.isCorrect,
 				)
@@ -158,7 +158,7 @@ func TestScheduleAnswer(t *testing.T) {
 }
 
 func TestEaseFactorFloorAt1_3(t *testing.T) {
-	srs := NewSRSService(nil)
+	srs := newSRSService(nil)
 	progress := &model.UserQuestionProgress{Repetitions: 1, IntervalDays: 1, EaseFactor: 1.3}
 	for range 5 {
 		srs.ScheduleAnswer(
@@ -209,7 +209,7 @@ func TestSRSService_GetDueReviewsForwardsUserScope(t *testing.T) {
 		},
 	}
 
-	got, err := NewSRSService(repo).GetDueReviews(
+	got, err := newSRSService(repo).GetDueReviews(
 		context.Background(),
 		42,
 		"ja",
@@ -261,7 +261,7 @@ func TestSRSService_GetDueReviewsUsesAdjacentJapaneseScope(t *testing.T) {
 		},
 	}
 
-	got, err := NewSRSService(repo).GetDueReviews(
+	got, err := newSRSService(repo).GetDueReviews(
 		context.Background(),
 		42,
 		"ja",
@@ -294,7 +294,7 @@ func TestSRSService_GetDueReviewsPropagatesError(t *testing.T) {
 			return nil, expectedErr
 		},
 	}
-	_, err := NewSRSService(repo).GetDueReviews(
+	_, err := newSRSService(repo).GetDueReviews(
 		context.Background(),
 		1,
 		"ja",
@@ -336,7 +336,7 @@ func TestSRSService_GetDueCountForwardsUserScope(t *testing.T) {
 			return 7, nil
 		},
 	}
-	got, err := NewSRSService(repo).GetDueCount(
+	got, err := newSRSService(repo).GetDueCount(
 		context.Background(),
 		42,
 		"ja",
@@ -380,7 +380,7 @@ func TestSRSService_GetDueCountUsesAdjacentJapaneseScope(t *testing.T) {
 		},
 	}
 
-	got, err := NewSRSService(repo).GetDueCount(
+	got, err := newSRSService(repo).GetDueCount(
 		context.Background(),
 		42,
 		"ja",

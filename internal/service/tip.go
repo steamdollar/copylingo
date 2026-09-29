@@ -26,7 +26,7 @@ type TipRepo interface {
 // LLM-backed bucket top-up (ADR-059 §8.6).
 type TipService struct {
 	repo      TipRepo
-	generator *TipGenerator
+	generator *tipGenerator
 }
 
 // NewTipService wires tip storage and generation. A nil generatorLLM keeps
@@ -38,7 +38,7 @@ func NewTipService(
 ) *TipService {
 	return &TipService{
 		repo: repo,
-		generator: NewTipGenerator(
+		generator: newTipGenerator(
 			repo,
 			generatorLLM,
 			sourceModel,

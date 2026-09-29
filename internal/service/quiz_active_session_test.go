@@ -148,10 +148,10 @@ func TestQuizActiveSessionCreateFromDBAndGet(t *testing.T) {
 			return state, nil
 		},
 	}
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 
 	if _, err := svc.CreateFromDB(
@@ -208,7 +208,7 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 			return state, nil
 		},
 	}
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		repo,
 		store,
 		nil,
@@ -241,7 +241,7 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 
 	// Verify deterministic: same sessionID + questionID yields identical order
 	store2 := newFakeQuizSessionStore()
-	svc2 := NewQuizActiveSessionService(
+	svc2 := newQuizActiveSessionService(
 		repo,
 		store2,
 		nil,
@@ -272,7 +272,7 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 	differentPermutationFound := false
 	for nextSID := sessionID + 1; nextSID <= sessionID+20; nextSID++ {
 		storeN := newFakeQuizSessionStore()
-		svcN := NewQuizActiveSessionService(
+		svcN := newQuizActiveSessionService(
 			repo,
 			storeN,
 			nil,
@@ -313,7 +313,7 @@ func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 			), nil
 		},
 	}
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		repo,
 		store,
 		nil,
@@ -356,7 +356,7 @@ func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 
 func TestQuizActiveSessionGetMissing(t *testing.T) {
 	ctx := context.Background()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		nil,
 		newFakeQuizSessionStore(),
 		nil,
@@ -378,7 +378,7 @@ func TestQuizActiveSessionGetMissing(t *testing.T) {
 }
 
 func TestQuizActiveSessionMissingStoreDependency(t *testing.T) {
-	_, err := NewQuizActiveSessionService(
+	_, err := newQuizActiveSessionService(
 		nil,
 		nil,
 		nil,
@@ -401,10 +401,10 @@ func TestQuizActiveSessionRecordAnswerUpdatesProgressAndSRS(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
 	store := newFakeQuizSessionStore()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -478,10 +478,10 @@ func TestQuizActiveSessionRecordAnswerRejectsDuplicate(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
 	store := newFakeQuizSessionStore()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -519,10 +519,10 @@ func TestQuizActiveSessionRecordAnswerUsesCurrentDuplicateOccurrence(t *testing.
 	ctx := context.Background()
 	sessionID := 10
 	store := newFakeQuizSessionStore()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 
 	state := quizActiveSessionTestState(
@@ -591,10 +591,10 @@ func TestQuizActiveSessionRecordAnswerRejectsStaleDuplicateCallback(t *testing.T
 	ctx := context.Background()
 	sessionID := 10
 	store := newFakeQuizSessionStore()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 
 	state := quizActiveSessionTestState(
@@ -683,10 +683,10 @@ func TestQuizActiveSessionFlushSuccess(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -729,10 +729,10 @@ func TestQuizActiveSessionFlushRejectsIncomplete(t *testing.T) {
 	sessionID := 10
 	userID := int64(123)
 	store := newFakeQuizSessionStore()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		&fakeQuizActiveSessionRepo{},
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -768,10 +768,10 @@ func TestQuizActiveSessionFlushRejectsUserMismatch(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
 	store := newFakeQuizSessionStore()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		&fakeQuizActiveSessionRepo{},
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -810,10 +810,10 @@ func TestQuizActiveSessionFlushRejectsNilRepo(t *testing.T) {
 	userID := int64(123)
 	store := newFakeQuizSessionStore()
 	// repo nil but state already in Redis (complete) — dependency missing at flush time.
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -859,10 +859,10 @@ func TestQuizActiveSessionFlushRepoError(t *testing.T) {
 			return flushErr
 		},
 	}
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -903,10 +903,10 @@ func TestQuizActiveSessionDelete(t *testing.T) {
 		"removes the working set key",
 		func(t *testing.T) {
 			store := newFakeQuizSessionStore()
-			svc := NewQuizActiveSessionService(
+			svc := newQuizActiveSessionService(
 				nil,
 				store,
-				NewSRSService(nil),
+				newSRSService(nil),
 			)
 			if err := svc.save(
 				ctx,
@@ -945,10 +945,10 @@ func TestQuizActiveSessionDelete(t *testing.T) {
 			delErr := errors.New("redis del failed")
 			store := newFakeQuizSessionStore()
 			store.delErr = delErr
-			svc := NewQuizActiveSessionService(
+			svc := newQuizActiveSessionService(
 				nil,
 				store,
-				NewSRSService(nil),
+				newSRSService(nil),
 			)
 			err := svc.Delete(
 				ctx,
@@ -972,10 +972,10 @@ func TestQuizActiveSessionSaveError(t *testing.T) {
 	ctx := context.Background()
 	setErr := errors.New("redis set failed")
 	store := newFakeQuizSessionStore()
-	svc := NewQuizActiveSessionService(
+	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		NewSRSService(nil),
+		newSRSService(nil),
 	)
 	state := quizActiveSessionTestState(
 		10,

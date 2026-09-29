@@ -201,7 +201,7 @@ func TestGradeAnswer_Correct(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(
+	grader := newGraderService(
 		active,
 		nil,
 	)
@@ -262,7 +262,7 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(
+	grader := newGraderService(
 		active,
 		nil,
 	)
@@ -328,7 +328,7 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(
+	grader := newGraderService(
 		active,
 		llm,
 	)
@@ -388,7 +388,7 @@ func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(
+	grader := newGraderService(
 		active,
 		llm,
 	)
@@ -451,7 +451,7 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(
+	grader := newGraderService(
 		active,
 		llm,
 	)
@@ -503,7 +503,7 @@ func TestGradeAnswer_AlreadyAnswered(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(
+	grader := newGraderService(
 		active,
 		nil,
 	)
@@ -556,7 +556,7 @@ func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(
+	grader := newGraderService(
 		active,
 		nil,
 	)

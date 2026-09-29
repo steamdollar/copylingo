@@ -123,7 +123,7 @@ func TestStudyActiveSessionStartLoadsAndStoresWorkingSet(t *testing.T) {
 			), nil
 		},
 	}
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		starter,
 		store,
@@ -185,7 +185,7 @@ func TestStudyActiveSessionStartResumesRedisWorkingSet(t *testing.T) {
 			), nil
 		},
 	}
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		starter,
 		store,
@@ -258,7 +258,7 @@ func TestStudyActiveSessionMarkStudiedUpdatesRedisOnly(t *testing.T) {
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		nil,
 		nil,
 		store,
@@ -328,7 +328,7 @@ func TestStudyActiveSessionCompleteFlushesAndDeletesWorkingSet(t *testing.T) {
 			return nil
 		},
 	}
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		nil,
 		store,
@@ -380,7 +380,7 @@ func TestStudyActiveSessionCompleteRejectsIncomplete(t *testing.T) {
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		&fakeStudyActiveRepo{},
 		nil,
 		store,
@@ -433,7 +433,7 @@ func TestStudyActiveSessionStartReturnsCompletedEarly(t *testing.T) {
 			), nil
 		},
 	}
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		starter,
 		store,
@@ -483,7 +483,7 @@ func TestStudyActiveSessionStartPendingWithoutStarterFails(t *testing.T) {
 		},
 	}
 	// sessionRepo nil while session is pending -> dependency missing.
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		nil,
 		store,
@@ -521,7 +521,7 @@ func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
 			), nil
 		},
 	}
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		&fakeStudySessionStarter{},
 		store,
@@ -546,7 +546,7 @@ func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
 func TestStudyActiveSessionStartDependencyMissingRepo(t *testing.T) {
 	ctx := context.Background()
 	// repo nil -> loadFromDB returns dependency missing.
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		nil,
 		nil,
 		newFakeStudySessionStore(),
@@ -578,7 +578,7 @@ func TestStudyActiveSessionStartPropagatesLoadError(t *testing.T) {
 			return nil, loadErr
 		},
 	}
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		nil,
 		newFakeStudySessionStore(),
@@ -617,7 +617,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateLoadsFromDBOnMiss(t *testin
 			), nil
 		},
 	}
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		repo,
 		nil,
 		store,
@@ -657,7 +657,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsUserMismatch(t *test
 	ctx := context.Background()
 	sessionID := 77
 	store := newFakeStudySessionStore()
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		&fakeStudyActiveRepo{},
 		nil,
 		store,
@@ -697,7 +697,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *test
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		&fakeStudyActiveRepo{},
 		nil,
 		store,
@@ -736,7 +736,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *test
 }
 
 func TestStudyActiveSessionMissingStoreDependency(t *testing.T) {
-	_, err := NewStudyActiveSessionService(
+	_, err := newStudyActiveSessionService(
 		nil,
 		nil,
 		nil,
@@ -761,7 +761,7 @@ func TestStudyActiveSessionMarkStudiedRejectsUnknownOrder(t *testing.T) {
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		nil,
 		nil,
 		store,
@@ -801,7 +801,7 @@ func TestStudyActiveSessionDelete(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
 	store := newFakeStudySessionStore()
-	svc := NewStudyActiveSessionService(
+	svc := newStudyActiveSessionService(
 		nil,
 		nil,
 		store,

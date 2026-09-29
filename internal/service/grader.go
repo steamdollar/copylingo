@@ -41,24 +41,24 @@ type graderQuizActiveSession interface {
 	) error
 }
 
-// GraderService handles answer grading and result processing.
-type GraderService struct {
+// graderService handles answer grading and result processing.
+type graderService struct {
 	quizActiveSession graderQuizActiveSession
 	llm               graderLLM
 }
 
-func NewGraderService(
+func newGraderService(
 	quizActiveSession graderQuizActiveSession,
 	llm graderLLM,
-) *GraderService {
-	return &GraderService{
+) *graderService {
+	return &graderService{
 		quizActiveSession: quizActiveSession,
 		llm:               llm,
 	}
 }
 
 // GradeAnswer grades a single answer and updates SRS accordingly.
-func (g *GraderService) GradeAnswer(
+func (g *graderService) GradeAnswer(
 	ctx context.Context,
 	sessionID,
 	questionID int,
@@ -81,7 +81,7 @@ func (g *GraderService) GradeAnswer(
 	)
 }
 
-func (g *GraderService) GradeAnswerWithQuestion(
+func (g *graderService) GradeAnswerWithQuestion(
 	ctx context.Context,
 	sessionID,
 	questionID int,
@@ -131,7 +131,7 @@ func (g *GraderService) GradeAnswerWithQuestion(
 	return isCorrect, feedback, nil
 }
 
-func (g *GraderService) GradeHandwriting(
+func (g *graderService) GradeHandwriting(
 	ctx context.Context,
 	sessionID,
 	questionID int,
@@ -154,7 +154,7 @@ func (g *GraderService) GradeHandwriting(
 	)
 }
 
-func (g *GraderService) GradeHandwritingWithQuestion(
+func (g *graderService) GradeHandwritingWithQuestion(
 	ctx context.Context,
 	sessionID,
 	questionID int,
@@ -244,7 +244,7 @@ func mapAIUnavailableError(err error) error {
 	return err
 }
 
-func (g *GraderService) recordGradingResult(
+func (g *graderService) recordGradingResult(
 	ctx context.Context,
 	sessionID,
 	questionID int,
@@ -263,7 +263,7 @@ func (g *GraderService) recordGradingResult(
 	)
 }
 
-func (g *GraderService) questionFromQuizActiveSession(
+func (g *graderService) questionFromQuizActiveSession(
 	ctx context.Context,
 	sessionID,
 	questionID int,

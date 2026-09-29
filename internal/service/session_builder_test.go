@@ -294,7 +294,7 @@ func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -470,7 +470,7 @@ func TestBuildMorningSession_ReservesListeningAndBuildsSeventeenQuestions(t *tes
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -629,7 +629,7 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -726,7 +726,7 @@ func TestBuildEveningSession_FillsVocabularyShortageWithRelay(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -789,7 +789,7 @@ func TestBuildReviewSession_OnlySRS(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		nil,
 		sStore,
 		sqStore,
@@ -891,7 +891,7 @@ func TestBuildReviewSession_CapsKanjiRecallAdmissionAtThree(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		nil,
 		sStore,
 		sqStore,
@@ -995,7 +995,7 @@ func TestBuildMorningSession_PassesRemainingKanjiRecallBudgetToNewFetches(t *tes
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -1051,7 +1051,7 @@ func TestBuildSession_NoQuestions(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		nil,
 		nil,
@@ -1099,7 +1099,7 @@ func TestBuildSession_CreateFails(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		nil,
 		sStore,
 		nil,
@@ -1165,7 +1165,7 @@ func TestBuildSession_CreateSessionQuestionsFails(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		nil,
 		sStore,
 		sqStore,
@@ -1259,7 +1259,7 @@ func TestBuildSession_DeduplicatesQuestionIDs(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -1378,7 +1378,7 @@ func TestBuildSession_CapsReadingAtOne(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -1513,7 +1513,7 @@ func TestBuildMorningSession_CurrentLevelMinimumAndLowerDueCap(t *testing.T) {
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -1677,7 +1677,7 @@ func TestBuildMorningSession_PrioritizesCurrentDueListeningAndReading(t *testing
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -1809,7 +1809,7 @@ func TestBuildEveningSession_UsesN3CurrentScopeBeforeAdjacentFallback(t *testing
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,
@@ -1920,7 +1920,7 @@ func TestBuildEveningSession_FallsBackToAdjacentWhenCurrentSupplyIsShort(t *test
 		},
 	}
 
-	builder := NewSessionBuilderService(
+	builder := newSessionBuilderService(
 		qFetcher,
 		sStore,
 		sqStore,

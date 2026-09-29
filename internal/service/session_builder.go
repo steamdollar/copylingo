@@ -59,21 +59,21 @@ type sessionQuestionStore interface {
 	) error
 }
 
-// SessionBuilderService creates learning sessions with appropriate question mix.
-type SessionBuilderService struct {
+// sessionBuilderService creates learning sessions with appropriate question mix.
+type sessionBuilderService struct {
 	questionRepo        questionFetcher
 	sessionRepo         sessionStore
 	sessionQuestionRepo sessionQuestionStore
 	srs                 srsScheduler
 }
 
-func NewSessionBuilderService(
+func newSessionBuilderService(
 	questionRepo questionFetcher,
 	sessionRepo sessionStore,
 	sessionQuestionRepo sessionQuestionStore,
 	srs srsScheduler,
-) *SessionBuilderService {
-	return &SessionBuilderService{
+) *sessionBuilderService {
+	return &sessionBuilderService{
 		questionRepo:        questionRepo,
 		sessionRepo:         sessionRepo,
 		sessionQuestionRepo: sessionQuestionRepo,
@@ -82,7 +82,7 @@ func NewSessionBuilderService(
 }
 
 // BuildMorningSession creates a 17-question session, normally starting with 6 reviews.
-func (s *SessionBuilderService) BuildMorningSession(
+func (s *sessionBuilderService) BuildMorningSession(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -103,7 +103,7 @@ func (s *SessionBuilderService) BuildMorningSession(
 }
 
 // BuildEveningSession creates an evening session with vocabulary and listening reservations, total 12 questions.
-func (s *SessionBuilderService) BuildEveningSession(
+func (s *sessionBuilderService) BuildEveningSession(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -124,7 +124,7 @@ func (s *SessionBuilderService) BuildEveningSession(
 }
 
 // BuildReviewSession creates an on-demand review session from SRS due items.
-func (s *SessionBuilderService) BuildReviewSession(
+func (s *sessionBuilderService) BuildReviewSession(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -142,7 +142,7 @@ func (s *SessionBuilderService) BuildReviewSession(
 	)
 }
 
-func (s *SessionBuilderService) buildSession(
+func (s *sessionBuilderService) buildSession(
 	ctx context.Context,
 	userID int64,
 	language,

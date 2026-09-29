@@ -45,7 +45,7 @@ func (m *mockLLMClient) AnswerLearningQuestion(
 }
 
 func TestLLMServiceAnswerLearningQuestion(t *testing.T) {
-	svc := NewLLMService(&mockLLMClient{
+	svc := newLLMService(&mockLLMClient{
 		answerFn: func(
 			ctx context.Context,
 			question string,
@@ -79,7 +79,7 @@ func TestLLMServiceAnswerLearningQuestion(t *testing.T) {
 }
 
 func TestLLMServiceAnswerLearningQuestionWrapsError(t *testing.T) {
-	svc := NewLLMService(&mockLLMClient{
+	svc := newLLMService(&mockLLMClient{
 		answerFn: func(
 			ctx context.Context,
 			question string,

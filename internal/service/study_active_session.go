@@ -51,26 +51,26 @@ type studyActiveSessionStarter interface {
 	) error
 }
 
-// StudyActiveSessionService owns the Redis working set for in-progress study sessions.
-type StudyActiveSessionService struct {
+// studyActiveSessionService owns the Redis working set for in-progress study sessions.
+type studyActiveSessionService struct {
 	repo        studyActiveSessionRepository
 	sessionRepo studyActiveSessionStarter
 	store       StudySessionStore
 }
 
-func NewStudyActiveSessionService(
+func newStudyActiveSessionService(
 	repo studyActiveSessionRepository,
 	sessionRepo studyActiveSessionStarter,
 	store StudySessionStore,
-) *StudyActiveSessionService {
-	return &StudyActiveSessionService{
+) *studyActiveSessionService {
+	return &studyActiveSessionService{
 		repo:        repo,
 		sessionRepo: sessionRepo,
 		store:       store,
 	}
 }
 
-func (s *StudyActiveSessionService) Start(
+func (s *studyActiveSessionService) Start(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
@@ -134,7 +134,7 @@ func (s *StudyActiveSessionService) Start(
 	return state, nil
 }
 
-func (s *StudyActiveSessionService) loadFromDB(
+func (s *studyActiveSessionService) loadFromDB(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
@@ -155,7 +155,7 @@ func (s *StudyActiveSessionService) loadFromDB(
 	return state, nil
 }
 
-func (s *StudyActiveSessionService) LoadOwnedStudySessionState(
+func (s *studyActiveSessionService) LoadOwnedStudySessionState(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
@@ -207,7 +207,7 @@ func (s *StudyActiveSessionService) LoadOwnedStudySessionState(
 	return state, nil
 }
 
-func (s *StudyActiveSessionService) MarkStudied(
+func (s *studyActiveSessionService) MarkStudied(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
@@ -245,7 +245,7 @@ func (s *StudyActiveSessionService) MarkStudied(
 	return state, nil
 }
 
-func (s *StudyActiveSessionService) Complete(
+func (s *studyActiveSessionService) Complete(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
@@ -287,7 +287,7 @@ func (s *StudyActiveSessionService) Complete(
 	return nil
 }
 
-func (s *StudyActiveSessionService) Delete(
+func (s *studyActiveSessionService) Delete(
 	ctx context.Context,
 	sessionID int,
 ) error {
@@ -307,7 +307,7 @@ func (s *StudyActiveSessionService) Delete(
 	return nil
 }
 
-func (s *StudyActiveSessionService) save(
+func (s *studyActiveSessionService) save(
 	ctx context.Context,
 	state *model.StudyActiveSessionState,
 ) error {

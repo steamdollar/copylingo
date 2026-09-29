@@ -218,7 +218,7 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 						return result, nil
 					}}
 					var selected []model.SessionQuestion
-					builder := NewSessionBuilderService(
+					builder := newSessionBuilderService(
 						fetcher,
 						&mockSessionStore{
 							createSessionFn: func(

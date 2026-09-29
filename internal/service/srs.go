@@ -27,8 +27,8 @@ type questionQuerier interface {
 }
 
 // srs: Spaced Repetition System
-// srsScheduler는 GraderService와 SessionBuilderService가 SRSService에 의존할 때 쓰는 계약.
-// *SRSService가 암묵적으로 만족한다.
+// srsScheduler는 graderService와 sessionBuilderService가 srsService에 의존할 때 쓰는 계약.
+// *srsService가 암묵적으로 만족한다.
 type srsScheduler interface {
 	GetDueReviews(
 		ctx context.Context,
@@ -47,17 +47,17 @@ type srsScheduler interface {
 	) (int, error)
 }
 
-// SRSService implements the SM-2 Spaced Repetition algorithm for per-user progress.
-type SRSService struct {
+// srsService implements the SM-2 Spaced Repetition algorithm for per-user progress.
+type srsService struct {
 	questionRepo questionQuerier
 }
 
-func NewSRSService(questionRepo questionQuerier) *SRSService {
-	return &SRSService{questionRepo: questionRepo}
+func newSRSService(questionRepo questionQuerier) *srsService {
+	return &srsService{questionRepo: questionRepo}
 }
 
 // ScheduleAnswer applies SRS changes in memory without writing to the DB.
-func (s *SRSService) ScheduleAnswer(
+func (s *srsService) ScheduleAnswer(
 	progress *model.UserQuestionProgress,
 	isCorrect bool,
 ) {
@@ -73,7 +73,7 @@ func (s *SRSService) ScheduleAnswer(
 }
 
 // updateSchedule applies the SM-2 algorithm to update the user's Question progress.
-func (s *SRSService) updateSchedule(
+func (s *srsService) updateSchedule(
 	q *model.UserQuestionProgress,
 	quality int,
 ) {
@@ -113,7 +113,7 @@ func (s *SRSService) updateSchedule(
 }
 
 // GetDueReviews returns questions due for review.
-func (s *SRSService) GetDueReviews(
+func (s *srsService) GetDueReviews(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -138,7 +138,7 @@ func (s *SRSService) GetDueReviews(
 }
 
 // GetDueCount returns the number of questions due for review.
-func (s *SRSService) GetDueCount(
+func (s *srsService) GetDueCount(
 	ctx context.Context,
 	userID int64,
 	language,

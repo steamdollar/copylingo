@@ -64,26 +64,26 @@ type QuizSessionResult struct {
 	WrongAnswers   []QuizSessionWrongAnswer
 }
 
-// QuizActiveSessionService owns the Redis working set for in-progress learning sessions.
-type QuizActiveSessionService struct {
+// quizActiveSessionService owns the Redis working set for in-progress learning sessions.
+type quizActiveSessionService struct {
 	repo  quizActiveSessionRepository
 	store QuizSessionStore
 	srs   quizActiveSessionScheduler
 }
 
-func NewQuizActiveSessionService(
+func newQuizActiveSessionService(
 	repo quizActiveSessionRepository,
 	store QuizSessionStore,
 	srs quizActiveSessionScheduler,
-) *QuizActiveSessionService {
-	return &QuizActiveSessionService{
+) *quizActiveSessionService {
+	return &quizActiveSessionService{
 		repo:  repo,
 		store: store,
 		srs:   srs,
 	}
 }
 
-func (s *QuizActiveSessionService) CreateFromDB(
+func (s *quizActiveSessionService) CreateFromDB(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
@@ -134,7 +134,7 @@ func (s *QuizActiveSessionService) CreateFromDB(
 }
 
 // Get retrieves the active session working set from Redis. If not found, it attempts to recover from DB and store in Redis.
-func (s *QuizActiveSessionService) Get(
+func (s *quizActiveSessionService) Get(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
@@ -171,7 +171,7 @@ func (s *QuizActiveSessionService) Get(
 	return state, nil
 }
 
-func (s *QuizActiveSessionService) RecordAnswer(
+func (s *quizActiveSessionService) RecordAnswer(
 	ctx context.Context,
 	sessionID,
 	questionID int,
@@ -230,7 +230,7 @@ func (s *QuizActiveSessionService) RecordAnswer(
 	)
 }
 
-func (s *QuizActiveSessionService) Flush(
+func (s *quizActiveSessionService) Flush(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
@@ -276,7 +276,7 @@ func (s *QuizActiveSessionService) Flush(
 	return quizSessionResultFromState(state), nil
 }
 
-func (s *QuizActiveSessionService) Delete(
+func (s *quizActiveSessionService) Delete(
 	ctx context.Context,
 	sessionID int,
 ) error {
@@ -296,7 +296,7 @@ func (s *QuizActiveSessionService) Delete(
 	return nil
 }
 
-func (s *QuizActiveSessionService) save(
+func (s *quizActiveSessionService) save(
 	ctx context.Context,
 	state *model.QuizActiveSessionState,
 ) error {

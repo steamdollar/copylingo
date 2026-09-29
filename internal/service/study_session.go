@@ -176,19 +176,19 @@ type studySessionStore interface {
 	) error
 }
 
-// StudySessionService creates material-based study sessions.
-type StudySessionService struct {
+// studySessionService creates material-based study sessions.
+type studySessionService struct {
 	materialRepo studyMaterialStore
 	sessionRepo  studySessionStore
 	db           *sqlx.DB
 }
 
-func NewStudySessionService(
+func newStudySessionService(
 	materialRepo studyMaterialStore,
 	sessionRepo studySessionStore,
 	db *sqlx.DB,
-) *StudySessionService {
-	return &StudySessionService{
+) *studySessionService {
+	return &studySessionService{
 		materialRepo: materialRepo,
 		sessionRepo:  sessionRepo,
 		db:           db,
@@ -197,7 +197,7 @@ func NewStudySessionService(
 
 // BuildStudySession selects the fixed morning/evening plan, or scales the
 // morning plan when limit is positive, then creates the session in the DB.
-func (s *StudySessionService) BuildStudySession(
+func (s *studySessionService) BuildStudySession(
 	ctx context.Context,
 	userID int64,
 	language,

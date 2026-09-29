@@ -7,15 +7,15 @@ import (
 	"github.com/lsj/copylingo/internal/external"
 )
 
-type LLMService struct {
+type llmService struct {
 	client external.LLMClient
 }
 
-func NewLLMService(client external.LLMClient) *LLMService {
-	return &LLMService{client: client}
+func newLLMService(client external.LLMClient) *llmService {
+	return &llmService{client: client}
 }
 
-func (s *LLMService) GradeAnswer(
+func (s *llmService) GradeAnswer(
 	ctx context.Context,
 	questionPrompt,
 	correctAnswer,
@@ -32,7 +32,7 @@ func (s *LLMService) GradeAnswer(
 	)
 }
 
-func (s *LLMService) GradeHandwriting(
+func (s *llmService) GradeHandwriting(
 	ctx context.Context,
 	questionPrompt,
 	correctAnswer string,
@@ -49,7 +49,7 @@ func (s *LLMService) GradeHandwriting(
 	)
 }
 
-func (s *LLMService) AnswerLearningQuestion(
+func (s *llmService) AnswerLearningQuestion(
 	ctx context.Context,
 	question string,
 ) (string, error) {

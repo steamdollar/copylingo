@@ -77,7 +77,7 @@ func NewLLMClient(cfg *config.Config) LLMClient {
 }
 
 // GradeAnswer evaluates a QuestionSubjective free-text answer by semantic similarity.
-// Fill-blank and multiple-choice answers are graded by exact string matching in GraderService.
+// Fill-blank and multiple-choice answers are graded by exact string matching in the service-layer grader.
 func (c *DefaultLLMClient) GradeAnswer(
 	ctx context.Context,
 	questionPrompt,

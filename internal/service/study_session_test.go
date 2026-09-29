@@ -156,7 +156,7 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 		},
 	}
 
-	svc := NewStudySessionService(
+	svc := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
@@ -210,7 +210,7 @@ func TestBuildStudySessionDoesNotPublishIDWhenMaterialInsertFails(t *testing.T) 
 		},
 	}
 
-	session, err := NewStudySessionService(
+	session, err := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
@@ -266,7 +266,7 @@ func TestBuildStudySessionUsesAdjacentJapaneseLevelScope(t *testing.T) {
 	}
 	sessionStore := &mockStudySessionStore{}
 
-	session, err := NewStudySessionService(
+	session, err := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
@@ -330,7 +330,7 @@ func TestBuildStudySessionUsesRequestedLimit(t *testing.T) {
 	}
 	sessionStore := &mockStudySessionStore{}
 
-	svc := NewStudySessionService(
+	svc := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
@@ -358,7 +358,7 @@ func TestBuildStudySessionUsesRequestedLimit(t *testing.T) {
 }
 
 func TestBuildStudySessionRejectsOutOfRangeLimit(t *testing.T) {
-	svc := NewStudySessionService(
+	svc := newStudySessionService(
 		nil,
 		nil,
 		nil,
@@ -467,7 +467,7 @@ func TestBuildStudySessionUsesFixedPlan(t *testing.T) {
 }
 
 func TestBuildStudySessionRejectsUnknownProfile(t *testing.T) {
-	svc := NewStudySessionService(
+	svc := newStudySessionService(
 		nil,
 		nil,
 		nil,
@@ -603,8 +603,8 @@ func studyPlan(
 	}}
 }
 
-func newPlanCaptureStudySessionService(capture *model.StudySessionPlan) *StudySessionService {
-	return NewStudySessionService(
+func newPlanCaptureStudySessionService(capture *model.StudySessionPlan) *studySessionService {
+	return newStudySessionService(
 		&mockStudyMaterialStore{getMaterialsByPlanFn: func(
 			_ context.Context,
 			_ int64,
@@ -641,7 +641,7 @@ func TestBuildStudySessionNoMaterialsReturnsNil(t *testing.T) {
 			return 0, nil
 		},
 	}
-	svc := NewStudySessionService(
+	svc := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
@@ -682,7 +682,7 @@ func TestBuildStudySessionWrapsMaterialError(t *testing.T) {
 			return nil, errors.New("db down")
 		},
 	}
-	svc := NewStudySessionService(
+	svc := newStudySessionService(
 		materialStore,
 		nil,
 		nil,

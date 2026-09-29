@@ -108,7 +108,7 @@ func TestTopUpBucket_FullBucketSkipsLLM(t *testing.T) {
 			return nil, nil
 		},
 	}
-	g := NewTipGenerator(
+	g := newTipGenerator(
 		repo,
 		llm,
 		"test-model",
@@ -174,7 +174,7 @@ func TestTopUpBucket_BelowTargetGeneratesAndCreates(t *testing.T) {
 			return []external.GeneratedTip{{Body: "tip a"}, {Body: "tip b"}}, nil
 		},
 	}
-	g := NewTipGenerator(
+	g := newTipGenerator(
 		repo,
 		llm,
 		"test-model",
@@ -262,7 +262,7 @@ func TestTopUpBucket_EmptyLLMResultNoError(t *testing.T) {
 			return []external.GeneratedTip{}, nil
 		},
 	}
-	g := NewTipGenerator(
+	g := newTipGenerator(
 		repo,
 		llm,
 		"test-model",
@@ -315,7 +315,7 @@ func TestTopUpBucket_LLMErrorPropagates(t *testing.T) {
 			return nil, wantErr
 		},
 	}
-	g := NewTipGenerator(
+	g := newTipGenerator(
 		repo,
 		llm,
 		"test-model",
@@ -377,7 +377,7 @@ func TestTopUpBucket_PartialCreateFailureContinues(t *testing.T) {
 			return []external.GeneratedTip{{Body: "a"}, {Body: "b"}, {Body: "c"}}, nil
 		},
 	}
-	g := NewTipGenerator(
+	g := newTipGenerator(
 		repo,
 		llm,
 		"test-model",
