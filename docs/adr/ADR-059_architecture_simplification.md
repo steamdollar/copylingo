@@ -1,7 +1,7 @@
 # ADR-059: 기능별 호출 경계와 서버 초기화 구조 단순화
 
 - 날짜: 2026-09-26
-- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중**
+- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중 — A·B 완료(2026-09-30), 다음 C**
 - 보강: 2026-09-30 — 서비스 2계층·생성자 규칙·하위 계층 규칙 추가 (§8)
 - 범위: 패키지 간 호출 경계, Quiz·Study 책임 배치, Redis 접근, 서버 인스턴스 생성·주입
 - 관련 결정: [ADR-057·058·060](ADR_from_41_to_60.md), [1단계 구현 기록](../workthrough/2609/2609262045_redis_access_boundary.md)
@@ -363,4 +363,17 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 | Stats·Preference | 기존 `AnalyzerService`·`MaterialPreferenceService` 이름을 유지한다. | leaf이며 이름 변경의 동작상 이득이 없다. |
 | Redis 진행 상태 저장소 | Quiz·Study 저장소를 한 타입으로 합치지 않는다. `SessionDeps`는 기존 `SessionStores{Quiz, Study}`를 필드 하나로 받는다. | Redis 연결은 이미 하나(`rdb`)이고 두 저장소는 제네릭 `SessionStore[T]`의 타입별 인스턴스다. 합치면 ADR-062에서 제거한 전달 계층이 되살아나고 테스트 대역이 넓어진다. |
 
-`SessionService`의 의존은 repo 7개·`SessionStores`·LLM·DB로 10개이며 §8.3에 따라 `SessionDeps`의 이름 있는 필드로 받는다. 구현 계획은 [B단계 계획](../todos/adr059_stage_b_plan.md)에 있다.
+`SessionService`의 의존은 repo 7개·`SessionStores`·LLM·DB로 10개이며 §8.3에 따라 `SessionDeps`의 이름 있는 필드로 받는다.
+
+#### 8.6.1 B단계 구현 중 확정 사항 (2026-09-30)
+
+구현 기록은 [B단계 workthrough](../workthrough/2609/2609300127_adr059_stage_b_session_service.md)에 있다. 계획서(`docs/todos/adr059_stage_b_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
+
+| 대상 | 결정 | 근거 |
+|---|---|---|
+| `SessionDeps` 필드 타입 | 소비자 정의 인터페이스를 export한다(`QuestionRepo`·`SessionRepo`·`QuizGradingLLM` 등). | 필드 목록이 외부 경계 목록이 된다(§8.3). 다른 패키지의 테스트 대역이 인터페이스를 embed해 필요한 메서드만 구현할 수 있다. |
+| 실패 구분 | 호출자 화면이 달라지는 실패만 sentinel error로 둔다: `ErrQuizStatePrepareFailed`·`ErrNoDueReviews`·`ErrQuizStateUnavailable`·`ErrQuizAnswerStale`·`ErrQuizInvalidOption`·`ErrStudyFinalMarkFailed`·`ErrStudyCompleteFailed`. 소유자 불일치·문항 없음은 기존 `ErrQuizActiveSession*`를 재사용한다. 로그만 남기는 실패는 `%w` wrap으로 단계를 메시지에 남긴다. | sentinel 수를 화면 분기 수에 맞춘다. 이 때문에 Quiz 시작의 조회 실패·DB 시작 실패, 답안 채점 실패·대체 기록 실패의 bot 로그 event가 각각 하나로 합쳐졌다. |
+| 주관식 typing 표시 | `QuizTextAnswer.OnAIGrading` 훅으로 AI 채점 직전에 호출한다. | 표시가 LLM 호출보다 먼저여야 하고, 텍스트 답안 경로의 bot은 문항 유형을 모른다. 훅은 Redis 조회를 늘리지 않는다. |
+| 어순 문제 제출 | `SubmitQuizWordOrder(sessionID, questionID, selection []int)`로 받고, service가 현재 문항 옵션으로 답을 조립하며 순열 여부를 검증한다. | 선택지 제출과 같은 index 입력이고, 답 조립을 도메인 쪽에 둔다. 범용 문자열 제출 입구는 만들지 않는다. draft 관리는 bot에 남긴다. |
+| 손글씨 | `HandwritingService` 타입을 없애고 `SessionService.SubmitHandwriting`으로 옮긴다. 렌더러는 기본 PNG 렌더러로 생성자 안에서 만든다. | 흐름은 그대로이고 전달 계층만 사라진다. |
+| Tip·LLMQuestion 생성자 | `NewTipService(repo, generatorLLM, sourceModel)`가 generator를 내부에서 만든다. `NewLLMQuestionService(llm, tips, sourceModel)`는 답변 후 `TipService`로 후보를 저장한다. | 팁 후보의 source model을 bot 설정에서 읽지 않는다. `GenerateTips` concrete 단언은 D단계에서 제거할 때까지 `NewServices`에 남긴다. |
