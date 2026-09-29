@@ -19,161 +19,293 @@ import (
 )
 
 type mockTipRepo struct {
-	listActiveFn func(ctx context.Context, language, level string, limit int) ([]model.Tip, error)
+	listActiveFn func(
+		ctx context.Context,
+		language,
+		level string,
+		limit int,
+	) ([]model.Tip, error)
 }
 
 func TestRefreshHandwritingMessagePreservesParentCorrelation(t *testing.T) {
 	var output bytes.Buffer
 	previous := slog.Default()
-	slog.SetDefault(slog.New(observability.NewContextHandler(slog.NewJSONHandler(&output, nil))))
+	slog.SetDefault(slog.New(observability.NewContextHandler(slog.NewJSONHandler(
+		&output,
+		nil,
+	))))
 	defer slog.SetDefault(previous)
 
-	ctx := observability.WithAttrs(context.Background(), slog.String("interaction_id", "http-parent"))
+	ctx := observability.WithAttrs(
+		context.Background(),
+		slog.String(
+			"interaction_id",
+			"http-parent",
+		),
+	)
 	handler := NewHandler(HandlerDeps{})
-	handler.refreshHandwritingMessage(context.WithoutCancel(ctx), 1, 2)
+	handler.refreshHandwritingMessage(
+		context.WithoutCancel(ctx),
+		1,
+		2,
+	)
 
 	var entry map[string]any
-	if err := json.Unmarshal(output.Bytes(), &entry); err != nil {
-		t.Fatalf("json.Unmarshal(%q) error = %v", output.Bytes(), err)
+	if err := json.Unmarshal(
+		output.Bytes(),
+		&entry,
+	); err != nil {
+		t.Fatalf(
+			"json.Unmarshal(%q) error = %v",
+			output.Bytes(),
+			err,
+		)
 	}
 	if got := entry["interaction_id"]; got != "http-parent" {
-		t.Fatalf("entry[interaction_id] = %#v, want http-parent", got)
+		t.Fatalf(
+			"entry[interaction_id] = %#v, want http-parent",
+			got,
+		)
 	}
 	if got := entry["event"]; got != "handwriting.cleanup.skipped" {
-		t.Fatalf("entry[event] = %#v, want handwriting.cleanup.skipped", got)
+		t.Fatalf(
+			"entry[event] = %#v, want handwriting.cleanup.skipped",
+			got,
+		)
 	}
 }
 
-func (m *mockTipRepo) ListActive(ctx context.Context, language, level string, limit int) ([]model.Tip, error) {
-	return m.listActiveFn(ctx, language, level, limit)
+func (m *mockTipRepo) ListActive(
+	ctx context.Context,
+	language,
+	level string,
+	limit int,
+) ([]model.Tip, error) {
+	return m.listActiveFn(
+		ctx,
+		language,
+		level,
+		limit,
+	)
 }
 
-func (m *mockTipRepo) CreateCandidate(ctx context.Context, candidate *model.TipCandidate) error {
+func (m *mockTipRepo) CreateCandidate(
+	ctx context.Context,
+	candidate *model.TipCandidate,
+) error {
 	return nil
 }
 
 func TestListTips(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	t.Run("success", func(t *testing.T) {
-		repo := &mockTipRepo{
-			listActiveFn: func(ctx context.Context, language, level string, limit int) ([]model.Tip, error) {
-				return []model.Tip{
-					{ID: 1, Language: "ja", ProficiencyLevel: "N5", Category: "kana_shape", Body: "Tip 1"},
-				}, nil
-			},
-		}
-		tipSvc := service.NewTipService(repo)
-		handler := NewHandler(HandlerDeps{Tip: tipSvc})
+	t.Run(
+		"success",
+		func(t *testing.T) {
+			repo := &mockTipRepo{
+				listActiveFn: func(
+					ctx context.Context,
+					language,
+					level string,
+					limit int,
+				) ([]model.Tip, error) {
+					return []model.Tip{
+						{ID: 1, Language: "ja", ProficiencyLevel: "N5", Category: "kana_shape", Body: "Tip 1"},
+					}, nil
+				},
+			}
+			tipSvc := service.NewTipService(repo)
+			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/miniapp/tips?language=ja&level=N5", nil)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request, _ = http.NewRequest(
+				"GET",
+				"/api/miniapp/tips?language=ja&level=N5",
+				nil,
+			)
 
-		handler.ListTips(c)
+			handler.ListTips(c)
 
-		if w.Code != http.StatusOK {
-			t.Errorf("expected status 200, got %d", w.Code)
-		}
+			if w.Code != http.StatusOK {
+				t.Errorf(
+					"expected status 200, got %d",
+					w.Code,
+				)
+			}
 
-		var tips []model.Tip
-		if err := json.Unmarshal(w.Body.Bytes(), &tips); err != nil {
-			t.Fatalf("failed to unmarshal response: %v", err)
-		}
+			var tips []model.Tip
+			if err := json.Unmarshal(
+				w.Body.Bytes(),
+				&tips,
+			); err != nil {
+				t.Fatalf(
+					"failed to unmarshal response: %v",
+					err,
+				)
+			}
 
-		if len(tips) != 1 || tips[0].Body != "Tip 1" {
-			t.Errorf("unexpected response: %v", tips)
-		}
-	})
+			if len(tips) != 1 || tips[0].Body != "Tip 1" {
+				t.Errorf(
+					"unexpected response: %v",
+					tips,
+				)
+			}
+		},
+	)
 
-	t.Run("missing parameters", func(t *testing.T) {
-		handler := NewHandler(HandlerDeps{})
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/miniapp/tips?language=ja", nil)
+	t.Run(
+		"missing parameters",
+		func(t *testing.T) {
+			handler := NewHandler(HandlerDeps{})
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request, _ = http.NewRequest(
+				"GET",
+				"/api/miniapp/tips?language=ja",
+				nil,
+			)
 
-		handler.ListTips(c)
+			handler.ListTips(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected status 400, got %d", w.Code)
-		}
-	})
+			if w.Code != http.StatusBadRequest {
+				t.Errorf(
+					"expected status 400, got %d",
+					w.Code,
+				)
+			}
+		},
+	)
 
-	t.Run("empty result returns array", func(t *testing.T) {
-		repo := &mockTipRepo{
-			listActiveFn: func(ctx context.Context, language, level string, limit int) ([]model.Tip, error) {
-				return nil, nil
-			},
-		}
-		tipSvc := service.NewTipService(repo)
-		handler := NewHandler(HandlerDeps{Tip: tipSvc})
+	t.Run(
+		"empty result returns array",
+		func(t *testing.T) {
+			repo := &mockTipRepo{
+				listActiveFn: func(
+					ctx context.Context,
+					language,
+					level string,
+					limit int,
+				) ([]model.Tip, error) {
+					return nil, nil
+				},
+			}
+			tipSvc := service.NewTipService(repo)
+			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/miniapp/tips?language=ja&level=N5", nil)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request, _ = http.NewRequest(
+				"GET",
+				"/api/miniapp/tips?language=ja&level=N5",
+				nil,
+			)
 
-		handler.ListTips(c)
+			handler.ListTips(c)
 
-		if w.Code != http.StatusOK {
-			t.Errorf("expected status 200, got %d", w.Code)
-		}
-		if got := w.Body.String(); got != "[]" {
-			t.Errorf("expected empty JSON array, got %q", got)
-		}
-	})
+			if w.Code != http.StatusOK {
+				t.Errorf(
+					"expected status 200, got %d",
+					w.Code,
+				)
+			}
+			if got := w.Body.String(); got != "[]" {
+				t.Errorf(
+					"expected empty JSON array, got %q",
+					got,
+				)
+			}
+		},
+	)
 
-	t.Run("repo error", func(t *testing.T) {
-		repo := &mockTipRepo{
-			listActiveFn: func(ctx context.Context, language, level string, limit int) ([]model.Tip, error) {
-				return nil, errors.New("db down")
-			},
-		}
-		tipSvc := service.NewTipService(repo)
-		handler := NewHandler(HandlerDeps{Tip: tipSvc})
+	t.Run(
+		"repo error",
+		func(t *testing.T) {
+			repo := &mockTipRepo{
+				listActiveFn: func(
+					ctx context.Context,
+					language,
+					level string,
+					limit int,
+				) ([]model.Tip, error) {
+					return nil, errors.New("db down")
+				},
+			}
+			tipSvc := service.NewTipService(repo)
+			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/miniapp/tips?language=ja&level=N5", nil)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request, _ = http.NewRequest(
+				"GET",
+				"/api/miniapp/tips?language=ja&level=N5",
+				nil,
+			)
 
-		handler.ListTips(c)
+			handler.ListTips(c)
 
-		if w.Code != http.StatusInternalServerError {
-			t.Errorf("expected status 500, got %d", w.Code)
-		}
-	})
+			if w.Code != http.StatusInternalServerError {
+				t.Errorf(
+					"expected status 500, got %d",
+					w.Code,
+				)
+			}
+		},
+	)
 
-	t.Run("limit clamp", func(t *testing.T) {
-		var capturedLimit int
-		repo := &mockTipRepo{
-			listActiveFn: func(ctx context.Context, language, level string, limit int) ([]model.Tip, error) {
-				capturedLimit = limit
-				return []model.Tip{}, nil
-			},
-		}
-		tipSvc := service.NewTipService(repo)
-		handler := NewHandler(HandlerDeps{Tip: tipSvc})
+	t.Run(
+		"limit clamp",
+		func(t *testing.T) {
+			var capturedLimit int
+			repo := &mockTipRepo{
+				listActiveFn: func(
+					ctx context.Context,
+					language,
+					level string,
+					limit int,
+				) ([]model.Tip, error) {
+					capturedLimit = limit
+					return []model.Tip{}, nil
+				},
+			}
+			tipSvc := service.NewTipService(repo)
+			handler := NewHandler(HandlerDeps{Tip: tipSvc})
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/miniapp/tips?language=ja&level=N5&limit=999", nil)
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request, _ = http.NewRequest(
+				"GET",
+				"/api/miniapp/tips?language=ja&level=N5&limit=999",
+				nil,
+			)
 
-		handler.ListTips(c)
+			handler.ListTips(c)
 
-		if capturedLimit != 50 {
-			t.Errorf("expected limit 50, got %d", capturedLimit)
-		}
-	})
+			if capturedLimit != 50 {
+				t.Errorf(
+					"expected limit 50, got %d",
+					capturedLimit,
+				)
+			}
+		},
+	)
 }
 
 type mockHandwritingService struct {
-	submitAnswerFn func(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error)
+	submitAnswerFn func(
+		ctx context.Context,
+		req service.HandwritingSubmitRequest,
+	) (*service.HandwritingSubmitResult, error)
 }
 
 func (m *mockHandwritingService) SubmitAnswer(
 	ctx context.Context,
 	req service.HandwritingSubmitRequest,
 ) (*service.HandwritingSubmitResult, error) {
-	return m.submitAnswerFn(ctx, req)
+	return m.submitAnswerFn(
+		ctx,
+		req,
+	)
 }
 
 type mockVerifier struct {
@@ -230,10 +362,147 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				handwriting := &mockHandwritingService{
+					submitAnswerFn: func(
+						ctx context.Context,
+						req service.HandwritingSubmitRequest,
+					) (*service.HandwritingSubmitResult, error) {
+						return nil, tt.serviceErr
+					},
+				}
+				verifier := &mockVerifier{
+					verifyFn: func(initData string) (*TelegramUser, error) {
+						return &TelegramUser{ID: 123}, nil
+					},
+				}
+				handler := NewHandler(HandlerDeps{
+					Handwriting: handwriting,
+					Verifier:    verifier,
+				})
+
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				reqBody := `{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`
+				c.Request, _ = http.NewRequest(
+					"POST",
+					"/api/miniapp/handwriting/submit",
+					strings.NewReader(reqBody),
+				)
+				c.Request.Header.Set(
+					"Content-Type",
+					"application/json",
+				)
+
+				handler.SubmitHandwriting(c)
+
+				if w.Code != tt.wantStatus {
+					t.Errorf(
+						"expected status %d, got %d",
+						tt.wantStatus,
+						w.Code,
+					)
+				}
+
+				var resp map[string]string
+				if err := json.Unmarshal(
+					w.Body.Bytes(),
+					&resp,
+				); err != nil {
+					t.Fatalf(
+						"failed to unmarshal response: %v",
+						err,
+					)
+				}
+
+				if got := resp["error"]; got != tt.wantBody {
+					t.Errorf(
+						"expected error message %q, got %q",
+						tt.wantBody,
+						got,
+					)
+				}
+
+				if tt.notWantInBody != "" && strings.Contains(
+					w.Body.String(),
+					tt.notWantInBody,
+				) {
+					t.Errorf(
+						"response leaked sensitive information: %s",
+						w.Body.String(),
+					)
+				}
+			},
+		)
+	}
+}
+
+func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run(
+		"invalid json",
+		func(t *testing.T) {
+			handler := NewHandler(HandlerDeps{})
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request, _ = http.NewRequest(
+				"POST",
+				"/submit",
+				strings.NewReader(`{invalid`),
+			)
+			handler.SubmitHandwriting(c)
+			if w.Code != http.StatusBadRequest {
+				t.Errorf(
+					"expected 400, got %d",
+					w.Code,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"auth failure",
+		func(t *testing.T) {
+			verifier := &mockVerifier{
+				verifyFn: func(initData string) (*TelegramUser, error) {
+					return nil, errors.New("auth failed")
+				},
+			}
+			handler := NewHandler(HandlerDeps{Verifier: verifier})
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			reqBody := `{"init_data":"bad","session_id":1,"question_id":1,"strokes":[]}`
+			c.Request, _ = http.NewRequest(
+				"POST",
+				"/submit",
+				strings.NewReader(reqBody),
+			)
+			c.Request.Header.Set(
+				"Content-Type",
+				"application/json",
+			)
+			handler.SubmitHandwriting(c)
+			if w.Code != http.StatusUnauthorized {
+				t.Errorf(
+					"expected 401, got %d",
+					w.Code,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"success",
+		func(t *testing.T) {
 			handwriting := &mockHandwritingService{
-				submitAnswerFn: func(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error) {
-					return nil, tt.serviceErr
+				submitAnswerFn: func(
+					ctx context.Context,
+					req service.HandwritingSubmitRequest,
+				) (*service.HandwritingSubmitResult, error) {
+					return &service.HandwritingSubmitResult{IsCorrect: true}, nil
 				},
 			}
 			verifier := &mockVerifier{
@@ -249,92 +518,33 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 			reqBody := `{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`
-			c.Request, _ = http.NewRequest("POST", "/api/miniapp/handwriting/submit", strings.NewReader(reqBody))
-			c.Request.Header.Set("Content-Type", "application/json")
+			c.Request, _ = http.NewRequest(
+				"POST",
+				"/submit",
+				strings.NewReader(reqBody),
+			)
+			c.Request.Header.Set(
+				"Content-Type",
+				"application/json",
+			)
 
 			handler.SubmitHandwriting(c)
 
-			if w.Code != tt.wantStatus {
-				t.Errorf("expected status %d, got %d", tt.wantStatus, w.Code)
+			if w.Code != http.StatusOK {
+				t.Errorf(
+					"expected 200, got %d",
+					w.Code,
+				)
 			}
-
-			var resp map[string]string
-			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-				t.Fatalf("failed to unmarshal response: %v", err)
+			if !strings.Contains(
+				w.Body.String(),
+				`"is_correct":true`,
+			) {
+				t.Errorf(
+					"unexpected body: %s",
+					w.Body.String(),
+				)
 			}
-
-			if got := resp["error"]; got != tt.wantBody {
-				t.Errorf("expected error message %q, got %q", tt.wantBody, got)
-			}
-
-			if tt.notWantInBody != "" && strings.Contains(w.Body.String(), tt.notWantInBody) {
-				t.Errorf("response leaked sensitive information: %s", w.Body.String())
-			}
-		})
-	}
-}
-
-func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("invalid json", func(t *testing.T) {
-		handler := NewHandler(HandlerDeps{})
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/submit", strings.NewReader(`{invalid`))
-		handler.SubmitHandwriting(c)
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400, got %d", w.Code)
-		}
-	})
-
-	t.Run("auth failure", func(t *testing.T) {
-		verifier := &mockVerifier{
-			verifyFn: func(initData string) (*TelegramUser, error) {
-				return nil, errors.New("auth failed")
-			},
-		}
-		handler := NewHandler(HandlerDeps{Verifier: verifier})
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		reqBody := `{"init_data":"bad","session_id":1,"question_id":1,"strokes":[]}`
-		c.Request, _ = http.NewRequest("POST", "/submit", strings.NewReader(reqBody))
-		c.Request.Header.Set("Content-Type", "application/json")
-		handler.SubmitHandwriting(c)
-		if w.Code != http.StatusUnauthorized {
-			t.Errorf("expected 401, got %d", w.Code)
-		}
-	})
-
-	t.Run("success", func(t *testing.T) {
-		handwriting := &mockHandwritingService{
-			submitAnswerFn: func(ctx context.Context, req service.HandwritingSubmitRequest) (*service.HandwritingSubmitResult, error) {
-				return &service.HandwritingSubmitResult{IsCorrect: true}, nil
-			},
-		}
-		verifier := &mockVerifier{
-			verifyFn: func(initData string) (*TelegramUser, error) {
-				return &TelegramUser{ID: 123}, nil
-			},
-		}
-		handler := NewHandler(HandlerDeps{
-			Handwriting: handwriting,
-			Verifier:    verifier,
-		})
-
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		reqBody := `{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`
-		c.Request, _ = http.NewRequest("POST", "/submit", strings.NewReader(reqBody))
-		c.Request.Header.Set("Content-Type", "application/json")
-
-		handler.SubmitHandwriting(c)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("expected 200, got %d", w.Code)
-		}
-		if !strings.Contains(w.Body.String(), `"is_correct":true`) {
-			t.Errorf("unexpected body: %s", w.Body.String())
-		}
-	})
+		},
+	)
 }

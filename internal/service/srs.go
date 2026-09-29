@@ -11,12 +11,19 @@ type questionQuerier interface {
 	GetDueReviews(
 		ctx context.Context,
 		userID int64,
-		language, currentLevel string,
+		language,
+		currentLevel string,
 		levels []string,
-		limit, kanjiRecallLimit int,
+		limit,
+		kanjiRecallLimit int,
 		categories ...model.QuestionCategory,
 	) ([]model.Question, error)
-	GetDueReviewCount(ctx context.Context, userID int64, language string, levels []string) (int, error)
+	GetDueReviewCount(
+		ctx context.Context,
+		userID int64,
+		language string,
+		levels []string,
+	) (int, error)
 }
 
 // srs: Spaced Repetition System
@@ -26,11 +33,18 @@ type srsScheduler interface {
 	GetDueReviews(
 		ctx context.Context,
 		userID int64,
-		language, level string,
-		limit, kanjiRecallLimit int,
+		language,
+		level string,
+		limit,
+		kanjiRecallLimit int,
 		categories ...model.QuestionCategory,
 	) ([]model.Question, error)
-	GetDueCount(ctx context.Context, userID int64, language, level string) (int, error)
+	GetDueCount(
+		ctx context.Context,
+		userID int64,
+		language,
+		level string,
+	) (int, error)
 }
 
 // SRSService implements the SM-2 Spaced Repetition algorithm for per-user progress.
@@ -43,17 +57,26 @@ func NewSRSService(questionRepo questionQuerier) *SRSService {
 }
 
 // ScheduleAnswer applies SRS changes in memory without writing to the DB.
-func (s *SRSService) ScheduleAnswer(progress *model.UserQuestionProgress, isCorrect bool) {
+func (s *SRSService) ScheduleAnswer(
+	progress *model.UserQuestionProgress,
+	isCorrect bool,
+) {
 	quality := 1 // wrong
 	if isCorrect {
 		quality = 4 // correct with some hesitation
 	}
 
-	s.updateSchedule(progress, quality)
+	s.updateSchedule(
+		progress,
+		quality,
+	)
 }
 
 // updateSchedule applies the SM-2 algorithm to update the user's Question progress.
-func (s *SRSService) updateSchedule(q *model.UserQuestionProgress, quality int) {
+func (s *SRSService) updateSchedule(
+	q *model.UserQuestionProgress,
+	quality int,
+) {
 	now := time.Now()
 	q.LastReviewedAt = &now
 
@@ -81,7 +104,11 @@ func (s *SRSService) updateSchedule(q *model.UserQuestionProgress, quality int) 
 	}
 	q.EaseFactor = ef
 
-	nextReview := now.AddDate(0, 0, q.IntervalDays)
+	nextReview := now.AddDate(
+		0,
+		0,
+		q.IntervalDays,
+	)
 	q.NextReviewAt = &nextReview
 }
 
@@ -89,8 +116,10 @@ func (s *SRSService) updateSchedule(q *model.UserQuestionProgress, quality int) 
 func (s *SRSService) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, level string,
-	limit, kanjiRecallLimit int,
+	language,
+	level string,
+	limit,
+	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	return s.questionRepo.GetDueReviews(
@@ -98,7 +127,10 @@ func (s *SRSService) GetDueReviews(
 		userID,
 		language,
 		level,
-		sessionLevelsFor(language, level),
+		sessionLevelsFor(
+			language,
+			level,
+		),
 		limit,
 		kanjiRecallLimit,
 		categories...,
@@ -109,7 +141,16 @@ func (s *SRSService) GetDueReviews(
 func (s *SRSService) GetDueCount(
 	ctx context.Context,
 	userID int64,
-	language, level string,
+	language,
+	level string,
 ) (int, error) {
-	return s.questionRepo.GetDueReviewCount(ctx, userID, language, sessionLevelsFor(language, level))
+	return s.questionRepo.GetDueReviewCount(
+		ctx,
+		userID,
+		language,
+		sessionLevelsFor(
+			language,
+			level,
+		),
+	)
 }

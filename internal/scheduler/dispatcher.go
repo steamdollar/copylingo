@@ -51,7 +51,10 @@ func (d *sessionDispatcher) dispatchBatch(
 		return nil
 	}
 
-	jobs := make(chan pushJob, len(users))
+	jobs := make(
+		chan pushJob,
+		len(users),
+	)
 	for _, u := range users {
 		count := 0
 		if unfinishedCounts != nil {
@@ -81,12 +84,23 @@ func (d *sessionDispatcher) dispatchBatch(
 					}
 				}
 
-				if err := d.dispatchUser(ctx, job.user, job.slot, job.unfinishedCount); err != nil {
-					slog.ErrorContext(ctx, "Failed to dispatch user session",
-						"event", "scheduler.dispatch.failed",
-						"user_id", job.user.ID,
-						"slot", job.slot,
-						"error", err,
+				if err := d.dispatchUser(
+					ctx,
+					job.user,
+					job.slot,
+					job.unfinishedCount,
+				); err != nil {
+					slog.ErrorContext(
+						ctx,
+						"Failed to dispatch user session",
+						"event",
+						"scheduler.dispatch.failed",
+						"user_id",
+						job.user.ID,
+						"slot",
+						job.slot,
+						"error",
+						err,
 					)
 					errOnce.Do(func() {
 						firstErr = err
@@ -109,19 +123,35 @@ func (d *sessionDispatcher) dispatchUser(
 	// Claim today's user/slot dispatch through the narrow scheduler storage contract.
 	if d.claims != nil {
 		today := time.Now().Format("2006-01-02")
-		acquired, err := d.claims.TryClaim(ctx, user.ID, slot, today)
+		acquired, err := d.claims.TryClaim(
+			ctx,
+			user.ID,
+			slot,
+			today,
+		)
 		if err != nil {
-			slog.WarnContext(ctx, "Redis idempotency lock check error; proceeding",
-				"event", "scheduler.lock.error",
-				"user_id", user.ID,
-				"slot", slot,
-				"error", err,
+			slog.WarnContext(
+				ctx,
+				"Redis idempotency lock check error; proceeding",
+				"event",
+				"scheduler.lock.error",
+				"user_id",
+				user.ID,
+				"slot",
+				slot,
+				"error",
+				err,
 			)
 		} else if !acquired {
-			slog.InfoContext(ctx, "Session already pushed today for user; skipping",
-				"event", "scheduler.lock.skipped",
-				"user_id", user.ID,
-				"slot", slot,
+			slog.InfoContext(
+				ctx,
+				"Session already pushed today for user; skipping",
+				"event",
+				"scheduler.lock.skipped",
+				"user_id",
+				user.ID,
+				"slot",
+				slot,
 			)
 			return nil
 		}
@@ -129,7 +159,10 @@ func (d *sessionDispatcher) dispatchUser(
 
 	// Each user with three unfinished sessions gets a reminder before another session is built.
 	if unfinishedCount >= maxUnfinishedSessions {
-		reminded, err := d.remindUnfinishedSession(ctx, user.ID)
+		reminded, err := d.remindUnfinishedSession(
+			ctx,
+			user.ID,
+		)
 		if err != nil {
 			return err
 		}
@@ -141,15 +174,34 @@ func (d *sessionDispatcher) dispatchUser(
 	// 3. Build & push session
 	switch slot {
 	case model.SessionSlotMorningStudy:
-		return d.buildAndPushStudy(ctx, user, service.StudyProfileMorning)
+		return d.buildAndPushStudy(
+			ctx,
+			user,
+			service.StudyProfileMorning,
+		)
 	case model.SessionSlotMorningQuiz:
-		return d.buildAndPushQuiz(ctx, user, model.SessionMorning)
+		return d.buildAndPushQuiz(
+			ctx,
+			user,
+			model.SessionMorning,
+		)
 	case model.SessionSlotEveningStudy:
-		return d.buildAndPushStudy(ctx, user, service.StudyProfileEvening)
+		return d.buildAndPushStudy(
+			ctx,
+			user,
+			service.StudyProfileEvening,
+		)
 	case model.SessionSlotEveningQuiz:
-		return d.buildAndPushQuiz(ctx, user, model.SessionEvening)
+		return d.buildAndPushQuiz(
+			ctx,
+			user,
+			model.SessionEvening,
+		)
 	default:
-		return fmt.Errorf("unsupported session slot: %s", slot)
+		return fmt.Errorf(
+			"unsupported session slot: %s",
+			slot,
+		)
 	}
 }
 
@@ -170,25 +222,48 @@ func (d *sessionDispatcher) buildAndPushStudy(
 		0,
 	)
 	if err != nil {
-		return fmt.Errorf("build study session user_id=%d: %w", user.ID, err)
+		return fmt.Errorf(
+			"build study session user_id=%d: %w",
+			user.ID,
+			err,
+		)
 	}
 	if session == nil {
-		slog.WarnContext(ctx, "No study materials available for session",
-			"event", "scheduler.study_session.empty",
-			"user_id", user.ID,
+		slog.WarnContext(
+			ctx,
+			"No study materials available for session",
+			"event",
+			"scheduler.study_session.empty",
+			"user_id",
+			user.ID,
 		)
 		return nil
 	}
 
-	if err := d.bot.PushStudySession(ctx, user.ID, session.ID); err != nil {
-		return fmt.Errorf("push study session user_id=%d session_id=%d: %w", user.ID, session.ID, err)
+	if err := d.bot.PushStudySession(
+		ctx,
+		user.ID,
+		session.ID,
+	); err != nil {
+		return fmt.Errorf(
+			"push study session user_id=%d session_id=%d: %w",
+			user.ID,
+			session.ID,
+			err,
+		)
 	}
 
-	slog.InfoContext(ctx, "Study session pushed",
-		"event", "scheduler.study_session.pushed",
-		"user_id", user.ID,
-		"session_id", session.ID,
-		"total_materials", session.TotalQuestions,
+	slog.InfoContext(
+		ctx,
+		"Study session pushed",
+		"event",
+		"scheduler.study_session.pushed",
+		"user_id",
+		user.ID,
+		"session_id",
+		session.ID,
+		"total_materials",
+		session.TotalQuestions,
 	)
 	return nil
 }
@@ -221,35 +296,66 @@ func (d *sessionDispatcher) buildAndPushQuiz(
 			user.ProficiencyLevel,
 		)
 	default:
-		return fmt.Errorf("unsupported quiz session type: %s", sessionType)
+		return fmt.Errorf(
+			"unsupported quiz session type: %s",
+			sessionType,
+		)
 	}
 
 	if err != nil {
-		return fmt.Errorf("build quiz session user_id=%d: %w", user.ID, err)
+		return fmt.Errorf(
+			"build quiz session user_id=%d: %w",
+			user.ID,
+			err,
+		)
 	}
 	if session == nil {
-		slog.WarnContext(ctx, "No questions available for session",
-			"event", "scheduler.session.empty",
-			"user_id", user.ID,
+		slog.WarnContext(
+			ctx,
+			"No questions available for session",
+			"event",
+			"scheduler.session.empty",
+			"user_id",
+			user.ID,
 		)
 		return nil
 	}
 
-	if err := d.bot.PushSession(ctx, user.ID, session.ID, string(sessionType)); err != nil {
-		return fmt.Errorf("push quiz session user_id=%d session_id=%d: %w", user.ID, session.ID, err)
+	if err := d.bot.PushSession(
+		ctx,
+		user.ID,
+		session.ID,
+		string(sessionType),
+	); err != nil {
+		return fmt.Errorf(
+			"push quiz session user_id=%d session_id=%d: %w",
+			user.ID,
+			session.ID,
+			err,
+		)
 	}
 
-	slog.InfoContext(ctx, "Session pushed",
-		"event", "scheduler.session.pushed",
-		"user_id", user.ID,
-		"session_id", session.ID,
-		"session_type", sessionType,
-		"total_questions", session.TotalQuestions,
+	slog.InfoContext(
+		ctx,
+		"Session pushed",
+		"event",
+		"scheduler.session.pushed",
+		"user_id",
+		user.ID,
+		"session_id",
+		session.ID,
+		"session_type",
+		sessionType,
+		"total_questions",
+		session.TotalQuestions,
 	)
 	return nil
 }
 
-func (d *sessionDispatcher) remindUnfinishedSession(ctx context.Context, userID int64) (bool, error) {
+func (d *sessionDispatcher) remindUnfinishedSession(
+	ctx context.Context,
+	userID int64,
+) (bool, error) {
 	if d.services == nil || d.services.SessionQuery == nil {
 		return false, fmt.Errorf("session query service unavailable")
 	}
@@ -257,9 +363,16 @@ func (d *sessionDispatcher) remindUnfinishedSession(ctx context.Context, userID 
 		return false, fmt.Errorf("session pusher unavailable")
 	}
 
-	session, err := d.services.SessionQuery.GetOldestUnfinished(ctx, userID)
+	session, err := d.services.SessionQuery.GetOldestUnfinished(
+		ctx,
+		userID,
+	)
 	if err != nil {
-		return false, fmt.Errorf("query unfinished session user_id=%d: %w", userID, err)
+		return false, fmt.Errorf(
+			"query unfinished session user_id=%d: %w",
+			userID,
+			err,
+		)
 	}
 	if session == nil {
 		return false, nil
@@ -267,23 +380,52 @@ func (d *sessionDispatcher) remindUnfinishedSession(ctx context.Context, userID 
 
 	switch session.Mode {
 	case model.SessionModeStudy:
-		if err := d.bot.PushStudySession(ctx, userID, session.ID); err != nil {
-			return true, fmt.Errorf("push study session reminder user_id=%d session_id=%d: %w", userID, session.ID, err)
+		if err := d.bot.PushStudySession(
+			ctx,
+			userID,
+			session.ID,
+		); err != nil {
+			return true, fmt.Errorf(
+				"push study session reminder user_id=%d session_id=%d: %w",
+				userID,
+				session.ID,
+				err,
+			)
 		}
-		slog.InfoContext(ctx, "Unfinished study session reminded",
-			"event", "scheduler.study_session.reminded",
-			"user_id", userID,
-			"session_id", session.ID,
+		slog.InfoContext(
+			ctx,
+			"Unfinished study session reminded",
+			"event",
+			"scheduler.study_session.reminded",
+			"user_id",
+			userID,
+			"session_id",
+			session.ID,
 		)
 		return true, nil
 	case model.SessionModeQuiz, "":
-		if err := d.bot.PushSession(ctx, userID, session.ID, string(session.Type)); err != nil {
-			return true, fmt.Errorf("push quiz session reminder user_id=%d session_id=%d: %w", userID, session.ID, err)
+		if err := d.bot.PushSession(
+			ctx,
+			userID,
+			session.ID,
+			string(session.Type),
+		); err != nil {
+			return true, fmt.Errorf(
+				"push quiz session reminder user_id=%d session_id=%d: %w",
+				userID,
+				session.ID,
+				err,
+			)
 		}
-		slog.InfoContext(ctx, "Unfinished quiz session reminded",
-			"event", "scheduler.session.reminded",
-			"user_id", userID,
-			"session_id", session.ID,
+		slog.InfoContext(
+			ctx,
+			"Unfinished quiz session reminded",
+			"event",
+			"scheduler.session.reminded",
+			"user_id",
+			userID,
+			"session_id",
+			session.ID,
 		)
 		return true, nil
 	default:

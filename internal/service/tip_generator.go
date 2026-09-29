@@ -23,15 +23,23 @@ const (
 // tipGeneratorRepo is the inline repository contract TipGenerator depends on,
 // kept narrow so the service layer can be unit-tested with a mock.
 type tipGeneratorRepo interface {
-	CountActive(ctx context.Context, language, level string) (int, error)
-	Create(ctx context.Context, tip *model.Tip) error
+	CountActive(
+		ctx context.Context,
+		language,
+		level string,
+	) (int, error)
+	Create(
+		ctx context.Context,
+		tip *model.Tip,
+	) error
 }
 
 // tipGeneratorLLM is the inline LLM contract TipGenerator depends on.
 type tipGeneratorLLM interface {
 	GenerateTips(
 		ctx context.Context,
-		language, level string,
+		language,
+		level string,
 		category model.TipCategory,
 		n int,
 	) ([]external.GeneratedTip, error)
@@ -48,7 +56,11 @@ type TipGenerator struct {
 
 // NewTipGenerator wires the generator with its repository, LLM client, and the
 // configured model name used for source_model attribution.
-func NewTipGenerator(tips tipGeneratorRepo, llm tipGeneratorLLM, model string) *TipGenerator {
+func NewTipGenerator(
+	tips tipGeneratorRepo,
+	llm tipGeneratorLLM,
+	model string,
+) *TipGenerator {
 	return &TipGenerator{tips: tips, llm: llm, model: model}
 }
 
@@ -56,40 +68,73 @@ func NewTipGenerator(tips tipGeneratorRepo, llm tipGeneratorLLM, model string) *
 // pipeline. GenerateTips is only on the concrete *DefaultLLMClient, so it asserts
 // and, on failure, stores a true nil LLM (not a typed nil) so TopUpBucket's nil
 // guard works as intended.
-func newTipGeneratorFromClient(tips tipGeneratorRepo, client external.LLMClient, model string) *TipGenerator {
+func newTipGeneratorFromClient(
+	tips tipGeneratorRepo,
+	client external.LLMClient,
+	model string,
+) *TipGenerator {
 	concrete, ok := client.(*external.DefaultLLMClient)
 	if !ok {
-		return NewTipGenerator(tips, nil, model)
+		return NewTipGenerator(
+			tips,
+			nil,
+			model,
+		)
 	}
-	return NewTipGenerator(tips, concrete, model)
+	return NewTipGenerator(
+		tips,
+		concrete,
+		model,
+	)
 }
 
 // TopUpBucket generates up to TipGeneratePerCycle new tips for the given
 // (language, level) when the active balance is below TipBucketTarget. It is a
 // no-op once the bucket is full, so callers can invoke it every cycle safely.
-func (g *TipGenerator) TopUpBucket(ctx context.Context, language, level string) error {
+func (g *TipGenerator) TopUpBucket(
+	ctx context.Context,
+	language,
+	level string,
+) error {
 	if g.llm == nil {
 		return external.ErrAIConfigMissing
 	}
 
-	count, err := g.tips.CountActive(ctx, language, level)
+	count, err := g.tips.CountActive(
+		ctx,
+		language,
+		level,
+	)
 	if err != nil {
 		return err
 	}
 	if count >= TipBucketTarget {
-		slog.InfoContext(ctx, "Tip bucket already full",
-			"event", "tipgen.skip_full",
-			"source", "service.tip_generator",
-			"language", language,
-			"level", level,
-			"count", count,
+		slog.InfoContext(
+			ctx,
+			"Tip bucket already full",
+			"event",
+			"tipgen.skip_full",
+			"source",
+			"service.tip_generator",
+			"language",
+			language,
+			"level",
+			level,
+			"count",
+			count,
 		)
 		return nil
 	}
 
 	category := pickTipCategory()
 
-	generated, err := g.llm.GenerateTips(ctx, language, level, category, TipGeneratePerCycle)
+	generated, err := g.llm.GenerateTips(
+		ctx,
+		language,
+		level,
+		category,
+		TipGeneratePerCycle,
+	)
 	if err != nil {
 		return err
 	}
@@ -108,31 +153,53 @@ func (g *TipGenerator) TopUpBucket(ctx context.Context, language, level string) 
 			SourcePromptVer:  &promptVer,
 			IsActive:         true,
 		}
-		if err := g.tips.Create(ctx, tip); err != nil {
+		if err := g.tips.Create(
+			ctx,
+			tip,
+		); err != nil {
 			skipped++
-			slog.WarnContext(ctx, "Failed to persist generated tip",
-				"event", "tipgen.create_failed",
-				"source", "service.tip_generator",
-				"language", language,
-				"level", level,
-				"category", category,
-				"error", err,
+			slog.WarnContext(
+				ctx,
+				"Failed to persist generated tip",
+				"event",
+				"tipgen.create_failed",
+				"source",
+				"service.tip_generator",
+				"language",
+				language,
+				"level",
+				level,
+				"category",
+				category,
+				"error",
+				err,
 			)
 			continue
 		}
 		saved++
 	}
 
-	slog.InfoContext(ctx, "Tip bucket topped up",
-		"event", "tipgen.topped_up",
-		"source", "service.tip_generator",
-		"language", language,
-		"level", level,
-		"category", category,
-		"requested", TipGeneratePerCycle,
-		"generated", saved,
-		"skipped", skipped,
-		"bucket_before", count,
+	slog.InfoContext(
+		ctx,
+		"Tip bucket topped up",
+		"event",
+		"tipgen.topped_up",
+		"source",
+		"service.tip_generator",
+		"language",
+		language,
+		"level",
+		level,
+		"category",
+		category,
+		"requested",
+		TipGeneratePerCycle,
+		"generated",
+		saved,
+		"skipped",
+		skipped,
+		"bucket_before",
+		count,
 	)
 	return nil
 }

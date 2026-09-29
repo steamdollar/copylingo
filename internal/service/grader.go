@@ -13,23 +13,48 @@ import (
 )
 
 type graderLLM interface {
-	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (external.GradeResult, error)
+	GradeAnswer(
+		ctx context.Context,
+		questionPrompt,
+		correctAnswer,
+		userAnswer string,
+	) (external.GradeResult, error)
 	GradeHandwriting(
 		ctx context.Context,
-		questionPrompt, correctAnswer string,
+		questionPrompt,
+		correctAnswer string,
 		pngImage []byte,
 	) (external.GradeResult, error)
 }
 
 type graderUserRepo interface {
-	UpdateStreak(ctx context.Context, userID int64) error
+	UpdateStreak(
+		ctx context.Context,
+		userID int64,
+	) error
 }
 
 type graderQuizActiveSession interface {
-	Get(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
-	RecordAnswer(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
-	Flush(ctx context.Context, sessionID int, userID int64) (*QuizSessionResult, error)
-	Delete(ctx context.Context, sessionID int) error
+	Get(
+		ctx context.Context,
+		sessionID int,
+	) (*model.QuizActiveSessionState, error)
+	RecordAnswer(
+		ctx context.Context,
+		sessionID,
+		questionID int,
+		userAnswer string,
+		isCorrect bool,
+	) error
+	Flush(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+	) (*QuizSessionResult, error)
+	Delete(
+		ctx context.Context,
+		sessionID int,
+	) error
 }
 
 // GraderService handles answer grading and result processing.
@@ -54,19 +79,31 @@ func NewGraderService(
 // GradeAnswer grades a single answer and updates SRS accordingly.
 func (g *GraderService) GradeAnswer(
 	ctx context.Context,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	userAnswer string,
 ) (bool, string, error) {
-	question, err := g.questionFromQuizActiveSession(ctx, sessionID, questionID)
+	question, err := g.questionFromQuizActiveSession(
+		ctx,
+		sessionID,
+		questionID,
+	)
 	if err != nil {
 		return false, "", err
 	}
-	return g.GradeAnswerWithQuestion(ctx, sessionID, questionID, question, userAnswer)
+	return g.GradeAnswerWithQuestion(
+		ctx,
+		sessionID,
+		questionID,
+		question,
+		userAnswer,
+	)
 }
 
 func (g *GraderService) GradeAnswerWithQuestion(
 	ctx context.Context,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	question *model.Question,
 	userAnswer string,
 ) (bool, string, error) {
@@ -85,7 +122,12 @@ func (g *GraderService) GradeAnswerWithQuestion(
 	// FillBlank and MultipleChoice remain exact-match to avoid unnecessary latency and nondeterminism.
 	if question.Type == model.QuestionSubjective {
 		var result external.GradeResult
-		result, err = g.llm.GradeAnswer(ctx, question.Prompt, question.CorrectAnswer, userAnswer)
+		result, err = g.llm.GradeAnswer(
+			ctx,
+			question.Prompt,
+			question.CorrectAnswer,
+			userAnswer,
+		)
 		if err != nil {
 			return false, "", mapAIUnavailableError(err)
 		}
@@ -95,7 +137,13 @@ func (g *GraderService) GradeAnswerWithQuestion(
 		isCorrect = userAnswer == question.CorrectAnswer
 	}
 
-	if err := g.recordGradingResult(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
+	if err := g.recordGradingResult(
+		ctx,
+		sessionID,
+		questionID,
+		userAnswer,
+		isCorrect,
+	); err != nil {
 		return false, "", err
 	}
 
@@ -104,27 +152,49 @@ func (g *GraderService) GradeAnswerWithQuestion(
 
 func (g *GraderService) GradeHandwriting(
 	ctx context.Context,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	renderedImage []byte,
 ) (bool, string, error) {
-	question, err := g.questionFromQuizActiveSession(ctx, sessionID, questionID)
+	question, err := g.questionFromQuizActiveSession(
+		ctx,
+		sessionID,
+		questionID,
+	)
 	if err != nil {
 		return false, "", err
 	}
-	return g.GradeHandwritingWithQuestion(ctx, sessionID, questionID, question, renderedImage)
+	return g.GradeHandwritingWithQuestion(
+		ctx,
+		sessionID,
+		questionID,
+		question,
+		renderedImage,
+	)
 }
 
 func (g *GraderService) GradeHandwritingWithQuestion(
 	ctx context.Context,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	question *model.Question,
 	renderedImage []byte,
 ) (bool, string, error) {
 	startedAt := time.Now()
-	ctx = observability.WithAttrs(ctx,
-		slog.String("source", "service.grader"),
-		slog.Int("session_id", sessionID),
-		slog.Int("question_id", questionID),
+	ctx = observability.WithAttrs(
+		ctx,
+		slog.String(
+			"source",
+			"service.grader",
+		),
+		slog.Int(
+			"session_id",
+			sessionID,
+		),
+		slog.Int(
+			"question_id",
+			questionID,
+		),
 	)
 
 	if question == nil || question.ID != questionID {
@@ -138,7 +208,12 @@ func (g *GraderService) GradeHandwritingWithQuestion(
 		return false, "", ErrHandwritingInvalidQuestion
 	}
 
-	result, err := g.llm.GradeHandwriting(ctx, question.Prompt, question.CorrectAnswer, renderedImage)
+	result, err := g.llm.GradeHandwriting(
+		ctx,
+		question.Prompt,
+		question.CorrectAnswer,
+		renderedImage,
+	)
 	if err != nil {
 		return false, "", mapAIUnavailableError(err)
 	}
@@ -147,55 +222,96 @@ func (g *GraderService) GradeHandwritingWithQuestion(
 	gradedAt := time.Now()
 
 	userAnswer := "handwriting:submitted"
-	if err := g.recordGradingResult(ctx, sessionID, questionID, userAnswer, isCorrect); err != nil {
+	if err := g.recordGradingResult(
+		ctx,
+		sessionID,
+		questionID,
+		userAnswer,
+		isCorrect,
+	); err != nil {
 		return false, "", err
 	}
-	slog.InfoContext(ctx, "Handwriting grader completed",
-		"event", "handwriting.grader.completed",
-		"duration_ms", time.Since(startedAt).Milliseconds(),
-		"llm_duration_ms", gradedAt.Sub(startedAt).Milliseconds(),
-		"record_duration_ms", time.Since(gradedAt).Milliseconds(),
-		"is_correct", isCorrect,
+	slog.InfoContext(
+		ctx,
+		"Handwriting grader completed",
+		"event",
+		"handwriting.grader.completed",
+		"duration_ms",
+		time.Since(startedAt).Milliseconds(),
+		"llm_duration_ms",
+		gradedAt.Sub(startedAt).Milliseconds(),
+		"record_duration_ms",
+		time.Since(gradedAt).Milliseconds(),
+		"is_correct",
+		isCorrect,
 	)
 
 	return isCorrect, feedback, nil
 }
 
 func mapAIUnavailableError(err error) error {
-	if errors.Is(err, external.ErrAIConfigMissing) {
-		return fmt.Errorf("%w: %w", ErrAIUnavailable, err)
+	if errors.Is(
+		err,
+		external.ErrAIConfigMissing,
+	) {
+		return fmt.Errorf(
+			"%w: %w",
+			ErrAIUnavailable,
+			err,
+		)
 	}
 	return err
 }
 
 func (g *GraderService) recordGradingResult(
 	ctx context.Context,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	userAnswer string,
 	isCorrect bool,
 ) error {
 	if g.quizActiveSession == nil {
 		return ErrQuizActiveSessionDependencyMissing
 	}
-	return g.quizActiveSession.RecordAnswer(ctx, sessionID, questionID, userAnswer, isCorrect)
+	return g.quizActiveSession.RecordAnswer(
+		ctx,
+		sessionID,
+		questionID,
+		userAnswer,
+		isCorrect,
+	)
 }
 
 // CompleteSession finalizes a session with results.
-func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, userID int64) (*QuizSessionResult, error) {
+func (g *GraderService) CompleteSession(
+	ctx context.Context,
+	sessionID int,
+	userID int64,
+) (*QuizSessionResult, error) {
 	if g.quizActiveSession == nil {
 		return nil, ErrQuizActiveSessionDependencyMissing
 	}
-	result, err := g.quizActiveSession.Flush(ctx, sessionID, userID)
+	result, err := g.quizActiveSession.Flush(
+		ctx,
+		sessionID,
+		userID,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	// Update streak
-	if err := g.userRepo.UpdateStreak(ctx, userID); err != nil {
+	if err := g.userRepo.UpdateStreak(
+		ctx,
+		userID,
+	); err != nil {
 		return nil, err
 	}
 
-	if err := g.quizActiveSession.Delete(ctx, sessionID); err != nil {
+	if err := g.quizActiveSession.Delete(
+		ctx,
+		sessionID,
+	); err != nil {
 		return nil, err
 	}
 
@@ -204,12 +320,16 @@ func (g *GraderService) CompleteSession(ctx context.Context, sessionID int, user
 
 func (g *GraderService) questionFromQuizActiveSession(
 	ctx context.Context,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 ) (*model.Question, error) {
 	if g.quizActiveSession == nil {
 		return nil, ErrQuizActiveSessionDependencyMissing
 	}
-	state, err := g.quizActiveSession.Get(ctx, sessionID)
+	state, err := g.quizActiveSession.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
 		return nil, err
 	}

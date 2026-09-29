@@ -10,31 +10,69 @@ import (
 )
 
 type mockGraderUserRepo struct {
-	updateStreakFn func(ctx context.Context, userID int64) error
+	updateStreakFn func(
+		ctx context.Context,
+		userID int64,
+	) error
 }
 
-func (m *mockGraderUserRepo) UpdateStreak(ctx context.Context, userID int64) error {
-	return m.updateStreakFn(ctx, userID)
+func (m *mockGraderUserRepo) UpdateStreak(
+	ctx context.Context,
+	userID int64,
+) error {
+	return m.updateStreakFn(
+		ctx,
+		userID,
+	)
 }
 
 type mockGraderQuizActiveSession struct {
-	getFn          func(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
-	recordAnswerFn func(ctx context.Context, sessionID, questionID int, userAnswer string, isCorrect bool) error
-	flushFn        func(ctx context.Context, sessionID int, userID int64) (*QuizSessionResult, error)
-	deleteFn       func(ctx context.Context, sessionID int) error
+	getFn func(
+		ctx context.Context,
+		sessionID int,
+	) (*model.QuizActiveSessionState, error)
+	recordAnswerFn func(
+		ctx context.Context,
+		sessionID,
+		questionID int,
+		userAnswer string,
+		isCorrect bool,
+	) error
+	flushFn func(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+	) (*QuizSessionResult, error)
+	deleteFn func(
+		ctx context.Context,
+		sessionID int,
+	) error
 }
 
-func (m *mockGraderQuizActiveSession) Get(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error) {
-	return m.getFn(ctx, sessionID)
+func (m *mockGraderQuizActiveSession) Get(
+	ctx context.Context,
+	sessionID int,
+) (*model.QuizActiveSessionState, error) {
+	return m.getFn(
+		ctx,
+		sessionID,
+	)
 }
 
 func (m *mockGraderQuizActiveSession) RecordAnswer(
 	ctx context.Context,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	userAnswer string,
 	isCorrect bool,
 ) error {
-	return m.recordAnswerFn(ctx, sessionID, questionID, userAnswer, isCorrect)
+	return m.recordAnswerFn(
+		ctx,
+		sessionID,
+		questionID,
+		userAnswer,
+		isCorrect,
+	)
 }
 
 func (m *mockGraderQuizActiveSession) Flush(
@@ -42,63 +80,132 @@ func (m *mockGraderQuizActiveSession) Flush(
 	sessionID int,
 	userID int64,
 ) (*QuizSessionResult, error) {
-	return m.flushFn(ctx, sessionID, userID)
+	return m.flushFn(
+		ctx,
+		sessionID,
+		userID,
+	)
 }
 
-func (m *mockGraderQuizActiveSession) Delete(ctx context.Context, sessionID int) error {
-	return m.deleteFn(ctx, sessionID)
+func (m *mockGraderQuizActiveSession) Delete(
+	ctx context.Context,
+	sessionID int,
+) error {
+	return m.deleteFn(
+		ctx,
+		sessionID,
+	)
 }
 
 type mockSRS struct {
-	getDueReviewsForCategoriesFn func(ctx context.Context, userID int64, limit, kanjiRecallLimit int, categories ...model.QuestionCategory) ([]model.Question, error)
-	getDueReviewsFn              func(ctx context.Context, userID int64, limit, kanjiRecallLimit int) ([]model.Question, error)
-	getDueCountFn                func(ctx context.Context) (int, error)
-	processAnswerFn              func(ctx context.Context, q *model.Question, isCorrect bool) error
-	gotLanguage                  string
-	gotLevel                     string
+	getDueReviewsForCategoriesFn func(
+		ctx context.Context,
+		userID int64,
+		limit,
+		kanjiRecallLimit int,
+		categories ...model.QuestionCategory,
+	) ([]model.Question, error)
+	getDueReviewsFn func(
+		ctx context.Context,
+		userID int64,
+		limit,
+		kanjiRecallLimit int,
+	) ([]model.Question, error)
+	getDueCountFn   func(ctx context.Context) (int, error)
+	processAnswerFn func(
+		ctx context.Context,
+		q *model.Question,
+		isCorrect bool,
+	) error
+	gotLanguage string
+	gotLevel    string
 }
 
 func (m *mockSRS) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, level string,
-	limit, kanjiRecallLimit int,
+	language,
+	level string,
+	limit,
+	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	m.gotLanguage = language
 	m.gotLevel = level
 	if len(categories) > 0 {
 		if m.getDueReviewsForCategoriesFn != nil {
-			return m.getDueReviewsForCategoriesFn(ctx, userID, limit, kanjiRecallLimit, categories...)
+			return m.getDueReviewsForCategoriesFn(
+				ctx,
+				userID,
+				limit,
+				kanjiRecallLimit,
+				categories...,
+			)
 		}
 		return nil, nil
 	}
-	return m.getDueReviewsFn(ctx, userID, limit, kanjiRecallLimit)
+	return m.getDueReviewsFn(
+		ctx,
+		userID,
+		limit,
+		kanjiRecallLimit,
+	)
 }
-func (m *mockSRS) GetDueCount(ctx context.Context, userID int64, language, level string) (int, error) {
+func (m *mockSRS) GetDueCount(
+	ctx context.Context,
+	userID int64,
+	language,
+	level string,
+) (int, error) {
 	return m.getDueCountFn(ctx)
 }
 
 type mockLLM struct {
-	gradeAnswerFn      func(ctx context.Context, prompt, correctAnswer, userAnswer string) (external.GradeResult, error)
-	gradeHandwritingFn func(ctx context.Context, prompt, correctAnswer string, image []byte) (external.GradeResult, error)
+	gradeAnswerFn func(
+		ctx context.Context,
+		prompt,
+		correctAnswer,
+		userAnswer string,
+	) (external.GradeResult, error)
+	gradeHandwritingFn func(
+		ctx context.Context,
+		prompt,
+		correctAnswer string,
+		image []byte,
+	) (external.GradeResult, error)
 }
 
 func (m *mockLLM) GradeAnswer(
 	ctx context.Context,
-	prompt, correctAnswer, userAnswer string,
+	prompt,
+	correctAnswer,
+	userAnswer string,
 ) (external.GradeResult, error) {
-	return m.gradeAnswerFn(ctx, prompt, correctAnswer, userAnswer)
+	return m.gradeAnswerFn(
+		ctx,
+		prompt,
+		correctAnswer,
+		userAnswer,
+	)
 }
 
 func (m *mockLLM) GradeHandwriting(
 	ctx context.Context,
-	prompt, correctAnswer string,
+	prompt,
+	correctAnswer string,
 	image []byte,
 ) (external.GradeResult, error) {
-	return m.gradeHandwritingFn(ctx, prompt, correctAnswer, image)
+	return m.gradeHandwritingFn(
+		ctx,
+		prompt,
+		correctAnswer,
+		image,
+	)
 }
-func (m *mockLLM) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
+func (m *mockLLM) AnswerLearningQuestion(
+	ctx context.Context,
+	question string,
+) (string, error) {
 	return "answer", nil
 }
 
@@ -108,31 +215,65 @@ func TestGradeAnswer_Correct(t *testing.T) {
 	questionID := 1
 
 	active := &mockGraderQuizActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(sessionID, model.Question{
-				ID:            questionID,
-				CorrectAnswer: "apple",
-				Type:          model.QuestionMultipleChoice,
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			sid int,
+		) (*model.QuizActiveSessionState, error) {
+			return activeStateForQuestion(
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					CorrectAnswer: "apple",
+					Type:          model.QuestionMultipleChoice,
+				},
+				false,
+			), nil
 		},
-		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
+		recordAnswerFn: func(
+			ctx context.Context,
+			sid,
+			qid int,
+			ans string,
+			correct bool,
+		) error {
 			if sid != sessionID || qid != questionID || ans != "apple" || !correct {
-				t.Fatalf("unexpected record args sid=%d qid=%d ans=%q correct=%t", sid, qid, ans, correct)
+				t.Fatalf(
+					"unexpected record args sid=%d qid=%d ans=%q correct=%t",
+					sid,
+					qid,
+					ans,
+					correct,
+				)
 			}
 			return nil
 		},
 	}
 
-	grader := NewGraderService(nil, active, nil)
-	isCorrect, feedback, err := grader.GradeAnswer(ctx, sessionID, questionID, "apple")
+	grader := NewGraderService(
+		nil,
+		active,
+		nil,
+	)
+	isCorrect, feedback, err := grader.GradeAnswer(
+		ctx,
+		sessionID,
+		questionID,
+		"apple",
+	)
 	if err != nil {
-		t.Fatalf("GradeAnswer failed: %v", err)
+		t.Fatalf(
+			"GradeAnswer failed: %v",
+			err,
+		)
 	}
 	if !isCorrect {
 		t.Error("expected isCorrect true")
 	}
 	if feedback != "" {
-		t.Errorf("expected empty feedback, got %q", feedback)
+		t.Errorf(
+			"expected empty feedback, got %q",
+			feedback,
+		)
 	}
 }
 
@@ -142,14 +283,27 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 	questionID := 1
 
 	active := &mockGraderQuizActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(sessionID, model.Question{
-				ID:            questionID,
-				CorrectAnswer: "apple",
-				Type:          model.QuestionMultipleChoice,
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			sid int,
+		) (*model.QuizActiveSessionState, error) {
+			return activeStateForQuestion(
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					CorrectAnswer: "apple",
+					Type:          model.QuestionMultipleChoice,
+				},
+				false,
+			), nil
 		},
-		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
+		recordAnswerFn: func(
+			ctx context.Context,
+			sid,
+			qid int,
+			ans string,
+			correct bool,
+		) error {
 			if correct {
 				t.Fatal("expected wrong answer to be recorded")
 			}
@@ -157,10 +311,22 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 		},
 	}
 
-	grader := NewGraderService(nil, active, nil)
-	isCorrect, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "banana")
+	grader := NewGraderService(
+		nil,
+		active,
+		nil,
+	)
+	isCorrect, _, err := grader.GradeAnswer(
+		ctx,
+		sessionID,
+		questionID,
+		"banana",
+	)
 	if err != nil {
-		t.Fatalf("GradeAnswer failed: %v", err)
+		t.Fatalf(
+			"GradeAnswer failed: %v",
+			err,
+		)
 	}
 	if isCorrect {
 		t.Error("expected isCorrect false")
@@ -173,15 +339,28 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 	questionID := 1
 
 	active := &mockGraderQuizActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(sessionID, model.Question{
-				ID:            questionID,
-				CorrectAnswer: "I'm a student",
-				Type:          model.QuestionSubjective,
-				Prompt:        "Translate: 私は学生です",
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			sid int,
+		) (*model.QuizActiveSessionState, error) {
+			return activeStateForQuestion(
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					CorrectAnswer: "I'm a student",
+					Type:          model.QuestionSubjective,
+					Prompt:        "Translate: 私は学生です",
+				},
+				false,
+			), nil
 		},
-		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
+		recordAnswerFn: func(
+			ctx context.Context,
+			sid,
+			qid int,
+			ans string,
+			correct bool,
+		) error {
 			if !correct {
 				t.Fatal("expected subjective answer to be recorded as correct")
 			}
@@ -189,21 +368,41 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 		},
 	}
 	llm := &mockLLM{
-		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (external.GradeResult, error) {
+		gradeAnswerFn: func(
+			ctx context.Context,
+			prompt,
+			correct,
+			user string,
+		) (external.GradeResult, error) {
 			return external.GradeResult{IsCorrect: true, Feedback: "Good job"}, nil
 		},
 	}
 
-	grader := NewGraderService(nil, active, llm)
-	isCorrect, feedback, err := grader.GradeAnswer(ctx, sessionID, questionID, "I am a student")
+	grader := NewGraderService(
+		nil,
+		active,
+		llm,
+	)
+	isCorrect, feedback, err := grader.GradeAnswer(
+		ctx,
+		sessionID,
+		questionID,
+		"I am a student",
+	)
 	if err != nil {
-		t.Fatalf("GradeAnswer failed: %v", err)
+		t.Fatalf(
+			"GradeAnswer failed: %v",
+			err,
+		)
 	}
 	if !isCorrect {
 		t.Error("expected isCorrect true from LLM")
 	}
 	if feedback != "Good job" {
-		t.Errorf("expected feedback 'Good job', got %q", feedback)
+		t.Errorf(
+			"expected feedback 'Good job', got %q",
+			feedback,
+		)
 	}
 }
 
@@ -213,28 +412,61 @@ func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
 	questionID := 1
 
 	active := &mockGraderQuizActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(sessionID, model.Question{
-				ID:            questionID,
-				CorrectAnswer: "I'm a student",
-				Type:          model.QuestionSubjective,
-				Prompt:        "Translate: 私は学生です",
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			sid int,
+		) (*model.QuizActiveSessionState, error) {
+			return activeStateForQuestion(
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					CorrectAnswer: "I'm a student",
+					Type:          model.QuestionSubjective,
+					Prompt:        "Translate: 私は学生です",
+				},
+				false,
+			), nil
 		},
 	}
 	llm := &mockLLM{
-		gradeAnswerFn: func(ctx context.Context, prompt, correct, user string) (external.GradeResult, error) {
+		gradeAnswerFn: func(
+			ctx context.Context,
+			prompt,
+			correct,
+			user string,
+		) (external.GradeResult, error) {
 			return external.GradeResult{}, external.ErrAIConfigMissing
 		},
 	}
 
-	grader := NewGraderService(nil, active, llm)
-	_, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "I am a student")
-	if !errors.Is(err, ErrAIUnavailable) {
-		t.Fatalf("expected ErrAIUnavailable, got %v", err)
+	grader := NewGraderService(
+		nil,
+		active,
+		llm,
+	)
+	_, _, err := grader.GradeAnswer(
+		ctx,
+		sessionID,
+		questionID,
+		"I am a student",
+	)
+	if !errors.Is(
+		err,
+		ErrAIUnavailable,
+	) {
+		t.Fatalf(
+			"expected ErrAIUnavailable, got %v",
+			err,
+		)
 	}
-	if !errors.Is(err, external.ErrAIConfigMissing) {
-		t.Fatalf("expected wrapped external.ErrAIConfigMissing, got %v", err)
+	if !errors.Is(
+		err,
+		external.ErrAIConfigMissing,
+	) {
+		t.Fatalf(
+			"expected wrapped external.ErrAIConfigMissing, got %v",
+			err,
+		)
 	}
 }
 
@@ -244,28 +476,61 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 	questionID := 1
 
 	active := &mockGraderQuizActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(sessionID, model.Question{
-				ID:            questionID,
-				CorrectAnswer: "あ",
-				Type:          model.QuestionKanaHandwriting,
-				Prompt:        "Write あ",
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			sid int,
+		) (*model.QuizActiveSessionState, error) {
+			return activeStateForQuestion(
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					CorrectAnswer: "あ",
+					Type:          model.QuestionKanaHandwriting,
+					Prompt:        "Write あ",
+				},
+				false,
+			), nil
 		},
 	}
 	llm := &mockLLM{
-		gradeHandwritingFn: func(ctx context.Context, prompt, correctAnswer string, image []byte) (external.GradeResult, error) {
+		gradeHandwritingFn: func(
+			ctx context.Context,
+			prompt,
+			correctAnswer string,
+			image []byte,
+		) (external.GradeResult, error) {
 			return external.GradeResult{}, external.ErrAIConfigMissing
 		},
 	}
 
-	grader := NewGraderService(nil, active, llm)
-	_, _, err := grader.GradeHandwriting(ctx, sessionID, questionID, []byte("png"))
-	if !errors.Is(err, ErrAIUnavailable) {
-		t.Fatalf("expected ErrAIUnavailable, got %v", err)
+	grader := NewGraderService(
+		nil,
+		active,
+		llm,
+	)
+	_, _, err := grader.GradeHandwriting(
+		ctx,
+		sessionID,
+		questionID,
+		[]byte("png"),
+	)
+	if !errors.Is(
+		err,
+		ErrAIUnavailable,
+	) {
+		t.Fatalf(
+			"expected ErrAIUnavailable, got %v",
+			err,
+		)
 	}
-	if !errors.Is(err, external.ErrAIConfigMissing) {
-		t.Fatalf("expected wrapped external.ErrAIConfigMissing, got %v", err)
+	if !errors.Is(
+		err,
+		external.ErrAIConfigMissing,
+	) {
+		t.Fatalf(
+			"expected wrapped external.ErrAIConfigMissing, got %v",
+			err,
+		)
 	}
 }
 
@@ -275,19 +540,41 @@ func TestGradeAnswer_AlreadyAnswered(t *testing.T) {
 	questionID := 1
 
 	active := &mockGraderQuizActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(sessionID, model.Question{
-				ID:            questionID,
-				CorrectAnswer: "apple",
-				Type:          model.QuestionMultipleChoice,
-			}, true), nil
+		getFn: func(
+			ctx context.Context,
+			sid int,
+		) (*model.QuizActiveSessionState, error) {
+			return activeStateForQuestion(
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					CorrectAnswer: "apple",
+					Type:          model.QuestionMultipleChoice,
+				},
+				true,
+			), nil
 		},
 	}
 
-	grader := NewGraderService(nil, active, nil)
-	_, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "apple")
-	if !errors.Is(err, ErrQuizActiveSessionAlreadyAnswered) {
-		t.Fatalf("expected ErrActiveSessionAlreadyAnswered, got %v", err)
+	grader := NewGraderService(
+		nil,
+		active,
+		nil,
+	)
+	_, _, err := grader.GradeAnswer(
+		ctx,
+		sessionID,
+		questionID,
+		"apple",
+	)
+	if !errors.Is(
+		err,
+		ErrQuizActiveSessionAlreadyAnswered,
+	) {
+		t.Fatalf(
+			"expected ErrActiveSessionAlreadyAnswered, got %v",
+			err,
+		)
 	}
 }
 
@@ -298,22 +585,51 @@ func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 	expectedErr := errors.New("record answer failed")
 
 	active := &mockGraderQuizActiveSession{
-		getFn: func(ctx context.Context, sid int) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(sessionID, model.Question{
-				ID:            questionID,
-				CorrectAnswer: "apple",
-				Type:          model.QuestionMultipleChoice,
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			sid int,
+		) (*model.QuizActiveSessionState, error) {
+			return activeStateForQuestion(
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					CorrectAnswer: "apple",
+					Type:          model.QuestionMultipleChoice,
+				},
+				false,
+			), nil
 		},
-		recordAnswerFn: func(ctx context.Context, sid, qid int, ans string, correct bool) error {
+		recordAnswerFn: func(
+			ctx context.Context,
+			sid,
+			qid int,
+			ans string,
+			correct bool,
+		) error {
 			return expectedErr
 		},
 	}
 
-	grader := NewGraderService(nil, active, nil)
-	_, _, err := grader.GradeAnswer(ctx, sessionID, questionID, "apple")
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("expected RecordAnswer error %v, got %v", expectedErr, err)
+	grader := NewGraderService(
+		nil,
+		active,
+		nil,
+	)
+	_, _, err := grader.GradeAnswer(
+		ctx,
+		sessionID,
+		questionID,
+		"apple",
+	)
+	if !errors.Is(
+		err,
+		expectedErr,
+	) {
+		t.Fatalf(
+			"expected RecordAnswer error %v, got %v",
+			expectedErr,
+			err,
+		)
 	}
 }
 
@@ -324,43 +640,82 @@ func TestCompleteSession_FlushStreakAndDelete(t *testing.T) {
 	deleteCalled := false
 
 	active := &mockGraderQuizActiveSession{
-		flushFn: func(ctx context.Context, sid int, uid int64) (*QuizSessionResult, error) {
+		flushFn: func(
+			ctx context.Context,
+			sid int,
+			uid int64,
+		) (*QuizSessionResult, error) {
 			if sid != sessionID || uid != userID {
-				t.Fatalf("unexpected flush args sid=%d uid=%d", sid, uid)
+				t.Fatalf(
+					"unexpected flush args sid=%d uid=%d",
+					sid,
+					uid,
+				)
 			}
 			return &QuizSessionResult{TotalQuestions: 3, CorrectCount: 2}, nil
 		},
-		deleteFn: func(ctx context.Context, sid int) error {
+		deleteFn: func(
+			ctx context.Context,
+			sid int,
+		) error {
 			if sid != sessionID {
-				t.Fatalf("unexpected delete session id %d", sid)
+				t.Fatalf(
+					"unexpected delete session id %d",
+					sid,
+				)
 			}
 			deleteCalled = true
 			return nil
 		},
 	}
 	userRepo := &mockGraderUserRepo{
-		updateStreakFn: func(ctx context.Context, uid int64) error {
+		updateStreakFn: func(
+			ctx context.Context,
+			uid int64,
+		) error {
 			if uid != userID {
-				t.Fatalf("expected userID %d, got %d", userID, uid)
+				t.Fatalf(
+					"expected userID %d, got %d",
+					userID,
+					uid,
+				)
 			}
 			return nil
 		},
 	}
 
-	grader := NewGraderService(userRepo, active, nil)
-	result, err := grader.CompleteSession(ctx, sessionID, userID)
+	grader := NewGraderService(
+		userRepo,
+		active,
+		nil,
+	)
+	result, err := grader.CompleteSession(
+		ctx,
+		sessionID,
+		userID,
+	)
 	if err != nil {
-		t.Fatalf("CompleteSession failed: %v", err)
+		t.Fatalf(
+			"CompleteSession failed: %v",
+			err,
+		)
 	}
 	if result.CorrectCount != 2 || result.TotalQuestions != 3 {
-		t.Fatalf("unexpected result: %+v", result)
+		t.Fatalf(
+			"unexpected result: %+v",
+			result,
+		)
 	}
 	if !deleteCalled {
 		t.Fatal("expected active session state to be deleted")
 	}
 }
 
-func activeStateForQuestion(sessionID int, question model.Question, answered bool) *model.QuizActiveSessionState {
+func activeStateForQuestion(
+	sessionID int,
+	question model.Question,
+	answered bool,
+) *model.QuizActiveSessionState {
 	var userAnswer *string
 	var isCorrect *bool
 	if answered {
@@ -385,7 +740,10 @@ func activeStateForQuestion(sessionID int, question model.Question, answered boo
 					IsCorrect:  isCorrect,
 				},
 				Question: question,
-				Progress: model.NewUserQuestionProgress(1, question.ID),
+				Progress: model.NewUserQuestionProgress(
+					1,
+					question.ID,
+				),
 			},
 		},
 	}

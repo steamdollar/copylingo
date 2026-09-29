@@ -13,23 +13,41 @@ type mockQuestionQuerier struct {
 	getDueReviewsFn func(
 		ctx context.Context,
 		userID int64,
-		language, currentLevel string,
+		language,
+		currentLevel string,
 		levels []string,
-		limit, kanjiRecallLimit int,
+		limit,
+		kanjiRecallLimit int,
 		categories ...model.QuestionCategory,
 	) ([]model.Question, error)
-	getDueReviewCountFn func(ctx context.Context, userID int64, language string, levels []string) (int, error)
+	getDueReviewCountFn func(
+		ctx context.Context,
+		userID int64,
+		language string,
+		levels []string,
+	) (int, error)
 }
 
 func (m *mockQuestionQuerier) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, currentLevel string,
+	language,
+	currentLevel string,
 	levels []string,
-	limit, kanjiRecallLimit int,
+	limit,
+	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
-	return m.getDueReviewsFn(ctx, userID, language, currentLevel, levels, limit, kanjiRecallLimit, categories...)
+	return m.getDueReviewsFn(
+		ctx,
+		userID,
+		language,
+		currentLevel,
+		levels,
+		limit,
+		kanjiRecallLimit,
+		categories...,
+	)
 }
 
 func (m *mockQuestionQuerier) GetDueReviewCount(
@@ -38,7 +56,12 @@ func (m *mockQuestionQuerier) GetDueReviewCount(
 	language string,
 	levels []string,
 ) (int, error) {
-	return m.getDueReviewCountFn(ctx, userID, language, levels)
+	return m.getDueReviewCountFn(
+		ctx,
+		userID,
+		language,
+		levels,
+	)
 }
 
 func TestScheduleAnswer(t *testing.T) {
@@ -92,27 +115,45 @@ func TestScheduleAnswer(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			progress := &model.UserQuestionProgress{
-				Repetitions:  tt.initialRep,
-				IntervalDays: tt.initialInt,
-				EaseFactor:   tt.initialEase,
-			}
-			NewSRSService(nil).ScheduleAnswer(progress, tt.isCorrect)
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				progress := &model.UserQuestionProgress{
+					Repetitions:  tt.initialRep,
+					IntervalDays: tt.initialInt,
+					EaseFactor:   tt.initialEase,
+				}
+				NewSRSService(nil).ScheduleAnswer(
+					progress,
+					tt.isCorrect,
+				)
 
-			if progress.Repetitions != tt.expectRep {
-				t.Errorf("Repetitions = %d, want %d", progress.Repetitions, tt.expectRep)
-			}
-			if progress.IntervalDays != tt.expectInt {
-				t.Errorf("IntervalDays = %d, want %d", progress.IntervalDays, tt.expectInt)
-			}
-			if progress.EaseFactor < tt.expectEaseGte {
-				t.Errorf("EaseFactor = %f, want >= %f", progress.EaseFactor, tt.expectEaseGte)
-			}
-			if progress.NextReviewAt == nil || progress.LastReviewedAt == nil {
-				t.Fatal("expected review timestamps")
-			}
-		})
+				if progress.Repetitions != tt.expectRep {
+					t.Errorf(
+						"Repetitions = %d, want %d",
+						progress.Repetitions,
+						tt.expectRep,
+					)
+				}
+				if progress.IntervalDays != tt.expectInt {
+					t.Errorf(
+						"IntervalDays = %d, want %d",
+						progress.IntervalDays,
+						tt.expectInt,
+					)
+				}
+				if progress.EaseFactor < tt.expectEaseGte {
+					t.Errorf(
+						"EaseFactor = %f, want >= %f",
+						progress.EaseFactor,
+						tt.expectEaseGte,
+					)
+				}
+				if progress.NextReviewAt == nil || progress.LastReviewedAt == nil {
+					t.Fatal("expected review timestamps")
+				}
+			},
+		)
 	}
 }
 
@@ -120,9 +161,15 @@ func TestEaseFactorFloorAt1_3(t *testing.T) {
 	srs := NewSRSService(nil)
 	progress := &model.UserQuestionProgress{Repetitions: 1, IntervalDays: 1, EaseFactor: 1.3}
 	for range 5 {
-		srs.ScheduleAnswer(progress, false)
+		srs.ScheduleAnswer(
+			progress,
+			false,
+		)
 		if progress.EaseFactor < 1.3 {
-			t.Fatalf("EaseFactor dropped below 1.3: %f", progress.EaseFactor)
+			t.Fatalf(
+				"EaseFactor dropped below 1.3: %f",
+				progress.EaseFactor,
+			)
 		}
 	}
 }
@@ -133,23 +180,50 @@ func TestSRSService_GetDueReviewsForwardsUserScope(t *testing.T) {
 		getDueReviewsFn: func(
 			_ context.Context,
 			userID int64,
-			language, currentLevel string,
+			language,
+			currentLevel string,
 			levels []string,
-			limit, kanjiRecallLimit int,
+			limit,
+			kanjiRecallLimit int,
 			categories ...model.QuestionCategory,
 		) ([]model.Question, error) {
-			if userID != 42 || language != "ja" || currentLevel != "N5" || !reflect.DeepEqual(levels, []string{"N5", "N4"}) || limit != 10 ||
+			if userID != 42 || language != "ja" || currentLevel != "N5" || !reflect.DeepEqual(
+				levels,
+				[]string{"N5", "N4"},
+			) || limit != 10 ||
 				kanjiRecallLimit != 3 ||
-				!reflect.DeepEqual(categories, []model.QuestionCategory{model.CategoryReading}) {
-				t.Fatalf("unexpected scope: %d %s %v %d %d", userID, language, levels, limit, kanjiRecallLimit)
+				!reflect.DeepEqual(
+					categories,
+					[]model.QuestionCategory{model.CategoryReading},
+				) {
+				t.Fatalf(
+					"unexpected scope: %d %s %v %d %d",
+					userID,
+					language,
+					levels,
+					limit,
+					kanjiRecallLimit,
+				)
 			}
 			return want, nil
 		},
 	}
 
-	got, err := NewSRSService(repo).GetDueReviews(context.Background(), 42, "ja", "N5", 10, 3, model.CategoryReading)
+	got, err := NewSRSService(repo).GetDueReviews(
+		context.Background(),
+		42,
+		"ja",
+		"N5",
+		10,
+		3,
+		model.CategoryReading,
+	)
 	if err != nil || len(got) != len(want) {
-		t.Fatalf("GetDueReviews() = %v, %v", got, err)
+		t.Fatalf(
+			"GetDueReviews() = %v, %v",
+			got,
+			err,
+		)
 	}
 }
 
@@ -158,25 +232,49 @@ func TestSRSService_GetDueReviewsUsesAdjacentJapaneseScope(t *testing.T) {
 		getDueReviewsFn: func(
 			_ context.Context,
 			_ int64,
-			language, currentLevel string,
+			language,
+			currentLevel string,
 			levels []string,
-			_, _ int,
+			_,
+			_ int,
 			_ ...model.QuestionCategory,
 		) ([]model.Question, error) {
 			if language != "ja" || currentLevel != "N4" {
-				t.Fatalf("language/current level = %s/%s, want ja/N4", language, currentLevel)
+				t.Fatalf(
+					"language/current level = %s/%s, want ja/N4",
+					language,
+					currentLevel,
+				)
 			}
 			want := []string{"N5", "N4", "N3"}
-			if !reflect.DeepEqual(levels, want) {
-				t.Fatalf("levels = %v, want %v", levels, want)
+			if !reflect.DeepEqual(
+				levels,
+				want,
+			) {
+				t.Fatalf(
+					"levels = %v, want %v",
+					levels,
+					want,
+				)
 			}
 			return []model.Question{{ID: 1}}, nil
 		},
 	}
 
-	got, err := NewSRSService(repo).GetDueReviews(context.Background(), 42, "ja", "N4", 1, 0)
+	got, err := NewSRSService(repo).GetDueReviews(
+		context.Background(),
+		42,
+		"ja",
+		"N4",
+		1,
+		0,
+	)
 	if err != nil || len(got) != 1 {
-		t.Fatalf("GetDueReviews() = %v, %v", got, err)
+		t.Fatalf(
+			"GetDueReviews() = %v, %v",
+			got,
+			err,
+		)
 	}
 }
 
@@ -186,50 +284,113 @@ func TestSRSService_GetDueReviewsPropagatesError(t *testing.T) {
 		getDueReviewsFn: func(
 			context.Context,
 			int64,
-			string, string, []string,
-			int, int,
+			string,
+			string,
+			[]string,
+			int,
+			int,
 			...model.QuestionCategory,
 		) ([]model.Question, error) {
 			return nil, expectedErr
 		},
 	}
-	_, err := NewSRSService(repo).GetDueReviews(context.Background(), 1, "ja", "N5", 1, 0)
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("GetDueReviews() error = %v, want %v", err, expectedErr)
+	_, err := NewSRSService(repo).GetDueReviews(
+		context.Background(),
+		1,
+		"ja",
+		"N5",
+		1,
+		0,
+	)
+	if !errors.Is(
+		err,
+		expectedErr,
+	) {
+		t.Fatalf(
+			"GetDueReviews() error = %v, want %v",
+			err,
+			expectedErr,
+		)
 	}
 }
 
 func TestSRSService_GetDueCountForwardsUserScope(t *testing.T) {
 	repo := &mockQuestionQuerier{
-		getDueReviewCountFn: func(_ context.Context, userID int64, language string, levels []string) (int, error) {
-			if userID != 42 || language != "ja" || !reflect.DeepEqual(levels, []string{"N5", "N4"}) {
-				t.Fatalf("unexpected scope: %d %s %v", userID, language, levels)
+		getDueReviewCountFn: func(
+			_ context.Context,
+			userID int64,
+			language string,
+			levels []string,
+		) (int, error) {
+			if userID != 42 || language != "ja" || !reflect.DeepEqual(
+				levels,
+				[]string{"N5", "N4"},
+			) {
+				t.Fatalf(
+					"unexpected scope: %d %s %v",
+					userID,
+					language,
+					levels,
+				)
 			}
 			return 7, nil
 		},
 	}
-	got, err := NewSRSService(repo).GetDueCount(context.Background(), 42, "ja", "N5")
+	got, err := NewSRSService(repo).GetDueCount(
+		context.Background(),
+		42,
+		"ja",
+		"N5",
+	)
 	if err != nil || got != 7 {
-		t.Fatalf("GetDueCount() = %d, %v", got, err)
+		t.Fatalf(
+			"GetDueCount() = %d, %v",
+			got,
+			err,
+		)
 	}
 }
 
 func TestSRSService_GetDueCountUsesAdjacentJapaneseScope(t *testing.T) {
 	repo := &mockQuestionQuerier{
-		getDueReviewCountFn: func(_ context.Context, _ int64, language string, levels []string) (int, error) {
+		getDueReviewCountFn: func(
+			_ context.Context,
+			_ int64,
+			language string,
+			levels []string,
+		) (int, error) {
 			if language != "ja" {
-				t.Fatalf("language = %s, want ja", language)
+				t.Fatalf(
+					"language = %s, want ja",
+					language,
+				)
 			}
 			want := []string{"N5", "N4", "N3"}
-			if !reflect.DeepEqual(levels, want) {
-				t.Fatalf("levels = %v, want %v", levels, want)
+			if !reflect.DeepEqual(
+				levels,
+				want,
+			) {
+				t.Fatalf(
+					"levels = %v, want %v",
+					levels,
+					want,
+				)
 			}
 			return 2, nil
 		},
 	}
 
-	got, err := NewSRSService(repo).GetDueCount(context.Background(), 42, "ja", "N4")
+	got, err := NewSRSService(repo).GetDueCount(
+		context.Background(),
+		42,
+		"ja",
+		"N4",
+	)
 	if err != nil || got != 2 {
-		t.Fatalf("GetDueCount() = %d, %v", got, err)
+		t.Fatalf(
+			"GetDueCount() = %d, %v",
+			got,
+			err,
+		)
 	}
 }

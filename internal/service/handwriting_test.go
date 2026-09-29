@@ -11,27 +11,46 @@ import (
 )
 
 type mockHandwritingQuizActiveSession struct {
-	getFn func(ctx context.Context, sessionID int) (*model.QuizActiveSessionState, error)
+	getFn func(
+		ctx context.Context,
+		sessionID int,
+	) (*model.QuizActiveSessionState, error)
 }
 
 func (m *mockHandwritingQuizActiveSession) Get(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	return m.getFn(ctx, sessionID)
+	return m.getFn(
+		ctx,
+		sessionID,
+	)
 }
 
 type mockGraderClient struct {
-	gradeHandwritingFn func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error)
+	gradeHandwritingFn func(
+		ctx context.Context,
+		sid,
+		qid int,
+		q *model.Question,
+		img []byte,
+	) (bool, string, error)
 }
 
 func (m *mockGraderClient) GradeHandwritingWithQuestion(
 	ctx context.Context,
-	sid, qid int,
+	sid,
+	qid int,
 	q *model.Question,
 	img []byte,
 ) (bool, string, error) {
-	return m.gradeHandwritingFn(ctx, sid, qid, q, img)
+	return m.gradeHandwritingFn(
+		ctx,
+		sid,
+		qid,
+		q,
+		img,
+	)
 }
 
 type mockRenderer struct {
@@ -49,19 +68,39 @@ func TestSubmitAnswer_Success(t *testing.T) {
 	questionID := 1
 
 	active := &mockHandwritingQuizActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
-			return handwritingState(userID, sessionID, model.Question{
-				ID:            questionID,
-				Type:          model.QuestionKanaHandwriting,
-				CorrectAnswer: "あ",
-				Explanation:   "hiragana a",
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			id int,
+		) (*model.QuizActiveSessionState, error) {
+			return handwritingState(
+				userID,
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					Type:          model.QuestionKanaHandwriting,
+					CorrectAnswer: "あ",
+					Explanation:   "hiragana a",
+				},
+				false,
+			), nil
 		},
 	}
 	grader := &mockGraderClient{
-		gradeHandwritingFn: func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+		gradeHandwritingFn: func(
+			ctx context.Context,
+			sid,
+			qid int,
+			q *model.Question,
+			img []byte,
+		) (bool, string, error) {
 			if sid != sessionID || qid != questionID || q.CorrectAnswer != "あ" || string(img) != "fake-image" {
-				t.Fatalf("unexpected grade args sid=%d qid=%d q=%+v img=%q", sid, qid, q, string(img))
+				t.Fatalf(
+					"unexpected grade args sid=%d qid=%d q=%+v img=%q",
+					sid,
+					qid,
+					q,
+					string(img),
+				)
 			}
 			return true, "Correct!", nil
 		},
@@ -72,25 +111,41 @@ func TestSubmitAnswer_Success(t *testing.T) {
 		},
 	}
 
-	svc := NewHandwritingService(active, grader, renderer)
-	res, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{
-		UserID:     userID,
-		SessionID:  sessionID,
-		QuestionID: questionID,
-		Strokes:    []Stroke{{Points: []StrokePoint{{X: 0, Y: 0}}}},
-	})
+	svc := NewHandwritingService(
+		active,
+		grader,
+		renderer,
+	)
+	res, err := svc.SubmitAnswer(
+		ctx,
+		HandwritingSubmitRequest{
+			UserID:     userID,
+			SessionID:  sessionID,
+			QuestionID: questionID,
+			Strokes:    []Stroke{{Points: []StrokePoint{{X: 0, Y: 0}}}},
+		},
+	)
 
 	if err != nil {
-		t.Fatalf("SubmitAnswer failed: %v", err)
+		t.Fatalf(
+			"SubmitAnswer failed: %v",
+			err,
+		)
 	}
 	if !res.IsCorrect {
 		t.Error("expected IsCorrect true")
 	}
 	if res.Feedback != "Correct!" {
-		t.Errorf("expected feedback Correct!, got %s", res.Feedback)
+		t.Errorf(
+			"expected feedback Correct!, got %s",
+			res.Feedback,
+		)
 	}
 	if res.CorrectAnswer != "あ" || res.Explanation != "hiragana a" {
-		t.Fatalf("unexpected public result: %+v", res)
+		t.Fatalf(
+			"unexpected public result: %+v",
+			res,
+		)
 	}
 }
 
@@ -105,17 +160,31 @@ func TestSubmitAnswer_WrongSavesRenderedImage(t *testing.T) {
 	defer func() { failedHandwritingImageDir = previousImageDir }()
 
 	active := &mockHandwritingQuizActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
-			return handwritingState(userID, sessionID, model.Question{
-				ID:            questionID,
-				Type:          model.QuestionKanaHandwriting,
-				CorrectAnswer: "あ",
-				Explanation:   "hiragana a",
-			}, false), nil
+		getFn: func(
+			ctx context.Context,
+			id int,
+		) (*model.QuizActiveSessionState, error) {
+			return handwritingState(
+				userID,
+				sessionID,
+				model.Question{
+					ID:            questionID,
+					Type:          model.QuestionKanaHandwriting,
+					CorrectAnswer: "あ",
+					Explanation:   "hiragana a",
+				},
+				false,
+			), nil
 		},
 	}
 	grader := &mockGraderClient{
-		gradeHandwritingFn: func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+		gradeHandwritingFn: func(
+			ctx context.Context,
+			sid,
+			qid int,
+			q *model.Question,
+			img []byte,
+		) (bool, string, error) {
 			return false, "Try again", nil
 		},
 	}
@@ -125,41 +194,81 @@ func TestSubmitAnswer_WrongSavesRenderedImage(t *testing.T) {
 		},
 	}
 
-	svc := NewHandwritingService(active, grader, renderer)
-	res, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{
-		UserID:     userID,
-		SessionID:  sessionID,
-		QuestionID: questionID,
-		Strokes:    []Stroke{{Points: []StrokePoint{{X: 0, Y: 0}}}},
-	})
+	svc := NewHandwritingService(
+		active,
+		grader,
+		renderer,
+	)
+	res, err := svc.SubmitAnswer(
+		ctx,
+		HandwritingSubmitRequest{
+			UserID:     userID,
+			SessionID:  sessionID,
+			QuestionID: questionID,
+			Strokes:    []Stroke{{Points: []StrokePoint{{X: 0, Y: 0}}}},
+		},
+	)
 
 	if err != nil {
-		t.Fatalf("SubmitAnswer failed: %v", err)
+		t.Fatalf(
+			"SubmitAnswer failed: %v",
+			err,
+		)
 	}
 	if res.IsCorrect {
 		t.Fatal("expected wrong handwriting result")
 	}
-	got, err := os.ReadFile(filepath.Join(imageDir, "100.png"))
+	got, err := os.ReadFile(filepath.Join(
+		imageDir,
+		"100.png",
+	))
 	if err != nil {
-		t.Fatalf("failed to read saved image: %v", err)
+		t.Fatalf(
+			"failed to read saved image: %v",
+			err,
+		)
 	}
 	if string(got) != "fake-image" {
-		t.Fatalf("saved image = %q, want fake-image", string(got))
+		t.Fatalf(
+			"saved image = %q, want fake-image",
+			string(got),
+		)
 	}
 }
 
 func TestSubmitAnswer_Unauthorized(t *testing.T) {
 	ctx := context.Background()
 	active := &mockHandwritingQuizActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
-			return handwritingState(456, 10, model.Question{ID: 1, Type: model.QuestionKanaHandwriting}, false), nil
+		getFn: func(
+			ctx context.Context,
+			id int,
+		) (*model.QuizActiveSessionState, error) {
+			return handwritingState(
+				456,
+				10,
+				model.Question{ID: 1, Type: model.QuestionKanaHandwriting},
+				false,
+			), nil
 		},
 	}
 
-	svc := NewHandwritingService(active, nil, nil)
-	_, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{UserID: 123, SessionID: 10, QuestionID: 1})
-	if !errors.Is(err, ErrHandwritingUnauthorized) {
-		t.Errorf("expected ErrHandwritingUnauthorized, got %v", err)
+	svc := NewHandwritingService(
+		active,
+		nil,
+		nil,
+	)
+	_, err := svc.SubmitAnswer(
+		ctx,
+		HandwritingSubmitRequest{UserID: 123, SessionID: 10, QuestionID: 1},
+	)
+	if !errors.Is(
+		err,
+		ErrHandwritingUnauthorized,
+	) {
+		t.Errorf(
+			"expected ErrHandwritingUnauthorized, got %v",
+			err,
+		)
 	}
 }
 
@@ -167,15 +276,36 @@ func TestSubmitAnswer_InvalidQuestionType(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
 	active := &mockHandwritingQuizActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
-			return handwritingState(userID, 10, model.Question{ID: 1, Type: model.QuestionMultipleChoice}, false), nil
+		getFn: func(
+			ctx context.Context,
+			id int,
+		) (*model.QuizActiveSessionState, error) {
+			return handwritingState(
+				userID,
+				10,
+				model.Question{ID: 1, Type: model.QuestionMultipleChoice},
+				false,
+			), nil
 		},
 	}
 
-	svc := NewHandwritingService(active, nil, nil)
-	_, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{UserID: userID, SessionID: 10, QuestionID: 1})
-	if !errors.Is(err, ErrHandwritingInvalidQuestion) {
-		t.Errorf("expected ErrHandwritingInvalidQuestion, got %v", err)
+	svc := NewHandwritingService(
+		active,
+		nil,
+		nil,
+	)
+	_, err := svc.SubmitAnswer(
+		ctx,
+		HandwritingSubmitRequest{UserID: userID, SessionID: 10, QuestionID: 1},
+	)
+	if !errors.Is(
+		err,
+		ErrHandwritingInvalidQuestion,
+	) {
+		t.Errorf(
+			"expected ErrHandwritingInvalidQuestion, got %v",
+			err,
+		)
 	}
 }
 
@@ -183,15 +313,36 @@ func TestSubmitAnswer_AlreadyAnswered(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
 	active := &mockHandwritingQuizActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
-			return handwritingState(userID, 10, model.Question{ID: 1, Type: model.QuestionKanaHandwriting}, true), nil
+		getFn: func(
+			ctx context.Context,
+			id int,
+		) (*model.QuizActiveSessionState, error) {
+			return handwritingState(
+				userID,
+				10,
+				model.Question{ID: 1, Type: model.QuestionKanaHandwriting},
+				true,
+			), nil
 		},
 	}
 
-	svc := NewHandwritingService(active, nil, nil)
-	_, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{UserID: userID, SessionID: 10, QuestionID: 1})
-	if !errors.Is(err, ErrHandwritingAlreadyAnswered) {
-		t.Errorf("expected ErrHandwritingAlreadyAnswered, got %v", err)
+	svc := NewHandwritingService(
+		active,
+		nil,
+		nil,
+	)
+	_, err := svc.SubmitAnswer(
+		ctx,
+		HandwritingSubmitRequest{UserID: userID, SessionID: 10, QuestionID: 1},
+	)
+	if !errors.Is(
+		err,
+		ErrHandwritingAlreadyAnswered,
+	) {
+		t.Errorf(
+			"expected ErrHandwritingAlreadyAnswered, got %v",
+			err,
+		)
 	}
 }
 
@@ -201,28 +352,45 @@ func TestSubmitAnswer_UsesCurrentDuplicateOccurrence(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	state := handwritingState(userID, sessionID, model.Question{
-		ID:            questionID,
-		Type:          model.QuestionKanaHandwriting,
-		CorrectAnswer: "あ",
-	}, true)
-	state.Items = append(state.Items, model.QuizActiveSessionQuestion{
-		SessionQuestion: model.SessionQuestion{ID: 101, SessionID: sessionID, QuestionID: questionID},
-		Question: model.Question{
+	state := handwritingState(
+		userID,
+		sessionID,
+		model.Question{
 			ID:            questionID,
 			Type:          model.QuestionKanaHandwriting,
 			CorrectAnswer: "あ",
 		},
-	})
+		true,
+	)
+	state.Items = append(
+		state.Items,
+		model.QuizActiveSessionQuestion{
+			SessionQuestion: model.SessionQuestion{ID: 101, SessionID: sessionID, QuestionID: questionID},
+			Question: model.Question{
+				ID:            questionID,
+				Type:          model.QuestionKanaHandwriting,
+				CorrectAnswer: "あ",
+			},
+		},
+	)
 	state.CurrentIndex = 1
 
 	active := &mockHandwritingQuizActiveSession{
-		getFn: func(ctx context.Context, id int) (*model.QuizActiveSessionState, error) {
+		getFn: func(
+			ctx context.Context,
+			id int,
+		) (*model.QuizActiveSessionState, error) {
 			return state, nil
 		},
 	}
 	grader := &mockGraderClient{
-		gradeHandwritingFn: func(ctx context.Context, sid, qid int, q *model.Question, img []byte) (bool, string, error) {
+		gradeHandwritingFn: func(
+			ctx context.Context,
+			sid,
+			qid int,
+			q *model.Question,
+			img []byte,
+		) (bool, string, error) {
 			return true, "", nil
 		},
 	}
@@ -232,13 +400,23 @@ func TestSubmitAnswer_UsesCurrentDuplicateOccurrence(t *testing.T) {
 		},
 	}
 
-	svc := NewHandwritingService(active, grader, renderer)
-	if _, err := svc.SubmitAnswer(ctx, HandwritingSubmitRequest{
-		UserID:     userID,
-		SessionID:  sessionID,
-		QuestionID: questionID,
-	}); err != nil {
-		t.Fatalf("SubmitAnswer failed: %v", err)
+	svc := NewHandwritingService(
+		active,
+		grader,
+		renderer,
+	)
+	if _, err := svc.SubmitAnswer(
+		ctx,
+		HandwritingSubmitRequest{
+			UserID:     userID,
+			SessionID:  sessionID,
+			QuestionID: questionID,
+		},
+	); err != nil {
+		t.Fatalf(
+			"SubmitAnswer failed: %v",
+			err,
+		)
 	}
 }
 
@@ -248,7 +426,11 @@ func handwritingState(
 	question model.Question,
 	answered bool,
 ) *model.QuizActiveSessionState {
-	state := activeStateForQuestion(sessionID, question, answered)
+	state := activeStateForQuestion(
+		sessionID,
+		question,
+		answered,
+	)
 	state.Session.UserID = userID
 	return state
 }

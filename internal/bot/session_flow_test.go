@@ -21,30 +21,61 @@ func TestMiniAppURLFingerprint(t *testing.T) {
 		t.Fatal("expected fingerprint")
 	}
 	if a != b {
-		t.Fatalf("expected host-only case-insensitive fingerprint, got %q and %q", a, b)
+		t.Fatalf(
+			"expected host-only case-insensitive fingerprint, got %q and %q",
+			a,
+			b,
+		)
 	}
 	if a == c {
-		t.Fatalf("expected different hosts to produce different fingerprints, got %q", a)
+		t.Fatalf(
+			"expected different hosts to produce different fingerprints, got %q",
+			a,
+		)
 	}
 	if got := callback.MiniAppURLFingerprint("not a url"); got != "" {
-		t.Fatalf("expected invalid URL to return empty fingerprint, got %q", got)
+		t.Fatalf(
+			"expected invalid URL to return empty fingerprint, got %q",
+			got,
+		)
 	}
 }
 
 func TestFormatHandwritingNextCallback(t *testing.T) {
 	t.Parallel()
 
-	got := callback.FormatHandwritingNext(55, 6, "https://example.trycloudflare.com")
-	if !strings.HasPrefix(got, "q:55:next:6:u:") {
-		t.Fatalf("expected next callback with URL token, got %q", got)
+	got := callback.FormatHandwritingNext(
+		55,
+		6,
+		"https://example.trycloudflare.com",
+	)
+	if !strings.HasPrefix(
+		got,
+		"q:55:next:6:u:",
+	) {
+		t.Fatalf(
+			"expected next callback with URL token, got %q",
+			got,
+		)
 	}
 	if len(got) > 64 {
-		t.Fatalf("callback data exceeds Telegram limit: len=%d data=%q", len(got), got)
+		t.Fatalf(
+			"callback data exceeds Telegram limit: len=%d data=%q",
+			len(got),
+			got,
+		)
 	}
 
-	withoutURL := callback.FormatHandwritingNext(55, 6, "")
+	withoutURL := callback.FormatHandwritingNext(
+		55,
+		6,
+		"",
+	)
 	if withoutURL != "q:55:next:6" {
-		t.Fatalf("expected legacy callback without URL, got %q", withoutURL)
+		t.Fatalf(
+			"expected legacy callback without URL, got %q",
+			withoutURL,
+		)
 	}
 }
 
@@ -78,13 +109,23 @@ func TestIsStaleMiniAppCallback(t *testing.T) {
 
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
 
-			if got := callback.IsStaleMiniAppCallback(tt.parts, currentURL); got != tt.want {
-				t.Fatalf("isStaleMiniAppCallback()=%v, want %v", got, tt.want)
-			}
-		})
+				if got := callback.IsStaleMiniAppCallback(
+					tt.parts,
+					currentURL,
+				); got != tt.want {
+					t.Fatalf(
+						"isStaleMiniAppCallback()=%v, want %v",
+						got,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
@@ -109,21 +150,45 @@ func TestSessionFlowUsesQuizActiveSessionProgress(t *testing.T) {
 		},
 	}
 	stateStores := newTestInteractionStores()
-	seedQuizState(stateStores, state)
-	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
+	seedQuizState(
+		stateStores,
+		state,
+	)
+	active := service.NewQuizActiveSessionService(
+		nil,
+		stateStores.quiz,
+		nil,
+	)
 	sf := NewSessionFlow(&Bot{services: &service.Services{QuizActiveSession: active}})
 
-	idx, err := sf.nextUnansweredQuestionIndex(ctx, sessionID)
+	idx, err := sf.nextUnansweredQuestionIndex(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
-		t.Fatalf("nextUnansweredQuestionIndex failed: %v", err)
+		t.Fatalf(
+			"nextUnansweredQuestionIndex failed: %v",
+			err,
+		)
 	}
 	if idx != 1 {
-		t.Fatalf("expected next unanswered index 1, got %d", idx)
+		t.Fatalf(
+			"expected next unanswered index 1, got %d",
+			idx,
+		)
 	}
-	if !sf.isQuestionAnswered(ctx, sessionID, 0) {
+	if !sf.isQuestionAnswered(
+		ctx,
+		sessionID,
+		0,
+	) {
 		t.Fatal("expected first question to be answered")
 	}
-	if sf.isQuestionAnswered(ctx, sessionID, 1) {
+	if sf.isQuestionAnswered(
+		ctx,
+		sessionID,
+		1,
+	) {
 		t.Fatal("expected second question to be unanswered")
 	}
 }
