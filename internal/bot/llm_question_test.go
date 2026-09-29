@@ -73,11 +73,6 @@ func keyboardHasCallback(
 func TestLoadQuizQuestionContext(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		&mockSRS{},
-	)
 	b := &Bot{
 		input:    stateStores,
 		drafts:   stateStores,
@@ -89,7 +84,6 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 				stateStores,
 				service.SessionDeps{},
 			),
-			QuizActiveSession: active,
 		},
 	}
 
@@ -283,15 +277,6 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 		stateStores *testInteractionStores,
 		mAPI *mockBotAPI,
 	) *SessionFlow {
-		active := service.NewQuizActiveSessionService(
-			nil,
-			stateStores.quiz,
-			&mockSRS{},
-		)
-		grader := service.NewGraderService(
-			active,
-			&mockLLM{},
-		)
 		b := &Bot{
 			telegram: newTelegramClient(mAPI),
 			input:    stateStores,
@@ -302,10 +287,8 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 			services: &service.Services{
 				Session: newTestSessionService(
 					stateStores,
-					service.SessionDeps{},
+					service.SessionDeps{LLM: &mockLLM{}},
 				),
-				QuizActiveSession: active,
-				Grader:            grader,
 			},
 		}
 		return NewSessionFlow(b)
@@ -342,14 +325,15 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 				model.SessionQuestion{QuestionID: questionID},
 			)
 
-			sf.processAnswerText(
-				context.Background(),
+			answerByText(
+				t,
+				sf,
+				stateStores,
 				123,
 				owner,
 				sessionID,
-				questionID,
+				0,
 				"apple",
-				nil,
 			)
 
 			if len(mAPI.sentMessages) != 1 {
@@ -398,14 +382,15 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 				model.SessionQuestion{QuestionID: questionID},
 			)
 
-			sf.processAnswerText(
-				context.Background(),
+			answerByText(
+				t,
+				sf,
+				stateStores,
 				123,
 				nil,
 				sessionID,
-				questionID,
+				0,
 				"apple",
-				nil,
 			)
 
 			if keyboardHasCallback(

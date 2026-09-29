@@ -199,11 +199,6 @@ func newPreferenceQuizBot(t *testing.T) (*Bot, *botMaterialPreferenceRepo, *test
 				stateStores,
 				service.SessionDeps{},
 			),
-			QuizActiveSession: service.NewQuizActiveSessionService(
-				nil,
-				stateStores.quiz,
-				nil,
-			),
 			MaterialPreference: service.NewMaterialPreferenceService(repo),
 		},
 	}

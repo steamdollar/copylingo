@@ -16,9 +16,6 @@ type Services struct {
 	StudySession       *StudySessionService
 	StudyActiveSession *StudyActiveSessionService
 	MaterialPreference *MaterialPreferenceService
-	QuizActiveSession  *QuizActiveSessionService
-	Grader             *GraderService
-	Handwriting        *HandwritingService
 	Analyzer           *AnalyzerService
 	Tip                *TipService
 	TipGenerator       *TipGenerator
@@ -68,13 +65,8 @@ func NewServices(
 		QuizActiveSessionRepo: repos.QuizActiveSession,
 		UserRepo:              repos.User,
 		Stores:                stores,
+		LLM:                   llm,
 	})
-	// Transitional (ADR-059 §8 step B): answer and Mini App paths still reach
-	// these Tier2 services directly, so share SessionService's instances.
-	graderService := NewGraderService(
-		session.quizProgress,
-		llm,
-	)
 
 	return &Services{
 		Content: NewContentService(repos.Content),
@@ -91,13 +83,6 @@ func NewServices(
 			stores.Study,
 		),
 		MaterialPreference: NewMaterialPreferenceService(repos.MaterialPreference),
-		QuizActiveSession:  session.quizProgress,
-		Grader:             graderService,
-		Handwriting: NewHandwritingService(
-			session.quizProgress,
-			graderService,
-			nil,
-		),
 		Analyzer: NewAnalyzerService(
 			repos.User,
 			repos.SessionQuestion,

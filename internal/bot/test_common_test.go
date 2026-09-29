@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"testing"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -129,6 +130,28 @@ func newTestSessionService(
 		deps.Stores = service.SessionStores{Quiz: stores.quiz, Study: stores.study}
 	}
 	return service.NewSessionService(deps)
+}
+
+// answerByText drives the typed-answer path: it arms the active question for
+// chatID and delivers text from the given user through HandleTextInput.
+func answerByText(
+	t *testing.T,
+	sf *SessionFlow,
+	stores *testInteractionStores,
+	chatID int64,
+	from *tgbotapi.User,
+	sessionID,
+	questionIndex int,
+	text string,
+) {
+	t.Helper()
+	stores.active[chatID] = model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIndex}
+	if !sf.HandleTextInput(
+		context.Background(),
+		&tgbotapi.Message{Chat: &tgbotapi.Chat{ID: chatID}, From: from, Text: text},
+	) {
+		t.Fatal("text answer was not consumed")
+	}
 }
 
 func (s *testInteractionStores) stateStores() StateStores {
@@ -371,24 +394,6 @@ func (s *testInteractionStores) RecordQuestionStart(
 ) error {
 	s.starts[sessionID] = startedAt
 	return nil
-}
-
-type mockSRS struct {
-	service.SRSService
-}
-
-func (m *mockSRS) ScheduleAnswer(
-	q *model.UserQuestionProgress,
-	isCorrect bool,
-) {
-}
-func (m *mockSRS) GetDueCount(
-	ctx context.Context,
-	userID int64,
-	language,
-	level string,
-) (int, error) {
-	return 0, nil
 }
 
 type mockLLM struct {

@@ -391,21 +391,6 @@ func (sf *SessionFlow) handleWordOrderCallback(
 		if len(parts) != 5 || len(selection) != len(options) {
 			return
 		}
-		answerParts := make(
-			[]string,
-			0,
-			len(selection),
-		)
-		for _, idx := range selection {
-			answerParts = append(
-				answerParts,
-				options[idx],
-			)
-		}
-		answer := strings.Join(
-			answerParts,
-			"",
-		)
 		if item.SessionQuestion.IsCorrect != nil {
 			sf.telegram.SendMessage(
 				cb.Message.Chat.ID,
@@ -414,15 +399,29 @@ func (sf *SessionFlow) handleWordOrderCallback(
 			return
 		}
 		editMessageID := cb.Message.MessageID
-		sf.processAnswerText(
+		result, err := sf.bot.services.Session.SubmitQuizWordOrder(
 			ctx,
-			cb.Message.Chat.ID,
-			cb.From,
 			sessionID,
 			questionID,
-			answer,
-			&editMessageID,
+			selection,
 		)
+		if err != nil {
+			sf.handleQuizAnswerError(
+				ctx,
+				cb.Message.Chat.ID,
+				sessionID,
+				&editMessageID,
+				err,
+			)
+		} else {
+			sf.renderQuizAnswerResult(
+				cb.Message.Chat.ID,
+				cb.From,
+				sessionID,
+				result,
+				&editMessageID,
+			)
+		}
 		if state, _, valid := sf.wordOrderCurrentItem(
 			ctx,
 			cb,

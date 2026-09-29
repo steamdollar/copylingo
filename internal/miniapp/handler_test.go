@@ -291,21 +291,30 @@ func TestListTips(t *testing.T) {
 	)
 }
 
-type mockHandwritingService struct {
-	submitAnswerFn func(
+// mockQuizSession fakes service.SessionService's Mini App surface. Progress
+// lookups fail, so the background button refresh stops early.
+type mockQuizSession struct {
+	submitHandwritingFn func(
 		ctx context.Context,
 		req service.HandwritingSubmitRequest,
 	) (*service.HandwritingSubmitResult, error)
 }
 
-func (m *mockHandwritingService) SubmitAnswer(
+func (m *mockQuizSession) SubmitHandwriting(
 	ctx context.Context,
 	req service.HandwritingSubmitRequest,
 ) (*service.HandwritingSubmitResult, error) {
-	return m.submitAnswerFn(
+	return m.submitHandwritingFn(
 		ctx,
 		req,
 	)
+}
+
+func (m *mockQuizSession) QuizProgress(
+	context.Context,
+	int,
+) (*model.QuizActiveSessionState, error) {
+	return nil, errors.New("progress not configured")
 }
 
 type mockVerifier struct {
@@ -365,8 +374,8 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 		t.Run(
 			tt.name,
 			func(t *testing.T) {
-				handwriting := &mockHandwritingService{
-					submitAnswerFn: func(
+				handwriting := &mockQuizSession{
+					submitHandwritingFn: func(
 						ctx context.Context,
 						req service.HandwritingSubmitRequest,
 					) (*service.HandwritingSubmitResult, error) {
@@ -379,8 +388,8 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 					},
 				}
 				handler := NewHandler(HandlerDeps{
-					Handwriting: handwriting,
-					Verifier:    verifier,
+					Session:  handwriting,
+					Verifier: verifier,
 				})
 
 				w := httptest.NewRecorder()
@@ -497,8 +506,8 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 	t.Run(
 		"success",
 		func(t *testing.T) {
-			handwriting := &mockHandwritingService{
-				submitAnswerFn: func(
+			handwriting := &mockQuizSession{
+				submitHandwritingFn: func(
 					ctx context.Context,
 					req service.HandwritingSubmitRequest,
 				) (*service.HandwritingSubmitResult, error) {
@@ -511,8 +520,8 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 				},
 			}
 			handler := NewHandler(HandlerDeps{
-				Handwriting: handwriting,
-				Verifier:    verifier,
+				Session:  handwriting,
+				Verifier: verifier,
 			})
 
 			w := httptest.NewRecorder()

@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/lsj/copylingo/internal/callback"
-	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -22,58 +20,46 @@ func (sf *SessionFlow) processAnswer(
 	questionID int,
 	optionIdx int,
 ) {
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	ctx = observability.WithAttrs(
+		ctx,
+		slog.Int(
+			"session_id",
+			sessionID,
+		),
+		slog.Int(
+			"question_id",
+			questionID,
+		),
+	)
+	editMessageID := cb.Message.MessageID
+	result, err := sf.bot.services.Session.SubmitQuizOption(
 		ctx,
 		sessionID,
+		questionID,
+		optionIdx,
 	)
 	if err != nil {
-		return
-	}
-	item, _, ok := state.CurrentItemByQuestionID(questionID)
-	if !ok {
-		// A delayed button can point at a question that is no longer current
-		// (including one already answered). Re-render the first unanswered item
-		// instead of silently dropping the callback.
-		if _, exists := state.ItemByQuestionID(questionID); exists {
-			sf.redirectToNextUnansweredQuestion(
-				ctx,
-				cb.Message.Chat.ID,
-				sessionID,
-				&cb.Message.MessageID,
-			)
-		}
-		return
-	}
-	if item.SessionQuestion.IsCorrect != nil {
-		sf.redirectToNextUnansweredQuestion(
+		sf.handleQuizAnswerError(
 			ctx,
 			cb.Message.Chat.ID,
 			sessionID,
-			&cb.Message.MessageID,
+			&editMessageID,
+			err,
 		)
 		return
 	}
-	question := item.Question
-
-	options, err := question.GetOptions()
-	if err != nil || optionIdx >= len(options) {
-		return
-	}
-
-	selectedAnswer := options[optionIdx]
-	editMessageID := cb.Message.MessageID
-	sf.processAnswerText(
-		ctx,
+	sf.renderQuizAnswerResult(
 		cb.Message.Chat.ID,
 		cb.From,
 		sessionID,
-		questionID,
-		selectedAnswer,
+		result,
 		&editMessageID,
 	)
 }
 
 // HandleTextInput intercepts text messages if there is an active text question.
+// It returns false (message not consumed) when the active question can no
+// longer be resolved from the Quiz working set.
 func (sf *SessionFlow) HandleTextInput(
 	ctx context.Context,
 	msg *tgbotapi.Message,
@@ -93,176 +79,118 @@ func (sf *SessionFlow) HandleTextInput(
 		msg.Chat.ID,
 	)
 
-	state, err := sf.bot.services.QuizActiveSession.Get(
-		ctx,
-		activeQuestion.SessionID,
-	)
-	if err != nil || activeQuestion.QuestionIndex >= len(state.Items) {
-		return false
-	}
-	questionID := state.Items[activeQuestion.QuestionIndex].SessionQuestion.QuestionID
-
-	sf.processAnswerText(
-		ctx,
-		msg.Chat.ID,
-		msg.From,
-		activeQuestion.SessionID,
-		questionID,
-		strings.TrimSpace(msg.Text),
-		nil,
-	)
-	return true
-}
-
-func (sf *SessionFlow) processAnswerText(
-	ctx context.Context,
-	chatID int64,
-	from *tgbotapi.User,
-	sessionID,
-	questionID int,
-	selectedAnswer string,
-	editMessageID *int,
-) {
+	sessionID := activeQuestion.SessionID
 	ctx = observability.WithAttrs(
 		ctx,
 		slog.Int(
 			"session_id",
 			sessionID,
 		),
-		slog.Int(
-			"question_id",
-			questionID,
-		),
 	)
-	state, err := sf.bot.services.QuizActiveSession.Get(
+	result, err := sf.bot.services.Session.SubmitQuizText(
 		ctx,
-		sessionID,
+		service.QuizTextAnswer{
+			SessionID:     sessionID,
+			QuestionIndex: activeQuestion.QuestionIndex,
+			Text:          msg.Text,
+			// Show typing status while AI grades a subjective answer.
+			OnAIGrading: func() {
+				sf.telegram.SendChatAction(
+					msg.Chat.ID,
+					tgbotapi.ChatTyping,
+				)
+			},
+		},
 	)
+	if errors.Is(
+		err,
+		service.ErrQuizStateUnavailable,
+	) || errors.Is(
+		err,
+		service.ErrQuizActiveSessionQuestionNotFound,
+	) {
+		return false
+	}
 	if err != nil {
-		slog.ErrorContext(
+		sf.handleQuizAnswerError(
 			ctx,
-			"Failed to get active session for answer",
-			"event",
-			"telegram.answer.session_lookup_failed",
-			"error",
+			msg.Chat.ID,
+			sessionID,
+			nil,
 			err,
 		)
-		sf.showQuizActiveSessionUnavailable(
-			chatID,
-			editMessageID,
-		)
-		return
+		return true
 	}
-	item, currentIdx, ok := state.CurrentItemByQuestionID(questionID)
-	if !ok {
-		slog.WarnContext(
-			ctx,
-			"Question not found in active session",
-			"event",
-			"telegram.answer.question_not_found",
-		)
-		if _, exists := state.ItemByQuestionID(questionID); exists {
-			sf.redirectToNextUnansweredQuestion(
-				ctx,
-				chatID,
-				sessionID,
-				editMessageID,
-			)
-		}
-		return
-	}
-	if item.SessionQuestion.IsCorrect != nil {
+	sf.renderQuizAnswerResult(
+		msg.Chat.ID,
+		msg.From,
+		sessionID,
+		result,
+		nil,
+	)
+	return true
+}
+
+// handleQuizAnswerError maps a rejected answer to its screen: a stale answer
+// re-renders the next unanswered question, unexpected grading failures are
+// logged, and unresolvable targets are ignored.
+func (sf *SessionFlow) handleQuizAnswerError(
+	ctx context.Context,
+	chatID int64,
+	sessionID int,
+	editMessageID *int,
+	err error,
+) {
+	switch {
+	case errors.Is(
+		err,
+		service.ErrQuizAnswerStale,
+	):
 		sf.redirectToNextUnansweredQuestion(
 			ctx,
 			chatID,
 			sessionID,
 			editMessageID,
 		)
+	case errors.Is(
+		err,
+		service.ErrQuizStateUnavailable,
+	), errors.Is(
+		err,
+		service.ErrQuizActiveSessionQuestionNotFound,
+	), errors.Is(
+		err,
+		service.ErrQuizInvalidOption,
+	):
 		return
-	}
-	question := item.Question
-
-	// Grade the answer
-	switch question.Type {
-	case model.QuestionFillBlank:
-		selectedAnswer = strings.ToLower(selectedAnswer) // For Kana fill in the blank
-	case model.QuestionSubjective:
-		// Show typing status for AI grading UX
-		sf.telegram.SendChatAction(
-			chatID,
-			tgbotapi.ChatTyping,
+	default:
+		slog.ErrorContext(
+			ctx,
+			"Failed to grade answer",
+			"event",
+			"telegram.answer.grading_failed",
+			"error",
+			err,
 		)
 	}
+}
 
-	isCorrect, feedback, err := sf.bot.services.Grader.GradeAnswerWithQuestion(
-		ctx,
-		sessionID,
-		questionID,
-		&question,
-		selectedAnswer,
-	)
-	if err != nil {
-		if errors.Is(
-			err,
-			service.ErrAIUnavailable,
-		) {
-			sf.telegram.SendMessage(
-				chatID,
-				botMessagesByLocale[botDefaultLocale].subjectiveGradingUnavailable,
-			)
-			isCorrect = false
-			if recordErr := sf.bot.services.QuizActiveSession.RecordAnswer(
-				ctx,
-				sessionID,
-				questionID,
-				selectedAnswer,
-				false,
-			); recordErr != nil {
-				if errors.Is(
-					recordErr,
-					service.ErrQuizActiveSessionAlreadyAnswered,
-				) {
-					sf.redirectToNextUnansweredQuestion(
-						ctx,
-						chatID,
-						sessionID,
-						editMessageID,
-					)
-					return
-				}
-				slog.ErrorContext(
-					ctx,
-					"Failed to record fallback wrong answer",
-					"event",
-					"telegram.answer.fallback_record_failed",
-					"error",
-					recordErr,
-				)
-				return
-			}
-		} else if errors.Is(
-			err,
-			service.ErrQuizActiveSessionAlreadyAnswered,
-		) {
-			sf.redirectToNextUnansweredQuestion(
-				ctx,
-				chatID,
-				sessionID,
-				editMessageID,
-			)
-			return
-		} else {
-			slog.ErrorContext(
-				ctx,
-				"Failed to grade answer",
-				"event",
-				"telegram.answer.grading_failed",
-				"error",
-				err,
-			)
-			return
-		}
+func (sf *SessionFlow) renderQuizAnswerResult(
+	chatID int64,
+	from *tgbotapi.User,
+	sessionID int,
+	result *service.QuizAnswerResult,
+	editMessageID *int,
+) {
+	if result.GradingUnavailable {
+		sf.telegram.SendMessage(
+			chatID,
+			botMessagesByLocale[botDefaultLocale].subjectiveGradingUnavailable,
+		)
 	}
+	question := result.Question
+	questionID := question.ID
+	currentIdx := result.QuestionIndex
 
 	// 원본 문제 메시지는 editMessage로 덮어써지므로, 결과에 문제 원문을 다시 실어 맥락을 보존한다.
 	messages := botMessagesByLocale[botDefaultLocale]
@@ -271,7 +199,7 @@ func (sf *SessionFlow) processAnswerText(
 		question.Prompt,
 	)
 	var text string
-	if isCorrect {
+	if result.IsCorrect {
 		text = promptLine + fmt.Sprintf(
 			messages.correctAnswerResultFormat,
 			question.Explanation,
@@ -279,26 +207,26 @@ func (sf *SessionFlow) processAnswerText(
 	} else {
 		text = promptLine + fmt.Sprintf(
 			messages.wrongAnswerResultFormat,
-			selectedAnswer,
+			result.Answer,
 			question.CorrectAnswer,
 			question.Explanation,
 		)
 	}
 
-	if feedback != "" {
+	if result.Feedback != "" {
 		text += fmt.Sprintf(
 			messages.aiFeedbackFormat,
-			feedback,
+			result.Feedback,
 		)
 	}
 
 	nextLabel := messages.nextQuestionButton
-	if currentIdx+1 >= len(state.Items) {
+	if currentIdx+1 >= result.TotalQuestions {
 		nextLabel = messages.resultsButton
 	}
 
 	var nextData string
-	if currentIdx+1 >= len(state.Items) {
+	if currentIdx+1 >= result.TotalQuestions {
 		nextData = fmt.Sprintf(
 			formatSessionFinish,
 			sessionID,

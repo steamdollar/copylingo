@@ -142,17 +142,11 @@ func TestHandwritingCellCountExcludesSokuon(t *testing.T) {
 func TestQuestionNavigation(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		nil,
-	)
 	sf := NewSessionFlow(&Bot{services: &service.Services{
 		Session: newTestSessionService(
 			stateStores,
 			service.SessionDeps{},
 		),
-		QuizActiveSession: active,
 	}})
 
 	trueVal := true
@@ -650,11 +644,6 @@ func TestShowQuestion_Finish(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		nil,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores,
@@ -667,7 +656,6 @@ func TestShowQuestion_Finish(t *testing.T) {
 				stateStores,
 				service.SessionDeps{},
 			),
-			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -90,6 +91,22 @@ type QuizActiveSessionRepo interface {
 	) error
 }
 
+// QuizGradingLLM grades answers that need AI judgment (subjective text and handwriting).
+type QuizGradingLLM interface {
+	GradeAnswer(
+		ctx context.Context,
+		questionPrompt,
+		correctAnswer,
+		userAnswer string,
+	) (external.GradeResult, error)
+	GradeHandwriting(
+		ctx context.Context,
+		questionPrompt,
+		correctAnswer string,
+		pngImage []byte,
+	) (external.GradeResult, error)
+}
+
 // SessionUserRepo updates user-level learning records on Quiz completion.
 type SessionUserRepo interface {
 	UpdateStreak(
@@ -106,21 +123,29 @@ type SessionDeps struct {
 	QuizActiveSessionRepo QuizActiveSessionRepo
 	UserRepo              SessionUserRepo
 	Stores                SessionStores
+	LLM                   QuizGradingLLM
 }
 
 // SessionService is the Tier1 entry point for Quiz and Study sessions
 // (ADR-059 §8.6). Callers see only this type; selection, progress, SRS and
 // grading are internal collaborators built here.
 type SessionService struct {
-	sessionRepo  SessionRepo
-	userRepo     SessionUserRepo
-	selection    *SessionBuilderService
-	quizProgress *QuizActiveSessionService
-	srs          *SRSService
+	sessionRepo    SessionRepo
+	userRepo       SessionUserRepo
+	selection      *SessionBuilderService
+	quizProgress   *QuizActiveSessionService
+	srs            *SRSService
+	grader         *GraderService
+	strokeRenderer StrokeRenderer
 }
 
 func NewSessionService(deps SessionDeps) *SessionService {
 	srs := NewSRSService(deps.QuestionRepo)
+	quizProgress := NewQuizActiveSessionService(
+		deps.QuizActiveSessionRepo,
+		deps.Stores.Quiz,
+		srs,
+	)
 	return &SessionService{
 		sessionRepo: deps.SessionRepo,
 		userRepo:    deps.UserRepo,
@@ -130,11 +155,12 @@ func NewSessionService(deps SessionDeps) *SessionService {
 			deps.SessionQuestionRepo,
 			srs,
 		),
-		quizProgress: NewQuizActiveSessionService(
-			deps.QuizActiveSessionRepo,
-			deps.Stores.Quiz,
-			srs,
+		quizProgress: quizProgress,
+		srs:          srs,
+		grader: NewGraderService(
+			quizProgress,
+			deps.LLM,
 		),
-		srs: srs,
+		strokeRenderer: NewDefaultPNGStrokeRenderer(),
 	}
 }

@@ -28,11 +28,17 @@ type TelegramMessenger interface {
 	) error
 }
 
-type handwritingService interface {
-	SubmitAnswer(
+// quizSession is the Quiz part of service.SessionService used by the Mini App:
+// grading a handwriting submission and re-reading progress to refresh buttons.
+type quizSession interface {
+	SubmitHandwriting(
 		ctx context.Context,
 		req service.HandwritingSubmitRequest,
 	) (*service.HandwritingSubmitResult, error)
+	QuizProgress(
+		ctx context.Context,
+		sessionID int,
+	) (*model.QuizActiveSessionState, error)
 }
 
 type tipService interface {
@@ -42,13 +48,6 @@ type tipService interface {
 		level string,
 		limit int,
 	) ([]model.Tip, error)
-}
-
-type quizActiveSessionService interface {
-	Get(
-		ctx context.Context,
-		sessionID int,
-	) (*model.QuizActiveSessionState, error)
 }
 
 type HandwritingMessageStore interface {
@@ -64,9 +63,8 @@ type verifier interface {
 }
 
 type Handler struct {
-	handwriting         handwritingService
+	session             quizSession
 	tip                 tipService
-	quizActiveSession   quizActiveSessionService
 	verifier            verifier
 	handwritingMessages HandwritingMessageStore
 	messenger           TelegramMessenger
@@ -74,9 +72,8 @@ type Handler struct {
 }
 
 type HandlerDeps struct {
-	Handwriting         handwritingService
+	Session             quizSession
 	Tip                 tipService
-	QuizActiveSession   quizActiveSessionService
 	Verifier            verifier
 	HandwritingMessages HandwritingMessageStore
 	Messenger           TelegramMessenger
@@ -92,9 +89,8 @@ type handwritingSubmitRequest struct {
 
 func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
-		handwriting:         deps.Handwriting,
+		session:             deps.Session,
 		tip:                 deps.Tip,
-		quizActiveSession:   deps.QuizActiveSession,
 		verifier:            deps.Verifier,
 		handwritingMessages: deps.HandwritingMessages,
 		messenger:           deps.Messenger,
@@ -110,9 +106,8 @@ func RegisterRoutes(
 	messenger TelegramMessenger,
 ) {
 	handler := NewHandler(HandlerDeps{
-		Handwriting:       services.Handwriting,
-		Tip:               services.Tip,
-		QuizActiveSession: services.QuizActiveSession,
+		Session: services.Session,
+		Tip:     services.Tip,
 		Verifier: NewInitDataVerifier(
 			cfg.Telegram.Token,
 			24*time.Hour,
@@ -249,7 +244,7 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 		),
 	)
 
-	result, err := h.handwriting.SubmitAnswer(
+	result, err := h.session.SubmitHandwriting(
 		ctx,
 		service.HandwritingSubmitRequest{
 			UserID:     user.ID,
@@ -412,7 +407,7 @@ func (h *Handler) refreshHandwritingMessage(
 	}
 
 	// We need to know the question index to format the "Next" button.
-	state, err := h.quizActiveSession.Get(
+	state, err := h.session.QuizProgress(
 		ctx,
 		sessionID,
 	)

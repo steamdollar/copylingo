@@ -13,23 +13,6 @@ import (
 	"github.com/lsj/copylingo/internal/observability"
 )
 
-type handwritingQuizActiveSession interface {
-	Get(
-		ctx context.Context,
-		sessionID int,
-	) (*model.QuizActiveSessionState, error)
-}
-
-type graderClient interface {
-	GradeHandwritingWithQuestion(
-		ctx context.Context,
-		sessionID,
-		questionID int,
-		question *model.Question,
-		renderedImage []byte,
-	) (bool, string, error)
-}
-
 var failedHandwritingImageDir = filepath.Join(
 	"logs",
 	"images",
@@ -71,29 +54,10 @@ type HandwritingSubmitResult struct {
 	Explanation   string `json:"explanation"`
 }
 
-// HandwritingService coordinates Mini App submissions without coupling HTTP and Bot flows.
-type HandwritingService struct {
-	quizActiveSession handwritingQuizActiveSession
-	grader            graderClient
-	renderer          StrokeRenderer
-}
-
-func NewHandwritingService(
-	quizActiveSession handwritingQuizActiveSession,
-	grader graderClient,
-	renderer StrokeRenderer,
-) *HandwritingService {
-	if renderer == nil {
-		renderer = NewDefaultPNGStrokeRenderer()
-	}
-	return &HandwritingService{
-		quizActiveSession: quizActiveSession,
-		grader:            grader,
-		renderer:          renderer,
-	}
-}
-
-func (s *HandwritingService) SubmitAnswer(
+// SubmitHandwriting grades a Mini App handwriting submission for the current
+// question. Unlike subjective text answers, an AI grading failure is returned
+// as an error and nothing is recorded, so the user can resubmit.
+func (s *SessionService) SubmitHandwriting(
 	ctx context.Context,
 	req HandwritingSubmitRequest,
 ) (*HandwritingSubmitResult, error) {
@@ -118,7 +82,7 @@ func (s *HandwritingService) SubmitAnswer(
 		),
 	)
 
-	state, err := s.quizActiveSession.Get(
+	state, err := s.quizProgress.Get(
 		ctx,
 		req.SessionID,
 	)
@@ -144,7 +108,7 @@ func (s *HandwritingService) SubmitAnswer(
 		return nil, ErrHandwritingAlreadyAnswered
 	}
 
-	renderedImage, err := s.renderer.RenderPNG(req.Strokes)
+	renderedImage, err := s.strokeRenderer.RenderPNG(req.Strokes)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"render handwriting strokes: %w",

@@ -16,17 +16,7 @@ import (
 func TestHandleTextInput(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	mSRS := &mockSRS{}
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		mSRS,
-	)
 	mLLM := &mockLLM{}
-	grader := service.NewGraderService(
-		active,
-		mLLM,
-	)
 
 	mAPI := &mockBotAPI{}
 	b := &Bot{
@@ -35,10 +25,8 @@ func TestHandleTextInput(t *testing.T) {
 		services: &service.Services{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDeps{LLM: mLLM},
 			),
-			QuizActiveSession: active,
-			Grader:            grader,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -113,19 +101,8 @@ func TestHandleTextInput(t *testing.T) {
 }
 
 func TestProcessAnswerText_Correct(t *testing.T) {
-	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	mSRS := &mockSRS{}
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		mSRS,
-	)
 	mLLM := &mockLLM{}
-	grader := service.NewGraderService(
-		active,
-		mLLM,
-	)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
@@ -133,10 +110,8 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 		services: &service.Services{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDeps{LLM: mLLM},
 			),
-			QuizActiveSession: active,
-			Grader:            grader,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -163,14 +138,15 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 		state,
 	)
 
-	sf.processAnswerText(
-		ctx,
+	answerByText(
+		t,
+		sf,
+		stateStores,
 		123,
 		nil,
 		sessionID,
-		questionID,
+		0,
 		"apple",
-		nil,
 	)
 
 	if len(mAPI.sentMessages) != 1 {
@@ -192,13 +168,7 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 }
 
 func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
-	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		nil,
-	)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
@@ -208,7 +178,6 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 				stateStores,
 				service.SessionDeps{},
 			),
-			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -231,14 +200,15 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 		state,
 	)
 
-	sf.processAnswerText(
-		ctx,
+	answerByText(
+		t,
+		sf,
+		stateStores,
 		123,
 		nil,
 		sessionID,
-		questionID,
+		0,
 		"apple",
-		nil,
 	)
 
 	msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
@@ -265,11 +235,6 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	active := service.NewQuizActiveSessionService(
-		nil,
-		stateStores.quiz,
-		nil,
-	)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
@@ -280,7 +245,6 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 				stateStores,
 				service.SessionDeps{},
 			),
-			QuizActiveSession: active,
 		},
 	}
 	sf := NewSessionFlow(b)

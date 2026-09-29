@@ -70,15 +70,6 @@ func botWithActive(
 	userRepo *streakRepoStub,
 ) (*Bot, *mockBotAPI) {
 	mAPI := &mockBotAPI{}
-	active := service.NewQuizActiveSessionService(
-		repo,
-		stateStores.quiz,
-		&mockSRS{},
-	)
-	grader := service.NewGraderService(
-		active,
-		&mockLLM{},
-	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
@@ -89,10 +80,9 @@ func botWithActive(
 				service.SessionDeps{
 					QuizActiveSessionRepo: repo,
 					UserRepo:              userRepo,
+					LLM:                   &mockLLM{},
 				},
 			),
-			QuizActiveSession: active,
-			Grader:            grader,
 		},
 	}
 	return b, mAPI
@@ -625,7 +615,6 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 // --- processAnswerText: wrong answer & AI unavailable ----------------------
 
 func TestProcessAnswerText_Wrong(t *testing.T) {
-	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	b, mAPI := botWithActive(
 		stateStores,
@@ -657,14 +646,15 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 		state,
 	)
 
-	sf.processAnswerText(
-		ctx,
+	answerByText(
+		t,
+		sf,
+		stateStores,
 		123,
 		nil,
 		sessionID,
-		questionID,
+		0,
 		"banana",
-		nil,
 	)
 
 	text := collectText(mAPI.sentMessages)
@@ -689,14 +679,8 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 }
 
 func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
-	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	mAPI := &mockBotAPI{}
-	active := service.NewQuizActiveSessionService(
-		&activeRepoStub{},
-		stateStores.quiz,
-		&mockSRS{},
-	)
 	// LLM returns AI-unavailable error
 	llm := &mockLLM{
 		gradeFn: func(
@@ -708,10 +692,6 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 			return external.GradeResult{}, service.ErrAIUnavailable
 		},
 	}
-	grader := service.NewGraderService(
-		active,
-		llm,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(mAPI),
 		input:    stateStores,
@@ -723,10 +703,8 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 		services: &service.Services{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDeps{LLM: llm, QuizActiveSessionRepo: &activeRepoStub{}},
 			),
-			QuizActiveSession: active,
-			Grader:            grader,
 		},
 	}
 	sf := NewSessionFlow(b)
@@ -754,14 +732,15 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 		state,
 	)
 
-	sf.processAnswerText(
-		ctx,
+	answerByText(
+		t,
+		sf,
+		stateStores,
 		123,
 		nil,
 		sessionID,
-		questionID,
+		0,
 		"answer",
-		nil,
 	)
 
 	text := collectText(mAPI.sentMessages)
