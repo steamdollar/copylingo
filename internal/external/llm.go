@@ -19,11 +19,24 @@ import (
 // LLMClient defines AI-backed grading paths that cannot be handled by exact string matching.
 type LLMClient interface {
 	// GradeAnswer is for QuestionSubjective only: free-text semantic grading such as translated meaning or paraphrased answers.
-	GradeAnswer(ctx context.Context, questionPrompt, correctAnswer, userAnswer string) (GradeResult, error)
+	GradeAnswer(
+		ctx context.Context,
+		questionPrompt,
+		correctAnswer,
+		userAnswer string,
+	) (GradeResult, error)
 	// GradeHandwriting is for QuestionKanaHandwriting only: binary visual verification of a rendered handwriting PNG.
-	GradeHandwriting(ctx context.Context, questionPrompt, correctAnswer string, pngImage []byte) (GradeResult, error)
+	GradeHandwriting(
+		ctx context.Context,
+		questionPrompt,
+		correctAnswer string,
+		pngImage []byte,
+	) (GradeResult, error)
 	// AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
-	AnswerLearningQuestion(ctx context.Context, question string) (string, error)
+	AnswerLearningQuestion(
+		ctx context.Context,
+		question string,
+	) (string, error)
 }
 
 // GradeResult represents the structured JSON output from the LLM.
@@ -67,7 +80,9 @@ func NewLLMClient(cfg *config.Config) LLMClient {
 // Fill-blank and multiple-choice answers are graded by exact string matching in GraderService.
 func (c *DefaultLLMClient) GradeAnswer(
 	ctx context.Context,
-	questionPrompt, correctAnswer, userAnswer string,
+	questionPrompt,
+	correctAnswer,
+	userAnswer string,
 ) (GradeResult, error) {
 	if c.client == nil || c.model == "" {
 		return GradeResult{}, ErrAIConfigMissing
@@ -87,31 +102,42 @@ Rules for grading:
 2. If it is completely wrong or conceptually incorrect, set 'is_correct' to false.
 3. The 'feedback' should be encouraging but direct in Korean.`
 
-	userPrompt := fmt.Sprintf(`Question Context: %s
+	userPrompt := fmt.Sprintf(
+		`Question Context: %s
 Expected Correct Answer: %s
 User's Answer: %s
 
-Evaluate the User's Answer against the Expected Correct Answer and output JSON.`, questionPrompt, correctAnswer, userAnswer)
+Evaluate the User's Answer against the Expected Correct Answer and output JSON.`,
+		questionPrompt,
+		correctAnswer,
+		userAnswer,
+	)
 
-	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: c.model,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: systemPrompt,
+	resp, err := c.client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: c.model,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: systemPrompt,
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: userPrompt,
+				},
 			},
-			{
-				Role:    openai.ChatMessageRoleUser,
-				Content: userPrompt,
+			ResponseFormat: &openai.ChatCompletionResponseFormat{
+				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
 			},
 		},
-		ResponseFormat: &openai.ChatCompletionResponseFormat{
-			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
-		},
-	})
+	)
 
 	if err != nil {
-		return GradeResult{}, fmt.Errorf("llm grading request failed: %w", err)
+		return GradeResult{}, fmt.Errorf(
+			"llm grading request failed: %w",
+			err,
+		)
 	}
 
 	if len(resp.Choices) == 0 {
@@ -121,38 +147,54 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 	rawContent := resp.Choices[0].Message.Content
 
 	var result GradeResult
-	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
-		return GradeResult{}, fmt.Errorf("failed to parse llm output (%s): %w", rawContent, err)
+	if err := json.Unmarshal(
+		[]byte(rawContent),
+		&result,
+	); err != nil {
+		return GradeResult{}, fmt.Errorf(
+			"failed to parse llm output (%s): %w",
+			rawContent,
+			err,
+		)
 	}
 
 	return result, nil
 }
 
-func (c *DefaultLLMClient) AnswerLearningQuestion(ctx context.Context, question string) (string, error) {
+func (c *DefaultLLMClient) AnswerLearningQuestion(
+	ctx context.Context,
+	question string,
+) (string, error) {
 	if c.client == nil || c.model == "" {
 		return "", ErrAIConfigMissing
 	}
 
-	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model:               c.model,
-		MaxCompletionTokens: learningQuestionMaxTokens,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role: openai.ChatMessageRoleSystem,
-				Content: `You are CopyLingo's language-learning assistant.
+	resp, err := c.client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model:               c.model,
+			MaxCompletionTokens: learningQuestionMaxTokens,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role: openai.ChatMessageRoleSystem,
+					Content: `You are CopyLingo's language-learning assistant.
 Answer in Korean by default.
 Be concise, accurate, and practical for a beginner-to-intermediate language learner.
 When the user asks about Japanese, include kana/romaji/meaning distinctions when useful.
 Do not use HTML tags or markdown code fences.`,
-			},
-			{
-				Role:    openai.ChatMessageRoleUser,
-				Content: question,
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: question,
+				},
 			},
 		},
-	})
+	)
 	if err != nil {
-		return "", fmt.Errorf("llm learning question request failed: %w", err)
+		return "", fmt.Errorf(
+			"llm learning question request failed: %w",
+			err,
+		)
 	}
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("empty llm learning question response")
@@ -163,24 +205,45 @@ Do not use HTML tags or markdown code fences.`,
 // GradeHandwriting verifies whether a rendered handwriting image matches the expected Japanese text.
 func (c *DefaultLLMClient) GradeHandwriting(
 	ctx context.Context,
-	questionPrompt, correctAnswer string,
+	questionPrompt,
+	correctAnswer string,
 	pngImage []byte,
 ) (GradeResult, error) {
 	startedAt := time.Now()
-	ctx = observability.WithAttrs(ctx, slog.String("source", "external.llm"))
+	ctx = observability.WithAttrs(
+		ctx,
+		slog.String(
+			"source",
+			"external.llm",
+		),
+	)
 
 	if c.client == nil || c.model == "" {
 		return GradeResult{}, ErrAIConfigMissing
 	}
 
 	systemPrompt := buildHandwritingSystemPrompt()
-	userPrompt := buildHandwritingUserPrompt(questionPrompt, correctAnswer)
+	userPrompt := buildHandwritingUserPrompt(
+		questionPrompt,
+		correctAnswer,
+	)
 
 	imageURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngImage)
-	req := buildHandwritingChatCompletionRequest(c.model, systemPrompt, userPrompt, imageURL)
-	resp, err := c.client.CreateChatCompletion(ctx, req)
+	req := buildHandwritingChatCompletionRequest(
+		c.model,
+		systemPrompt,
+		userPrompt,
+		imageURL,
+	)
+	resp, err := c.client.CreateChatCompletion(
+		ctx,
+		req,
+	)
 	if err != nil {
-		return GradeResult{}, fmt.Errorf("llm handwriting grading request failed: %w", err)
+		return GradeResult{}, fmt.Errorf(
+			"llm handwriting grading request failed: %w",
+			err,
+		)
 	}
 	if len(resp.Choices) == 0 {
 		return GradeResult{}, fmt.Errorf("empty llm handwriting response")
@@ -188,22 +251,39 @@ func (c *DefaultLLMClient) GradeHandwriting(
 
 	rawContent := resp.Choices[0].Message.Content
 	var result GradeResult
-	if err := json.Unmarshal([]byte(rawContent), &result); err != nil {
-		return GradeResult{}, fmt.Errorf("failed to parse llm handwriting output (%s): %w", rawContent, err)
+	if err := json.Unmarshal(
+		[]byte(rawContent),
+		&result,
+	); err != nil {
+		return GradeResult{}, fmt.Errorf(
+			"failed to parse llm handwriting output (%s): %w",
+			rawContent,
+			err,
+		)
 	}
-	slog.InfoContext(ctx, "Handwriting LLM grading completed",
-		"event", "handwriting.llm.completed",
-		"model", c.model,
-		"duration_ms", time.Since(startedAt).Milliseconds(),
-		"image_bytes", len(pngImage),
-		"is_correct", result.IsCorrect,
+	slog.InfoContext(
+		ctx,
+		"Handwriting LLM grading completed",
+		"event",
+		"handwriting.llm.completed",
+		"model",
+		c.model,
+		"duration_ms",
+		time.Since(startedAt).Milliseconds(),
+		"image_bytes",
+		len(pngImage),
+		"is_correct",
+		result.IsCorrect,
 	)
 
 	return result, nil
 }
 
 func buildHandwritingChatCompletionRequest(
-	model, systemPrompt, userPrompt, imageURL string,
+	model,
+	systemPrompt,
+	userPrompt,
+	imageURL string,
 ) openai.ChatCompletionRequest {
 	return openai.ChatCompletionRequest{
 		Model:               model,
@@ -310,11 +390,18 @@ func buildHandwritingResponseFormat() *openai.ChatCompletionResponseFormat {
 	}
 }
 
-func buildHandwritingUserPrompt(questionPrompt, correctAnswer string) string {
-	return fmt.Sprintf(`Question Context: %s
+func buildHandwritingUserPrompt(
+	questionPrompt,
+	correctAnswer string,
+) string {
+	return fmt.Sprintf(
+		`Question Context: %s
 Expected Text: %s
 
-Evaluate whether the handwriting image matches the Expected Text and output JSON.`, questionPrompt, correctAnswer)
+Evaluate whether the handwriting image matches the Expected Text and output JSON.`,
+		questionPrompt,
+		correctAnswer,
+	)
 }
 
 // GenerateTips asks the LLM for n short Korean learning tips for the given
@@ -326,7 +413,8 @@ Evaluate whether the handwriting image matches the Expected Text and output JSON
 // narrow service-layer interface instead.
 func (c *DefaultLLMClient) GenerateTips(
 	ctx context.Context,
-	language, level string,
+	language,
+	level string,
 	category model.TipCategory,
 	n int,
 ) ([]GeneratedTip, error) {
@@ -338,42 +426,72 @@ func (c *DefaultLLMClient) GenerateTips(
 	}
 
 	systemPrompt := `당신은 외국어 학습 팁 작성자입니다. JSON 배열로만 응답하세요.`
-	userPrompt := buildTipGenerationUserPrompt(language, level, category, n)
+	userPrompt := buildTipGenerationUserPrompt(
+		language,
+		level,
+		category,
+		n,
+	)
 
-	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model:               c.model,
-		MaxCompletionTokens: tipGenerationMaxTokens,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: systemPrompt,
-			},
-			{
-				Role:    openai.ChatMessageRoleUser,
-				Content: userPrompt,
+	resp, err := c.client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model:               c.model,
+			MaxCompletionTokens: tipGenerationMaxTokens,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: systemPrompt,
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: userPrompt,
+				},
 			},
 		},
-	})
+	)
 	if err != nil {
-		return nil, fmt.Errorf("llm tip generation request failed (language=%s level=%s category=%s): %w",
-			language, level, category, err)
+		return nil, fmt.Errorf(
+			"llm tip generation request failed (language=%s level=%s category=%s): %w",
+			language,
+			level,
+			category,
+			err,
+		)
 	}
 	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("empty llm tip generation response (language=%s level=%s category=%s)",
-			language, level, category)
+		return nil, fmt.Errorf(
+			"empty llm tip generation response (language=%s level=%s category=%s)",
+			language,
+			level,
+			category,
+		)
 	}
 
 	rawContent := extractJSONArray(resp.Choices[0].Message.Content)
 
 	var tips []GeneratedTip
-	if err := json.Unmarshal([]byte(rawContent), &tips); err != nil {
-		return nil, fmt.Errorf("failed to parse llm tip output (%s): %w", rawContent, err)
+	if err := json.Unmarshal(
+		[]byte(rawContent),
+		&tips,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"failed to parse llm tip output (%s): %w",
+			rawContent,
+			err,
+		)
 	}
 	return tips, nil
 }
 
-func buildTipGenerationUserPrompt(language, level string, category model.TipCategory, n int) string {
-	return fmt.Sprintf(`대상 언어: %s
+func buildTipGenerationUserPrompt(
+	language,
+	level string,
+	category model.TipCategory,
+	n int,
+) string {
+	return fmt.Sprintf(
+		`대상 언어: %s
 학습 레벨: %s
 카테고리: %s (%s)
 
@@ -385,20 +503,40 @@ func buildTipGenerationUserPrompt(language, level string, category model.TipCate
 
 출력 스키마:
 [{"body": "..."}, {"body": "..."}]`,
-		language, level, category.DisplayName(), category, n)
+		language,
+		level,
+		category.DisplayName(),
+		category,
+		n,
+	)
 }
 
 // extractJSONArray trims optional markdown code fences and isolates the JSON
 // array payload so json.Unmarshal can parse defensively against fenced output.
 func extractJSONArray(raw string) string {
 	s := strings.TrimSpace(raw)
-	s = strings.TrimPrefix(s, "```json")
-	s = strings.TrimPrefix(s, "```")
-	s = strings.TrimSuffix(s, "```")
+	s = strings.TrimPrefix(
+		s,
+		"```json",
+	)
+	s = strings.TrimPrefix(
+		s,
+		"```",
+	)
+	s = strings.TrimSuffix(
+		s,
+		"```",
+	)
 	s = strings.TrimSpace(s)
 
-	start := strings.Index(s, "[")
-	end := strings.LastIndex(s, "]")
+	start := strings.Index(
+		s,
+		"[",
+	)
+	end := strings.LastIndex(
+		s,
+		"]",
+	)
 	if start != -1 && end != -1 && end > start {
 		return s[start : end+1]
 	}
