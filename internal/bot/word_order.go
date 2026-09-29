@@ -338,7 +338,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 	action := parts[4]
 	if item.SessionQuestion.IsCorrect != nil {
 		if action == callbackActionWordOrderSubmit && len(parts) == 5 {
-			sf.bot.SendMessage(
+			sf.telegram.SendMessage(
 				cb.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].alreadyAnswered,
 			)
@@ -407,7 +407,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 			"",
 		)
 		if item.SessionQuestion.IsCorrect != nil {
-			sf.bot.SendMessage(
+			sf.telegram.SendMessage(
 				cb.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].alreadyAnswered,
 			)
@@ -493,7 +493,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 			),
 		)
 	}
-	sf.bot.EditMessage(
+	sf.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		text,

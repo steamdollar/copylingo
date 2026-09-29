@@ -81,8 +81,8 @@ func botWithActive(
 		&mockLLM{},
 	)
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{},
 		services: &service.Services{
 			QuizActiveSession: active,
@@ -708,7 +708,7 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 		llm,
 	)
 	b := &Bot{
-		api:      mAPI,
+		telegram: newTelegramClient(mAPI),
 		input:    stateStores,
 		drafts:   stateStores,
 		messages: stateStores,
@@ -797,7 +797,7 @@ func botWithAnalyzer() (*Bot, *mockBotAPI) {
 		&statRepoStub{},
 	)
 	b := &Bot{
-		api: mAPI, cfg: &config.Config{},
+		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
 		services: &service.Services{Analyzer: analyzer},
 	}
 	return b, mAPI
@@ -902,7 +902,7 @@ func TestHandleMenu(t *testing.T) {
 	})
 	srs := service.NewSRSService(&mockSRSRepo{})
 	b := &Bot{
-		api: mAPI, cfg: &config.Config{},
+		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
 		services: &service.Services{User: userSvc, SRS: srs},
 	}
 
@@ -931,7 +931,7 @@ func ptr(s string) *string { return &s }
 
 func TestEditMessageReplyMarkup(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -967,7 +967,7 @@ func TestEditMessageReplyMarkup(t *testing.T) {
 
 func TestBotPushSession(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 	b.flow = NewSessionFlow(b)
 
 	if err := b.PushSession(

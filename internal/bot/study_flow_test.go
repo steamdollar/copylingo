@@ -177,7 +177,7 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 		botTestDB,
 	)
 	b := &Bot{
-		api: api,
+		telegram: newTelegramClient(api),
 		services: &service.Services{
 			StudySession:       studyService,
 			StudyActiveSession: studyActiveService,
@@ -368,7 +368,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 		stateStores.study,
 	)
 	b := &Bot{
-		api: api,
+		telegram: newTelegramClient(api),
 		services: &service.Services{
 			StudyActiveSession: studyActiveService,
 		},
@@ -562,7 +562,7 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 		botTestDB,
 	)
 	b := &Bot{
-		api: api,
+		telegram: newTelegramClient(api),
 		services: &service.Services{
 			StudySession:       studyService,
 			StudyActiveSession: studyActiveService,
@@ -663,7 +663,7 @@ func TestStudyFlowReadingRendering(t *testing.T) {
 		botTestDB,
 	)
 	b := &Bot{
-		api: api,
+		telegram: newTelegramClient(api),
 		services: &service.Services{
 			StudySession:       studyService,
 			StudyActiveSession: studyActiveService,

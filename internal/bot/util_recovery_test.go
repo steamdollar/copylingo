@@ -25,7 +25,7 @@ func (s *sessionListStore) ListInProgress(ctx context.Context) ([]model.Session,
 func TestRefreshStaleMiniAppMessages_EmptyBaseURL(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI, cfg: &config.Config{}} // PublicBaseURL empty
+	b := &Bot{telegram: newTelegramClient(mAPI), cfg: &config.Config{}} // PublicBaseURL empty
 
 	b.RefreshStaleMiniAppMessages(ctx)
 
@@ -51,7 +51,7 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Server.PublicBaseURL = "https://x.trycloudflare.com"
 	b := &Bot{
-		api:      mAPI,
+		telegram: newTelegramClient(mAPI),
 		input:    stateStores,
 		drafts:   stateStores,
 		messages: stateStores,
@@ -113,7 +113,7 @@ func TestHandleTest_NoQuestions(t *testing.T) {
 		srs,
 	)
 	b := &Bot{
-		api: mAPI, cfg: &config.Config{},
+		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
 		services: &service.Services{User: userSvc, SessionBuilder: sb},
 	}
 

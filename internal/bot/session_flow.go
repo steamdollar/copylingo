@@ -17,11 +17,15 @@ import (
 
 // SessionFlow handles the question-answering interaction flow.
 type SessionFlow struct {
-	bot *Bot
+	bot      *Bot
+	telegram *telegramClient
 }
 
 func NewSessionFlow(bot *Bot) *SessionFlow {
-	return &SessionFlow{bot: bot}
+	return &SessionFlow{
+		bot:      bot,
+		telegram: bot.telegram,
+	}
 }
 
 // StartStudy begins a new study session or resumes a pending one.
@@ -85,7 +89,7 @@ func (sf *SessionFlow) getPendingSessions(
 		return err
 	}
 	if len(sessions) == 0 {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			cb.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].pendingSessionsEmpty,
@@ -115,7 +119,7 @@ func (sf *SessionFlow) getPendingSessions(
 			botMessagesByLocale[botDefaultLocale].studySessionReadyFormat,
 			studySession.TotalQuestions,
 		)
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			cb.Message.MessageID,
 			text,
@@ -125,7 +129,7 @@ func (sf *SessionFlow) getPendingSessions(
 	}
 	session, ok := firstQuizSession(sessions)
 	if !ok {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			cb.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].pendingSessionsEmpty,
@@ -155,7 +159,7 @@ func (sf *SessionFlow) getPendingSessions(
 		session.TotalQuestions,
 		sessionTypeLabel(string(session.Type)),
 	)
-	sf.bot.EditMessage(
+	sf.telegram.EditMessage(
 		chatID,
 		cb.Message.MessageID,
 		text,
@@ -209,7 +213,7 @@ func (sf *SessionFlow) getInProgressSessions(
 			"error",
 			err,
 		)
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			cb.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].activeSessionUnavailable,
@@ -242,7 +246,7 @@ func (sf *SessionFlow) StartReview(
 		cb.From.UserName,
 	)
 	if err != nil {
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			chatID,
 			botMessagesByLocale[botDefaultLocale].reviewUserLoadFailed,
 		)
@@ -256,7 +260,7 @@ func (sf *SessionFlow) StartReview(
 		user.ProficiencyLevel,
 	)
 	if count == 0 {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			cb.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].noReviewQuestions,
@@ -278,7 +282,7 @@ func (sf *SessionFlow) StartReview(
 		limit,
 	)
 	if err != nil || session == nil {
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			chatID,
 			botMessagesByLocale[botDefaultLocale].reviewSessionBuildFailed,
 		)
@@ -302,7 +306,7 @@ func (sf *SessionFlow) StartReview(
 		session.TotalQuestions,
 	)
 
-	sf.bot.EditMessage(
+	sf.telegram.EditMessage(
 		chatID,
 		cb.Message.MessageID,
 		text,
@@ -398,11 +402,11 @@ func (sf *SessionFlow) HandleAnswerCallback(
 				parts,
 				sf.bot.cfg.Server.PublicBaseURL,
 			) {
-				sf.bot.ClearInlineKeyboard(
+				sf.telegram.ClearInlineKeyboard(
 					cb.Message.Chat.ID,
 					cb.Message.MessageID,
 				)
-				sf.bot.SendMessage(
+				sf.telegram.SendMessage(
 					cb.Message.Chat.ID,
 					botMessagesByLocale[botDefaultLocale].handwritingLinkExpired,
 				)
@@ -415,14 +419,14 @@ func (sf *SessionFlow) HandleAnswerCallback(
 				)
 				return
 			}
-			sf.bot.SendMessage(
+			sf.telegram.SendMessage(
 				cb.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].handwritingSubmitFirst,
 			)
 			return
 		}
 		// 같은 손글씨 제출 결과로 다음 문제를 중복 진행하지 못하게 먼저 버튼을 제거한다.
-		sf.bot.ClearInlineKeyboard(
+		sf.telegram.ClearInlineKeyboard(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 		)
@@ -496,7 +500,7 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 		return
 	}
 	if sf.bot.input == nil {
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].llmQuestionActivationFailed,
 		)
@@ -521,13 +525,13 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].llmQuestionActivationFailed,
 		)
 		return
 	}
-	sf.bot.SendMessageWithKeyboard(
+	sf.telegram.SendMessageWithKeyboard(
 		cb.Message.Chat.ID,
 		botMessagesByLocale[botDefaultLocale].quizLLMQuestionPrompt,
 		llmCancelKeyboard(),
@@ -611,7 +615,7 @@ func (sf *SessionFlow) startSession(
 				"error",
 				err,
 			)
-			sf.bot.SendMessage(
+			sf.telegram.SendMessage(
 				cb.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].sessionStatePrepareFailed,
 			)
@@ -734,7 +738,7 @@ func (sf *SessionFlow) finishSession(
 		wrongSummary,
 	)
 
-	sf.bot.EditMessage(
+	sf.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		text,
@@ -777,7 +781,7 @@ func (sf *SessionFlow) PushSession(
 	)
 
 	// 위해서 만든 keyboard를 send
-	return sf.bot.SendMessageWithKeyboard(
+	return sf.telegram.SendMessageWithKeyboard(
 		chatID,
 		text,
 		keyboard,

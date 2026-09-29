@@ -31,8 +31,8 @@ func newWordOrderFixture(
 	)
 	api := &mockBotAPI{}
 	b := &Bot{
-		api:   api,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(api),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			QuizActiveSession: active,
 			Grader:            grader,

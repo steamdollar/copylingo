@@ -164,7 +164,7 @@ func TestMainMenuKeyboard(t *testing.T) {
 
 func TestShowSessionFetchError(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 	sf := NewSessionFlow(b)
 
 	cb := &tgbotapi.CallbackQuery{
@@ -200,7 +200,7 @@ func TestShowSessionFetchError(t *testing.T) {
 
 func TestShowQuizActiveSessionUnavailable(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 	sf := NewSessionFlow(b)
 
 	t.Run(

@@ -21,7 +21,7 @@ func TestHandleUpdateLogsTelegramCorrelationWithoutMessageBody(t *testing.T) {
 	))))
 	defer slog.SetDefault(previous)
 
-	b := &Bot{api: &mockBotAPI{}}
+	b := &Bot{telegram: newTelegramClient(&mockBotAPI{})}
 	b.handleUpdate(tgbotapi.Update{
 		UpdateID: 42,
 		Message: &tgbotapi.Message{

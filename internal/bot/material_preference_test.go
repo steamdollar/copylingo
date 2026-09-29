@@ -156,7 +156,7 @@ func newPreferenceStudyBot(
 		t.Fatal(err)
 	}
 	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
-	b := &Bot{api: &mockBotAPI{}, services: &service.Services{
+	b := &Bot{telegram: newTelegramClient(&mockBotAPI{}), services: &service.Services{
 		StudyActiveSession: active,
 		MaterialPreference: service.NewMaterialPreferenceService(repo),
 	}}
@@ -187,7 +187,7 @@ func newPreferenceQuizBot(t *testing.T) (*Bot, *botMaterialPreferenceRepo, *test
 	)
 	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
 	bot := &Bot{
-		api:      &mockBotAPI{},
+		telegram: newTelegramClient(&mockBotAPI{}),
 		input:    stateStores,
 		drafts:   stateStores,
 		messages: stateStores,
@@ -255,7 +255,7 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 			repo,
 		)
 	}
-	messages := bot.api.(*mockBotAPI).sentMessages
+	messages := bot.telegram.api.(*mockBotAPI).sentMessages
 	menu, ok := messages[len(messages)-1].(tgbotapi.MessageConfig)
 	if !ok || !strings.Contains(
 		menu.Text,
@@ -314,7 +314,7 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 		)
 		edit := lastEditMessage(
 			t,
-			bot.api.(*mockBotAPI),
+			bot.telegram.api.(*mockBotAPI),
 		)
 		if !strings.Contains(
 			edit.Text,
@@ -364,7 +364,7 @@ func TestQuizMaterialPreferenceButtonFollowsLinkedQuestions(t *testing.T) {
 		77,
 		0,
 	)
-	api := bot.api.(*mockBotAPI)
+	api := bot.telegram.api.(*mockBotAPI)
 	message, ok := api.sentMessages[len(api.sentMessages)-1].(tgbotapi.MessageConfig)
 	if !ok {
 		t.Fatalf(
@@ -483,7 +483,7 @@ func TestStudyMaterialPreferenceDoesNotChangeSessionProgress(t *testing.T) {
 	}
 	edit := lastEditMessage(
 		t,
-		b.api.(*mockBotAPI),
+		b.telegram.api.(*mockBotAPI),
 	)
 	if !strings.Contains(
 		edit.Text,
@@ -544,7 +544,7 @@ func TestStudyMaterialPreferenceEscapesHTMLAndExplainsMaintenance(t *testing.T) 
 	)
 	edit := lastEditMessage(
 		t,
-		b.api.(*mockBotAPI),
+		b.telegram.api.(*mockBotAPI),
 	)
 	for _, want := range []string{"&lt;水 &amp; 물&gt;", "30일", "60→120→최대 180일", "오답이면 일반 학습", "새로 만드는 세션부터 적용"} {
 		if !strings.Contains(

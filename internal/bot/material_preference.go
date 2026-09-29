@@ -87,13 +87,13 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 				"error",
 				err,
 			)
-			sf.bot.SendMessage(
+			sf.telegram.SendMessage(
 				cb.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].materialPreferenceSaveFailed,
 			)
 			return
 		}
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			fmt.Sprintf(
@@ -123,7 +123,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].materialPreferenceLoadFailed,
 		)
@@ -142,7 +142,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 		questionID,
 		mode,
 	)
-	if err := sf.bot.SendMessageWithKeyboard(
+	if err := sf.telegram.SendMessageWithKeyboard(
 		cb.Message.Chat.ID,
 		text,
 		keyboard,
@@ -247,10 +247,10 @@ func (sf *StudyFlow) handleMaterialPreference(
 			"error",
 			err,
 		)
-		sf.bot.api.Request(tgbotapi.NewCallbackWithAlert(
+		sf.telegram.AnswerCallbackAlert(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].materialQuizSessionRejected,
-		))
+		)
 		return
 	}
 	var item *model.StudySessionMaterial
@@ -261,10 +261,10 @@ func (sf *StudyFlow) handleMaterialPreference(
 		}
 	}
 	if item == nil {
-		sf.bot.api.Request(tgbotapi.NewCallbackWithAlert(
+		sf.telegram.AnswerCallbackAlert(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].materialNotInSession,
-		))
+		)
 		return
 	}
 	if parts[2] == callbackActionCard {
@@ -292,10 +292,10 @@ func (sf *StudyFlow) handleMaterialPreference(
 			)
 			return
 		}
-		sf.bot.api.Request(tgbotapi.NewCallback(
+		sf.telegram.AnswerCallback(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].materialPreferenceAppliedNotice,
-		))
+		)
 	} else {
 		preference, err := sf.bot.services.MaterialPreference.Get(
 			ctx,
@@ -325,7 +325,7 @@ func (sf *StudyFlow) handleMaterialPreference(
 		materialID,
 		mode,
 	)
-	sf.bot.EditMessage(
+	sf.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		text,
@@ -481,10 +481,10 @@ func (b *Bot) handleMaterialPreferencesCallback(
 			)
 			return
 		}
-		b.api.Request(tgbotapi.NewCallback(
+		b.telegram.AnswerCallback(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].materialPreferenceRestoredNotice,
-		))
+		)
 	}
 	items, hasNext, err := b.services.MaterialPreference.List(
 		ctx,
@@ -505,7 +505,7 @@ func (b *Bot) handleMaterialPreferencesCallback(
 		page,
 		hasNext,
 	)
-	b.EditMessage(
+	b.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		text,
@@ -630,8 +630,8 @@ func (b *Bot) materialPreferenceError(
 		"error",
 		err,
 	)
-	b.api.Request(tgbotapi.NewCallbackWithAlert(
+	b.telegram.AnswerCallbackAlert(
 		cb.ID,
 		botMessagesByLocale[botDefaultLocale].materialPreferenceFailed,
-	))
+	)
 }

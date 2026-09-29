@@ -288,7 +288,7 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 			&mockLLM{},
 		)
 		b := &Bot{
-			api:      mAPI,
+			telegram: newTelegramClient(mAPI),
 			input:    stateStores,
 			drafts:   stateStores,
 			messages: stateStores,
@@ -415,7 +415,7 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 		mAPI *mockBotAPI,
 	) *SessionFlow {
 		b := &Bot{
-			api:      mAPI,
+			telegram: newTelegramClient(mAPI),
 			input:    stateStores,
 			drafts:   stateStores,
 			messages: stateStores,
@@ -538,8 +538,12 @@ func TestHandleStudyAskLLMQuestion(t *testing.T) {
 		)
 		api := &mockBotAPI{}
 		b := &Bot{
-			api:   api,
-			input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+			telegram: newTelegramClient(api),
+			input:    stateStores,
+			drafts:   stateStores,
+			messages: stateStores,
+			recovery: stateStores,
+			timing:   stateStores,
 			services: &service.Services{
 				StudyActiveSession: service.NewStudyActiveSessionService(
 					nil,

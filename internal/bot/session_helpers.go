@@ -9,7 +9,7 @@ import (
 )
 
 func (sf *SessionFlow) showSessionFetchError(cb *tgbotapi.CallbackQuery) {
-	sf.bot.EditMessage(
+	sf.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		botMessagesByLocale[botDefaultLocale].sessionFetchFailed,
@@ -23,7 +23,7 @@ func (sf *SessionFlow) showQuizActiveSessionUnavailable(
 ) {
 	text := botMessagesByLocale[botDefaultLocale].activeSessionUnavailable
 	if editMessageID != nil {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -31,7 +31,7 @@ func (sf *SessionFlow) showQuizActiveSessionUnavailable(
 		)
 		return
 	}
-	sf.bot.SendMessage(
+	sf.telegram.SendMessage(
 		chatID,
 		text,
 	)

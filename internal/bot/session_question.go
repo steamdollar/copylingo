@@ -61,14 +61,14 @@ func (sf *SessionFlow) showQuestion(
 			),
 		)
 		if editMessageID != nil {
-			sf.bot.EditMessage(
+			sf.telegram.EditMessage(
 				chatID,
 				*editMessageID,
 				botMessagesByLocale[botDefaultLocale].questionCompleted,
 				&keyboard,
 			)
 		} else {
-			sf.bot.SendMessageWithKeyboard(
+			sf.telegram.SendMessageWithKeyboard(
 				chatID,
 				botMessagesByLocale[botDefaultLocale].questionCompleted,
 				keyboard,
@@ -151,7 +151,7 @@ func (sf *SessionFlow) showQuestion(
 
 	// err handling after rendering question
 	if editMessageID != nil {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -159,13 +159,13 @@ func (sf *SessionFlow) showQuestion(
 		)
 	} else {
 		if keyboard != nil {
-			sf.bot.SendMessageWithKeyboard(
+			sf.telegram.SendMessageWithKeyboard(
 				chatID,
 				text,
 				*keyboard,
 			)
 		} else {
-			sf.bot.SendMessage(
+			sf.telegram.SendMessage(
 				chatID,
 				text,
 			)
@@ -250,14 +250,14 @@ func (sf *SessionFlow) renderByType(
 		if editMessageID != nil {
 			// Web App 버튼은 별도 메시지로 두는 편이 Mini App 왕복 흐름을 추적하기 쉽다.
 			// 이전 메시지는 재사용하지 않고 짧은 안내 문구로 축약한다.
-			sf.bot.EditMessage(
+			sf.telegram.EditMessage(
 				chatID,
 				*editMessageID,
 				messages.handwritingSentNotice,
 				nil,
 			)
 		}
-		msgID, err := sf.bot.SendMessageWithReplyMarkup(
+		msgID, err := sf.telegram.SendMessageWithReplyMarkup(
 			chatID,
 			text,
 			replyMarkup,
@@ -443,7 +443,7 @@ func (sf *SessionFlow) sendListeningAudio(
 
 	// Fast path: re-send by cached file_id (no store fetch, no re-upload).
 	if q.AudioFileID != nil && *q.AudioFileID != "" {
-		if err := sf.bot.SendVoiceFileID(
+		if err := sf.telegram.SendVoiceFileID(
 			chatID,
 			*q.AudioFileID,
 		); err == nil {
@@ -480,7 +480,7 @@ func (sf *SessionFlow) sendListeningAudio(
 		return false
 	}
 
-	fileID, err := sf.bot.SendVoiceBytes(
+	fileID, err := sf.telegram.SendVoiceBytes(
 		chatID,
 		clip,
 	)

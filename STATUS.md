@@ -6,7 +6,7 @@
 
 ## 🔨 진행 중
 
-- (없음)
+- 아키텍처 단순화 2·3단계 — ADR-059 §8 세분화 순서 A~E (A: Telegram 호출 분리 완료, 다음 B: Quiz·Study Tier1 통합). see [ADR-059](docs/adr/ADR-059_architecture_simplification.md#8-보강-2026-09-30-계층-규칙과-세분화된-실행-순서)
 
 ---
 
@@ -36,6 +36,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-30 | Bot의 Telegram API 호출을 `telegramClient`로 분리, Flow가 전송 시 `*Bot`을 거치지 않도록 정리 (ADR-059 §8 A) | [2609300018_bot_telegram_client_extraction.md](docs/workthrough/2609/2609300018_bot_telegram_client_extraction.md) |
 | 2026-09-28 | Bot 한글 문구를 단일 locale map에 정리하고 bot 전용 callback·명령 상수를 bot 패키지로 이동 | [2609280142_bot_message_callback_constants.md](docs/workthrough/2609/2609280142_bot_message_callback_constants.md) |
 | 2026-09-28 | StudyFlow·LLM 질문 문구를 하나의 locale map 파일로 통합 | [2609280054_study_flow_message_map.md](docs/workthrough/2609/2609280054_study_flow_message_map.md) |
 | 2026-09-28 | Study Redis 진행 상태의 불필요한 version 필드·검사 제거 (ADR-063) | [2609280008_remove_study_session_version.md](docs/workthrough/2609/2609280008_remove_study_session_version.md) |

@@ -31,8 +31,8 @@ func TestHandleTextInput(t *testing.T) {
 
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			QuizActiveSession: active,
 			Grader:            grader,
@@ -126,8 +126,8 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 	)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			QuizActiveSession: active,
 			Grader:            grader,
@@ -195,8 +195,8 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 	)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			QuizActiveSession: active,
 		},
@@ -262,8 +262,8 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 	)
 	mAPI := &mockBotAPI{}
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{},
 		services: &service.Services{
 			QuizActiveSession: active,

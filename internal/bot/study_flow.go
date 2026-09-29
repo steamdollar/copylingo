@@ -18,11 +18,15 @@ import (
 
 // StudyFlow handles material-based study sessions.
 type StudyFlow struct {
-	bot *Bot
+	bot      *Bot
+	telegram *telegramClient
 }
 
 func NewStudyFlow(bot *Bot) *StudyFlow {
-	return &StudyFlow{bot: bot}
+	return &StudyFlow{
+		bot:      bot,
+		telegram: bot.telegram,
+	}
 }
 
 func (sf *StudyFlow) PushSession(
@@ -42,7 +46,7 @@ func (sf *StudyFlow) PushSession(
 			),
 		),
 	)
-	return sf.bot.SendMessageWithKeyboard(
+	return sf.telegram.SendMessageWithKeyboard(
 		chatID,
 		message.sessionPush,
 		keyboard,
@@ -169,7 +173,7 @@ func (sf *StudyFlow) startSession(
 			"error",
 			err,
 		)
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			messages.startFailed,
@@ -178,7 +182,7 @@ func (sf *StudyFlow) startSession(
 		return
 	}
 	if state.Session.Status == model.SessionCompleted {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			messages.alreadyCompleted,
@@ -224,7 +228,7 @@ func (sf *StudyFlow) nextMaterial(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.saveProgressFailed,
 		)
@@ -266,7 +270,7 @@ func (sf *StudyFlow) prevMaterial(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.loadProgressFailed,
 		)
@@ -307,7 +311,7 @@ func (sf *StudyFlow) finishSession(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.saveCompletionFailed,
 		)
@@ -328,14 +332,14 @@ func (sf *StudyFlow) finishSession(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.completeFailed,
 		)
 		return
 	}
 
-	sf.bot.EditMessage(
+	sf.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		messages.sessionCompleted,
@@ -353,7 +357,7 @@ func (sf *StudyFlow) showMaterial(
 	messages := botMessagesByLocale[botDefaultLocale]
 	items := state.Items
 	if len(items) == 0 {
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			chatID,
 			messages.noMaterials,
 		)
@@ -379,7 +383,7 @@ func (sf *StudyFlow) showMaterial(
 				err,
 			)
 		}
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			chatID,
 			messages.autoCompleted,
 		)
@@ -400,7 +404,7 @@ func (sf *StudyFlow) showMaterial(
 			"material_order",
 			materialOrder,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			chatID,
 			messages.materialOrderNotFound,
 		)
@@ -437,7 +441,7 @@ func (sf *StudyFlow) showMaterial(
 	}
 
 	if editMessageID != nil {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -445,7 +449,7 @@ func (sf *StudyFlow) showMaterial(
 		)
 		return
 	}
-	sf.bot.SendMessageWithKeyboard(
+	sf.telegram.SendMessageWithKeyboard(
 		chatID,
 		text,
 		keyboard,
@@ -542,7 +546,7 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		return
 	}
 	if sf.bot.input == nil || sf.bot.services == nil || sf.bot.services.StudyActiveSession == nil {
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.llmQuestionActivationFailed,
 		)
@@ -567,14 +571,14 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.currentMaterialQuestionUnavailable,
 		)
 		return
 	}
 	if _, _, ok := state.ItemByOrder(materialOrder); !ok {
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.materialNotFound,
 		)
@@ -603,13 +607,13 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 			"error",
 			err,
 		)
-		sf.bot.SendMessage(
+		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.llmQuestionActivationFailed,
 		)
 		return
 	}
-	sf.bot.SendMessageWithKeyboard(
+	sf.telegram.SendMessageWithKeyboard(
 		cb.Message.Chat.ID,
 		messages.llmQuestionPrompt,
 		llmCancelKeyboard(),

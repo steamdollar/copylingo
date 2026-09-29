@@ -19,8 +19,8 @@ func TestHandleExit(t *testing.T) {
 		model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 2},
 	)
 	b := &Bot{
-		api:   mAPI,
-		input: mRdb,
+		telegram: newTelegramClient(mAPI),
+		input:    mRdb,
 	}
 
 	msg := &tgbotapi.Message{
@@ -62,9 +62,9 @@ func TestHandleExit(t *testing.T) {
 
 func TestClearInlineKeyboardOmitsReplyMarkup(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 
-	if err := b.ClearInlineKeyboard(
+	if err := b.telegram.ClearInlineKeyboard(
 		12345,
 		678,
 	); err != nil {

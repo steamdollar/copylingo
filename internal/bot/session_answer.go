@@ -188,10 +188,10 @@ func (sf *SessionFlow) processAnswerText(
 		selectedAnswer = strings.ToLower(selectedAnswer) // For Kana fill in the blank
 	case model.QuestionSubjective:
 		// Show typing status for AI grading UX
-		sf.bot.api.Request(tgbotapi.NewChatAction(
+		sf.telegram.SendChatAction(
 			chatID,
 			tgbotapi.ChatTyping,
-		))
+		)
 	}
 
 	isCorrect, feedback, err := sf.bot.services.Grader.GradeAnswerWithQuestion(
@@ -206,11 +206,10 @@ func (sf *SessionFlow) processAnswerText(
 			err,
 			service.ErrAIUnavailable,
 		) {
-			errMsg := tgbotapi.NewMessage(
+			sf.telegram.SendMessage(
 				chatID,
 				botMessagesByLocale[botDefaultLocale].subjectiveGradingUnavailable,
 			)
-			sf.bot.api.Send(errMsg)
 			isCorrect = false
 			if recordErr := sf.bot.services.QuizActiveSession.RecordAnswer(
 				ctx,
@@ -351,7 +350,7 @@ func (sf *SessionFlow) processAnswerText(
 	}
 
 	if editMessageID != nil {
-		sf.bot.EditMessage(
+		sf.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -359,7 +358,7 @@ func (sf *SessionFlow) processAnswerText(
 		)
 	} else {
 		// 텍스트 답변은 사용자 메시지로 들어오므로 편집할 봇 문제 메시지가 없다.
-		sf.bot.SendMessageWithKeyboard(
+		sf.telegram.SendMessageWithKeyboard(
 			chatID,
 			text,
 			keyboard,

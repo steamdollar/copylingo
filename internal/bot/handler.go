@@ -42,7 +42,7 @@ type BotAPI interface {
 
 // Bot wraps the Telegram bot API with CopyLingo business logic.
 type Bot struct {
-	api      BotAPI
+	telegram *telegramClient
 	cfg      *config.Config
 	services *service.Services
 	input    InputStateStore
@@ -75,7 +75,7 @@ func NewBot(
 	)
 
 	bot := &Bot{
-		api:      api,
+		telegram: newTelegramClient(api),
 		cfg:      cfg,
 		services: services,
 		input:    stores.Input,
@@ -100,7 +100,7 @@ func (b *Bot) Start() {
 	pollConfig.Timeout = 60
 
 	// 업데이트 받는 go chan 생성
-	updates := b.api.GetUpdatesChan(pollConfig)
+	updates := b.telegram.Updates(pollConfig)
 
 	for {
 		select {
@@ -116,7 +116,7 @@ func (b *Bot) Start() {
 // Stop signals the bot to stop listening.
 func (b *Bot) Stop() {
 	close(b.stopCh)
-	b.api.StopReceivingUpdates()
+	b.telegram.StopUpdates()
 }
 
 // PushSession: push session container message to user
@@ -150,139 +150,18 @@ func (b *Bot) PushStudySession(
 	)
 }
 
-// TODO: sendMessage, SendMessageWithKeyboard 굳이 따로 두는 이유가?
-// SendMessage sends a text message to a chat.
-func (b *Bot) SendMessage(
-	chatID int64,
-	text string,
-) error {
-	msg := tgbotapi.NewMessage(
-		chatID,
-		sanitizeTelegramHTML(text),
-	)
-	msg.ParseMode = "HTML"
-	_, err := b.api.Send(msg)
-	return err
-}
-
-// SendMessageWithKeyboard sends a message with an inline keyboard.
-func (b *Bot) SendMessageWithKeyboard(
-	chatID int64,
-	text string,
-	keyboard tgbotapi.InlineKeyboardMarkup,
-) error {
-	msg := tgbotapi.NewMessage(
-		chatID,
-		sanitizeTelegramHTML(text),
-	)
-	msg.ParseMode = "HTML"
-	if len(keyboard.InlineKeyboard) > 0 {
-		msg.ReplyMarkup = keyboard
-	}
-	_, err := b.api.Send(msg)
-	return err
-}
-
-// SendMessageWithReplyMarkup sends a message with custom Telegram reply markup.
-func (b *Bot) SendMessageWithReplyMarkup(
-	chatID int64,
-	text string,
-	replyMarkup interface{},
-) (int, error) {
-	msg := tgbotapi.NewMessage(
-		chatID,
-		sanitizeTelegramHTML(text),
-	)
-	msg.ParseMode = "HTML"
-	msg.ReplyMarkup = replyMarkup
-	sent, err := b.api.Send(msg)
-	if err != nil {
-		return 0, err
-	}
-	return sent.MessageID, nil
-}
-
-// SendVoiceFileID sends a voice message by reusing a cached Telegram file_id.
-func (b *Bot) SendVoiceFileID(
-	chatID int64,
-	fileID string,
-) error {
-	voice := tgbotapi.NewVoice(
-		chatID,
-		tgbotapi.FileID(fileID),
-	)
-	_, err := b.api.Send(voice)
-	return err
-}
-
-// SendVoiceBytes uploads raw OGG/Opus bytes as a voice message and returns the
-// Telegram file_id assigned to it, so callers can cache it for later re-sends.
-func (b *Bot) SendVoiceBytes(
-	chatID int64,
-	data []byte,
-) (string, error) {
-	voice := tgbotapi.NewVoice(
-		chatID,
-		tgbotapi.FileBytes{Name: "listening.ogg", Bytes: data},
-	)
-	sent, err := b.api.Send(voice)
-	if err != nil {
-		return "", err
-	}
-	if sent.Voice != nil {
-		return sent.Voice.FileID, nil
-	}
-	return "", nil
-}
-
-// EditMessageReplyMarkup updates the inline keyboard of an existing message.
+// EditMessageReplyMarkup satisfies the Mini App's TelegramMessenger contract.
+// It moves to a narrow Flow contract when flows are split (ADR-059 §8 step C).
 func (b *Bot) EditMessageReplyMarkup(
 	chatID int64,
 	messageID int,
 	markup tgbotapi.InlineKeyboardMarkup,
 ) error {
-	edit := tgbotapi.NewEditMessageReplyMarkup(
+	return b.telegram.EditMessageReplyMarkup(
 		chatID,
 		messageID,
 		markup,
 	)
-	_, err := b.api.Send(edit)
-	return err
-}
-
-// EditMessage edits an existing message.
-func (b *Bot) EditMessage(
-	chatID int64,
-	messageID int,
-	text string,
-	keyboard *tgbotapi.InlineKeyboardMarkup,
-) error {
-	edit := tgbotapi.NewEditMessageText(
-		chatID,
-		messageID,
-		sanitizeTelegramHTML(text),
-	)
-	edit.ParseMode = "HTML"
-	if keyboard != nil && len(keyboard.InlineKeyboard) > 0 {
-		edit.ReplyMarkup = keyboard
-	}
-	_, err := b.api.Send(edit)
-	return err
-}
-
-// ClearInlineKeyboard removes inline buttons from an existing bot message.
-func (b *Bot) ClearInlineKeyboard(
-	chatID int64,
-	messageID int,
-) error {
-	edit := tgbotapi.EditMessageReplyMarkupConfig{
-		BaseEdit: tgbotapi.BaseEdit{
-			ChatID:    chatID,
-			MessageID: messageID,
-		},
-	}
-	_, err := b.api.Send(edit)
-	return err
 }
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
@@ -562,7 +441,7 @@ func (b *Bot) handleMessage(
 			msg,
 		)
 	default:
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].unknownCommand,
 		)
@@ -574,11 +453,10 @@ func (b *Bot) handleCallback(
 	cb *tgbotapi.CallbackQuery,
 ) {
 	// Acknowledge callback to remove loading indicator
-	callbackResponse := tgbotapi.NewCallback(
+	b.telegram.AnswerCallback(
 		cb.ID,
 		"",
 	)
-	b.api.Request(callbackResponse)
 
 	data := cb.Data
 
@@ -650,7 +528,7 @@ func (b *Bot) handleCallback(
 }
 
 func (b *Bot) handleStart(msg *tgbotapi.Message) {
-	b.SendMessage(
+	b.telegram.SendMessage(
 		msg.Chat.ID,
 		botMessagesByLocale[botDefaultLocale].welcomeMessage,
 	)
@@ -746,7 +624,7 @@ func (b *Bot) showMainMenu(
 		),
 	)
 
-	b.SendMessageWithKeyboard(
+	b.telegram.SendMessageWithKeyboard(
 		chatID,
 		text,
 		keyboard,
@@ -762,7 +640,7 @@ func (b *Bot) handleStats(
 		msg.From.ID,
 	)
 	if err != nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].statsCommandFailed,
 		)
@@ -781,7 +659,7 @@ func (b *Bot) handleStats(
 		stats.ListeningAccuracy,
 	)
 
-	b.SendMessage(
+	b.telegram.SendMessage(
 		msg.Chat.ID,
 		text,
 	)
@@ -820,7 +698,7 @@ func (b *Bot) handleStatsCallback(
 		),
 	)
 
-	b.EditMessage(
+	b.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		text,
@@ -837,7 +715,7 @@ func (b *Bot) handleStreak(
 		msg.From.ID,
 	)
 	if err != nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].streakCommandFailed,
 		)
@@ -848,7 +726,7 @@ func (b *Bot) handleStreak(
 		botMessagesByLocale[botDefaultLocale].streakFormat,
 		stats.CurrentStreak,
 	)
-	b.SendMessage(
+	b.telegram.SendMessage(
 		msg.Chat.ID,
 		text,
 	)
@@ -858,7 +736,7 @@ func (b *Bot) handleHelp(
 	_ context.Context,
 	msg *tgbotapi.Message,
 ) {
-	b.SendMessage(
+	b.telegram.SendMessage(
 		msg.Chat.ID,
 		botMessagesByLocale[botDefaultLocale].helpMessage,
 	)
@@ -879,7 +757,7 @@ func (b *Bot) handleExit(
 			userID,
 		)
 	}
-	b.SendMessage(
+	b.telegram.SendMessage(
 		msg.Chat.ID,
 		botMessagesByLocale[botDefaultLocale].exitMessage,
 	)
@@ -891,7 +769,7 @@ func (b *Bot) handleStudy(
 ) {
 	limit, err := parseStudyCommandLimit(msg.CommandArguments())
 	if err != nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			fmt.Sprintf(
 				botMessagesByLocale[botDefaultLocale].studyCommandUsageFormat,
@@ -915,7 +793,7 @@ func (b *Bot) handleStudy(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].userUnavailable,
 		)
@@ -943,14 +821,14 @@ func (b *Bot) handleStudy(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].studyCommandBuildFailed,
 		)
 		return
 	}
 	if session == nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].studyCommandNoMaterials,
 		)
@@ -974,7 +852,7 @@ func (b *Bot) handleStudy(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].studyCommandPushFailed,
 		)
@@ -1039,7 +917,7 @@ func (b *Bot) handleTest(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].userUnavailable,
 		)
@@ -1064,7 +942,7 @@ func (b *Bot) handleTest(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].testSessionBuildFailed,
 		)
@@ -1072,7 +950,7 @@ func (b *Bot) handleTest(
 	}
 
 	if session == nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].testSessionNoQuestions,
 		)
@@ -1098,7 +976,7 @@ func (b *Bot) handleTest(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].testSessionPushFailed,
 		)

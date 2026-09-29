@@ -95,7 +95,7 @@ func newSettingsTestBot() (*Bot, *settingsMockUserRepo, *mockBotAPI) {
 
 	mockAPI := &mockBotAPI{}
 	bot := &Bot{
-		api:      mockAPI,
+		telegram: newTelegramClient(mockAPI),
 		services: services,
 	}
 	return bot, repo, mockAPI

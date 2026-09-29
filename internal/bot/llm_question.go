@@ -31,7 +31,7 @@ func (b *Bot) handleLLM(
 		return
 	}
 	if b.input == nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			messages.activationUnavailable,
 		)
@@ -53,13 +53,13 @@ func (b *Bot) handleLLM(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			messages.activationUnavailable,
 		)
 		return
 	}
-	b.SendMessageWithKeyboard(
+	b.telegram.SendMessageWithKeyboard(
 		msg.Chat.ID,
 		messages.modeActivated,
 		llmCancelKeyboard(),
@@ -87,7 +87,7 @@ func (b *Bot) handleLLMCancel(
 		return
 	}
 	if b.input == nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.cancelUnavailable,
 		)
@@ -108,13 +108,13 @@ func (b *Bot) handleLLMCancel(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.cancelUnavailable,
 		)
 		return
 	}
-	b.SendMessage(
+	b.telegram.SendMessage(
 		cb.Message.Chat.ID,
 		messages.modeCancelled,
 	)
@@ -151,14 +151,14 @@ func (b *Bot) handleLLMQuestion(
 	}
 	question := strings.TrimSpace(msg.Text)
 	if question == "" {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			messages.emptyQuestion,
 		)
 		return true
 	}
 	if b.services == nil || b.services.User == nil || b.services.LLM == nil || b.services.Tip == nil {
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			messages.questionUnavailable,
 		)
@@ -181,14 +181,14 @@ func (b *Bot) handleLLMQuestion(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			messages.userUnavailable,
 		)
 		return true
 	}
 
-	b.SendMessage(
+	b.telegram.SendMessage(
 		msg.Chat.ID,
 		messages.answerGenerating,
 	)
@@ -227,7 +227,7 @@ func (b *Bot) handleLLMQuestion(
 			"error",
 			err,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			messages.answerFailed,
 		)
@@ -241,7 +241,7 @@ func (b *Bot) handleLLMQuestion(
 		answer,
 	)
 
-	b.SendMessage(
+	b.telegram.SendMessage(
 		msg.Chat.ID,
 		fmt.Sprintf(
 			messages.answerFormat,

@@ -289,8 +289,8 @@ func TestRenderByType(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		cfg: &config.Config{Server: config.ServerConfig{PublicBaseURL: "https://ex.com"}},
 	}
 	sf := NewSessionFlow(b)
@@ -484,7 +484,11 @@ func TestRenderByType_Listening(t *testing.T) {
 		"cached file_id fast path",
 		func(t *testing.T) {
 			mAPI := &mockBotAPI{}
-			b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
+			b := &Bot{
+				telegram: newTelegramClient(mAPI),
+				input:    newTestInteractionStores(),
+				services: &service.Services{Audio: audio},
+			}
 			sf := NewSessionFlow(b)
 			q := model.Question{
 				ID:          5,
@@ -548,7 +552,11 @@ func TestRenderByType_Listening(t *testing.T) {
 		func(t *testing.T) {
 			store.getCalls = 0
 			mAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
-			b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
+			b := &Bot{
+				telegram: newTelegramClient(mAPI),
+				input:    newTestInteractionStores(),
+				services: &service.Services{Audio: audio},
+			}
 			sf := NewSessionFlow(b)
 			q := model.Question{
 				ID:        9,
@@ -590,7 +598,11 @@ func TestRenderByType_Listening(t *testing.T) {
 		"no audio available degrades softly",
 		func(t *testing.T) {
 			mAPI := &mockBotAPI{}
-			b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
+			b := &Bot{
+				telegram: newTelegramClient(mAPI),
+				input:    newTestInteractionStores(),
+				services: &service.Services{Audio: audio},
+			}
 			sf := NewSessionFlow(b)
 			q := model.Question{
 				ID:      1,
@@ -638,7 +650,7 @@ func TestShowQuestion_Finish(t *testing.T) {
 		nil,
 	)
 	b := &Bot{
-		api:      mAPI,
+		telegram: newTelegramClient(mAPI),
 		input:    stateStores,
 		drafts:   stateStores,
 		messages: stateStores,

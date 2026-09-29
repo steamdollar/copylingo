@@ -31,7 +31,7 @@ func (b *Bot) handleSettingsCommand(
 				err,
 			),
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].settingsLoadFailed,
 		)
@@ -40,7 +40,7 @@ func (b *Bot) handleSettingsCommand(
 
 	text := buildSettingsOverviewText(user)
 	keyboard := b.settingsKeyboard(user)
-	b.SendMessageWithKeyboard(
+	b.telegram.SendMessageWithKeyboard(
 		msg.Chat.ID,
 		text,
 		keyboard,
@@ -80,10 +80,10 @@ func (b *Bot) handleSettingsCallback(
 				err,
 			),
 		)
-		b.api.Request(tgbotapi.NewCallbackWithAlert(
+		b.telegram.AnswerCallbackAlert(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].settingsUserLoadFailed,
-		))
+		)
 		return
 	}
 
@@ -128,17 +128,17 @@ func (b *Bot) handleSettingsCallback(
 					err,
 				),
 			)
-			b.api.Request(tgbotapi.NewCallbackWithAlert(
+			b.telegram.AnswerCallbackAlert(
 				cb.ID,
 				botMessagesByLocale[botDefaultLocale].settingsTimezoneInvalid,
-			))
+			)
 			return
 		}
 		user.Timezone = tz
-		b.api.Request(tgbotapi.NewCallback(
+		b.telegram.AnswerCallback(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].settingsTimezoneChanged,
-		))
+		)
 		b.renderSettingsView(
 			ctx,
 			cb,
@@ -241,10 +241,10 @@ func (b *Bot) handleSettingsCallback(
 						err,
 					),
 				)
-				b.api.Request(tgbotapi.NewCallbackWithAlert(
+				b.telegram.AnswerCallbackAlert(
 					cb.ID,
 					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
-				))
+				)
 				return
 			}
 			setUserSlotTime(
@@ -252,10 +252,10 @@ func (b *Bot) handleSettingsCallback(
 				slot,
 				nil,
 			)
-			b.api.Request(tgbotapi.NewCallback(
+			b.telegram.AnswerCallback(
 				cb.ID,
 				botMessagesByLocale[botDefaultLocale].settingsNotificationsDisabled,
-			))
+			)
 		} else {
 			if err := b.services.User.UpdateSlotTime(
 				ctx,
@@ -279,10 +279,10 @@ func (b *Bot) handleSettingsCallback(
 						err,
 					),
 				)
-				b.api.Request(tgbotapi.NewCallbackWithAlert(
+				b.telegram.AnswerCallbackAlert(
 					cb.ID,
 					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
-				))
+				)
 				return
 			}
 			setUserSlotTime(
@@ -290,13 +290,13 @@ func (b *Bot) handleSettingsCallback(
 				slot,
 				&timeVal,
 			)
-			b.api.Request(tgbotapi.NewCallback(
+			b.telegram.AnswerCallback(
 				cb.ID,
 				fmt.Sprintf(
 					botMessagesByLocale[botDefaultLocale].settingsNotificationTimeSetFormat,
 					timeVal,
 				),
-			))
+			)
 		}
 		b.renderSettingsView(
 			ctx,
@@ -314,7 +314,7 @@ func (b *Bot) renderSettingsView(
 	text := buildSettingsOverviewText(u)
 	keyboard := b.settingsKeyboard(u)
 	if cb.Message != nil {
-		b.EditMessage(
+		b.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			text,
@@ -331,7 +331,7 @@ func (b *Bot) renderTimezoneView(
 	text := buildTimezoneText(u)
 	keyboard := buildTimezoneKeyboard()
 	if cb.Message != nil {
-		b.EditMessage(
+		b.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			text,
@@ -356,7 +356,7 @@ func (b *Bot) renderSlotPickerView(
 		isAll,
 	)
 	if cb.Message != nil {
-		b.EditMessage(
+		b.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			text,

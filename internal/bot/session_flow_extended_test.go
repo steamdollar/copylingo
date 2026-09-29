@@ -88,7 +88,7 @@ func TestStartStudy_NoSessions(t *testing.T) {
 		nil,
 	)
 	b := &Bot{
-		api: mAPI,
+		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
 			SessionBuilder: sb,
 		},
@@ -151,7 +151,7 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 		nil,
 	)
 	b := &Bot{
-		api: mAPI,
+		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
 			SessionBuilder: sb,
 		},
@@ -229,8 +229,8 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 		nil,
 	)
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			SessionBuilder:    sb,
 			QuizActiveSession: active,
@@ -326,7 +326,7 @@ func TestStartReview_NoneDue(t *testing.T) {
 	)
 
 	b := &Bot{
-		api: mAPI,
+		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
 			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
 				context.Context,
@@ -414,7 +414,7 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 	mSRSRepo := &mockSRSRepoWithCount{count: 0}
 	srs := service.NewSRSService(mSRSRepo)
 	b := &Bot{
-		api: mAPI,
+		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
 			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
 				context.Context,
@@ -485,8 +485,8 @@ func TestHandleSessionCallback(t *testing.T) {
 		nil,
 	)
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			SessionBuilder:    sb,
 			QuizActiveSession: active,
@@ -543,8 +543,8 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 		nil,
 	)
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			SessionBuilder:    sb,
 			QuizActiveSession: active,
@@ -696,8 +696,8 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 		nil,
 	)
 	b := &Bot{
-		api:   mAPI,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(mAPI),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			SessionBuilder: service.NewSessionBuilderService(
 				nil,
@@ -746,7 +746,7 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 
 func TestPushSession(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 	sf := NewSessionFlow(b)
 
 	err := sf.PushSession(

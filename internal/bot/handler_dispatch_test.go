@@ -249,7 +249,7 @@ func TestLanguageDisplayName(t *testing.T) {
 
 func TestHandleUpdate_Dispatch(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 
 	t.Run(
 		"Message update",
@@ -311,7 +311,7 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 
 func TestHandleHelp(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 	ctx := context.Background()
 	msg := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: 123},
@@ -342,7 +342,7 @@ func TestHandleHelp(t *testing.T) {
 
 func TestHandleMessage_UnknownCommand(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{api: mAPI}
+	b := &Bot{telegram: newTelegramClient(mAPI)}
 	ctx := context.Background()
 	msg := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: 123},
@@ -373,8 +373,8 @@ func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
 	api := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	b := &Bot{
-		api:   api,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(api),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 	}
 
 	allowedUserID := llmAllowedTelegramUserIDs[0]
@@ -436,7 +436,7 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 		otherUserID,
 		model.PendingLLMInput{Kind: model.PendingLLMPlain},
 	)
-	b := &Bot{api: api, input: stateStores}
+	b := &Bot{telegram: newTelegramClient(api), input: stateStores}
 
 	b.handleCallback(
 		context.Background(),
@@ -487,8 +487,8 @@ func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {
 	api := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	b := &Bot{
-		api:   api,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(api),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 	}
 
 	b.handleMessage(
@@ -544,7 +544,7 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 	}
 	var gotQuestion string
 	b := &Bot{
-		api: api,
+		telegram: newTelegramClient(api),
 		cfg: &config.Config{LLM: config.LLMConfig{
 			Model: "test-model",
 		}},
@@ -641,8 +641,8 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 		},
 	}
 	b := &Bot{
-		api:   api,
-		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+		telegram: newTelegramClient(api),
+		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
 			LLM: service.NewLLMService(&mockLLM{
@@ -715,7 +715,7 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
 	b := &Bot{
-		api: api,
+		telegram: newTelegramClient(api),
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
 			StudySession: service.NewStudySessionService(
@@ -1070,7 +1070,7 @@ func botWithStudyCommandDeps(
 		},
 	}
 	return &Bot{
-		api: api,
+		telegram: newTelegramClient(api),
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
 			StudySession: service.NewStudySessionService(

@@ -95,7 +95,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 				s.ID,
 				q.ID,
 			); err == nil && ref != nil {
-				_ = b.ClearInlineKeyboard(
+				_ = b.telegram.ClearInlineKeyboard(
 					ref.ChatID,
 					ref.MessageID,
 				)
@@ -113,7 +113,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			"user_id",
 			s.UserID,
 		)
-		b.SendMessage(
+		b.telegram.SendMessage(
 			s.UserID,
 			botMessagesByLocale[botDefaultLocale].handwritingLinkUpdated,
 		)
