@@ -1,7 +1,8 @@
 # ADR-059: 기능별 호출 경계와 서버 초기화 구조 단순화
 
 - 날짜: 2026-09-26
-- 상태: **설계 방향 승인, 1단계 완료; 2·3단계 미착수**
+- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중**
+- 보강: 2026-09-30 — 서비스 2계층·생성자 규칙·하위 계층 규칙 추가 (§8)
 - 범위: 패키지 간 호출 경계, Quiz·Study 책임 배치, Redis 접근, 서버 인스턴스 생성·주입
 - 관련 결정: [ADR-057·058·060](ADR_from_41_to_60.md), [1단계 구현 기록](../workthrough/2609/2609262045_redis_access_boundary.md)
 
@@ -274,11 +275,75 @@ Quiz와 Study 담당 서비스는 기존 `service` 패키지의 구성요소다.
 | 순서 | 작업 | 단계 완료 시 확인할 결과 |
 |---|---|---|
 | 1 (완료) | Redis 저장 경계 정리 | 호출자가 키·직렬화·Redis 명령 반환 타입을 모름 |
-| 2 | Quiz 책임 통합, Study 경계 정리 | 화면 코드가 채점·답안 기록·완료 정책을 직접 조정하지 않음 |
-| 3 | 좁은 기능 주입, 서버 조립 통합, 상수 이동 | 한 조립 경로에서 생성 순서를 확인하고 각 생성자에서 의존 범위를 읽을 수 있음 |
+| 2 → §8 B | Quiz 책임 통합, Study 경계 정리 | 화면 코드가 채점·답안 기록·완료 정책을 직접 조정하지 않음 |
+| 3 → §8 A·C·D·E | 좁은 기능 주입, 서버 조립 통합, 상수 이동 | 한 조립 경로에서 생성 순서를 확인하고 각 생성자에서 의존 범위를 읽을 수 있음 |
 
 구현 범위는 단계별로 잡는다. 후속 단계의 정확한 메서드명, 내부 helper 유지·통합 위치, 실행 객체의 종료 API는 설명용 예시만으로 확정하지 않는다. 기존 Redis TODO는 1단계 완료 후 제거하고 위 구현 기록에 결과를 남겼다.
 
 후속 구현에서는 기존 테스트로 세션 시작·재개·중복 제출·채점 실패·완료, 손글씨 화면 갱신, 발송 claim을 확인한다. 키·TTL·원자성·트랜잭션·worker·rate limit의 동작을 보존한다. 서버 조립 변경은 초기화 실패 시 정리와 정상 시작·종료도 확인한다.
 
 코드 변경 시 프로젝트 규칙에 따라 `make test`를 수행한다. 로컬 런타임 변경은 Makefile의 타깃 설명에 따라 앱을 재시작하고 `/health`를 확인한다. 이번 문서 export는 코드·설정·실행 상태를 변경하지 않으므로 해당 실행 검증 대상이 아니다.
+
+## 8. 보강 (2026-09-30): 계층 규칙과 세분화된 실행 순서
+
+### 8.1 추가 진단 — 인자 수가 아니라 묶음 전달이 문제
+
+1단계 완료 후 실측 결과, 생성자 인자는 최대 5개로 많지 않았다. 읽기 어려움의 원인은 인자로 전달되는 묶음과 상호 참조다.
+
+- `Services`(16필드)를 bot이 12종·52회, scheduler가 8종 사용한다. `NewBot(cfg, services, stores)`는 인자 3개지만 실제 의존은 본문을 모두 읽어야 드러난다.
+- `SessionFlow{bot *Bot}`·`StudyFlow{bot *Bot}`와 `Bot`이 서로를 참조한다. `*Bot` 41개·`SessionFlow` 29개·`StudyFlow` 9개 메서드가 사실상 한 객체로 동작한다. 같은 `*Bot`이 scheduler의 `sessionPusher`와 Mini App의 `TelegramMessenger`로도 주입된다.
+- 서비스 간 의존 계층(Handwriting → Grader → QuizActiveSession → SRS, Grader → LLM, SessionBuilder → SRS)은 존재하지만 `Services`가 16개를 평면으로 공개해 호출자가 상·하위 서비스를 섞어 직접 조정한다.
+- 1단계의 `bot.StateStores` 5개 필드는 모두 같은 `interactions`를 받는다. 소비자별 분리 없이 인터페이스만 나뉜 상태이며 C 단계의 Flow 분리 후 소비자별로 전달한다.
+
+패키지 import 그래프는 순환이 없고 계층 위반도 없다. 따라서 이번 보강은 **패키지를 늘리지 않는다**(12개 유지). 정리 대상은 패키지 내부의 타입·공개 범위·전달 경로다.
+
+### 8.2 서비스 2계층
+
+```mermaid
+flowchart TB
+    adapters["bot · scheduler · miniapp"]
+    subgraph service ["service 패키지"]
+        t1["Tier1 (exported): Quiz · Study · User · Preference · Stats · Tip · LLMQuestion"]
+        t2["Tier2 (unexported): selection · progress(+SRS) · grading · sessionQuery · llm"]
+        t1 --> t2
+    end
+    lower["repository · redisstore · external"]
+    adapters -->|"Tier1만"| t1
+    t1 --> lower
+    t2 --> lower
+```
+
+- 호출자(bot·scheduler·miniapp)는 Tier1만 참조한다. Tier2는 unexported로 두어 컴파일러가 경계를 강제한다.
+- Tier2는 Tier1 생성자 내부에서 만든다. `cmd/server`는 하위 계층과 Tier1만 조립한다.
+- Tier1은 기존 호출자가 조정하던 순서(소유자 확인 → 채점 → 실패 기록 → 완료)를 흡수해야 한다. 메서드를 그대로 전달하는 계층이면 완료로 보지 않는다.
+- 원래 leaf인 서비스(User·Preference·Tip 등)는 감싸지 않는다. 큰 Tier1은 같은 패키지 안에서 파일로 나눈다(`quiz_start.go`, `quiz_submit.go` 등).
+- Tier2를 하위 패키지(`service/srs`, `service/grading`)로 분리하는 안은 파편화를 늘려 기각한다.
+
+### 8.3 생성자 규칙
+
+- 위치 인자는 4개 이하. 초과 시 이름 있는 필드를 가진 `XxxDeps` struct를 사용한다(기존 `miniapp.HandlerDeps` 방식).
+- `Deps`의 각 필드는 소비자가 정의한 좁은 인터페이스 또는 값이다. `service.Services`·`*bot.Bot`·`*config.Config` 전체를 넣지 않는다.
+- 묶음 struct(`Repositories` 등)는 `cmd/server` 조립 중에만 사용한다. `Repositories`는 조립부 외 사용처가 없어 유지한다.
+- 인자 수가 줄어드는 것은 목표가 아니다. Tier1 Quiz처럼 의존이 7~8개가 되는 생성자는 `Deps` 필드 목록이 곧 외부 경계 목록이 되도록 한다.
+
+### 8.4 하위 계층(repository · redisstore · external) 규칙
+
+- 구조는 유지한다. 테이블 단위 repository와 서비스의 트랜잭션 범위 결정(ADR-061), 소비자 정의 인터페이스 방식을 그대로 둔다. 기능별 repository 통합은 Quiz·Study가 같은 테이블을 공유해 중복만 늘리므로 기각한다.
+- 하위 계층은 `model`과 드라이버만 import한다. `config`·`service`·`bot`을 import하지 않는다.
+  - 세션 상태는 `model`로 일원화한다(`repository/session_repo.go`의 `config.SessionStatus` 제거).
+  - `external` 생성자는 `*config.Config` 대신 필요한 값의 options struct를 받는다. `GenerateTips`를 인터페이스에 정식 포함해 `NewServices`의 concrete 타입 단언을 제거한다.
+- 서비스의 저장·외부 인터페이스는 Tier1 기준으로 다시 정의한다. Tier2 간 호출은 같은 패키지의 concrete 호출로 바꿀 수 있다.
+
+### 8.5 세분화된 실행 순서
+
+각 단계는 독립 커밋이며 `make test` 통과를 완료 조건으로 한다.
+
+| 단계 | 작업 | 완료 기준 |
+|---|---|---|
+| A | Telegram 전송 기능(`Send`/`Edit`/키보드/음성)을 bot 패키지 내부 타입으로 추출 | Flow가 전송을 위해 `Bot`을 거치지 않음 |
+| B | Quiz·Study Tier1 통합, Tier2 unexported (§8.2) | bot·scheduler·miniapp이 Tier1 타입만 참조 |
+| C | 기능별 Flow 분리, `*Bot` 역참조 제거, scheduler·Mini App에 Flow의 좁은 계약 주입 | bot 패키지 필드에 `*Bot`·`*service.Services`가 없음 |
+| D | `Services` 묶음 삭제, 외부 클라이언트 생성 이동, `app.Run/Close`, 필요한 설정 값만 전달, 세션 상태 `model` 일원화 | 조립 경로 한곳에서 생성 순서 확인 가능, 하위 계층이 `config` import 안 함 |
+| E | `go list` 기반 import 경계 테스트 | 금지 import가 CI에서 실패 |
+
+B를 C보다 먼저 한다. 반대로 하면 Flow가 받는 인터페이스를 두 번 바꿔야 한다. A는 B·C와 독립적이어서 먼저 수행한다.
