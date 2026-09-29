@@ -36,6 +36,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-09-28 | Bot 한글 문구를 단일 locale map에 정리하고 bot 전용 callback·명령 상수를 bot 패키지로 이동 | [2609280142_bot_message_callback_constants.md](docs/workthrough/2609/2609280142_bot_message_callback_constants.md) |
+| 2026-09-28 | StudyFlow·LLM 질문 문구를 하나의 locale map 파일로 통합 | [2609280054_study_flow_message_map.md](docs/workthrough/2609/2609280054_study_flow_message_map.md) |
 | 2026-09-28 | Study Redis 진행 상태의 불필요한 version 필드·검사 제거 (ADR-063) | [2609280008_remove_study_session_version.md](docs/workthrough/2609/2609280008_remove_study_session_version.md) |
 | 2026-09-27 | Quiz·Study Redis 진행 상태의 `workingSetStore` 포장 제거, 저장소 직접 호출 및 손상 상태 검사 통합 (ADR-062) | [2609272349_simplify_session_working_set.md](docs/workthrough/2609/2609272349_simplify_session_working_set.md) |
 | 2026-09-27 | Study 세션 생성의 트랜잭션 경계를 서비스 `WithinTx`로 이동하고 세션·자료 INSERT 분리 (ADR-061) | [2609272139_study_service_transaction_boundary.md](docs/workthrough/2609/2609272139_study_service_transaction_boundary.md) |

@@ -10,22 +10,36 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/model"
 )
 
-func wordOrderShuffleOrder(sessionID, questionID, count int) []int {
+func wordOrderShuffleOrder(
+	sessionID,
+	questionID,
+	count int,
+) []int {
 	if count <= 0 {
 		return nil
 	}
 	h := fnv.New64a()
-	_, _ = h.Write([]byte(fmt.Sprintf("%d:%d", sessionID, questionID)))
+	_, _ = h.Write([]byte(fmt.Sprintf(
+		"%d:%d",
+		sessionID,
+		questionID,
+	)))
 	order := rand.New(rand.NewSource(int64(h.Sum64()))).Perm(count)
 	return order
 }
 
-func validWordOrderSelection(selection []int, optionCount int) bool {
-	seen := make(map[int]struct{}, len(selection))
+func validWordOrderSelection(
+	selection []int,
+	optionCount int,
+) bool {
+	seen := make(
+		map[int]struct{},
+		len(selection),
+	)
 	for _, idx := range selection {
 		if idx < 0 || idx >= optionCount {
 			return false
@@ -38,83 +52,182 @@ func validWordOrderSelection(selection []int, optionCount int) bool {
 	return true
 }
 
-func (sf *SessionFlow) getWordOrderDraft(ctx context.Context, sessionID, questionID, optionCount int) ([]int, error) {
+func (sf *SessionFlow) getWordOrderDraft(
+	ctx context.Context,
+	sessionID,
+	questionID,
+	optionCount int,
+) ([]int, error) {
 	if sf.bot == nil || sf.bot.drafts == nil {
 		return nil, nil
 	}
-	selection, err := sf.bot.drafts.GetWordOrderDraft(ctx, sessionID, questionID)
+	selection, err := sf.bot.drafts.GetWordOrderDraft(
+		ctx,
+		sessionID,
+		questionID,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if !validWordOrderSelection(selection, optionCount) {
+	if !validWordOrderSelection(
+		selection,
+		optionCount,
+	) {
 		// A corrupt/stale draft must not make a question impossible to answer.
-		_ = sf.bot.drafts.DeleteWordOrderDraft(ctx, sessionID, questionID)
+		_ = sf.bot.drafts.DeleteWordOrderDraft(
+			ctx,
+			sessionID,
+			questionID,
+		)
 		return nil, nil
 	}
 	return selection, nil
 }
 
-func (sf *SessionFlow) setWordOrderDraft(ctx context.Context, sessionID, questionID int, selection []int) error {
+func (sf *SessionFlow) setWordOrderDraft(
+	ctx context.Context,
+	sessionID,
+	questionID int,
+	selection []int,
+) error {
 	if sf.bot == nil || sf.bot.drafts == nil {
 		return fmt.Errorf("word order draft redis is unavailable")
 	}
-	return sf.bot.drafts.SetWordOrderDraft(ctx, sessionID, questionID, selection)
+	return sf.bot.drafts.SetWordOrderDraft(
+		ctx,
+		sessionID,
+		questionID,
+		selection,
+	)
 }
 
-func (sf *SessionFlow) deleteWordOrderDraft(ctx context.Context, sessionID, questionID int) {
+func (sf *SessionFlow) deleteWordOrderDraft(
+	ctx context.Context,
+	sessionID,
+	questionID int,
+) {
 	if sf.bot != nil && sf.bot.drafts != nil {
-		_ = sf.bot.drafts.DeleteWordOrderDraft(ctx, sessionID, questionID)
+		_ = sf.bot.drafts.DeleteWordOrderDraft(
+			ctx,
+			sessionID,
+			questionID,
+		)
 	}
 }
 
-func wordOrderDisplayText(prompt string, options []string, selection []int) string {
-	assembled := "(아직 선택한 조각 없음)"
+func wordOrderDisplayText(
+	prompt string,
+	options []string,
+	selection []int,
+) string {
+	messages := botMessagesByLocale[botDefaultLocale]
+	assembled := messages.wordOrderEmptySelection
 	if len(selection) > 0 {
-		chunks := make([]string, 0, len(selection))
+		chunks := make(
+			[]string,
+			0,
+			len(selection),
+		)
 		for _, idx := range selection {
 			if idx >= 0 && idx < len(options) {
-				chunks = append(chunks, options[idx])
+				chunks = append(
+					chunks,
+					options[idx],
+				)
 			}
 		}
 		if len(chunks) > 0 {
-			assembled = strings.Join(chunks, "")
+			assembled = strings.Join(
+				chunks,
+				"",
+			)
 		}
 	}
-	return fmt.Sprintf("%s\n\n🧩 조립: <b>%s</b>", prompt, assembled)
+	return fmt.Sprintf(
+		"%s%s <b>%s</b>",
+		prompt,
+		messages.wordOrderAssembledPrefix,
+		assembled,
+	)
 }
 
-func wordOrderKeyboard(sessionID, questionID int, options []string, selection []int) *tgbotapi.InlineKeyboardMarkup {
-	selected := make(map[int]struct{}, len(selection))
+func wordOrderKeyboard(
+	sessionID,
+	questionID int,
+	options []string,
+	selection []int,
+) *tgbotapi.InlineKeyboardMarkup {
+	selected := make(
+		map[int]struct{},
+		len(selection),
+	)
 	for _, idx := range selection {
 		selected[idx] = struct{}{}
 	}
-	order := wordOrderShuffleOrder(sessionID, questionID, len(options))
-	rows := make([][]tgbotapi.InlineKeyboardButton, 0, len(options)+1)
+	order := wordOrderShuffleOrder(
+		sessionID,
+		questionID,
+		len(options),
+	)
+	rows := make(
+		[][]tgbotapi.InlineKeyboardButton,
+		0,
+		len(options)+1,
+	)
 	for _, idx := range order {
 		if _, ok := selected[idx]; ok {
 			continue
 		}
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				options[idx],
-				fmt.Sprintf(config.FormatWordOrderSelect, sessionID, questionID, idx),
+		rows = append(
+			rows,
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					options[idx],
+					fmt.Sprintf(
+						formatWordOrderSelect,
+						sessionID,
+						questionID,
+						idx,
+					),
+				),
 			),
-		))
+		)
 	}
 	controls := tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("↩️ 되돌리기", fmt.Sprintf(config.FormatWordOrderUndo, sessionID, questionID)),
-		tgbotapi.NewInlineKeyboardButtonData("초기화", fmt.Sprintf(config.FormatWordOrderReset, sessionID, questionID)),
+		tgbotapi.NewInlineKeyboardButtonData(
+			botMessagesByLocale[botDefaultLocale].wordOrderUndoButton,
+			fmt.Sprintf(
+				formatWordOrderUndo,
+				sessionID,
+				questionID,
+			),
+		),
+		tgbotapi.NewInlineKeyboardButtonData(
+			botMessagesByLocale[botDefaultLocale].wordOrderResetButton,
+			fmt.Sprintf(
+				formatWordOrderReset,
+				sessionID,
+				questionID,
+			),
+		),
 	)
 	if len(selection) == len(options) {
 		controls = append(
 			controls,
 			tgbotapi.NewInlineKeyboardButtonData(
-				"제출",
-				fmt.Sprintf(config.FormatWordOrderSubmit, sessionID, questionID),
+				botMessagesByLocale[botDefaultLocale].wordOrderSubmitButton,
+				fmt.Sprintf(
+					formatWordOrderSubmit,
+					sessionID,
+					questionID,
+				),
 			),
 		)
 	}
-	rows = append(rows, controls)
+	rows = append(
+		rows,
+		controls,
+	)
 	return &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
@@ -127,7 +240,12 @@ func (sf *SessionFlow) renderWordOrder(
 	if err != nil || len(options) == 0 {
 		return "", nil, true
 	}
-	selection, err := sf.getWordOrderDraft(ctx, sessionID, question.ID, len(options))
+	selection, err := sf.getWordOrderDraft(
+		ctx,
+		sessionID,
+		question.ID,
+		len(options),
+	)
 	if err != nil {
 		return "", nil, true
 	}
@@ -146,13 +264,17 @@ func (sf *SessionFlow) renderWordOrder(
 func (sf *SessionFlow) wordOrderCurrentItem(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 ) (*model.QuizActiveSessionState, *model.QuizActiveSessionQuestion, bool) {
 	if cb == nil || cb.From == nil || sf.bot == nil || sf.bot.services == nil ||
 		sf.bot.services.QuizActiveSession == nil {
 		return nil, nil, false
 	}
-	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil || state.Session.UserID != cb.From.ID {
 		return nil, nil, false
 	}
@@ -163,22 +285,40 @@ func (sf *SessionFlow) wordOrderCurrentItem(
 	return state, item, true
 }
 
-func wordOrderUpdatedText(existing, prompt string, options []string, selection []int) string {
-	if idx := strings.Index(existing, "\n\n🧩 조립:"); idx >= 0 {
+func wordOrderUpdatedText(
+	existing,
+	prompt string,
+	options []string,
+	selection []int,
+) string {
+	if idx := strings.Index(
+		existing,
+		botMessagesByLocale[botDefaultLocale].wordOrderAssembledPrefix,
+	); idx >= 0 {
 		existing = existing[:idx]
 	}
 	if strings.TrimSpace(existing) == "" {
 		existing = prompt
 	}
-	return existing + wordOrderDisplayText("", options, selection)
+	return existing + wordOrderDisplayText(
+		"",
+		options,
+		selection,
+	)
 }
 
-func (sf *SessionFlow) handleWordOrderCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (sf *SessionFlow) handleWordOrderCallback(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+) {
 	if cb == nil || cb.Message == nil {
 		return
 	}
-	parts := strings.Split(cb.Data, ":")
-	if len(parts) < 5 || parts[0] != "q" || parts[2] != "wo" {
+	parts := strings.Split(
+		cb.Data,
+		":",
+	)
+	if len(parts) < 5 || parts[0] != callback.QuestionRoot || parts[2] != callbackActionWordOrder {
 		return
 	}
 	sessionID, err1 := strconv.Atoi(parts[1])
@@ -186,14 +326,22 @@ func (sf *SessionFlow) handleWordOrderCallback(ctx context.Context, cb *tgbotapi
 	if err1 != nil || err2 != nil {
 		return
 	}
-	_, item, ok := sf.wordOrderCurrentItem(ctx, cb, sessionID, questionID)
+	_, item, ok := sf.wordOrderCurrentItem(
+		ctx,
+		cb,
+		sessionID,
+		questionID,
+	)
 	if !ok {
 		return
 	}
 	action := parts[4]
 	if item.SessionQuestion.IsCorrect != nil {
-		if action == "s" && len(parts) == 5 {
-			sf.bot.SendMessage(cb.Message.Chat.ID, "이미 답변한 문제입니다.")
+		if action == callbackActionWordOrderSubmit && len(parts) == 5 {
+			sf.bot.SendMessage(
+				cb.Message.Chat.ID,
+				botMessagesByLocale[botDefaultLocale].alreadyAnswered,
+			)
 		}
 		return
 	}
@@ -201,13 +349,18 @@ func (sf *SessionFlow) handleWordOrderCallback(ctx context.Context, cb *tgbotapi
 	if err != nil || len(options) == 0 {
 		return
 	}
-	selection, err := sf.getWordOrderDraft(ctx, sessionID, questionID, len(options))
+	selection, err := sf.getWordOrderDraft(
+		ctx,
+		sessionID,
+		questionID,
+		len(options),
+	)
 	if err != nil {
 		return
 	}
 
 	switch action {
-	case "a":
+	case callbackActionWordOrderSelect:
 		if len(parts) != 6 {
 			return
 		}
@@ -220,63 +373,130 @@ func (sf *SessionFlow) handleWordOrderCallback(ctx context.Context, cb *tgbotapi
 				return
 			}
 		}
-		selection = append(selection, idx)
-	case "u":
+		selection = append(
+			selection,
+			idx,
+		)
+	case callbackActionWordOrderUndo:
 		if len(parts) != 5 || len(selection) == 0 {
 			return
 		}
 		selection = selection[:len(selection)-1]
-	case "r":
+	case callbackActionWordOrderReset:
 		if len(parts) != 5 {
 			return
 		}
 		selection = nil
-	case "s":
+	case callbackActionWordOrderSubmit:
 		if len(parts) != 5 || len(selection) != len(options) {
 			return
 		}
-		answerParts := make([]string, 0, len(selection))
+		answerParts := make(
+			[]string,
+			0,
+			len(selection),
+		)
 		for _, idx := range selection {
-			answerParts = append(answerParts, options[idx])
+			answerParts = append(
+				answerParts,
+				options[idx],
+			)
 		}
-		answer := strings.Join(answerParts, "")
+		answer := strings.Join(
+			answerParts,
+			"",
+		)
 		if item.SessionQuestion.IsCorrect != nil {
-			sf.bot.SendMessage(cb.Message.Chat.ID, "이미 답변한 문제입니다.")
+			sf.bot.SendMessage(
+				cb.Message.Chat.ID,
+				botMessagesByLocale[botDefaultLocale].alreadyAnswered,
+			)
 			return
 		}
 		editMessageID := cb.Message.MessageID
-		sf.processAnswerText(ctx, cb.Message.Chat.ID, cb.From, sessionID, questionID, answer, &editMessageID)
-		if state, _, valid := sf.wordOrderCurrentItem(ctx, cb, sessionID, questionID); valid {
+		sf.processAnswerText(
+			ctx,
+			cb.Message.Chat.ID,
+			cb.From,
+			sessionID,
+			questionID,
+			answer,
+			&editMessageID,
+		)
+		if state, _, valid := sf.wordOrderCurrentItem(
+			ctx,
+			cb,
+			sessionID,
+			questionID,
+		); valid {
 			if current, _, exists := state.CurrentItemByQuestionID(
 				questionID,
 			); exists &&
 				current.SessionQuestion.IsCorrect != nil {
-				sf.deleteWordOrderDraft(ctx, sessionID, questionID)
+				sf.deleteWordOrderDraft(
+					ctx,
+					sessionID,
+					questionID,
+				)
 			}
 		}
 		return
 	default:
 		return
 	}
-	if !validWordOrderSelection(selection, len(options)) {
+	if !validWordOrderSelection(
+		selection,
+		len(options),
+	) {
 		return
 	}
-	if action == "r" {
-		sf.deleteWordOrderDraft(ctx, sessionID, questionID)
+	if action == callbackActionWordOrderReset {
+		sf.deleteWordOrderDraft(
+			ctx,
+			sessionID,
+			questionID,
+		)
 	} else {
-		if err := sf.setWordOrderDraft(ctx, sessionID, questionID, selection); err != nil {
+		if err := sf.setWordOrderDraft(
+			ctx,
+			sessionID,
+			questionID,
+			selection,
+		); err != nil {
 			return
 		}
 	}
-	text := wordOrderUpdatedText(cb.Message.Text, item.Question.Prompt, options, selection)
-	kb := wordOrderKeyboard(sessionID, questionID, options, selection)
+	text := wordOrderUpdatedText(
+		cb.Message.Text,
+		item.Question.Prompt,
+		options,
+		selection,
+	)
+	kb := wordOrderKeyboard(
+		sessionID,
+		questionID,
+		options,
+		selection,
+	)
 	if item.Question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
-		kb.InlineKeyboard = append(kb.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				"⚙️ 연결 자료 설정",
-				fmt.Sprintf(config.FormatQuestionPolicy, sessionID, questionID),
+		kb.InlineKeyboard = append(
+			kb.InlineKeyboard,
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					botMessagesByLocale[botDefaultLocale].linkedMaterialSettingsButton,
+					fmt.Sprintf(
+						callback.FormatQuestionPolicy,
+						sessionID,
+						questionID,
+					),
+				),
 			),
-		))
+		)
 	}
-	sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, kb)
+	sf.bot.EditMessage(
+		cb.Message.Chat.ID,
+		cb.Message.MessageID,
+		text,
+		kb,
+	)
 }

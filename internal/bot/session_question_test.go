@@ -18,7 +18,10 @@ import (
 func TestIsStaleMiniAppCallbackWrapper(t *testing.T) {
 	t.Parallel()
 	// This is a simple wrapper, we just check it doesn't crash and delegates correctly
-	if !isStaleMiniAppCallback([]string{"q", "1"}, "http://new.com") {
+	if !isStaleMiniAppCallback(
+		[]string{"q", "1"},
+		"http://new.com",
+	) {
 		t.Error("expected legacy callback to be stale")
 	}
 }
@@ -28,38 +31,84 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 	b := &Bot{cfg: &config.Config{}}
 	sf := NewSessionFlow(b)
 
-	t.Run("empty base url", func(t *testing.T) {
-		b.cfg.Server.PublicBaseURL = ""
-		_, err := sf.handwritingMiniAppURL(1, 1, "jp", "n5", "prompt", 1)
-		if err == nil {
-			t.Error("expected error for empty base URL")
-		}
-	})
+	t.Run(
+		"empty base url",
+		func(t *testing.T) {
+			b.cfg.Server.PublicBaseURL = ""
+			_, err := sf.handwritingMiniAppURL(
+				1,
+				1,
+				"jp",
+				"n5",
+				"prompt",
+				1,
+			)
+			if err == nil {
+				t.Error("expected error for empty base URL")
+			}
+		},
+	)
 
-	t.Run("valid url", func(t *testing.T) {
-		b.cfg.Server.PublicBaseURL = "https://api.example.com/"
-		prompt := "뜻 <b>'학교'</b>에 해당하는 일본어 단어를 손글씨로 쓰세요"
-		got, err := sf.handwritingMiniAppURL(123, 456, "jp", "n5", prompt, 2)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !strings.Contains(got, "session_id=123") {
-			t.Errorf("missing session_id in %s", got)
-		}
-		if !strings.Contains(got, "question_id=456") {
-			t.Errorf("missing question_id in %s", got)
-		}
-		u, err := url.Parse(got)
-		if err != nil {
-			t.Fatalf("parse url: %v", err)
-		}
-		if gotPrompt := u.Query().Get("prompt"); gotPrompt != prompt {
-			t.Errorf("prompt = %q, want %q", gotPrompt, prompt)
-		}
-		if gotCells := u.Query().Get("cells"); gotCells != "2" {
-			t.Errorf("cells = %q, want %q", gotCells, "2")
-		}
-	})
+	t.Run(
+		"valid url",
+		func(t *testing.T) {
+			b.cfg.Server.PublicBaseURL = "https://api.example.com/"
+			prompt := "뜻 <b>'학교'</b>에 해당하는 일본어 단어를 손글씨로 쓰세요"
+			got, err := sf.handwritingMiniAppURL(
+				123,
+				456,
+				"jp",
+				"n5",
+				prompt,
+				2,
+			)
+			if err != nil {
+				t.Fatalf(
+					"unexpected error: %v",
+					err,
+				)
+			}
+			if !strings.Contains(
+				got,
+				"session_id=123",
+			) {
+				t.Errorf(
+					"missing session_id in %s",
+					got,
+				)
+			}
+			if !strings.Contains(
+				got,
+				"question_id=456",
+			) {
+				t.Errorf(
+					"missing question_id in %s",
+					got,
+				)
+			}
+			u, err := url.Parse(got)
+			if err != nil {
+				t.Fatalf(
+					"parse url: %v",
+					err,
+				)
+			}
+			if gotPrompt := u.Query().Get("prompt"); gotPrompt != prompt {
+				t.Errorf(
+					"prompt = %q, want %q",
+					gotPrompt,
+					prompt,
+				)
+			}
+			if gotCells := u.Query().Get("cells"); gotCells != "2" {
+				t.Errorf(
+					"cells = %q, want %q",
+					gotCells,
+					"2",
+				)
+			}
+		},
+	)
 }
 
 func TestHandwritingCellCountExcludesSokuon(t *testing.T) {
@@ -74,18 +123,30 @@ func TestHandwritingCellCountExcludesSokuon(t *testing.T) {
 		{name: "without sokuon", answer: "かな", want: 2},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := handwritingCellCount(tt.answer); got != tt.want {
-				t.Errorf("handwritingCellCount(%q) = %d, want %d", tt.answer, got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				if got := handwritingCellCount(tt.answer); got != tt.want {
+					t.Errorf(
+						"handwritingCellCount(%q) = %d, want %d",
+						tt.answer,
+						got,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
 func TestQuestionNavigation(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
+	active := service.NewQuizActiveSessionService(
+		nil,
+		stateStores.quiz,
+		nil,
+	)
 	sf := NewSessionFlow(&Bot{services: &service.Services{QuizActiveSession: active}})
 
 	trueVal := true
@@ -98,29 +159,59 @@ func TestQuestionNavigation(t *testing.T) {
 			{SessionQuestion: model.SessionQuestion{QuestionID: 3}},
 		},
 	}
-	seedQuizState(stateStores, state)
+	seedQuizState(
+		stateStores,
+		state,
+	)
 
-	t.Run("isQuestionAnswered", func(t *testing.T) {
-		if !sf.isQuestionAnswered(ctx, 10, 0) {
-			t.Error("expected index 0 to be answered")
-		}
-		if sf.isQuestionAnswered(ctx, 10, 1) {
-			t.Error("expected index 1 to be unanswered")
-		}
-		if sf.isQuestionAnswered(ctx, 10, 5) {
-			t.Error("expected out of bounds to be false")
-		}
-	})
+	t.Run(
+		"isQuestionAnswered",
+		func(t *testing.T) {
+			if !sf.isQuestionAnswered(
+				ctx,
+				10,
+				0,
+			) {
+				t.Error("expected index 0 to be answered")
+			}
+			if sf.isQuestionAnswered(
+				ctx,
+				10,
+				1,
+			) {
+				t.Error("expected index 1 to be unanswered")
+			}
+			if sf.isQuestionAnswered(
+				ctx,
+				10,
+				5,
+			) {
+				t.Error("expected out of bounds to be false")
+			}
+		},
+	)
 
-	t.Run("nextUnansweredQuestionIndex", func(t *testing.T) {
-		idx, err := sf.nextUnansweredQuestionIndex(ctx, 10)
-		if err != nil {
-			t.Fatalf("failed: %v", err)
-		}
-		if idx != 1 {
-			t.Errorf("expected idx 1, got %d", idx)
-		}
-	})
+	t.Run(
+		"nextUnansweredQuestionIndex",
+		func(t *testing.T) {
+			idx, err := sf.nextUnansweredQuestionIndex(
+				ctx,
+				10,
+			)
+			if err != nil {
+				t.Fatalf(
+					"failed: %v",
+					err,
+				)
+			}
+			if idx != 1 {
+				t.Errorf(
+					"expected idx 1, got %d",
+					idx,
+				)
+			}
+		},
+	)
 }
 
 func TestBuildMCQKeyboardLayout(t *testing.T) {
@@ -137,28 +228,59 @@ func TestBuildMCQKeyboardLayout(t *testing.T) {
 		{"odd option count", []string{"A", "B", "C"}, []int{2, 1}},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			keyboard := buildMCQKeyboard(10, 20, tt.options)
-			if len(keyboard.InlineKeyboard) != len(tt.widths) {
-				t.Fatalf("rows = %d, want %d", len(keyboard.InlineKeyboard), len(tt.widths))
-			}
-			index := 0
-			for rowIndex, row := range keyboard.InlineKeyboard {
-				if len(row) != tt.widths[rowIndex] {
-					t.Fatalf("row %d has %d buttons, want %d", rowIndex, len(row), tt.widths[rowIndex])
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				keyboard := buildMCQKeyboard(
+					10,
+					20,
+					tt.options,
+				)
+				if len(keyboard.InlineKeyboard) != len(tt.widths) {
+					t.Fatalf(
+						"rows = %d, want %d",
+						len(keyboard.InlineKeyboard),
+						len(tt.widths),
+					)
 				}
-				for _, button := range row {
-					if button.Text != tt.options[index] {
-						t.Errorf("button %d text = %q, want %q", index, button.Text, tt.options[index])
+				index := 0
+				for rowIndex, row := range keyboard.InlineKeyboard {
+					if len(row) != tt.widths[rowIndex] {
+						t.Fatalf(
+							"row %d has %d buttons, want %d",
+							rowIndex,
+							len(row),
+							tt.widths[rowIndex],
+						)
 					}
-					wantData := fmt.Sprintf(config.FormatQuestionAnswer, 10, 20, index)
-					if button.CallbackData == nil || *button.CallbackData != wantData {
-						t.Errorf("button %d callback = %v, want %q", index, button.CallbackData, wantData)
+					for _, button := range row {
+						if button.Text != tt.options[index] {
+							t.Errorf(
+								"button %d text = %q, want %q",
+								index,
+								button.Text,
+								tt.options[index],
+							)
+						}
+						wantData := fmt.Sprintf(
+							formatQuestionAnswer,
+							10,
+							20,
+							index,
+						)
+						if button.CallbackData == nil || *button.CallbackData != wantData {
+							t.Errorf(
+								"button %d callback = %v, want %q",
+								index,
+								button.CallbackData,
+								wantData,
+							)
+						}
+						index++
 					}
-					index++
 				}
-			}
-		})
+			},
+		)
 	}
 }
 
@@ -173,56 +295,107 @@ func TestRenderByType(t *testing.T) {
 	}
 	sf := NewSessionFlow(b)
 
-	t.Run("MultipleChoice", func(t *testing.T) {
-		q := model.Question{
-			Type:    model.QuestionMultipleChoice,
-			Prompt:  "Choose one",
-			Options: json.RawMessage(`["A", "B", "C"]`),
-		}
-		text, kb, done := sf.renderByType(ctx, 1, nil, 10, 0, 5, q, false)
-		if done {
-			t.Fatal("expected not done")
-		}
-		if !strings.Contains(text, "Choose one") {
-			t.Errorf("text missing prompt: %s", text)
-		}
-		if kb == nil || len(kb.InlineKeyboard) != 2 {
-			t.Fatalf("expected 2 rows for 3 options, got %v", kb)
-		}
-	})
+	t.Run(
+		"MultipleChoice",
+		func(t *testing.T) {
+			q := model.Question{
+				Type:    model.QuestionMultipleChoice,
+				Prompt:  "Choose one",
+				Options: json.RawMessage(`["A", "B", "C"]`),
+			}
+			text, kb, done := sf.renderByType(
+				ctx,
+				1,
+				nil,
+				10,
+				0,
+				5,
+				q,
+				false,
+			)
+			if done {
+				t.Fatal("expected not done")
+			}
+			if !strings.Contains(
+				text,
+				"Choose one",
+			) {
+				t.Errorf(
+					"text missing prompt: %s",
+					text,
+				)
+			}
+			if kb == nil || len(kb.InlineKeyboard) != 2 {
+				t.Fatalf(
+					"expected 2 rows for 3 options, got %v",
+					kb,
+				)
+			}
+		},
+	)
 
-	t.Run("Subjective", func(t *testing.T) {
-		q := model.Question{
-			Type:   model.QuestionSubjective,
-			Prompt: "Write something",
-		}
-		_, kb, done := sf.renderByType(ctx, 123, nil, 10, 0, 5, q, false)
-		if done {
-			t.Fatal("expected not done")
-		}
-		if kb != nil {
-			t.Error("expected no keyboard for subjective")
-		}
-		if got, ok := stateStores.active[123]; !ok ||
-			got != (model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 0}) {
-			t.Errorf("active question = %+v, want session 10 index 0", got)
-		}
-	})
+	t.Run(
+		"Subjective",
+		func(t *testing.T) {
+			q := model.Question{
+				Type:   model.QuestionSubjective,
+				Prompt: "Write something",
+			}
+			_, kb, done := sf.renderByType(
+				ctx,
+				123,
+				nil,
+				10,
+				0,
+				5,
+				q,
+				false,
+			)
+			if done {
+				t.Fatal("expected not done")
+			}
+			if kb != nil {
+				t.Error("expected no keyboard for subjective")
+			}
+			if got, ok := stateStores.active[123]; !ok ||
+				got != (model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 0}) {
+				t.Errorf(
+					"active question = %+v, want session 10 index 0",
+					got,
+				)
+			}
+		},
+	)
 
-	t.Run("Handwriting", func(t *testing.T) {
-		q := model.Question{
-			ID:   456,
-			Type: model.QuestionKanaHandwriting,
-		}
-		mAPI.sentMessages = nil
-		_, _, done := sf.renderByType(ctx, 123, nil, 10, 0, 5, q, false)
-		if !done {
-			t.Fatal("expected done for handwriting (it sends message internally)")
-		}
-		if len(mAPI.sentMessages) != 1 {
-			t.Fatalf("expected 1 message sent, got %d", len(mAPI.sentMessages))
-		}
-	})
+	t.Run(
+		"Handwriting",
+		func(t *testing.T) {
+			q := model.Question{
+				ID:   456,
+				Type: model.QuestionKanaHandwriting,
+			}
+			mAPI.sentMessages = nil
+			_, _, done := sf.renderByType(
+				ctx,
+				123,
+				nil,
+				10,
+				0,
+				5,
+				q,
+				false,
+			)
+			if !done {
+				t.Fatal("expected done for handwriting (it sends message internally)")
+			}
+			if len(mAPI.sentMessages) != 1 {
+				t.Fatalf(
+					"expected 1 message sent, got %d",
+					len(mAPI.sentMessages),
+				)
+			}
+		},
+	)
 }
 
 // --- listening render fakes (structurally satisfy service.NewAudioService deps) ---
@@ -232,11 +405,26 @@ type fakeAudioRepo struct {
 	setFileVal string
 }
 
-func (f *fakeAudioRepo) GetListeningNeedingAudio(_ context.Context, _, _ string, _ int) ([]model.Question, error) {
+func (f *fakeAudioRepo) GetListeningNeedingAudio(
+	_ context.Context,
+	_,
+	_ string,
+	_ int,
+) ([]model.Question, error) {
 	return nil, nil
 }
-func (f *fakeAudioRepo) SetAudioPath(_ context.Context, _ int, _ string) error { return nil }
-func (f *fakeAudioRepo) SetAudioFileID(_ context.Context, id int, fileID string) error {
+func (f *fakeAudioRepo) SetAudioPath(
+	_ context.Context,
+	_ int,
+	_ string,
+) error {
+	return nil
+}
+func (f *fakeAudioRepo) SetAudioFileID(
+	_ context.Context,
+	id int,
+	fileID string,
+) error {
 	f.setFileID = id
 	f.setFileVal = fileID
 	return nil
@@ -244,16 +432,36 @@ func (f *fakeAudioRepo) SetAudioFileID(_ context.Context, id int, fileID string)
 
 type fakeSynth struct{}
 
-func (fakeSynth) Synthesize(_ context.Context, _ string) ([]byte, error) { return []byte("ogg"), nil }
+func (fakeSynth) Synthesize(
+	_ context.Context,
+	_ string,
+) ([]byte, error) {
+	return []byte("ogg"), nil
+}
 
 type fakeStore struct {
 	getCalls int
 	bytes    []byte
 }
 
-func (f *fakeStore) Exists(_ context.Context, _ string) (bool, error)          { return true, nil }
-func (f *fakeStore) Put(_ context.Context, _ string, _ []byte, _ string) error { return nil }
-func (f *fakeStore) Get(_ context.Context, _ string) ([]byte, error) {
+func (f *fakeStore) Exists(
+	_ context.Context,
+	_ string,
+) (bool, error) {
+	return true, nil
+}
+func (f *fakeStore) Put(
+	_ context.Context,
+	_ string,
+	_ []byte,
+	_ string,
+) error {
+	return nil
+}
+func (f *fakeStore) Get(
+	_ context.Context,
+	_ string,
+) ([]byte, error) {
 	f.getCalls++
 	return f.bytes, nil
 }
@@ -264,94 +472,171 @@ func TestRenderByType_Listening(t *testing.T) {
 	ctx := context.Background()
 	repo := &fakeAudioRepo{}
 	store := &fakeStore{bytes: []byte("ogg-bytes")}
-	audio := service.NewAudioService(repo, fakeSynth{}, store, "Kore", "Puck")
+	audio := service.NewAudioService(
+		repo,
+		fakeSynth{},
+		store,
+		"Kore",
+		"Puck",
+	)
 
-	t.Run("cached file_id fast path", func(t *testing.T) {
-		mAPI := &mockBotAPI{}
-		b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
-		sf := NewSessionFlow(b)
-		q := model.Question{
-			ID:          5,
-			Type:        model.QuestionListening,
-			Prompt:      "何をしますか?",
-			Options:     json.RawMessage(`["A","B"]`),
-			AudioPath:   strPtr("tts/ja/kore/abc.ogg"),
-			AudioFileID: strPtr("cached-fid"),
-		}
-		text, kb, done := sf.renderByType(ctx, 1, nil, 10, 0, 5, q, false)
-		if done {
-			t.Fatal("expected not done")
-		}
-		if kb == nil || len(kb.InlineKeyboard) != 1 {
-			t.Fatalf("expected 1 option row, got %v", kb)
-		}
-		if !strings.Contains(text, "🎧") {
-			t.Errorf("missing listen hint: %s", text)
-		}
-		if store.getCalls != 0 {
-			t.Errorf("cached file_id path must not fetch store, got %d gets", store.getCalls)
-		}
-		if len(mAPI.sentMessages) != 1 {
-			t.Fatalf("expected 1 voice message, got %d", len(mAPI.sentMessages))
-		}
-		if _, ok := mAPI.sentMessages[0].(tgbotapi.VoiceConfig); !ok {
-			t.Errorf("expected a VoiceConfig, got %T", mAPI.sentMessages[0])
-		}
-	})
+	t.Run(
+		"cached file_id fast path",
+		func(t *testing.T) {
+			mAPI := &mockBotAPI{}
+			b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
+			sf := NewSessionFlow(b)
+			q := model.Question{
+				ID:          5,
+				Type:        model.QuestionListening,
+				Prompt:      "何をしますか?",
+				Options:     json.RawMessage(`["A","B"]`),
+				AudioPath:   strPtr("tts/ja/kore/abc.ogg"),
+				AudioFileID: strPtr("cached-fid"),
+			}
+			text, kb, done := sf.renderByType(
+				ctx,
+				1,
+				nil,
+				10,
+				0,
+				5,
+				q,
+				false,
+			)
+			if done {
+				t.Fatal("expected not done")
+			}
+			if kb == nil || len(kb.InlineKeyboard) != 1 {
+				t.Fatalf(
+					"expected 1 option row, got %v",
+					kb,
+				)
+			}
+			if !strings.Contains(
+				text,
+				"🎧",
+			) {
+				t.Errorf(
+					"missing listen hint: %s",
+					text,
+				)
+			}
+			if store.getCalls != 0 {
+				t.Errorf(
+					"cached file_id path must not fetch store, got %d gets",
+					store.getCalls,
+				)
+			}
+			if len(mAPI.sentMessages) != 1 {
+				t.Fatalf(
+					"expected 1 voice message, got %d",
+					len(mAPI.sentMessages),
+				)
+			}
+			if _, ok := mAPI.sentMessages[0].(tgbotapi.VoiceConfig); !ok {
+				t.Errorf(
+					"expected a VoiceConfig, got %T",
+					mAPI.sentMessages[0],
+				)
+			}
+		},
+	)
 
-	t.Run("no file_id fetches store, uploads, caches file_id", func(t *testing.T) {
-		store.getCalls = 0
-		mAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
-		b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
-		sf := NewSessionFlow(b)
-		q := model.Question{
-			ID:        9,
-			Type:      model.QuestionListening,
-			Prompt:    "?",
-			Options:   json.RawMessage(`["A","B"]`),
-			AudioPath: strPtr("tts/ja/kore/def.ogg"),
-		}
-		_, _, done := sf.renderByType(ctx, 1, nil, 10, 0, 5, q, false)
-		if done {
-			t.Fatal("expected not done")
-		}
-		if store.getCalls != 1 {
-			t.Errorf("expected 1 store fetch, got %d", store.getCalls)
-		}
-		if repo.setFileID != 9 || repo.setFileVal != "new-fid" {
-			t.Errorf("expected file_id cached for q9=new-fid, got id=%d val=%q", repo.setFileID, repo.setFileVal)
-		}
-	})
+	t.Run(
+		"no file_id fetches store, uploads, caches file_id",
+		func(t *testing.T) {
+			store.getCalls = 0
+			mAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
+			b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
+			sf := NewSessionFlow(b)
+			q := model.Question{
+				ID:        9,
+				Type:      model.QuestionListening,
+				Prompt:    "?",
+				Options:   json.RawMessage(`["A","B"]`),
+				AudioPath: strPtr("tts/ja/kore/def.ogg"),
+			}
+			_, _, done := sf.renderByType(
+				ctx,
+				1,
+				nil,
+				10,
+				0,
+				5,
+				q,
+				false,
+			)
+			if done {
+				t.Fatal("expected not done")
+			}
+			if store.getCalls != 1 {
+				t.Errorf(
+					"expected 1 store fetch, got %d",
+					store.getCalls,
+				)
+			}
+			if repo.setFileID != 9 || repo.setFileVal != "new-fid" {
+				t.Errorf(
+					"expected file_id cached for q9=new-fid, got id=%d val=%q",
+					repo.setFileID,
+					repo.setFileVal,
+				)
+			}
+		},
+	)
 
-	t.Run("no audio available degrades softly", func(t *testing.T) {
-		mAPI := &mockBotAPI{}
-		b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
-		sf := NewSessionFlow(b)
-		q := model.Question{
-			ID:      1,
-			Type:    model.QuestionListening,
-			Prompt:  "?",
-			Options: json.RawMessage(`["A","B"]`),
-			// AudioPath nil => unavailable
-		}
-		text, kb, done := sf.renderByType(ctx, 1, nil, 10, 0, 5, q, false)
-		if done {
-			t.Fatal("expected not done (soft degrade still returns text)")
-		}
-		if kb != nil {
-			t.Error("expected no keyboard when audio is unavailable")
-		}
-		if !strings.Contains(text, "준비하지 못했") {
-			t.Errorf("expected soft-degrade text, got %s", text)
-		}
-	})
+	t.Run(
+		"no audio available degrades softly",
+		func(t *testing.T) {
+			mAPI := &mockBotAPI{}
+			b := &Bot{api: mAPI, input: newTestInteractionStores(), services: &service.Services{Audio: audio}}
+			sf := NewSessionFlow(b)
+			q := model.Question{
+				ID:      1,
+				Type:    model.QuestionListening,
+				Prompt:  "?",
+				Options: json.RawMessage(`["A","B"]`),
+				// AudioPath nil => unavailable
+			}
+			text, kb, done := sf.renderByType(
+				ctx,
+				1,
+				nil,
+				10,
+				0,
+				5,
+				q,
+				false,
+			)
+			if done {
+				t.Fatal("expected not done (soft degrade still returns text)")
+			}
+			if kb != nil {
+				t.Error("expected no keyboard when audio is unavailable")
+			}
+			if !strings.Contains(
+				text,
+				"준비하지 못했",
+			) {
+				t.Errorf(
+					"expected soft-degrade text, got %s",
+					text,
+				)
+			}
+		},
+	)
 }
 
 func TestShowQuestion_Finish(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
+	active := service.NewQuizActiveSessionService(
+		nil,
+		stateStores.quiz,
+		nil,
+	)
 	b := &Bot{
 		api:      mAPI,
 		input:    stateStores,
@@ -368,16 +653,34 @@ func TestShowQuestion_Finish(t *testing.T) {
 		Session: model.Session{ID: 10},
 		Items:   []model.QuizActiveSessionQuestion{{}}, // 1 item
 	}
-	seedQuizState(stateStores, state)
+	seedQuizState(
+		stateStores,
+		state,
+	)
 
 	// Index 1 on 1 item session -> should show finish
-	sf.showQuestion(ctx, 123, nil, 10, 1)
+	sf.showQuestion(
+		ctx,
+		123,
+		nil,
+		10,
+		1,
+	)
 
 	if len(mAPI.sentMessages) != 1 {
-		t.Fatalf("expected 1 message, got %d", len(mAPI.sentMessages))
+		t.Fatalf(
+			"expected 1 message, got %d",
+			len(mAPI.sentMessages),
+		)
 	}
 	msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(msg.Text, "모든 문제를 풀었습니다") {
-		t.Errorf("wrong text: %s", msg.Text)
+	if !strings.Contains(
+		msg.Text,
+		"모든 문제를 풀었습니다",
+	) {
+		t.Errorf(
+			"wrong text: %s",
+			msg.Text,
+		)
 	}
 }

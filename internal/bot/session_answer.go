@@ -9,7 +9,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
@@ -18,10 +18,14 @@ import (
 func (sf *SessionFlow) processAnswer(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	optionIdx int,
 ) {
-	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
 		return
 	}
@@ -31,12 +35,22 @@ func (sf *SessionFlow) processAnswer(
 		// (including one already answered). Re-render the first unanswered item
 		// instead of silently dropping the callback.
 		if _, exists := state.ItemByQuestionID(questionID); exists {
-			sf.redirectToNextUnansweredQuestion(ctx, cb.Message.Chat.ID, sessionID, &cb.Message.MessageID)
+			sf.redirectToNextUnansweredQuestion(
+				ctx,
+				cb.Message.Chat.ID,
+				sessionID,
+				&cb.Message.MessageID,
+			)
 		}
 		return
 	}
 	if item.SessionQuestion.IsCorrect != nil {
-		sf.redirectToNextUnansweredQuestion(ctx, cb.Message.Chat.ID, sessionID, &cb.Message.MessageID)
+		sf.redirectToNextUnansweredQuestion(
+			ctx,
+			cb.Message.Chat.ID,
+			sessionID,
+			&cb.Message.MessageID,
+		)
 		return
 	}
 	question := item.Question
@@ -48,21 +62,41 @@ func (sf *SessionFlow) processAnswer(
 
 	selectedAnswer := options[optionIdx]
 	editMessageID := cb.Message.MessageID
-	sf.processAnswerText(ctx, cb.Message.Chat.ID, cb.From, sessionID, questionID, selectedAnswer, &editMessageID)
+	sf.processAnswerText(
+		ctx,
+		cb.Message.Chat.ID,
+		cb.From,
+		sessionID,
+		questionID,
+		selectedAnswer,
+		&editMessageID,
+	)
 }
 
 // HandleTextInput intercepts text messages if there is an active text question.
-func (sf *SessionFlow) HandleTextInput(ctx context.Context, msg *tgbotapi.Message) bool {
+func (sf *SessionFlow) HandleTextInput(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) bool {
 	if sf.bot.input == nil {
 		return false
 	}
-	activeQuestion, err := sf.bot.input.GetActiveQuestion(ctx, msg.Chat.ID)
+	activeQuestion, err := sf.bot.input.GetActiveQuestion(
+		ctx,
+		msg.Chat.ID,
+	)
 	if err != nil || activeQuestion == nil {
 		return false
 	}
-	_ = sf.bot.input.DeleteActiveQuestion(ctx, msg.Chat.ID)
+	_ = sf.bot.input.DeleteActiveQuestion(
+		ctx,
+		msg.Chat.ID,
+	)
 
-	state, err := sf.bot.services.QuizActiveSession.Get(ctx, activeQuestion.SessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(
+		ctx,
+		activeQuestion.SessionID,
+	)
 	if err != nil || activeQuestion.QuestionIndex >= len(state.Items) {
 		return false
 	}
@@ -84,35 +118,66 @@ func (sf *SessionFlow) processAnswerText(
 	ctx context.Context,
 	chatID int64,
 	from *tgbotapi.User,
-	sessionID, questionID int,
+	sessionID,
+	questionID int,
 	selectedAnswer string,
 	editMessageID *int,
 ) {
-	ctx = observability.WithAttrs(ctx,
-		slog.Int("session_id", sessionID),
-		slog.Int("question_id", questionID),
+	ctx = observability.WithAttrs(
+		ctx,
+		slog.Int(
+			"session_id",
+			sessionID,
+		),
+		slog.Int(
+			"question_id",
+			questionID,
+		),
 	)
-	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get active session for answer",
-			"event", "telegram.answer.session_lookup_failed",
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to get active session for answer",
+			"event",
+			"telegram.answer.session_lookup_failed",
+			"error",
+			err,
 		)
-		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(
+			chatID,
+			editMessageID,
+		)
 		return
 	}
 	item, currentIdx, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
-		slog.WarnContext(ctx, "Question not found in active session",
-			"event", "telegram.answer.question_not_found",
+		slog.WarnContext(
+			ctx,
+			"Question not found in active session",
+			"event",
+			"telegram.answer.question_not_found",
 		)
 		if _, exists := state.ItemByQuestionID(questionID); exists {
-			sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
+			sf.redirectToNextUnansweredQuestion(
+				ctx,
+				chatID,
+				sessionID,
+				editMessageID,
+			)
 		}
 		return
 	}
 	if item.SessionQuestion.IsCorrect != nil {
-		sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
+		sf.redirectToNextUnansweredQuestion(
+			ctx,
+			chatID,
+			sessionID,
+			editMessageID,
+		)
 		return
 	}
 	question := item.Question
@@ -123,7 +188,10 @@ func (sf *SessionFlow) processAnswerText(
 		selectedAnswer = strings.ToLower(selectedAnswer) // For Kana fill in the blank
 	case model.QuestionSubjective:
 		// Show typing status for AI grading UX
-		sf.bot.api.Request(tgbotapi.NewChatAction(chatID, tgbotapi.ChatTyping))
+		sf.bot.api.Request(tgbotapi.NewChatAction(
+			chatID,
+			tgbotapi.ChatTyping,
+		))
 	}
 
 	isCorrect, feedback, err := sf.bot.services.Grader.GradeAnswerWithQuestion(
@@ -134,8 +202,14 @@ func (sf *SessionFlow) processAnswerText(
 		selectedAnswer,
 	)
 	if err != nil {
-		if errors.Is(err, service.ErrAIUnavailable) {
-			errMsg := tgbotapi.NewMessage(chatID, "⚠️ 시스템 설정 문제로 현재 AI 주관식 채점이 불가능합니다. 임시로 오답 처리하고 넘어갑니다.")
+		if errors.Is(
+			err,
+			service.ErrAIUnavailable,
+		) {
+			errMsg := tgbotapi.NewMessage(
+				chatID,
+				botMessagesByLocale[botDefaultLocale].subjectiveGradingUnavailable,
+			)
 			sf.bot.api.Send(errMsg)
 			isCorrect = false
 			if recordErr := sf.bot.services.QuizActiveSession.RecordAnswer(
@@ -145,78 +219,151 @@ func (sf *SessionFlow) processAnswerText(
 				selectedAnswer,
 				false,
 			); recordErr != nil {
-				if errors.Is(recordErr, service.ErrQuizActiveSessionAlreadyAnswered) {
-					sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
+				if errors.Is(
+					recordErr,
+					service.ErrQuizActiveSessionAlreadyAnswered,
+				) {
+					sf.redirectToNextUnansweredQuestion(
+						ctx,
+						chatID,
+						sessionID,
+						editMessageID,
+					)
 					return
 				}
-				slog.ErrorContext(ctx, "Failed to record fallback wrong answer",
-					"event", "telegram.answer.fallback_record_failed",
-					"error", recordErr,
+				slog.ErrorContext(
+					ctx,
+					"Failed to record fallback wrong answer",
+					"event",
+					"telegram.answer.fallback_record_failed",
+					"error",
+					recordErr,
 				)
 				return
 			}
-		} else if errors.Is(err, service.ErrQuizActiveSessionAlreadyAnswered) {
-			sf.redirectToNextUnansweredQuestion(ctx, chatID, sessionID, editMessageID)
+		} else if errors.Is(
+			err,
+			service.ErrQuizActiveSessionAlreadyAnswered,
+		) {
+			sf.redirectToNextUnansweredQuestion(
+				ctx,
+				chatID,
+				sessionID,
+				editMessageID,
+			)
 			return
 		} else {
-			slog.ErrorContext(ctx, "Failed to grade answer",
-				"event", "telegram.answer.grading_failed",
-				"error", err,
+			slog.ErrorContext(
+				ctx,
+				"Failed to grade answer",
+				"event",
+				"telegram.answer.grading_failed",
+				"error",
+				err,
 			)
 			return
 		}
 	}
 
 	// 원본 문제 메시지는 editMessage로 덮어써지므로, 결과에 문제 원문을 다시 실어 맥락을 보존한다.
-	promptLine := fmt.Sprintf("📝 %s\n\n", question.Prompt)
+	messages := botMessagesByLocale[botDefaultLocale]
+	promptLine := fmt.Sprintf(
+		messages.questionAnswerPromptFormat,
+		question.Prompt,
+	)
 	var text string
 	if isCorrect {
-		text = promptLine + fmt.Sprintf("✅ <b>정답!</b>\n\n%s", question.Explanation)
+		text = promptLine + fmt.Sprintf(
+			messages.correctAnswerResultFormat,
+			question.Explanation,
+		)
 	} else {
-		text = promptLine + fmt.Sprintf("❌ <b>오답</b>\n\n입력/선택: %s\n정답: <b>%s</b>\n\n%s",
-			selectedAnswer, question.CorrectAnswer, question.Explanation)
+		text = promptLine + fmt.Sprintf(
+			messages.wrongAnswerResultFormat,
+			selectedAnswer,
+			question.CorrectAnswer,
+			question.Explanation,
+		)
 	}
 
 	if feedback != "" {
-		text += fmt.Sprintf("\n\n🤖 <b>AI 피드백:</b>\n%s", feedback)
+		text += fmt.Sprintf(
+			messages.aiFeedbackFormat,
+			feedback,
+		)
 	}
 
-	nextLabel := "다음 문제 →"
+	nextLabel := messages.nextQuestionButton
 	if currentIdx+1 >= len(state.Items) {
-		nextLabel = "📊 결과 보기"
+		nextLabel = messages.resultsButton
 	}
 
 	var nextData string
 	if currentIdx+1 >= len(state.Items) {
-		nextData = fmt.Sprintf(config.FormatSessionFinish, sessionID)
+		nextData = fmt.Sprintf(
+			formatSessionFinish,
+			sessionID,
+		)
 	} else {
-		nextData = fmt.Sprintf(config.FormatQuestionNext, sessionID, currentIdx)
+		nextData = fmt.Sprintf(
+			callback.FormatQuestionNext,
+			sessionID,
+			currentIdx,
+		)
 	}
 
 	// "다음/결과" 버튼과 owner 전용 "질문" 버튼을 한 row에 나란히 둔다.
 	row := tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData(nextLabel, nextData),
+		tgbotapi.NewInlineKeyboardButtonData(
+			nextLabel,
+			nextData,
+		),
 	)
 	// owner에게만 "이 문제 질문" 버튼을 노출한다 (LLM 비용/abuse gate, ADR-028·029).
 	if sf.bot.isLLMAllowed(from) {
-		row = append(row, tgbotapi.NewInlineKeyboardButtonData("🤖 질문",
-			fmt.Sprintf(config.FormatQuestionAskLLM, sessionID, questionID)))
+		row = append(
+			row,
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.askButton,
+				fmt.Sprintf(
+					formatQuestionAskLLM,
+					sessionID,
+					questionID,
+				),
+			),
+		)
 	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(row)
 	if question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				"⚙️ 연결 자료 설정",
-				fmt.Sprintf(config.FormatQuestionPolicy, sessionID, questionID),
+		keyboard.InlineKeyboard = append(
+			keyboard.InlineKeyboard,
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					messages.linkedMaterialSettingsButton,
+					fmt.Sprintf(
+						callback.FormatQuestionPolicy,
+						sessionID,
+						questionID,
+					),
+				),
 			),
-		))
+		)
 	}
 
 	if editMessageID != nil {
-		sf.bot.EditMessage(chatID, *editMessageID, text, &keyboard)
+		sf.bot.EditMessage(
+			chatID,
+			*editMessageID,
+			text,
+			&keyboard,
+		)
 	} else {
 		// 텍스트 답변은 사용자 메시지로 들어오므로 편집할 봇 문제 메시지가 없다.
-		sf.bot.SendMessageWithKeyboard(chatID, text, keyboard)
+		sf.bot.SendMessageWithKeyboard(
+			chatID,
+			text,
+			keyboard,
+		)
 	}
 }
 
@@ -229,10 +376,22 @@ func (sf *SessionFlow) redirectToNextUnansweredQuestion(
 	sessionID int,
 	editMessageID *int,
 ) {
-	nextIdx, err := sf.nextUnansweredQuestionIndex(ctx, sessionID)
+	nextIdx, err := sf.nextUnansweredQuestionIndex(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
-		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(
+			chatID,
+			editMessageID,
+		)
 		return
 	}
-	sf.showQuestion(ctx, chatID, editMessageID, sessionID, nextIdx)
+	sf.showQuestion(
+		ctx,
+		chatID,
+		editMessageID,
+		sessionID,
+		nextIdx,
+	)
 }

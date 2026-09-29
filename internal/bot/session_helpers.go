@@ -5,30 +5,45 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
 func (sf *SessionFlow) showSessionFetchError(cb *tgbotapi.CallbackQuery) {
-	sf.bot.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID,
-		"❌ 세션 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+	sf.bot.EditMessage(
+		cb.Message.Chat.ID,
+		cb.Message.MessageID,
+		botMessagesByLocale[botDefaultLocale].sessionFetchFailed,
 		mainMenuKeyboard(),
 	)
 }
 
-func (sf *SessionFlow) showQuizActiveSessionUnavailable(chatID int64, editMessageID *int) {
-	text := "⚠️ 진행 중 세션 상태가 만료되었습니다. 새 세션을 다시 시작해 주세요."
+func (sf *SessionFlow) showQuizActiveSessionUnavailable(
+	chatID int64,
+	editMessageID *int,
+) {
+	text := botMessagesByLocale[botDefaultLocale].activeSessionUnavailable
 	if editMessageID != nil {
-		sf.bot.EditMessage(chatID, *editMessageID, text, nil)
+		sf.bot.EditMessage(
+			chatID,
+			*editMessageID,
+			text,
+			nil,
+		)
 		return
 	}
-	sf.bot.SendMessage(chatID, text)
+	sf.bot.SendMessage(
+		chatID,
+		text,
+	)
 }
 
 func mainMenuKeyboard() *tgbotapi.InlineKeyboardMarkup {
 	kb := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].menuHomeButton,
+				callbackMenuMain,
+			),
 		),
 	)
 	return &kb
@@ -36,23 +51,24 @@ func mainMenuKeyboard() *tgbotapi.InlineKeyboardMarkup {
 
 func formatSessionAnswer(userAnswer *string) string {
 	if userAnswer == nil || *userAnswer == "" {
-		return "미응답"
+		return botMessagesByLocale[botDefaultLocale].unansweredLabel
 	}
 	return *userAnswer
 }
 
 func sessionTypeLabel(t string) string {
+	messages := botMessagesByLocale[botDefaultLocale]
 	switch t {
 	case "morning":
-		return "🌅 오전 학습"
+		return messages.morningStudySessionLabel
 	case "evening":
-		return "🌙 오후 복습"
+		return messages.eveningReviewSessionLabel
 	case "review":
-		return "🔄 복습"
+		return messages.reviewSessionLabel
 	case "article":
-		return "📖 아티클"
+		return messages.articleSessionLabel
 	case "study":
-		return "☀️ 정오 학습"
+		return messages.middayStudySessionLabel
 	default:
 		return t
 	}
@@ -76,7 +92,10 @@ func firstStudySession(sessions []model.Session) (model.Session, bool) {
 	return model.Session{}, false
 }
 
-func truncate(s string, maxLen int) string {
+func truncate(
+	s string,
+	maxLen int,
+) string {
 	runes := []rune(s)
 	if len(runes) <= maxLen {
 		return s

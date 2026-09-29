@@ -12,7 +12,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jmoiron/sqlx"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -189,7 +188,7 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyStart,
+			formatStudyStart,
 			sessionID,
 			0,
 			userID,
@@ -234,13 +233,13 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyNext,
+			formatStudyNext,
 			sessionID,
 			0,
 			userID,
 		),
 	)
-	state, err := studyActiveService.GetOwned(
+	state, err := studyActiveService.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -287,7 +286,7 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyFinish,
+			formatStudyFinish,
 			sessionID,
 			1,
 			userID,
@@ -379,7 +378,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyStart,
+			formatStudyStart,
 			sessionID,
 			0,
 			userID,
@@ -388,7 +387,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyNext,
+			formatStudyNext,
 			sessionID,
 			0,
 			userID,
@@ -399,7 +398,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyPrev,
+			formatStudyPrev,
 			sessionID,
 			1,
 			userID,
@@ -433,7 +432,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	}
 
 	// 뒤로 가기는 studied 상태를 되돌리지 않는다.
-	state, err := studyActiveService.GetOwned(
+	state, err := studyActiveService.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -452,7 +451,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyNext,
+			formatStudyNext,
 			sessionID,
 			0,
 			userID,
@@ -477,7 +476,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyFinish,
+			formatStudyFinish,
 			sessionID,
 			1,
 			userID,
@@ -574,7 +573,7 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyStart,
+			formatStudyStart,
 			sessionID,
 			0,
 			userID,
@@ -675,7 +674,7 @@ func TestStudyFlowReadingRendering(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			config.FormatStudyStart,
+			formatStudyStart,
 			sessionID,
 			0,
 			userID,
@@ -750,7 +749,7 @@ func TestStudyMaterialKeyboardAskLLMGate(t *testing.T) {
 	t.Parallel()
 
 	askData := fmt.Sprintf(
-		config.FormatStudyAskLLM,
+		formatStudyAskLLM,
 		99,
 		3,
 	)
@@ -846,13 +845,13 @@ func studyCallback(
 ) *tgbotapi.CallbackQuery {
 	data := ""
 	switch format {
-	case config.FormatStudyStart:
+	case formatStudyStart:
 		data = "study:" + intString(sessionID) + ":start"
-	case config.FormatStudyNext:
+	case formatStudyNext:
 		data = "study:" + intString(sessionID) + ":next:" + intString(order)
-	case config.FormatStudyPrev:
+	case formatStudyPrev:
 		data = "study:" + intString(sessionID) + ":prev:" + intString(order)
-	case config.FormatStudyFinish:
+	case formatStudyFinish:
 		data = "study:" + intString(sessionID) + ":finish:" + intString(order)
 	}
 	return &tgbotapi.CallbackQuery{

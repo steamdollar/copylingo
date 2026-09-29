@@ -600,11 +600,11 @@ func TestStudyActiveSessionStartPropagatesLoadError(t *testing.T) {
 	}
 }
 
-func TestStudyActiveSessionGetOwnedLoadsFromDBOnMiss(t *testing.T) {
+func TestStudyActiveSessionLoadOwnedStudySessionStateLoadsFromDBOnMiss(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
 	userID := int64(123)
-	store := newFakeStudySessionStore() // empty -> GetOwned loads from DB
+	store := newFakeStudySessionStore() // empty -> LoadOwnedStudySessionState loads from DB
 	repo := &fakeStudyActiveRepo{
 		loadFn: func(
 			ctx context.Context,
@@ -623,14 +623,14 @@ func TestStudyActiveSessionGetOwnedLoadsFromDBOnMiss(t *testing.T) {
 		store,
 	)
 
-	state, err := svc.GetOwned(
+	state, err := svc.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
 	)
 	if err != nil {
 		t.Fatalf(
-			"GetOwned failed: %v",
+			"LoadOwnedStudySessionState failed: %v",
 			err,
 		)
 	}
@@ -641,19 +641,19 @@ func TestStudyActiveSessionGetOwnedLoadsFromDBOnMiss(t *testing.T) {
 			sessionID,
 		)
 	}
-	// GetOwned persists the loaded state back to Redis.
+	// LoadOwnedStudySessionState persists the loaded state back to Redis.
 	if _, err := store.Load(
 		ctx,
 		sessionID,
 	); err != nil {
 		t.Fatalf(
-			"working set missing after GetOwned: %v",
+			"working set missing after LoadOwnedStudySessionState: %v",
 			err,
 		)
 	}
 }
 
-func TestStudyActiveSessionGetOwnedRejectsUserMismatch(t *testing.T) {
+func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsUserMismatch(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
 	store := newFakeStudySessionStore()
@@ -676,7 +676,7 @@ func TestStudyActiveSessionGetOwnedRejectsUserMismatch(t *testing.T) {
 		)
 	}
 
-	_, err := svc.GetOwned(
+	_, err := svc.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		999,
@@ -686,13 +686,13 @@ func TestStudyActiveSessionGetOwnedRejectsUserMismatch(t *testing.T) {
 		ErrStudyActiveSessionUserMismatch,
 	) {
 		t.Fatalf(
-			"GetOwned user mismatch = %v, want ErrStudyActiveSessionUserMismatch",
+			"LoadOwnedStudySessionState user mismatch = %v, want ErrStudyActiveSessionUserMismatch",
 			err,
 		)
 	}
 }
 
-func TestStudyActiveSessionGetOwnedRejectsModeMismatch(t *testing.T) {
+func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
 	userID := int64(123)
@@ -719,7 +719,7 @@ func TestStudyActiveSessionGetOwnedRejectsModeMismatch(t *testing.T) {
 		)
 	}
 
-	_, err := svc.GetOwned(
+	_, err := svc.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -729,7 +729,7 @@ func TestStudyActiveSessionGetOwnedRejectsModeMismatch(t *testing.T) {
 		ErrStudyActiveSessionModeMismatch,
 	) {
 		t.Fatalf(
-			"GetOwned mode mismatch = %v, want ErrStudyActiveSessionModeMismatch",
+			"LoadOwnedStudySessionState mode mismatch = %v, want ErrStudyActiveSessionModeMismatch",
 			err,
 		)
 	}
@@ -740,7 +740,7 @@ func TestStudyActiveSessionMissingStoreDependency(t *testing.T) {
 		nil,
 		nil,
 		nil,
-	).GetOwned(
+	).LoadOwnedStudySessionState(
 		context.Background(),
 		77,
 		123,
@@ -750,7 +750,7 @@ func TestStudyActiveSessionMissingStoreDependency(t *testing.T) {
 		ErrStudyActiveSessionDependencyMissing,
 	) {
 		t.Fatalf(
-			"GetOwned without store = %v, want ErrStudyActiveSessionDependencyMissing",
+			"LoadOwnedStudySessionState without store = %v, want ErrStudyActiveSessionDependencyMissing",
 			err,
 		)
 	}

@@ -9,133 +9,334 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
 // handleSettingsCommand handles /settings command by displaying the schedule configuration menu.
-func (b *Bot) handleSettingsCommand(ctx context.Context, msg *tgbotapi.Message) {
-	user, err := b.services.User.GetUser(ctx, msg.From.ID, msg.From.UserName)
+func (b *Bot) handleSettingsCommand(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
+	user, err := b.services.User.GetUser(
+		ctx,
+		msg.From.ID,
+		msg.From.UserName,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get user for settings command", slog.Any("error", err))
-		b.SendMessage(msg.Chat.ID, "❌ 설정 정보를 불러오지 못했습니다.")
+		slog.ErrorContext(
+			ctx,
+			"Failed to get user for settings command",
+			slog.Any(
+				"error",
+				err,
+			),
+		)
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].settingsLoadFailed,
+		)
 		return
 	}
 
 	text := buildSettingsOverviewText(user)
 	keyboard := b.settingsKeyboard(user)
-	b.SendMessageWithKeyboard(msg.Chat.ID, text, keyboard)
+	b.SendMessageWithKeyboard(
+		msg.Chat.ID,
+		text,
+		keyboard,
+	)
 }
 
 // handleSettingsCallback routes callbacks related to push schedule & timezone settings.
-func (b *Bot) handleSettingsCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (b *Bot) handleSettingsCallback(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+) {
 	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
 		return
 	}
-	parts := strings.Split(cb.Data, ":")
-	if len(parts) >= 2 && (parts[1] == "materials" || parts[1] == "restore") {
-		b.handleMaterialPreferencesCallback(ctx, cb)
+	parts := strings.Split(
+		cb.Data,
+		":",
+	)
+	if len(parts) >= 2 && (parts[1] == callbackActionMaterials || parts[1] == callbackActionRestore) {
+		b.handleMaterialPreferencesCallback(
+			ctx,
+			cb,
+		)
 		return
 	}
-	user, err := b.services.User.GetUser(ctx, cb.From.ID, cb.From.UserName)
+	user, err := b.services.User.GetUser(
+		ctx,
+		cb.From.ID,
+		cb.From.UserName,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get user for settings callback", slog.Any("error", err))
-		b.api.Request(tgbotapi.NewCallbackWithAlert(cb.ID, "❌ 사용자 정보를 불러오지 못했습니다."))
+		slog.ErrorContext(
+			ctx,
+			"Failed to get user for settings callback",
+			slog.Any(
+				"error",
+				err,
+			),
+		)
+		b.api.Request(tgbotapi.NewCallbackWithAlert(
+			cb.ID,
+			botMessagesByLocale[botDefaultLocale].settingsUserLoadFailed,
+		))
 		return
 	}
 
 	data := cb.Data
 	switch {
-	case data == config.ActionMenuSettings || data == config.ActionSettingsView:
-		b.renderSettingsView(ctx, cb, user)
+	case data == callbackMenuSettings || data == callbackSettingsView:
+		b.renderSettingsView(
+			ctx,
+			cb,
+			user,
+		)
 
-	case data == config.ActionSettingsTimezone:
-		b.renderTimezoneView(ctx, cb, user)
+	case data == callbackSettingsTimezone:
+		b.renderTimezoneView(
+			ctx,
+			cb,
+			user,
+		)
 
-	case strings.HasPrefix(data, "settings:set_tz:"):
-		tz := strings.TrimPrefix(data, "settings:set_tz:")
-		if err := b.services.User.UpdateTimezone(ctx, user.ID, tz); err != nil {
-			slog.ErrorContext(ctx, "Failed to update timezone", slog.String("tz", tz), slog.Any("error", err))
-			b.api.Request(tgbotapi.NewCallbackWithAlert(cb.ID, "❌ 유효하지 않은 시간대입니다."))
+	case strings.HasPrefix(
+		data,
+		callbackPrefixSettingsTimezone,
+	):
+		tz := strings.TrimPrefix(
+			data,
+			callbackPrefixSettingsTimezone,
+		)
+		if err := b.services.User.UpdateTimezone(
+			ctx,
+			user.ID,
+			tz,
+		); err != nil {
+			slog.ErrorContext(
+				ctx,
+				"Failed to update timezone",
+				slog.String(
+					"tz",
+					tz,
+				),
+				slog.Any(
+					"error",
+					err,
+				),
+			)
+			b.api.Request(tgbotapi.NewCallbackWithAlert(
+				cb.ID,
+				botMessagesByLocale[botDefaultLocale].settingsTimezoneInvalid,
+			))
 			return
 		}
 		user.Timezone = tz
-		b.api.Request(tgbotapi.NewCallback(cb.ID, "✅ 시간대가 변경되었습니다."))
-		b.renderSettingsView(ctx, cb, user)
+		b.api.Request(tgbotapi.NewCallback(
+			cb.ID,
+			botMessagesByLocale[botDefaultLocale].settingsTimezoneChanged,
+		))
+		b.renderSettingsView(
+			ctx,
+			cb,
+			user,
+		)
 
-	case strings.HasPrefix(data, "settings:slot:"):
-		slotStr := strings.TrimPrefix(data, "settings:slot:")
+	case strings.HasPrefix(
+		data,
+		callbackPrefixSettingsSlot,
+	):
+		slotStr := strings.TrimPrefix(
+			data,
+			callbackPrefixSettingsSlot,
+		)
 		isAll := false
-		if strings.HasSuffix(slotStr, ":all") {
+		if strings.HasSuffix(
+			slotStr,
+			":"+callbackActionAllTimes,
+		) {
 			isAll = true
-			slotStr = strings.TrimSuffix(slotStr, ":all")
+			slotStr = strings.TrimSuffix(
+				slotStr,
+				":"+callbackActionAllTimes,
+			)
 		}
 		slot := model.SessionSlot(slotStr)
 		if !isValidSlot(slot) {
-			slog.WarnContext(ctx, "Invalid slot in callback", slog.String("slot", slotStr))
+			slog.WarnContext(
+				ctx,
+				"Invalid slot in callback",
+				slog.String(
+					"slot",
+					slotStr,
+				),
+			)
 			return
 		}
-		b.renderSlotPickerView(ctx, cb, user, slot, isAll)
+		b.renderSlotPickerView(
+			ctx,
+			cb,
+			user,
+			slot,
+			isAll,
+		)
 
-	case strings.HasPrefix(data, "settings:set:"):
-		payload := strings.TrimPrefix(data, "settings:set:")
-		parts := strings.SplitN(payload, ":", 2)
+	case strings.HasPrefix(
+		data,
+		callbackPrefixSettingsSet,
+	):
+		payload := strings.TrimPrefix(
+			data,
+			callbackPrefixSettingsSet,
+		)
+		parts := strings.SplitN(
+			payload,
+			":",
+			2,
+		)
 		if len(parts) != 2 {
-			slog.WarnContext(ctx, "Malformed settings:set callback", slog.String("data", data))
+			slog.WarnContext(
+				ctx,
+				"Malformed settings:set callback",
+				slog.String(
+					"data",
+					data,
+				),
+			)
 			return
 		}
 		slot := model.SessionSlot(parts[0])
 		timeVal := parts[1]
 		if !isValidSlot(slot) {
-			slog.WarnContext(ctx, "Invalid slot in settings:set", slog.String("slot", string(slot)))
+			slog.WarnContext(
+				ctx,
+				"Invalid slot in settings:set",
+				slog.String(
+					"slot",
+					string(slot),
+				),
+			)
 			return
 		}
 
-		if timeVal == "off" {
-			if err := b.services.User.UpdateSlotTime(ctx, user.ID, slot, nil); err != nil {
+		if timeVal == callbackActionOff {
+			if err := b.services.User.UpdateSlotTime(
+				ctx,
+				user.ID,
+				slot,
+				nil,
+			); err != nil {
 				slog.ErrorContext(
 					ctx,
 					"Failed to disable slot time",
-					slog.String("slot", string(slot)),
-					slog.Any("error", err),
+					slog.String(
+						"slot",
+						string(slot),
+					),
+					slog.Any(
+						"error",
+						err,
+					),
 				)
-				b.api.Request(tgbotapi.NewCallbackWithAlert(cb.ID, "❌ 설정 변경에 실패했습니다."))
+				b.api.Request(tgbotapi.NewCallbackWithAlert(
+					cb.ID,
+					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
+				))
 				return
 			}
-			setUserSlotTime(user, slot, nil)
-			b.api.Request(tgbotapi.NewCallback(cb.ID, "🔕 알림이 비활성화되었습니다."))
+			setUserSlotTime(
+				user,
+				slot,
+				nil,
+			)
+			b.api.Request(tgbotapi.NewCallback(
+				cb.ID,
+				botMessagesByLocale[botDefaultLocale].settingsNotificationsDisabled,
+			))
 		} else {
-			if err := b.services.User.UpdateSlotTime(ctx, user.ID, slot, &timeVal); err != nil {
+			if err := b.services.User.UpdateSlotTime(
+				ctx,
+				user.ID,
+				slot,
+				&timeVal,
+			); err != nil {
 				slog.ErrorContext(
 					ctx,
 					"Failed to update slot time",
-					slog.String("slot", string(slot)),
-					slog.String("time", timeVal),
-					slog.Any("error", err),
+					slog.String(
+						"slot",
+						string(slot),
+					),
+					slog.String(
+						"time",
+						timeVal,
+					),
+					slog.Any(
+						"error",
+						err,
+					),
 				)
-				b.api.Request(tgbotapi.NewCallbackWithAlert(cb.ID, "❌ 설정 변경에 실패했습니다."))
+				b.api.Request(tgbotapi.NewCallbackWithAlert(
+					cb.ID,
+					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
+				))
 				return
 			}
-			setUserSlotTime(user, slot, &timeVal)
-			b.api.Request(tgbotapi.NewCallback(cb.ID, fmt.Sprintf("✅ %s(으)로 설정되었습니다.", timeVal)))
+			setUserSlotTime(
+				user,
+				slot,
+				&timeVal,
+			)
+			b.api.Request(tgbotapi.NewCallback(
+				cb.ID,
+				fmt.Sprintf(
+					botMessagesByLocale[botDefaultLocale].settingsNotificationTimeSetFormat,
+					timeVal,
+				),
+			))
 		}
-		b.renderSettingsView(ctx, cb, user)
+		b.renderSettingsView(
+			ctx,
+			cb,
+			user,
+		)
 	}
 }
 
-func (b *Bot) renderSettingsView(ctx context.Context, cb *tgbotapi.CallbackQuery, u *model.User) {
+func (b *Bot) renderSettingsView(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	u *model.User,
+) {
 	text := buildSettingsOverviewText(u)
 	keyboard := b.settingsKeyboard(u)
 	if cb.Message != nil {
-		b.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
+		b.EditMessage(
+			cb.Message.Chat.ID,
+			cb.Message.MessageID,
+			text,
+			&keyboard,
+		)
 	}
 }
 
-func (b *Bot) renderTimezoneView(ctx context.Context, cb *tgbotapi.CallbackQuery, u *model.User) {
+func (b *Bot) renderTimezoneView(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+	u *model.User,
+) {
 	text := buildTimezoneText(u)
 	keyboard := buildTimezoneKeyboard()
 	if cb.Message != nil {
-		b.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
+		b.EditMessage(
+			cb.Message.Chat.ID,
+			cb.Message.MessageID,
+			text,
+			&keyboard,
+		)
 	}
 }
 
@@ -146,14 +347,26 @@ func (b *Bot) renderSlotPickerView(
 	slot model.SessionSlot,
 	isAll bool,
 ) {
-	text := buildSlotPickerText(u, slot)
-	keyboard := buildSlotPickerKeyboard(slot, isAll)
+	text := buildSlotPickerText(
+		u,
+		slot,
+	)
+	keyboard := buildSlotPickerKeyboard(
+		slot,
+		isAll,
+	)
 	if cb.Message != nil {
-		b.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &keyboard)
+		b.EditMessage(
+			cb.Message.Chat.ID,
+			cb.Message.MessageID,
+			text,
+			&keyboard,
+		)
 	}
 }
 
 func buildSettingsOverviewText(u *model.User) string {
+	messages := botMessagesByLocale[botDefaultLocale]
 	tz := u.Timezone
 	if tz == "" {
 		tz = "Asia/Seoul"
@@ -163,22 +376,22 @@ func buildSettingsOverviewText(u *model.User) string {
 	eStudy := formatSlotTime(u.EveningStudyTime)
 	eQuiz := formatSlotTime(u.EveningQuizTime)
 
-	return fmt.Sprintf(`⚙️ <b>푸시 알림 및 스케줄 설정</b>
-
-현재 시간대: <b>%s</b>
-각 슬롯별 알림 시각을 변경하거나 끌 수 있습니다.
-
-🌅 오전 학습: <b>%s</b>
-📝 오전 퀴즈: <b>%s</b>
-🌆 오후 학습: <b>%s</b>
-🌙 저녁 퀴즈: <b>%s</b>
-
-💡 30분 단위로 시각을 지정할 수 있습니다.`,
-		tz, mStudy, mQuiz, eStudy, eQuiz,
+	return fmt.Sprintf(
+		messages.settingsOverviewFormat,
+		tz,
+		messages.settingsMorningStudyLabel,
+		mStudy,
+		messages.settingsMorningQuizLabel,
+		mQuiz,
+		messages.settingsEveningStudyLabel,
+		eStudy,
+		messages.settingsEveningQuizLabel,
+		eQuiz,
 	)
 }
 
 func buildSettingsKeyboard(u *model.User) tgbotapi.InlineKeyboardMarkup {
+	messages := botMessagesByLocale[botDefaultLocale]
 	mStudy := formatSlotTime(u.MorningStudyTime)
 	mQuiz := formatSlotTime(u.MorningQuizTime)
 	eStudy := formatSlotTime(u.EveningStudyTime)
@@ -186,40 +399,99 @@ func buildSettingsKeyboard(u *model.User) tgbotapi.InlineKeyboardMarkup {
 
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("🌅 오전 학습 (%s)", mStudy), "settings:slot:morning_study"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf(
+					messages.settingsSlotButtonFormat,
+					"🌅",
+					messages.settingsMorningStudyLabel,
+					mStudy,
+				),
+				fmt.Sprintf(
+					formatSettingsSlot,
+					model.SessionSlotMorningStudy,
+				),
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("📝 오전 퀴즈 (%s)", mQuiz), "settings:slot:morning_quiz"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf(
+					messages.settingsSlotButtonFormat,
+					"📝",
+					messages.settingsMorningQuizLabel,
+					mQuiz,
+				),
+				fmt.Sprintf(
+					formatSettingsSlot,
+					model.SessionSlotMorningQuiz,
+				),
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("🌆 오후 학습 (%s)", eStudy), "settings:slot:evening_study"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf(
+					messages.settingsSlotButtonFormat,
+					"🌆",
+					messages.settingsEveningStudyLabel,
+					eStudy,
+				),
+				fmt.Sprintf(
+					formatSettingsSlot,
+					model.SessionSlotEveningStudy,
+				),
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("🌙 저녁 퀴즈 (%s)", eQuiz), "settings:slot:evening_quiz"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprintf(
+					messages.settingsSlotButtonFormat,
+					"🌙",
+					messages.settingsEveningQuizLabel,
+					eQuiz,
+				),
+				fmt.Sprintf(
+					formatSettingsSlot,
+					model.SessionSlotEveningQuiz,
+				),
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🌍 시간대 변경", config.ActionSettingsTimezone),
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.settingsTimezoneChangeButton,
+				callbackSettingsTimezone,
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain),
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.menuHomeButton,
+				callbackMenuMain,
+			),
 		),
 	)
 }
 
-func buildSlotPickerText(u *model.User, slot model.SessionSlot) string {
+func buildSlotPickerText(
+	u *model.User,
+	slot model.SessionSlot,
+) string {
 	icon := slotDisplayIcon(slot)
 	name := slotDisplayName(slot)
-	curr := formatSlotTime(getUserSlotTime(u, slot))
+	curr := formatSlotTime(getUserSlotTime(
+		u,
+		slot,
+	))
 
-	return fmt.Sprintf(`⚙️ <b>%s %s 시각 설정</b>
-
-현재 설정: <b>%s</b>
-원하는 시각을 선택하세요 (30분 단위):`,
-		icon, name, curr,
+	return fmt.Sprintf(
+		botMessagesByLocale[botDefaultLocale].settingsSlotPickerFormat,
+		icon,
+		name,
+		curr,
 	)
 }
 
-func buildSlotPickerKeyboard(slot model.SessionSlot, isAll bool) tgbotapi.InlineKeyboardMarkup {
+func buildSlotPickerKeyboard(
+	slot model.SessionSlot,
+	isAll bool,
+) tgbotapi.InlineKeyboardMarkup {
 	var times []string
 	if !isAll {
 		switch slot {
@@ -243,9 +515,23 @@ func buildSlotPickerKeyboard(slot model.SessionSlot, isAll bool) tgbotapi.Inline
 	}
 
 	if isAll {
-		times = make([]string, 0, 48)
+		times = make(
+			[]string,
+			0,
+			48,
+		)
 		for h := 0; h < 24; h++ {
-			times = append(times, fmt.Sprintf("%02d:00", h), fmt.Sprintf("%02d:30", h))
+			times = append(
+				times,
+				fmt.Sprintf(
+					"%02d:00",
+					h,
+				),
+				fmt.Sprintf(
+					"%02d:30",
+					h,
+				),
+			)
 		}
 	}
 
@@ -258,29 +544,76 @@ func buildSlotPickerKeyboard(slot model.SessionSlot, isAll bool) tgbotapi.Inline
 		}
 		var row []tgbotapi.InlineKeyboardButton
 		for _, t := range times[i:end] {
-			cbData := fmt.Sprintf("settings:set:%s:%s", slot, t)
-			row = append(row, tgbotapi.NewInlineKeyboardButtonData(t, cbData))
+			cbData := fmt.Sprintf(
+				formatSettingsSet,
+				slot,
+				t,
+			)
+			row = append(
+				row,
+				tgbotapi.NewInlineKeyboardButtonData(
+					t,
+					cbData,
+				),
+			)
 		}
-		rows = append(rows, row)
+		rows = append(
+			rows,
+			row,
+		)
 	}
 
 	// Action row: OFF button
-	rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonData("🔕 알림 끄기 (OFF)", fmt.Sprintf("settings:set:%s:off", slot)),
-	))
+	rows = append(
+		rows,
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsDisableNotificationsButton,
+				fmt.Sprintf(
+					formatSettingsSet,
+					slot,
+					callbackActionOff,
+				),
+			),
+		),
+	)
 
 	// Navigation row
 	var navRow []tgbotapi.InlineKeyboardButton
 	if !isAll {
 		navRow = append(
 			navRow,
-			tgbotapi.NewInlineKeyboardButtonData("🕒 전체 시간 (24h)", fmt.Sprintf("settings:slot:%s:all", slot)),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsAllTimesButton,
+				fmt.Sprintf(
+					formatSettingsSlotAll,
+					slot,
+				),
+			),
 		)
 	} else {
-		navRow = append(navRow, tgbotapi.NewInlineKeyboardButtonData("🕒 기본 시간대", fmt.Sprintf("settings:slot:%s", slot)))
+		navRow = append(
+			navRow,
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsDefaultTimesButton,
+				fmt.Sprintf(
+					formatSettingsSlot,
+					slot,
+				),
+			),
+		)
 	}
-	navRow = append(navRow, tgbotapi.NewInlineKeyboardButtonData("⬅️ 설정 목록으로", config.ActionSettingsView))
-	rows = append(rows, navRow)
+	navRow = append(
+		navRow,
+		tgbotapi.NewInlineKeyboardButtonData(
+			botMessagesByLocale[botDefaultLocale].settingsBackButton,
+			callbackSettingsView,
+		),
+	)
+	rows = append(
+		rows,
+		navRow,
+	)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
@@ -290,52 +623,95 @@ func buildTimezoneText(u *model.User) string {
 	if curr == "" {
 		curr = "Asia/Seoul"
 	}
-	return fmt.Sprintf(`🌍 <b>시간대(Timezone) 설정</b>
-
-현재 설정: <b>%s</b>
-알림 발송 기준이 되는 시간대를 선택하세요:`, curr)
+	return fmt.Sprintf(
+		botMessagesByLocale[botDefaultLocale].settingsTimezoneFormat,
+		curr,
+	)
 }
 
 func buildTimezoneKeyboard() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🇰🇷 서울 (Asia/Seoul)", "settings:set_tz:Asia/Seoul"),
-			tgbotapi.NewInlineKeyboardButtonData("🇯🇵 도쿄 (Asia/Tokyo)", "settings:set_tz:Asia/Tokyo"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsTimezoneSeoulButton,
+				fmt.Sprintf(
+					formatSettingsTimezone,
+					"Asia/Seoul",
+				),
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsTimezoneTokyoButton,
+				fmt.Sprintf(
+					formatSettingsTimezone,
+					"Asia/Tokyo",
+				),
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🇺🇸 뉴욕 (America/New_York)", "settings:set_tz:America/New_York"),
-			tgbotapi.NewInlineKeyboardButtonData("🇺🇸 LA (America/Los_Angeles)", "settings:set_tz:America/Los_Angeles"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsTimezoneNewYorkButton,
+				fmt.Sprintf(
+					formatSettingsTimezone,
+					"America/New_York",
+				),
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsTimezoneLosAngelesButton,
+				fmt.Sprintf(
+					formatSettingsTimezone,
+					"America/Los_Angeles",
+				),
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🇬🇧 런던 (Europe/London)", "settings:set_tz:Europe/London"),
-			tgbotapi.NewInlineKeyboardButtonData("🌐 UTC", "settings:set_tz:UTC"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsTimezoneLondonButton,
+				fmt.Sprintf(
+					formatSettingsTimezone,
+					"Europe/London",
+				),
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsTimezoneUTCButton,
+				fmt.Sprintf(
+					formatSettingsTimezone,
+					"UTC",
+				),
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("⬅️ 설정 목록으로", config.ActionSettingsView),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].settingsBackButton,
+				callbackSettingsView,
+			),
 		),
 	)
 }
 
 func formatSlotTime(t *string) string {
 	if t == nil || *t == "" {
-		return "🔕 꺼짐"
+		return botMessagesByLocale[botDefaultLocale].settingsDisabledSlotLabel
 	}
-	if parsed, err := time.Parse(time.RFC3339, *t); err == nil {
+	if parsed, err := time.Parse(
+		time.RFC3339,
+		*t,
+	); err == nil {
 		return parsed.Format("15:04")
 	}
 	return *t
 }
 
 func slotDisplayName(slot model.SessionSlot) string {
+	messages := botMessagesByLocale[botDefaultLocale]
 	switch slot {
 	case model.SessionSlotMorningStudy:
-		return "오전 학습"
+		return messages.settingsMorningStudyLabel
 	case model.SessionSlotMorningQuiz:
-		return "오전 퀴즈"
+		return messages.settingsMorningQuizLabel
 	case model.SessionSlotEveningStudy:
-		return "오후 학습"
+		return messages.settingsEveningStudyLabel
 	case model.SessionSlotEveningQuiz:
-		return "저녁 퀴즈"
+		return messages.settingsEveningQuizLabel
 	default:
 		return string(slot)
 	}
@@ -356,7 +732,10 @@ func slotDisplayIcon(slot model.SessionSlot) string {
 	}
 }
 
-func getUserSlotTime(u *model.User, slot model.SessionSlot) *string {
+func getUserSlotTime(
+	u *model.User,
+	slot model.SessionSlot,
+) *string {
 	switch slot {
 	case model.SessionSlotMorningStudy:
 		return u.MorningStudyTime
@@ -371,7 +750,11 @@ func getUserSlotTime(u *model.User, slot model.SessionSlot) *string {
 	}
 }
 
-func setUserSlotTime(u *model.User, slot model.SessionSlot, t *string) {
+func setUserSlotTime(
+	u *model.User,
+	slot model.SessionSlot,
+	t *string,
+) {
 	switch slot {
 	case model.SessionSlotMorningStudy:
 		u.MorningStudyTime = t

@@ -155,7 +155,7 @@ func (s *StudyActiveSessionService) loadFromDB(
 	return state, nil
 }
 
-func (s *StudyActiveSessionService) GetOwned(
+func (s *StudyActiveSessionService) LoadOwnedStudySessionState(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
@@ -214,7 +214,7 @@ func (s *StudyActiveSessionService) MarkStudied(
 	materialOrder int,
 ) (*model.StudyActiveSessionState, error) {
 	// get session state by ID
-	state, err := s.GetOwned(
+	state, err := s.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -250,7 +250,7 @@ func (s *StudyActiveSessionService) Complete(
 	sessionID int,
 	userID int64,
 ) error {
-	state, err := s.GetOwned(
+	state, err := s.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,

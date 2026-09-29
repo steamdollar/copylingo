@@ -16,18 +16,34 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
-	editMessageID *int, sessionID, questionIdx int) {
+func (sf *SessionFlow) showQuestion(
+	ctx context.Context,
+	chatID int64,
+	editMessageID *int,
+	sessionID,
+	questionIdx int,
+) {
 
 	// get active session from redis
-	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
+	state, err := sf.bot.services.QuizActiveSession.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get active session state",
-			"event", "telegram.question.session_lookup_failed",
-			"session_id", sessionID,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to get active session state",
+			"event",
+			"telegram.question.session_lookup_failed",
+			"session_id",
+			sessionID,
+			"error",
+			err,
 		)
-		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(
+			chatID,
+			editMessageID,
+		)
 		return
 	}
 
@@ -35,26 +51,54 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 	if questionIdx >= len(state.Items) {
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("📊 결과 보기", fmt.Sprintf(config.FormatSessionFinish, sessionID)),
+				tgbotapi.NewInlineKeyboardButtonData(
+					botMessagesByLocale[botDefaultLocale].resultsButton,
+					fmt.Sprintf(
+						formatSessionFinish,
+						sessionID,
+					),
+				),
 			),
 		)
 		if editMessageID != nil {
-			sf.bot.EditMessage(chatID, *editMessageID, "✅ 모든 문제를 풀었습니다!", &keyboard)
+			sf.bot.EditMessage(
+				chatID,
+				*editMessageID,
+				botMessagesByLocale[botDefaultLocale].questionCompleted,
+				&keyboard,
+			)
 		} else {
-			sf.bot.SendMessageWithKeyboard(chatID, "✅ 모든 문제를 풀었습니다!", keyboard)
+			sf.bot.SendMessageWithKeyboard(
+				chatID,
+				botMessagesByLocale[botDefaultLocale].questionCompleted,
+				keyboard,
+			)
 		}
 		return
 	}
 
 	// set current question index at redis
-	if err := sf.bot.services.QuizActiveSession.SetCurrentIndex(ctx, sessionID, questionIdx); err != nil {
-		slog.ErrorContext(ctx, "Failed to set active session index",
-			"event", "telegram.question.index_update_failed",
-			"session_id", sessionID,
-			"question_index", questionIdx,
-			"error", err,
+	if err := sf.bot.services.QuizActiveSession.SetCurrentIndex(
+		ctx,
+		sessionID,
+		questionIdx,
+	); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to set active session index",
+			"event",
+			"telegram.question.index_update_failed",
+			"session_id",
+			sessionID,
+			"question_index",
+			questionIdx,
+			"error",
+			err,
 		)
-		sf.showQuizActiveSessionUnavailable(chatID, editMessageID)
+		sf.showQuizActiveSessionUnavailable(
+			chatID,
+			editMessageID,
+		)
 		return
 	}
 
@@ -63,11 +107,16 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 
 	// TODO: err handling
 	// render question text and keyboard by question type
-	text, keyboard, done := sf.renderByType(ctx,
-		chatID, editMessageID,
-		sessionID, questionIdx, len(state.Items),
+	text, keyboard, done := sf.renderByType(
+		ctx,
+		chatID,
+		editMessageID,
+		sessionID,
+		questionIdx,
+		len(state.Items),
 		question,
-		item.SessionQuestion.IsReview)
+		item.SessionQuestion.IsReview,
+	)
 	if done {
 		return
 	}
@@ -77,42 +126,77 @@ func (sf *SessionFlow) showQuestion(ctx context.Context, chatID int64,
 		if keyboard == nil {
 			keyboard = &tgbotapi.InlineKeyboardMarkup{}
 		}
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				"⚙️ 연결 자료 설정",
-				fmt.Sprintf(config.FormatQuestionPolicy, sessionID, question.ID),
+		keyboard.InlineKeyboard = append(
+			keyboard.InlineKeyboard,
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					botMessagesByLocale[botDefaultLocale].linkedMaterialSettingsButton,
+					fmt.Sprintf(
+						callback.FormatQuestionPolicy,
+						sessionID,
+						question.ID,
+					),
+				),
 			),
-		))
+		)
 	}
 
 	if sf.bot.timing != nil {
-		_ = sf.bot.timing.RecordQuestionStart(ctx, sessionID, time.Now())
+		_ = sf.bot.timing.RecordQuestionStart(
+			ctx,
+			sessionID,
+			time.Now(),
+		)
 	}
 
 	// err handling after rendering question
 	if editMessageID != nil {
-		sf.bot.EditMessage(chatID, *editMessageID, text, keyboard)
+		sf.bot.EditMessage(
+			chatID,
+			*editMessageID,
+			text,
+			keyboard,
+		)
 	} else {
 		if keyboard != nil {
-			sf.bot.SendMessageWithKeyboard(chatID, text, *keyboard)
+			sf.bot.SendMessageWithKeyboard(
+				chatID,
+				text,
+				*keyboard,
+			)
 		} else {
-			sf.bot.SendMessage(chatID, text)
+			sf.bot.SendMessage(
+				chatID,
+				text,
+			)
 		}
 	}
 }
 
 // renderByType builds the question text and keyboard for the given question type.
 // Returns (text, keyboard, done): done=true means the message was already sent (or should be skipped) — caller must return.
-func (sf *SessionFlow) renderByType(ctx context.Context,
-	chatID int64, editMessageID *int,
-	sessionID, questionIdx, totalQuestions int,
+func (sf *SessionFlow) renderByType(
+	ctx context.Context,
+	chatID int64,
+	editMessageID *int,
+	sessionID,
+	questionIdx,
+	totalQuestions int,
 	question model.Question,
-	isReview bool) (string, *tgbotapi.InlineKeyboardMarkup, bool) {
+	isReview bool,
+) (string, *tgbotapi.InlineKeyboardMarkup, bool) {
+	messages := botMessagesByLocale[botDefaultLocale]
 	reviewTag := ""
 	if isReview {
-		reviewTag = " 🔄"
+		reviewTag = messages.reviewQuestionMarker
 	}
-	text := fmt.Sprintf("📝 <b>문제 %d/%d</b>%s\n\n%s", questionIdx+1, totalQuestions, reviewTag, question.Prompt)
+	text := fmt.Sprintf(
+		messages.questionFormat,
+		questionIdx+1,
+		totalQuestions,
+		reviewTag,
+		question.Prompt,
+	)
 
 	switch question.Type {
 	case model.QuestionKanaHandwriting:
@@ -127,47 +211,93 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 			cells,
 		)
 		if err != nil {
-			text += "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요."
+			text += messages.handwritingURLUnavailable
 			return text, nil, false
 		}
-		nextData := callback.FormatHandwritingNext(sessionID, questionIdx, sf.bot.cfg.Server.PublicBaseURL)
-		text += "\n\n✍️ 아래 버튼을 눌러 화면에 글자를 써 주세요.\n제출 후 이 채팅으로 돌아와 다음 문제를 진행하면 됩니다."
+		nextData := callback.FormatHandwritingNext(
+			sessionID,
+			questionIdx,
+			sf.bot.cfg.Server.PublicBaseURL,
+		)
+		text += messages.handwritingPrompt
 		replyMarkup := webAppKeyboardMarkup{
 			InlineKeyboard: [][]webAppButton{
-				{newWebAppButton("✍️ 손글씨로 답하기", miniAppURL)},
-				{newCallbackButton("제출 후 다음 문제 →", nextData)},
+				{newWebAppButton(
+					messages.handwritingAnswerButton,
+					miniAppURL,
+				)},
+				{newCallbackButton(
+					messages.handwritingNextButton,
+					nextData,
+				)},
 			},
 		}
 		if question.MaterialID != nil && sf.bot.services != nil && sf.bot.services.MaterialPreference != nil {
-			replyMarkup.InlineKeyboard = append(replyMarkup.InlineKeyboard, []webAppButton{
-				newCallbackButton("⚙️ 연결 자료 설정", fmt.Sprintf(config.FormatQuestionPolicy, sessionID, question.ID)),
-			})
+			replyMarkup.InlineKeyboard = append(
+				replyMarkup.InlineKeyboard,
+				[]webAppButton{
+					newCallbackButton(
+						messages.linkedMaterialSettingsButton,
+						fmt.Sprintf(
+							callback.FormatQuestionPolicy,
+							sessionID,
+							question.ID,
+						),
+					),
+				},
+			)
 		}
 		if editMessageID != nil {
 			// Web App 버튼은 별도 메시지로 두는 편이 Mini App 왕복 흐름을 추적하기 쉽다.
 			// 이전 메시지는 재사용하지 않고 짧은 안내 문구로 축약한다.
-			sf.bot.EditMessage(chatID, *editMessageID, "✍️ 손글씨 문항을 새 메시지로 보냈습니다.", nil)
+			sf.bot.EditMessage(
+				chatID,
+				*editMessageID,
+				messages.handwritingSentNotice,
+				nil,
+			)
 		}
-		msgID, err := sf.bot.SendMessageWithReplyMarkup(chatID, text, replyMarkup)
+		msgID, err := sf.bot.SendMessageWithReplyMarkup(
+			chatID,
+			text,
+			replyMarkup,
+		)
 		if err != nil {
-			slog.ErrorContext(ctx, "Failed to send handwriting message",
-				"event", "telegram.question.handwriting_send_failed",
-				"chat_id", chatID,
-				"session_id", sessionID,
-				"question_id", question.ID,
-				"error", err,
+			slog.ErrorContext(
+				ctx,
+				"Failed to send handwriting message",
+				"event",
+				"telegram.question.handwriting_send_failed",
+				"chat_id",
+				chatID,
+				"session_id",
+				sessionID,
+				"question_id",
+				question.ID,
+				"error",
+				err,
 			)
 			return "", nil, true
 		}
 		if sf.bot.messages != nil {
-			err := sf.bot.messages.SaveHandwritingMessage(ctx, sessionID, question.ID,
-				model.TelegramMessageRef{ChatID: chatID, MessageID: msgID})
+			err := sf.bot.messages.SaveHandwritingMessage(
+				ctx,
+				sessionID,
+				question.ID,
+				model.TelegramMessageRef{ChatID: chatID, MessageID: msgID},
+			)
 			if err != nil {
-				slog.ErrorContext(ctx, "Failed to cache handwriting message ID",
-					"event", "telegram.question.handwriting_cache_failed",
-					"session_id", sessionID,
-					"question_id", question.ID,
-					"error", err,
+				slog.ErrorContext(
+					ctx,
+					"Failed to cache handwriting message ID",
+					"event",
+					"telegram.question.handwriting_cache_failed",
+					"session_id",
+					sessionID,
+					"question_id",
+					question.ID,
+					"error",
+					err,
 				)
 			}
 		}
@@ -177,19 +307,31 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		// Deliver the audio as a separate voice message, then render the
 		// comprehension question + options through the shared MCQ path (grading
 		// reuses the exact-match option flow — no new grader, ADR-031).
-		if !sf.sendListeningAudio(ctx, chatID, &question) {
-			text += "\n\n⚠️ 이 청해 문항의 음성을 준비하지 못했습니다."
+		if !sf.sendListeningAudio(
+			ctx,
+			chatID,
+			&question,
+		) {
+			text += messages.listeningAudioUnavailable
 			return text, nil, false
 		}
-		text += "\n\n🎧 위 음성을 듣고 정답을 선택하세요."
+		text += messages.listeningAnswerPrompt
 		options, err := question.GetOptions()
 		if err != nil || len(options) == 0 {
 			return "", nil, true
 		}
-		return text, buildMCQKeyboard(sessionID, question.ID, options), false
+		return text, buildMCQKeyboard(
+			sessionID,
+			question.ID,
+			options,
+		), false
 
 	case model.QuestionWordOrder:
-		wordOrderText, keyboard, done := sf.renderWordOrder(ctx, sessionID, question)
+		wordOrderText, keyboard, done := sf.renderWordOrder(
+			ctx,
+			sessionID,
+			question,
+		)
 		if done {
 			return "", nil, true
 		}
@@ -197,13 +339,16 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 
 	case model.QuestionFillBlank, model.QuestionSubjective:
 		if sf.bot.input != nil {
-			_ = sf.bot.input.SetActiveQuestion(ctx, chatID,
-				model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIdx})
+			_ = sf.bot.input.SetActiveQuestion(
+				ctx,
+				chatID,
+				model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIdx},
+			)
 		}
 		if question.Type == model.QuestionSubjective {
-			text += "\n\n⌨️ 정답을 자유롭게 텍스트로 입력해 주세요"
+			text += messages.freeTextAnswerPrompt
 		} else {
-			text += "\n\n⌨️ 채팅창에 답안을 입력해 주세요"
+			text += messages.chatAnswerPrompt
 		}
 		return text, nil, false
 
@@ -212,7 +357,11 @@ func (sf *SessionFlow) renderByType(ctx context.Context,
 		if err != nil || len(options) == 0 {
 			return "", nil, true
 		}
-		return text, buildMCQKeyboard(sessionID, question.ID, options), false
+		return text, buildMCQKeyboard(
+			sessionID,
+			question.ID,
+			options,
+		), false
 	}
 }
 
@@ -232,7 +381,11 @@ func handwritingCellCount(answer string) int {
 
 // buildMCQKeyboard uses one button per row when an option is too wide for a
 // two-column layout. Shared by plain multiple-choice and listening comprehension.
-func buildMCQKeyboard(sessionID, questionID int, options []string) *tgbotapi.InlineKeyboardMarkup {
+func buildMCQKeyboard(
+	sessionID,
+	questionID int,
+	options []string,
+) *tgbotapi.InlineKeyboardMarkup {
 	const maxTwoColumnOptionWidth = 16
 	buttonsPerRow := 2
 	for _, option := range options {
@@ -253,12 +406,23 @@ func buildMCQKeyboard(sessionID, questionID int, options []string) *tgbotapi.Inl
 	for i := 0; i < len(options); i += buttonsPerRow {
 		var row []tgbotapi.InlineKeyboardButton
 		for j := i; j < i+buttonsPerRow && j < len(options); j++ {
-			row = append(row, tgbotapi.NewInlineKeyboardButtonData(
-				options[j],
-				fmt.Sprintf(config.FormatQuestionAnswer, sessionID, questionID, j),
-			))
+			row = append(
+				row,
+				tgbotapi.NewInlineKeyboardButtonData(
+					options[j],
+					fmt.Sprintf(
+						formatQuestionAnswer,
+						sessionID,
+						questionID,
+						j,
+					),
+				),
+			)
 		}
-		rows = append(rows, row)
+		rows = append(
+			rows,
+			row,
+		)
 	}
 	return &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
@@ -267,7 +431,11 @@ func buildMCQKeyboard(sessionID, questionID int, options []string) *tgbotapi.Inl
 // message. It prefers the cached file_id and falls back to fetching the object
 // from the store and uploading it, caching the returned file_id (ADR-032).
 // Returns false when audio is unavailable so the caller can degrade gracefully.
-func (sf *SessionFlow) sendListeningAudio(ctx context.Context, chatID int64, q *model.Question) bool {
+func (sf *SessionFlow) sendListeningAudio(
+	ctx context.Context,
+	chatID int64,
+	q *model.Question,
+) bool {
 	audio := sf.bot.services.Audio
 	if audio == nil || q.AudioPath == nil || *q.AudioPath == "" {
 		return false
@@ -275,59 +443,105 @@ func (sf *SessionFlow) sendListeningAudio(ctx context.Context, chatID int64, q *
 
 	// Fast path: re-send by cached file_id (no store fetch, no re-upload).
 	if q.AudioFileID != nil && *q.AudioFileID != "" {
-		if err := sf.bot.SendVoiceFileID(chatID, *q.AudioFileID); err == nil {
+		if err := sf.bot.SendVoiceFileID(
+			chatID,
+			*q.AudioFileID,
+		); err == nil {
 			return true
 		}
 		// A purged/invalid file_id falls through to a fresh upload (ADR-032).
-		slog.WarnContext(ctx, "Cached voice file_id failed; re-uploading from store",
-			"event", "telegram.listening.file_id_stale",
-			"question_id", q.ID,
+		slog.WarnContext(
+			ctx,
+			"Cached voice file_id failed; re-uploading from store",
+			"event",
+			"telegram.listening.file_id_stale",
+			"question_id",
+			q.ID,
 		)
 	}
 
-	clip, err := audio.GetClip(ctx, *q.AudioPath)
+	clip, err := audio.GetClip(
+		ctx,
+		*q.AudioPath,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to fetch listening clip from store",
-			"event", "telegram.listening.fetch_failed",
-			"question_id", q.ID,
-			"key", *q.AudioPath,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to fetch listening clip from store",
+			"event",
+			"telegram.listening.fetch_failed",
+			"question_id",
+			q.ID,
+			"key",
+			*q.AudioPath,
+			"error",
+			err,
 		)
 		return false
 	}
 
-	fileID, err := sf.bot.SendVoiceBytes(chatID, clip)
+	fileID, err := sf.bot.SendVoiceBytes(
+		chatID,
+		clip,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to send listening voice",
-			"event", "telegram.listening.send_failed",
-			"question_id", q.ID,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to send listening voice",
+			"event",
+			"telegram.listening.send_failed",
+			"question_id",
+			q.ID,
+			"error",
+			err,
 		)
 		return false
 	}
 
 	if fileID != "" {
-		if err := audio.CacheFileID(ctx, q.ID, fileID); err != nil {
-			slog.WarnContext(ctx, "Failed to cache listening voice file_id",
-				"event", "telegram.listening.cache_failed",
-				"question_id", q.ID,
-				"error", err,
+		if err := audio.CacheFileID(
+			ctx,
+			q.ID,
+			fileID,
+		); err != nil {
+			slog.WarnContext(
+				ctx,
+				"Failed to cache listening voice file_id",
+				"event",
+				"telegram.listening.cache_failed",
+				"question_id",
+				q.ID,
+				"error",
+				err,
 			)
 		}
 	}
 	return true
 }
 
-func (sf *SessionFlow) isQuestionAnswered(ctx context.Context, sessionID, questionIdx int) bool {
-	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
+func (sf *SessionFlow) isQuestionAnswered(
+	ctx context.Context,
+	sessionID,
+	questionIdx int,
+) bool {
+	state, err := sf.bot.services.QuizActiveSession.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil || questionIdx < 0 || questionIdx >= len(state.Items) {
 		return false
 	}
 	return state.Items[questionIdx].SessionQuestion.IsCorrect != nil
 }
 
-func (sf *SessionFlow) nextUnansweredQuestionIndex(ctx context.Context, sessionID int) (int, error) {
-	state, err := sf.bot.services.QuizActiveSession.Get(ctx, sessionID)
+func (sf *SessionFlow) nextUnansweredQuestionIndex(
+	ctx context.Context,
+	sessionID int,
+) (int, error) {
+	state, err := sf.bot.services.QuizActiveSession.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -337,11 +551,17 @@ func (sf *SessionFlow) nextUnansweredQuestionIndex(ctx context.Context, sessionI
 
 // TODO: 이 함수 굳이 이렇게 복잡하게 짜야 함?
 func (sf *SessionFlow) handwritingMiniAppURL(
-	sessionID, questionID int,
-	language, level, prompt string,
+	sessionID,
+	questionID int,
+	language,
+	level,
+	prompt string,
 	cells int,
 ) (string, error) {
-	baseURL := strings.TrimRight(sf.bot.cfg.Server.PublicBaseURL, "/")
+	baseURL := strings.TrimRight(
+		sf.bot.cfg.Server.PublicBaseURL,
+		"/",
+	)
 	if baseURL == "" {
 		return "", fmt.Errorf("server public base url is empty")
 	}
@@ -350,19 +570,43 @@ func (sf *SessionFlow) handwritingMiniAppURL(
 		return "", err
 	}
 	q := u.Query()
-	q.Set("session_id", strconv.Itoa(sessionID))
-	q.Set("question_id", strconv.Itoa(questionID))
-	q.Set("language", language)
-	q.Set("level", level)
-	q.Set("prompt", prompt)
+	q.Set(
+		"session_id",
+		strconv.Itoa(sessionID),
+	)
+	q.Set(
+		"question_id",
+		strconv.Itoa(questionID),
+	)
+	q.Set(
+		"language",
+		language,
+	)
+	q.Set(
+		"level",
+		level,
+	)
+	q.Set(
+		"prompt",
+		prompt,
+	)
 	if cells < 1 {
 		cells = 1
 	}
-	q.Set("cells", strconv.Itoa(cells))
+	q.Set(
+		"cells",
+		strconv.Itoa(cells),
+	)
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
 
-func isStaleMiniAppCallback(parts []string, currentPublicBaseURL string) bool {
-	return callback.IsStaleMiniAppCallback(parts, currentPublicBaseURL)
+func isStaleMiniAppCallback(
+	parts []string,
+	currentPublicBaseURL string,
+) bool {
+	return callback.IsStaleMiniAppCallback(
+		parts,
+		currentPublicBaseURL,
+	)
 }

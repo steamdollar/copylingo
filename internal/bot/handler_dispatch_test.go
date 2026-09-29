@@ -377,7 +377,7 @@ func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
 		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 	}
 
-	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	allowedUserID := llmAllowedTelegramUserIDs[0]
 	b.handleMessage(
 		context.Background(),
 		commandMessage(
@@ -412,18 +412,18 @@ func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
 	}
 	if !keyboardHasCallback(
 		sent,
-		config.ActionLLMCancel,
+		callbackLLMCancel,
 	) {
 		t.Fatalf(
 			"activation message does not include %q callback",
-			config.ActionLLMCancel,
+			callbackLLMCancel,
 		)
 	}
 }
 
 func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 	api := &mockBotAPI{}
-	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	allowedUserID := llmAllowedTelegramUserIDs[0]
 	otherUserID := allowedUserID + 1
 	stateStores := newTestInteractionStores()
 	_ = stateStores.SetLLMPending(
@@ -442,7 +442,7 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 		context.Background(),
 		&tgbotapi.CallbackQuery{
 			ID:   "cancel-llm",
-			Data: config.ActionLLMCancel,
+			Data: callbackLLMCancel,
 			From: &tgbotapi.User{ID: allowedUserID},
 			Message: &tgbotapi.Message{
 				Chat: &tgbotapi.Chat{ID: 456},
@@ -475,7 +475,7 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 			sent.Text,
 		)
 	}
-	if got := callbackType(config.ActionLLMCancel); got != "llm" {
+	if got := callbackType(callbackLLMCancel); got != "llm" {
 		t.Fatalf(
 			"callback type = %q, want llm",
 			got,
@@ -495,7 +495,7 @@ func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {
 		context.Background(),
 		commandMessage(
 			"/llm",
-			config.LLMAllowedTelegramUserIDs[0]+1,
+			llmAllowedTelegramUserIDs[0]+1,
 			456,
 			"learner",
 		),
@@ -517,7 +517,7 @@ func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {
 
 func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.T) {
 	api := &mockBotAPI{}
-	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	allowedUserID := llmAllowedTelegramUserIDs[0]
 	stateStores := newTestInteractionStores()
 	_ = stateStores.SetLLMPending(
 		context.Background(),
@@ -624,7 +624,7 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 
 func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 	api := &mockBotAPI{}
-	allowedUserID := config.LLMAllowedTelegramUserIDs[0]
+	allowedUserID := llmAllowedTelegramUserIDs[0]
 	stateStores := newTestInteractionStores()
 	_ = stateStores.SetLLMPending(
 		context.Background(),

@@ -8,7 +8,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -174,7 +173,7 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 
 func TestLoadStudyMaterialContext(t *testing.T) {
 	ctx := context.Background()
-	owner := config.LLMAllowedTelegramUserIDs[0]
+	owner := llmAllowedTelegramUserIDs[0]
 	sessionID := 20
 	state := &model.StudyActiveSessionState{
 		Session: model.Session{
@@ -271,7 +270,7 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 }
 
 func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
-	owner := &tgbotapi.User{ID: config.LLMAllowedTelegramUserIDs[0]}
+	owner := &tgbotapi.User{ID: llmAllowedTelegramUserIDs[0]}
 	sessionID, questionID := 10, 1
 
 	newFlow := func(
@@ -308,7 +307,7 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 		Type:          model.QuestionMultipleChoice,
 	}
 	askData := fmt.Sprintf(
-		config.FormatQuestionAskLLM,
+		formatQuestionAskLLM,
 		sessionID,
 		questionID,
 	)
@@ -409,7 +408,7 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 
 func TestHandleAskLLMQuestion(t *testing.T) {
 	sessionID, questionID := 10, 1
-	owner := &tgbotapi.User{ID: config.LLMAllowedTelegramUserIDs[0]}
+	owner := &tgbotapi.User{ID: llmAllowedTelegramUserIDs[0]}
 
 	newFlow := func(
 		stateStores *testInteractionStores,
@@ -464,11 +463,11 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 			}
 			if !keyboardHasCallback(
 				mAPI.sentMessages[0],
-				config.ActionLLMCancel,
+				callbackLLMCancel,
 			) {
 				t.Fatalf(
 					"instruction message does not include %q callback",
-					config.ActionLLMCancel,
+					callbackLLMCancel,
 				)
 			}
 		},
@@ -506,7 +505,7 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 
 func TestHandleStudyAskLLMQuestion(t *testing.T) {
 	ctx := context.Background()
-	owner := &tgbotapi.User{ID: config.LLMAllowedTelegramUserIDs[0]}
+	owner := &tgbotapi.User{ID: llmAllowedTelegramUserIDs[0]}
 	sessionID := 30
 
 	newFlow := func() (*StudyFlow, *testInteractionStores, *mockBotAPI) {
@@ -557,7 +556,7 @@ func TestHandleStudyAskLLMQuestion(t *testing.T) {
 	) *tgbotapi.CallbackQuery {
 		return &tgbotapi.CallbackQuery{
 			Data: fmt.Sprintf(
-				config.FormatStudyAskLLM,
+				formatStudyAskLLM,
 				sessionID,
 				order,
 			),
@@ -597,11 +596,11 @@ func TestHandleStudyAskLLMQuestion(t *testing.T) {
 			}
 			if !keyboardHasCallback(
 				api.sentMessages[0],
-				config.ActionLLMCancel,
+				callbackLLMCancel,
 			) {
 				t.Fatalf(
 					"instruction message does not include %q callback",
-					config.ActionLLMCancel,
+					callbackLLMCancel,
 				)
 			}
 		},

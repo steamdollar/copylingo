@@ -12,27 +12,13 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/model"
 )
 
 // StudyFlow handles material-based study sessions.
 type StudyFlow struct {
 	bot *Bot
-}
-
-type studySessionPushMessage struct {
-	text        string
-	startButton string
-}
-
-// Keep the push text and button label together for future UI locale selection.
-var studySessionPushMessages = map[string]studySessionPushMessage{
-	"ko": {
-		text: "📚 <b>Study Session이 도착했습니다!</b>\n\n" +
-			"현재 레벨에 맞춘 Study Material을 짧게 훑고 가세요.",
-		startButton: "▶️ 시작하기",
-	},
 }
 
 func NewStudyFlow(bot *Bot) *StudyFlow {
@@ -44,13 +30,13 @@ func (sf *StudyFlow) PushSession(
 	chatID int64,
 	sessionID int,
 ) error {
-	message := studySessionPushMessages["ko"]
+	message := botMessagesByLocale[botDefaultLocale]
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
 				message.startButton,
 				fmt.Sprintf(
-					config.FormatStudyStart,
+					formatStudyStart,
 					sessionID,
 				),
 			),
@@ -58,7 +44,7 @@ func (sf *StudyFlow) PushSession(
 	)
 	return sf.bot.SendMessageWithKeyboard(
 		chatID,
-		message.text,
+		message.sessionPush,
 		keyboard,
 	)
 }
@@ -94,19 +80,19 @@ func (sf *StudyFlow) HandleCallback(
 	}
 
 	switch parts[2] {
-	case "policy", "card":
+	case callback.QuestionActionPolicy, callbackActionCard:
 		sf.handleMaterialPreference(
 			ctx,
 			cb,
 			parts,
 		)
-	case "start":
+	case callbackActionStart:
 		sf.startSession(
 			ctx,
 			cb,
 			sessionID,
 		)
-	case "ask":
+	case callbackActionAsk:
 		if len(parts) < 4 {
 			return
 		}
@@ -116,7 +102,7 @@ func (sf *StudyFlow) HandleCallback(
 			sessionID,
 			parts[3],
 		)
-	case "next":
+	case callback.QuestionActionNext:
 		if len(parts) < 4 {
 			return
 		}
@@ -130,7 +116,7 @@ func (sf *StudyFlow) HandleCallback(
 			sessionID,
 			currentOrder,
 		)
-	case "prev":
+	case callbackActionPrev:
 		if len(parts) < 4 {
 			return
 		}
@@ -144,7 +130,7 @@ func (sf *StudyFlow) HandleCallback(
 			sessionID,
 			currentOrder,
 		)
-	case "finish":
+	case callbackActionFinish:
 		if len(parts) < 4 {
 			return
 		}
@@ -166,6 +152,7 @@ func (sf *StudyFlow) startSession(
 	cb *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
+	messages := botMessagesByLocale[botDefaultLocale]
 	state, err := sf.bot.services.StudyActiveSession.Start(
 		ctx,
 		sessionID,
@@ -185,7 +172,7 @@ func (sf *StudyFlow) startSession(
 		sf.bot.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
-			"❌ Study Session을 시작하지 못했습니다.",
+			messages.startFailed,
 			mainMenuKeyboard(),
 		)
 		return
@@ -194,7 +181,7 @@ func (sf *StudyFlow) startSession(
 		sf.bot.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
-			"✅ 이미 완료한 Study Session입니다.",
+			messages.alreadyCompleted,
 			mainMenuKeyboard(),
 		)
 		return
@@ -216,6 +203,8 @@ func (sf *StudyFlow) nextMaterial(
 	sessionID,
 	currentOrder int,
 ) {
+	messages := botMessagesByLocale[botDefaultLocale]
+	// update study proceeding state
 	state, err := sf.bot.services.StudyActiveSession.MarkStudied(
 		ctx,
 		sessionID,
@@ -237,7 +226,7 @@ func (sf *StudyFlow) nextMaterial(
 		)
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ Study 진행 상태를 저장하지 못했습니다.",
+			messages.saveProgressFailed,
 		)
 		return
 	}
@@ -258,7 +247,8 @@ func (sf *StudyFlow) prevMaterial(
 	sessionID,
 	currentOrder int,
 ) {
-	state, err := sf.bot.services.StudyActiveSession.GetOwned(
+	messages := botMessagesByLocale[botDefaultLocale]
+	state, err := sf.bot.services.StudyActiveSession.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -278,7 +268,7 @@ func (sf *StudyFlow) prevMaterial(
 		)
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ Study 진행 상태를 불러오지 못했습니다.",
+			messages.loadProgressFailed,
 		)
 		return
 	}
@@ -298,6 +288,7 @@ func (sf *StudyFlow) finishSession(
 	sessionID,
 	currentOrder int,
 ) {
+	messages := botMessagesByLocale[botDefaultLocale]
 	if _, err := sf.bot.services.StudyActiveSession.MarkStudied(
 		ctx,
 		sessionID,
@@ -318,7 +309,7 @@ func (sf *StudyFlow) finishSession(
 		)
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ Study 완료 상태를 저장하지 못했습니다.",
+			messages.saveCompletionFailed,
 		)
 		return
 	}
@@ -339,7 +330,7 @@ func (sf *StudyFlow) finishSession(
 		)
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ Study Session을 완료하지 못했습니다.",
+			messages.completeFailed,
 		)
 		return
 	}
@@ -347,7 +338,7 @@ func (sf *StudyFlow) finishSession(
 	sf.bot.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
-		"✅ <b>Study Session 완료!</b>\n\n학습한 Material 이력이 저장됐습니다.",
+		messages.sessionCompleted,
 		mainMenuKeyboard(),
 	)
 }
@@ -359,11 +350,12 @@ func (sf *StudyFlow) showMaterial(
 	state *model.StudyActiveSessionState,
 	materialOrder int,
 ) {
+	messages := botMessagesByLocale[botDefaultLocale]
 	items := state.Items
 	if len(items) == 0 {
 		sf.bot.SendMessage(
 			chatID,
-			"⚠️ 표시할 Study Material이 없습니다.",
+			messages.noMaterials,
 		)
 		return
 	}
@@ -389,7 +381,7 @@ func (sf *StudyFlow) showMaterial(
 		}
 		sf.bot.SendMessage(
 			chatID,
-			"✅ Study Session을 완료했습니다.",
+			messages.autoCompleted,
 		)
 		return
 	}
@@ -410,7 +402,7 @@ func (sf *StudyFlow) showMaterial(
 		)
 		sf.bot.SendMessage(
 			chatID,
-			"⚠️ Study Material 순서를 찾지 못했습니다.",
+			messages.materialOrderNotFound,
 		)
 		return
 	}
@@ -433,9 +425,9 @@ func (sf *StudyFlow) showMaterial(
 			keyboard.InlineKeyboard,
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(
-					"⚙️ 학습 설정",
+					messages.studySettingsButton,
 					fmt.Sprintf(
-						config.FormatStudyPolicy,
+						formatStudyPolicy,
 						state.Session.ID,
 						item.SessionMaterial.MaterialID,
 					),
@@ -467,6 +459,7 @@ func studyMaterialKeyboard(
 	isLast,
 	showAskLLM bool,
 ) tgbotapi.InlineKeyboardMarkup {
+	messages := botMessagesByLocale[botDefaultLocale]
 	buttons := make(
 		[]tgbotapi.InlineKeyboardButton,
 		0,
@@ -476,9 +469,9 @@ func studyMaterialKeyboard(
 		buttons = append(
 			buttons,
 			tgbotapi.NewInlineKeyboardButtonData(
-				"← 이전",
+				messages.previousButton,
 				fmt.Sprintf(
-					config.FormatStudyPrev,
+					formatStudyPrev,
 					sessionID,
 					materialOrder,
 				),
@@ -489,9 +482,9 @@ func studyMaterialKeyboard(
 		buttons = append(
 			buttons,
 			tgbotapi.NewInlineKeyboardButtonData(
-				"✅ 완료",
+				messages.completeButton,
 				fmt.Sprintf(
-					config.FormatStudyFinish,
+					formatStudyFinish,
 					sessionID,
 					materialOrder,
 				),
@@ -501,9 +494,9 @@ func studyMaterialKeyboard(
 		buttons = append(
 			buttons,
 			tgbotapi.NewInlineKeyboardButtonData(
-				"다음 →",
+				messages.nextButton,
 				fmt.Sprintf(
-					config.FormatStudyNext,
+					formatStudyNext,
 					sessionID,
 					materialOrder,
 				),
@@ -518,9 +511,9 @@ func studyMaterialKeyboard(
 			rows,
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(
-					"🤖 질문",
+					messages.askButton,
 					fmt.Sprintf(
-						config.FormatStudyAskLLM,
+						formatStudyAskLLM,
 						sessionID,
 						materialOrder,
 					),
@@ -540,6 +533,7 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 	sessionID int,
 	materialOrderStr string,
 ) {
+	messages := botMessagesByLocale[botDefaultLocale]
 	if cb.Message == nil || !sf.bot.isLLMAllowed(cb.From) {
 		return
 	}
@@ -550,12 +544,12 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 	if sf.bot.input == nil || sf.bot.services == nil || sf.bot.services.StudyActiveSession == nil {
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ LLM 질문을 활성화할 수 없습니다.",
+			messages.llmQuestionActivationFailed,
 		)
 		return
 	}
 
-	state, err := sf.bot.services.StudyActiveSession.GetOwned(
+	state, err := sf.bot.services.StudyActiveSession.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -575,14 +569,14 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		)
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ 현재 Study Material의 질문을 준비할 수 없습니다.",
+			messages.currentMaterialQuestionUnavailable,
 		)
 		return
 	}
 	if _, _, ok := state.ItemByOrder(materialOrder); !ok {
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ Study Material을 찾을 수 없습니다.",
+			messages.materialNotFound,
 		)
 		return
 	}
@@ -611,13 +605,13 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		)
 		sf.bot.SendMessage(
 			cb.Message.Chat.ID,
-			"❌ LLM 질문을 활성화할 수 없습니다.",
+			messages.llmQuestionActivationFailed,
 		)
 		return
 	}
 	sf.bot.SendMessageWithKeyboard(
 		cb.Message.Chat.ID,
-		"🤖 이 Study Material에 대해 궁금한 점을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.",
+		messages.llmQuestionPrompt,
 		llmCancelKeyboard(),
 	)
 }
@@ -678,6 +672,7 @@ func renderStudyMaterial(
 }
 
 func renderVocabularyPayload(payload json.RawMessage) string {
+	messages := botMessagesByLocale[botDefaultLocale]
 	var vocab vocabularyStudyPayload
 	if err := json.Unmarshal(
 		payload,
@@ -695,7 +690,7 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"읽기: <b>%s</b>",
+				messages.vocabularyReadingFormat,
 				escapeHTML(vocab.Kana),
 			),
 		)
@@ -704,7 +699,7 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"표기: <b>%s</b>",
+				messages.vocabularyWritingFormat,
 				escapeHTML(vocab.Kanji),
 			),
 		)
@@ -713,7 +708,7 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"의미: <b>%s</b>",
+				messages.meaningFormat,
 				escapeHTML(vocab.MeaningKo),
 			),
 		)
@@ -722,7 +717,7 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"품사: <b>%s</b>",
+				messages.partOfSpeechFormat,
 				escapeHTML(vocab.PartOfSpeech),
 			),
 		)
@@ -746,6 +741,7 @@ type grammarStudyPayload struct {
 }
 
 func renderGrammarPayload(payload json.RawMessage) string {
+	messages := botMessagesByLocale[botDefaultLocale]
 	var grammar grammarStudyPayload
 	if err := json.Unmarshal(
 		payload,
@@ -763,7 +759,7 @@ func renderGrammarPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"의미: <b>%s</b>",
+				messages.meaningFormat,
 				escapeHTML(grammar.MeaningKo),
 			),
 		)
@@ -772,7 +768,7 @@ func renderGrammarPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"설명: %s",
+				messages.explanationFormat,
 				escapeHTML(grammar.ExplanationKo),
 			),
 		)
@@ -781,7 +777,7 @@ func renderGrammarPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"예문: <b>%s</b>",
+				messages.exampleFormat,
 				escapeHTML(grammar.Example),
 			),
 		)
@@ -790,7 +786,7 @@ func renderGrammarPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"읽기: %s",
+				messages.readingFormat,
 				escapeHTML(grammar.ExampleReading),
 			),
 		)
@@ -799,7 +795,7 @@ func renderGrammarPayload(payload json.RawMessage) string {
 		lines = append(
 			lines,
 			fmt.Sprintf(
-				"해석: %s",
+				messages.translationFormat,
 				escapeHTML(grammar.TranslationKo),
 			),
 		)
@@ -829,6 +825,7 @@ type readingStudyPayload struct {
 // key vocabulary. The Korean translation and answer rationale intentionally
 // stay out — they surface only in the quiz explanation (ADR-036).
 func renderReadingPayload(payload json.RawMessage) string {
+	messages := botMessagesByLocale[botDefaultLocale]
 	var reading readingStudyPayload
 	if err := json.Unmarshal(
 		payload,
@@ -855,7 +852,7 @@ func renderReadingPayload(payload json.RawMessage) string {
 		sections = append(
 			sections,
 			fmt.Sprintf(
-				"읽기: %s",
+				messages.readingFormat,
 				escapeHTML(reading.Reading),
 			),
 		)
@@ -893,9 +890,12 @@ func renderReadingPayload(payload json.RawMessage) string {
 	if len(vocabLines) > 0 {
 		sections = append(
 			sections,
-			"핵심 어휘:\n"+strings.Join(
-				vocabLines,
-				"\n",
+			fmt.Sprintf(
+				messages.keyVocabularyFormat,
+				strings.Join(
+					vocabLines,
+					"\n",
+				),
 			),
 		)
 	}

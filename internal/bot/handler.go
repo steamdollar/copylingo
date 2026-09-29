@@ -12,6 +12,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
@@ -25,7 +26,10 @@ var brTagPattern = regexp.MustCompile(`(?i)<br\s*/?>`)
 
 // sanitizeTelegramHTML makes text safe for ParseMode=HTML messages.
 func sanitizeTelegramHTML(text string) string {
-	return brTagPattern.ReplaceAllString(text, "\n")
+	return brTagPattern.ReplaceAllString(
+		text,
+		"\n",
+	)
 }
 
 // BotAPI defines the interface for Telegram bot interactions to allow mocking.
@@ -51,14 +55,24 @@ type Bot struct {
 	stopCh   chan struct{}
 }
 
-func NewBot(cfg *config.Config, services *service.Services, stores StateStores) (*Bot, error) {
+func NewBot(
+	cfg *config.Config,
+	services *service.Services,
+	stores StateStores,
+) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Telegram bot: %w", err)
+		return nil, fmt.Errorf(
+			"failed to create Telegram bot: %w",
+			err,
+		)
 	}
 
 	api.Debug = cfg.Telegram.Debug
-	log.Printf("Telegram bot authorized as @%s", api.Self.UserName)
+	log.Printf(
+		"Telegram bot authorized as @%s",
+		api.Self.UserName,
+	)
 
 	bot := &Bot{
 		api:      api,
@@ -106,30 +120,61 @@ func (b *Bot) Stop() {
 }
 
 // PushSession: push session container message to user
-func (b *Bot) PushSession(ctx context.Context, chatID int64, sessionID int, sessionType string) error {
-	return b.flow.PushSession(ctx, chatID, sessionID, sessionType)
+func (b *Bot) PushSession(
+	ctx context.Context,
+	chatID int64,
+	sessionID int,
+	sessionType string,
+) error {
+	return b.flow.PushSession(
+		ctx,
+		chatID,
+		sessionID,
+		sessionType,
+	)
 }
 
 // PushStudySession: sends a material-based study session start message.
-func (b *Bot) PushStudySession(ctx context.Context, chatID int64, sessionID int) error {
+func (b *Bot) PushStudySession(
+	ctx context.Context,
+	chatID int64,
+	sessionID int,
+) error {
 	if b.study == nil {
 		b.study = NewStudyFlow(b)
 	}
-	return b.study.PushSession(ctx, chatID, sessionID)
+	return b.study.PushSession(
+		ctx,
+		chatID,
+		sessionID,
+	)
 }
 
 // TODO: sendMessage, SendMessageWithKeyboard 굳이 따로 두는 이유가?
 // SendMessage sends a text message to a chat.
-func (b *Bot) SendMessage(chatID int64, text string) error {
-	msg := tgbotapi.NewMessage(chatID, sanitizeTelegramHTML(text))
+func (b *Bot) SendMessage(
+	chatID int64,
+	text string,
+) error {
+	msg := tgbotapi.NewMessage(
+		chatID,
+		sanitizeTelegramHTML(text),
+	)
 	msg.ParseMode = "HTML"
 	_, err := b.api.Send(msg)
 	return err
 }
 
 // SendMessageWithKeyboard sends a message with an inline keyboard.
-func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbotapi.InlineKeyboardMarkup) error {
-	msg := tgbotapi.NewMessage(chatID, sanitizeTelegramHTML(text))
+func (b *Bot) SendMessageWithKeyboard(
+	chatID int64,
+	text string,
+	keyboard tgbotapi.InlineKeyboardMarkup,
+) error {
+	msg := tgbotapi.NewMessage(
+		chatID,
+		sanitizeTelegramHTML(text),
+	)
 	msg.ParseMode = "HTML"
 	if len(keyboard.InlineKeyboard) > 0 {
 		msg.ReplyMarkup = keyboard
@@ -139,8 +184,15 @@ func (b *Bot) SendMessageWithKeyboard(chatID int64, text string, keyboard tgbota
 }
 
 // SendMessageWithReplyMarkup sends a message with custom Telegram reply markup.
-func (b *Bot) SendMessageWithReplyMarkup(chatID int64, text string, replyMarkup interface{}) (int, error) {
-	msg := tgbotapi.NewMessage(chatID, sanitizeTelegramHTML(text))
+func (b *Bot) SendMessageWithReplyMarkup(
+	chatID int64,
+	text string,
+	replyMarkup interface{},
+) (int, error) {
+	msg := tgbotapi.NewMessage(
+		chatID,
+		sanitizeTelegramHTML(text),
+	)
 	msg.ParseMode = "HTML"
 	msg.ReplyMarkup = replyMarkup
 	sent, err := b.api.Send(msg)
@@ -151,16 +203,28 @@ func (b *Bot) SendMessageWithReplyMarkup(chatID int64, text string, replyMarkup 
 }
 
 // SendVoiceFileID sends a voice message by reusing a cached Telegram file_id.
-func (b *Bot) SendVoiceFileID(chatID int64, fileID string) error {
-	voice := tgbotapi.NewVoice(chatID, tgbotapi.FileID(fileID))
+func (b *Bot) SendVoiceFileID(
+	chatID int64,
+	fileID string,
+) error {
+	voice := tgbotapi.NewVoice(
+		chatID,
+		tgbotapi.FileID(fileID),
+	)
 	_, err := b.api.Send(voice)
 	return err
 }
 
 // SendVoiceBytes uploads raw OGG/Opus bytes as a voice message and returns the
 // Telegram file_id assigned to it, so callers can cache it for later re-sends.
-func (b *Bot) SendVoiceBytes(chatID int64, data []byte) (string, error) {
-	voice := tgbotapi.NewVoice(chatID, tgbotapi.FileBytes{Name: "listening.ogg", Bytes: data})
+func (b *Bot) SendVoiceBytes(
+	chatID int64,
+	data []byte,
+) (string, error) {
+	voice := tgbotapi.NewVoice(
+		chatID,
+		tgbotapi.FileBytes{Name: "listening.ogg", Bytes: data},
+	)
 	sent, err := b.api.Send(voice)
 	if err != nil {
 		return "", err
@@ -172,15 +236,32 @@ func (b *Bot) SendVoiceBytes(chatID int64, data []byte) (string, error) {
 }
 
 // EditMessageReplyMarkup updates the inline keyboard of an existing message.
-func (b *Bot) EditMessageReplyMarkup(chatID int64, messageID int, markup tgbotapi.InlineKeyboardMarkup) error {
-	edit := tgbotapi.NewEditMessageReplyMarkup(chatID, messageID, markup)
+func (b *Bot) EditMessageReplyMarkup(
+	chatID int64,
+	messageID int,
+	markup tgbotapi.InlineKeyboardMarkup,
+) error {
+	edit := tgbotapi.NewEditMessageReplyMarkup(
+		chatID,
+		messageID,
+		markup,
+	)
 	_, err := b.api.Send(edit)
 	return err
 }
 
 // EditMessage edits an existing message.
-func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *tgbotapi.InlineKeyboardMarkup) error {
-	edit := tgbotapi.NewEditMessageText(chatID, messageID, sanitizeTelegramHTML(text))
+func (b *Bot) EditMessage(
+	chatID int64,
+	messageID int,
+	text string,
+	keyboard *tgbotapi.InlineKeyboardMarkup,
+) error {
+	edit := tgbotapi.NewEditMessageText(
+		chatID,
+		messageID,
+		sanitizeTelegramHTML(text),
+	)
 	edit.ParseMode = "HTML"
 	if keyboard != nil && len(keyboard.InlineKeyboard) > 0 {
 		edit.ReplyMarkup = keyboard
@@ -190,7 +271,10 @@ func (b *Bot) EditMessage(chatID int64, messageID int, text string, keyboard *tg
 }
 
 // ClearInlineKeyboard removes inline buttons from an existing bot message.
-func (b *Bot) ClearInlineKeyboard(chatID int64, messageID int) error {
+func (b *Bot) ClearInlineKeyboard(
+	chatID int64,
+	messageID int,
+) error {
 	edit := tgbotapi.EditMessageReplyMarkupConfig{
 		BaseEdit: tgbotapi.BaseEdit{
 			ChatID:    chatID,
@@ -203,19 +287,32 @@ func (b *Bot) ClearInlineKeyboard(chatID int64, messageID int) error {
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	startedAt := time.Now()
-	ctx := observability.WithAttrs(context.Background(), telegramUpdateAttrs(update)...)
+	ctx := observability.WithAttrs(
+		context.Background(),
+		telegramUpdateAttrs(update)...,
+	)
 
 	if update.Message != nil {
 		// text input handle
-		b.handleMessage(ctx, update.Message)
+		b.handleMessage(
+			ctx,
+			update.Message,
+		)
 	} else if update.CallbackQuery != nil {
 		// button click handle
-		b.handleCallback(ctx, update.CallbackQuery)
+		b.handleCallback(
+			ctx,
+			update.CallbackQuery,
+		)
 	}
 
-	slog.InfoContext(ctx, "Telegram update completed",
-		"event", "telegram.update.completed",
-		"duration_ms", time.Since(startedAt).Milliseconds(),
+	slog.InfoContext(
+		ctx,
+		"Telegram update completed",
+		"event",
+		"telegram.update.completed",
+		"duration_ms",
+		time.Since(startedAt).Milliseconds(),
 	)
 }
 
@@ -223,57 +320,136 @@ func telegramUpdateAttrs(update tgbotapi.Update) []slog.Attr {
 	interactionID := observability.NewInteractionID("tg")
 	// updateID: a unique ID for each update received by the bot.
 	if update.UpdateID > 0 {
-		interactionID = fmt.Sprintf("tg-%d", update.UpdateID)
+		interactionID = fmt.Sprintf(
+			"tg-%d",
+			update.UpdateID,
+		)
 	}
 	attrs := []slog.Attr{
-		slog.String("interaction_id", interactionID),
-		slog.String("source", "telegram"),
-		slog.Int("update_id", update.UpdateID),
+		slog.String(
+			"interaction_id",
+			interactionID,
+		),
+		slog.String(
+			"source",
+			"telegram",
+		),
+		slog.Int(
+			"update_id",
+			update.UpdateID,
+		),
 	}
 
 	switch {
 	case update.Message != nil:
-		attrs = append(attrs, slog.String("update_type", "message"))
+		attrs = append(
+			attrs,
+			slog.String(
+				"update_type",
+				"message",
+			),
+		)
 		if update.Message.From != nil {
-			attrs = append(attrs, slog.Int64("user_id", update.Message.From.ID))
+			attrs = append(
+				attrs,
+				slog.Int64(
+					"user_id",
+					update.Message.From.ID,
+				),
+			)
 		}
 		if update.Message.Chat != nil {
-			attrs = append(attrs, slog.Int64("chat_id", update.Message.Chat.ID))
+			attrs = append(
+				attrs,
+				slog.Int64(
+					"chat_id",
+					update.Message.Chat.ID,
+				),
+			)
 		}
 		if update.Message.IsCommand() {
-			attrs = append(attrs, slog.String("command", update.Message.Command()))
+			attrs = append(
+				attrs,
+				slog.String(
+					"command",
+					update.Message.Command(),
+				),
+			)
 		}
 	case update.CallbackQuery != nil:
-		attrs = append(attrs,
-			slog.String("update_type", "callback"),
-			slog.String("callback_type", callbackType(update.CallbackQuery.Data)),
+		attrs = append(
+			attrs,
+			slog.String(
+				"update_type",
+				"callback",
+			),
+			slog.String(
+				"callback_type",
+				callbackType(update.CallbackQuery.Data),
+			),
 		)
 		if update.CallbackQuery.From != nil {
-			attrs = append(attrs, slog.Int64("user_id", update.CallbackQuery.From.ID))
+			attrs = append(
+				attrs,
+				slog.Int64(
+					"user_id",
+					update.CallbackQuery.From.ID,
+				),
+			)
 		}
 		if update.CallbackQuery.Message != nil && update.CallbackQuery.Message.Chat != nil {
-			attrs = append(attrs, slog.Int64("chat_id", update.CallbackQuery.Message.Chat.ID))
+			attrs = append(
+				attrs,
+				slog.Int64(
+					"chat_id",
+					update.CallbackQuery.Message.Chat.ID,
+				),
+			)
 		}
-		attrs = append(attrs, callbackIDAttrs(update.CallbackQuery.Data)...)
+		attrs = append(
+			attrs,
+			callbackIDAttrs(update.CallbackQuery.Data)...,
+		)
 	default:
-		attrs = append(attrs, slog.String("update_type", "unknown"))
+		attrs = append(
+			attrs,
+			slog.String(
+				"update_type",
+				"unknown",
+			),
+		)
 	}
 	return attrs
 }
 
 func callbackType(data string) string {
 	switch {
-	case data == config.ActionLLMCancel:
+	case data == callbackLLMCancel:
 		return "llm"
-	case strings.HasPrefix(data, "menu:"):
+	case strings.HasPrefix(
+		data,
+		callbackPrefixMenu,
+	):
 		return "menu"
-	case strings.HasPrefix(data, config.PrefixSettings):
+	case strings.HasPrefix(
+		data,
+		callbackPrefixSettings,
+	):
 		return "settings"
-	case strings.HasPrefix(data, config.PrefixSession):
+	case strings.HasPrefix(
+		data,
+		callbackPrefixSession,
+	):
 		return "session"
-	case strings.HasPrefix(data, config.PrefixQuestion):
+	case strings.HasPrefix(
+		data,
+		callback.QuestionPrefix,
+	):
 		return "question"
-	case strings.HasPrefix(data, config.PrefixStudy):
+	case strings.HasPrefix(
+		data,
+		callbackPrefixStudy,
+	):
 		return "study"
 	default:
 		return "unknown"
@@ -281,7 +457,10 @@ func callbackType(data string) string {
 }
 
 func callbackIDAttrs(data string) []slog.Attr {
-	parts := strings.Split(data, ":")
+	parts := strings.Split(
+		data,
+		":",
+	)
 	if len(parts) < 2 {
 		return nil
 	}
@@ -289,117 +468,223 @@ func callbackIDAttrs(data string) []slog.Attr {
 	if err != nil {
 		return nil
 	}
-	attrs := []slog.Attr{slog.Int("session_id", sessionID)}
-	if strings.HasPrefix(data, config.PrefixQuestion) && len(parts) >= 3 && parts[2] != "next" {
+	attrs := []slog.Attr{slog.Int(
+		"session_id",
+		sessionID,
+	)}
+	if strings.HasPrefix(
+		data,
+		callback.QuestionPrefix,
+	) && len(parts) >= 3 && parts[2] != callback.QuestionActionNext {
 		if questionID, err := strconv.Atoi(parts[2]); err == nil {
-			attrs = append(attrs, slog.Int("question_id", questionID))
+			attrs = append(
+				attrs,
+				slog.Int(
+					"question_id",
+					questionID,
+				),
+			)
 		}
 	}
 	return attrs
 }
 
-func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
+func (b *Bot) handleMessage(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
 	// if it is nor bot command, check if it is active question answer, if not, ignore or route to chat.
 	if !msg.IsCommand() {
-		if handled := b.handleLLMQuestion(ctx, msg); handled {
+		if handled := b.handleLLMQuestion(
+			ctx,
+			msg,
+		); handled {
 			return
 		}
 		// Route plain text to session flow for FillBlank questions
 		if b.flow != nil {
-			if handled := b.flow.HandleTextInput(ctx, msg); !handled {
+			if handled := b.flow.HandleTextInput(
+				ctx,
+				msg,
+			); !handled {
 				// Optional: Fallback to chat or ignore
 			}
 		}
 		return
 	}
 
-	switch config.BotCommand(msg.Command()) {
-	case config.CommandStart:
+	switch botCommand(msg.Command()) {
+	case commandStart:
 		b.handleStart(msg)
-	case config.CommandMenu:
-		b.handleMenu(ctx, msg)
-	case config.CommandStats:
-		b.handleStats(ctx, msg)
-	case config.CommandStreak:
-		b.handleStreak(ctx, msg)
-	case config.CommandStudy:
-		b.handleStudy(ctx, msg)
-	case config.CommandLLM:
-		b.handleLLM(ctx, msg)
-	case config.CommandTest:
-		b.handleTest(ctx, msg)
-	case config.CommandHelp:
-		b.handleHelp(ctx, msg)
-	case config.CommandExit:
-		b.handleExit(ctx, msg)
-	case config.CommandSettings:
-		b.handleSettingsCommand(ctx, msg)
+	case commandMenu:
+		b.handleMenu(
+			ctx,
+			msg,
+		)
+	case commandStats:
+		b.handleStats(
+			ctx,
+			msg,
+		)
+	case commandStreak:
+		b.handleStreak(
+			ctx,
+			msg,
+		)
+	case commandStudy:
+		b.handleStudy(
+			ctx,
+			msg,
+		)
+	case commandLLM:
+		b.handleLLM(
+			ctx,
+			msg,
+		)
+	case commandTest:
+		b.handleTest(
+			ctx,
+			msg,
+		)
+	case commandHelp:
+		b.handleHelp(
+			ctx,
+			msg,
+		)
+	case commandExit:
+		b.handleExit(
+			ctx,
+			msg,
+		)
+	case commandSettings:
+		b.handleSettingsCommand(
+			ctx,
+			msg,
+		)
 	default:
-		b.SendMessage(msg.Chat.ID, "❓ 알 수 없는 명령어입니다. /help 를 입력해 보세요.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].unknownCommand,
+		)
 	}
 }
 
-func (b *Bot) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
+func (b *Bot) handleCallback(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+) {
 	// Acknowledge callback to remove loading indicator
-	callback := tgbotapi.NewCallback(cb.ID, "")
-	b.api.Request(callback)
+	callbackResponse := tgbotapi.NewCallback(
+		cb.ID,
+		"",
+	)
+	b.api.Request(callbackResponse)
 
 	data := cb.Data
 
 	switch {
-	case data == config.ActionLLMCancel:
-		b.handleLLMCancel(ctx, cb)
-	case data == config.ActionMenuMain:
-		b.showMainMenu(ctx, cb.Message.Chat.ID, cb.From)
-	case data == config.ActionMenuStudy:
-		b.flow.StartStudy(ctx, cb)
-	case data == config.ActionMenuReview:
-		b.flow.StartReview(ctx, cb)
-	case data == config.ActionMenuStats:
-		b.handleStatsCallback(ctx, cb)
-	case data == config.ActionMenuSettings || strings.HasPrefix(data, config.PrefixSettings):
-		b.handleSettingsCallback(ctx, cb)
+	case data == callbackLLMCancel:
+		b.handleLLMCancel(
+			ctx,
+			cb,
+		)
+	case data == callbackMenuMain:
+		b.showMainMenu(
+			ctx,
+			cb.Message.Chat.ID,
+			cb.From,
+		)
+	case data == callbackMenuStudy:
+		b.flow.StartStudy(
+			ctx,
+			cb,
+		)
+	case data == callbackMenuReview:
+		b.flow.StartReview(
+			ctx,
+			cb,
+		)
+	case data == callbackMenuStats:
+		b.handleStatsCallback(
+			ctx,
+			cb,
+		)
+	case data == callbackMenuSettings || strings.HasPrefix(
+		data,
+		callbackPrefixSettings,
+	):
+		b.handleSettingsCallback(
+			ctx,
+			cb,
+		)
 		// 학습 세션 시작
 		// e.g. session:50:start
-	case strings.HasPrefix(data, config.PrefixSession):
-		b.flow.HandleSessionCallback(ctx, cb)
-	case strings.HasPrefix(data, config.PrefixQuestion):
-		b.flow.HandleAnswerCallback(ctx, cb)
-	case strings.HasPrefix(data, config.PrefixStudy):
+	case strings.HasPrefix(
+		data,
+		callbackPrefixSession,
+	):
+		b.flow.HandleSessionCallback(
+			ctx,
+			cb,
+		)
+	case strings.HasPrefix(
+		data,
+		callback.QuestionPrefix,
+	):
+		b.flow.HandleAnswerCallback(
+			ctx,
+			cb,
+		)
+	case strings.HasPrefix(
+		data,
+		callbackPrefixStudy,
+	):
 		if b.study == nil {
 			b.study = NewStudyFlow(b)
 		}
-		b.study.HandleCallback(ctx, cb)
+		b.study.HandleCallback(
+			ctx,
+			cb,
+		)
 	}
 }
 
 func (b *Bot) handleStart(msg *tgbotapi.Message) {
-	welcome := `🎌 <b>CopyLingo에 오신 것을 환영합니다!</b>
-
-일본어를 마스터하기 위한 여정을 시작합니다.
-JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
-
-📚 <b>학습 방식:</b>
-• 매일 오전/오후 학습 세션이 전송됩니다
-• 뉴스, 시험 대비 자료를 기반으로 문제가 생성됩니다
-• 틀린 문제는 간격 반복(SRS)으로 자동 복습됩니다
-• 주말에는 아티클 읽기 + AI 대화도 제공됩니다
-
-/menu 를 눌러 시작하세요! 🚀`
-
-	b.SendMessage(msg.Chat.ID, welcome)
+	b.SendMessage(
+		msg.Chat.ID,
+		botMessagesByLocale[botDefaultLocale].welcomeMessage,
+	)
 }
 
-func (b *Bot) handleMenu(ctx context.Context, msg *tgbotapi.Message) {
-	b.showMainMenu(ctx, msg.Chat.ID, msg.From)
+func (b *Bot) handleMenu(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
+	b.showMainMenu(
+		ctx,
+		msg.Chat.ID,
+		msg.From,
+	)
 }
 
-func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.User) {
-	user, err := b.services.User.GetUser(ctx, from.ID, from.UserName)
+func (b *Bot) showMainMenu(
+	ctx context.Context,
+	chatID int64,
+	from *tgbotapi.User,
+) {
+	user, err := b.services.User.GetUser(
+		ctx,
+		from.ID,
+		from.UserName,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get user for main menu",
-			"event", "telegram.menu.user_lookup_failed",
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to get user for main menu",
+			"event",
+			"telegram.menu.user_lookup_failed",
+			"error",
+			err,
 		)
 	}
 
@@ -416,50 +701,78 @@ func (b *Bot) showMainMenu(ctx context.Context, chatID int64, from *tgbotapi.Use
 		lang = user.Language
 		level = user.ProficiencyLevel
 	}
-	reviewCount, _ := b.services.SRS.GetDueCount(ctx, from.ID, lang, level)
+	reviewCount, _ := b.services.SRS.GetDueCount(
+		ctx,
+		from.ID,
+		lang,
+		level,
+	)
 
 	langName := languageDisplayName(lang)
-	text := fmt.Sprintf(`🎌 <b>CopyLingo</b>
+	text := fmt.Sprintf(
+		botMessagesByLocale[botDefaultLocale].mainMenuFormat,
+		streakEmoji,
+		streakDays,
+		langName,
+		level,
+	)
 
-%s 스트릭: <b>%d일</b> 연속
-🌐 언어: <b>%s</b>
-📈 레벨: <b>%s</b>`, streakEmoji, streakDays, langName, level)
-
-	reviewLabel := fmt.Sprintf("🔄 복습하기 (%d개)", reviewCount)
+	messages := botMessagesByLocale[botDefaultLocale]
+	reviewLabel := fmt.Sprintf(
+		messages.reviewMenuButtonFormat,
+		reviewCount,
+	)
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📚 학습하기", config.ActionMenuStudy),
-			tgbotapi.NewInlineKeyboardButtonData(reviewLabel, config.ActionMenuReview),
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.studyMenuButton,
+				callbackMenuStudy,
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				reviewLabel,
+				callbackMenuReview,
+			),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("📊 내 통계", config.ActionMenuStats),
-			tgbotapi.NewInlineKeyboardButtonData("⚙️ 설정", config.ActionMenuSettings),
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.statsMenuButton,
+				callbackMenuStats,
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.settingsMenuButton,
+				callbackMenuSettings,
+			),
 		),
 	)
 
-	b.SendMessageWithKeyboard(chatID, text, keyboard)
+	b.SendMessageWithKeyboard(
+		chatID,
+		text,
+		keyboard,
+	)
 }
 
-func (b *Bot) handleStats(ctx context.Context, msg *tgbotapi.Message) {
-	stats, err := b.services.Analyzer.GetUserStats(ctx, msg.From.ID)
+func (b *Bot) handleStats(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
+	stats, err := b.services.Analyzer.GetUserStats(
+		ctx,
+		msg.From.ID,
+	)
 	if err != nil {
-		b.SendMessage(msg.Chat.ID, "❌ 통계를 불러오는 데 실패했습니다.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].statsCommandFailed,
+		)
 		return
 	}
 
-	text := fmt.Sprintf(`📊 <b>학습 통계</b>
-
-📅 오늘: %d문제 풀음 (정답률 %.0f%%)
-🔥 스트릭: %d일 연속
-
-<b>카테고리별 정답률:</b>
-📝 어휘: %.0f%%
-📖 문법: %.0f%%
-🈲 한자: %.0f%%
-📚 독해: %.0f%%
-🎧 청해: %.0f%%`,
-		stats.TodayQuestions, stats.OverallAccuracy,
+	text := fmt.Sprintf(
+		botMessagesByLocale[botDefaultLocale].statsOverviewFormat,
+		stats.TodayQuestions,
+		stats.OverallAccuracy,
 		stats.CurrentStreak,
 		stats.VocabularyAccuracy,
 		stats.GrammarAccuracy,
@@ -468,100 +781,144 @@ func (b *Bot) handleStats(ctx context.Context, msg *tgbotapi.Message) {
 		stats.ListeningAccuracy,
 	)
 
-	b.SendMessage(msg.Chat.ID, text)
+	b.SendMessage(
+		msg.Chat.ID,
+		text,
+	)
 }
 
-func (b *Bot) handleStatsCallback(ctx context.Context, cb *tgbotapi.CallbackQuery) {
-	stats, err := b.services.Analyzer.GetUserStats(ctx, cb.From.ID)
+func (b *Bot) handleStatsCallback(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+) {
+	stats, err := b.services.Analyzer.GetUserStats(
+		ctx,
+		cb.From.ID,
+	)
 	if err != nil {
 		return
 	}
 
-	text := fmt.Sprintf(`📊 <b>학습 통계</b>
-
-📅 오늘: %d문제 (정답률 %.0f%%)
-🔥 스트릭: %d일
-
-📝 어휘: %.0f%% | 📖 문법: %.0f%%
-🈲 한자: %.0f%% | 📚 독해: %.0f%%
-🎧 청해: %.0f%%`,
-		stats.TodayQuestions, stats.OverallAccuracy,
+	text := fmt.Sprintf(
+		botMessagesByLocale[botDefaultLocale].statsMenuFormat,
+		stats.TodayQuestions,
+		stats.OverallAccuracy,
 		stats.CurrentStreak,
-		stats.VocabularyAccuracy, stats.GrammarAccuracy,
-		stats.KanjiAccuracy, stats.ReadingAccuracy,
+		stats.VocabularyAccuracy,
+		stats.GrammarAccuracy,
+		stats.KanjiAccuracy,
+		stats.ReadingAccuracy,
 		stats.ListeningAccuracy,
 	)
 
 	backBtn := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🏠 메뉴로", config.ActionMenuMain),
+			tgbotapi.NewInlineKeyboardButtonData(
+				botMessagesByLocale[botDefaultLocale].menuHomeButton,
+				callbackMenuMain,
+			),
 		),
 	)
 
-	b.EditMessage(cb.Message.Chat.ID, cb.Message.MessageID, text, &backBtn)
+	b.EditMessage(
+		cb.Message.Chat.ID,
+		cb.Message.MessageID,
+		text,
+		&backBtn,
+	)
 }
 
-func (b *Bot) handleStreak(ctx context.Context, msg *tgbotapi.Message) {
-	stats, err := b.services.Analyzer.GetUserStats(ctx, msg.From.ID)
+func (b *Bot) handleStreak(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
+	stats, err := b.services.Analyzer.GetUserStats(
+		ctx,
+		msg.From.ID,
+	)
 	if err != nil {
-		b.SendMessage(msg.Chat.ID, "❌ 스트릭 정보를 불러올 수 없습니다.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].streakCommandFailed,
+		)
 		return
 	}
 
-	text := fmt.Sprintf("🔥 현재 스트릭: <b>%d일</b> 연속 학습 중!", stats.CurrentStreak)
-	b.SendMessage(msg.Chat.ID, text)
+	text := fmt.Sprintf(
+		botMessagesByLocale[botDefaultLocale].streakFormat,
+		stats.CurrentStreak,
+	)
+	b.SendMessage(
+		msg.Chat.ID,
+		text,
+	)
 }
 
-func (b *Bot) handleHelp(_ context.Context, msg *tgbotapi.Message) {
-	help := `📖 <b>CopyLingo 도움말</b>
-
-<b>명령어:</b>
-/menu - 메인 메뉴
-/study [개수] - Study Material 세션 즉시 생성
-/llm - LLM 질문 mode 활성화
-/stats - 학습 통계
-/streak - 스트릭 확인
-/settings - 알림 시각 및 시간대 설정
-/exit - 현재 입력 취소 (세션은 보존, /menu 에서 재개)
-/help - 도움말
-
-<b>학습 흐름:</b>
-1. 설정한 시각에 맞춰 맞춤형 학습/퀴즈 세션이 전송됩니다 (설정: /settings)
-2. 인라인 버튼으로 문제를 풀어주세요
-3. 틀린 문제는 SRS로 자동 복습됩니다
-4. /menu → 복습하기로 수동 복습도 가능합니다`
-
-	b.SendMessage(msg.Chat.ID, help)
+func (b *Bot) handleHelp(
+	_ context.Context,
+	msg *tgbotapi.Message,
+) {
+	b.SendMessage(
+		msg.Chat.ID,
+		botMessagesByLocale[botDefaultLocale].helpMessage,
+	)
 }
 
-func (b *Bot) handleExit(ctx context.Context, msg *tgbotapi.Message) {
+func (b *Bot) handleExit(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
 	var userID *int64
 	if msg.From != nil {
 		userID = &msg.From.ID
 	}
 	if b.input != nil {
-		_ = b.input.ClearInput(ctx, msg.Chat.ID, userID)
+		_ = b.input.ClearInput(
+			ctx,
+			msg.Chat.ID,
+			userID,
+		)
 	}
-	b.SendMessage(msg.Chat.ID, "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요.")
+	b.SendMessage(
+		msg.Chat.ID,
+		botMessagesByLocale[botDefaultLocale].exitMessage,
+	)
 }
 
-func (b *Bot) handleStudy(ctx context.Context, msg *tgbotapi.Message) {
+func (b *Bot) handleStudy(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
 	limit, err := parseStudyCommandLimit(msg.CommandArguments())
 	if err != nil {
-		b.SendMessage(msg.Chat.ID, fmt.Sprintf(
-			"❓ 사용법: /study [1-%d]\n예: /study 20",
-			service.MaxStudySessionMaterialCount,
-		))
+		b.SendMessage(
+			msg.Chat.ID,
+			fmt.Sprintf(
+				botMessagesByLocale[botDefaultLocale].studyCommandUsageFormat,
+				service.MaxStudySessionMaterialCount,
+			),
+		)
 		return
 	}
 
-	user, err := b.services.User.GetUser(ctx, msg.From.ID, msg.From.UserName)
+	user, err := b.services.User.GetUser(
+		ctx,
+		msg.From.ID,
+		msg.From.UserName,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get user for study session",
-			"event", "telegram.study.command_user_lookup_failed",
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to get user for study session",
+			"event",
+			"telegram.study.command_user_lookup_failed",
+			"error",
+			err,
 		)
-		b.SendMessage(msg.Chat.ID, "❌ 사용자 정보를 확인할 수 없습니다.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].userUnavailable,
+		)
 		return
 	}
 
@@ -574,36 +931,67 @@ func (b *Bot) handleStudy(ctx context.Context, msg *tgbotapi.Message) {
 		limit,
 	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to build study session from command",
-			"event", "telegram.study.command_build_failed",
-			"user_id", user.ID,
-			"limit", limit,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to build study session from command",
+			"event",
+			"telegram.study.command_build_failed",
+			"user_id",
+			user.ID,
+			"limit",
+			limit,
+			"error",
+			err,
 		)
-		b.SendMessage(msg.Chat.ID, "❌ Study Session 생성 중 오류가 발생했습니다.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].studyCommandBuildFailed,
+		)
 		return
 	}
 	if session == nil {
-		b.SendMessage(msg.Chat.ID, "⚠️ 현재 학습 가능한 Study Material이 없습니다.")
-		return
-	}
-
-	if err := b.PushStudySession(ctx, msg.Chat.ID, session.ID); err != nil {
-		slog.ErrorContext(ctx, "Failed to push study session from command",
-			"event", "telegram.study.command_push_failed",
-			"user_id", user.ID,
-			"session_id", session.ID,
-			"error", err,
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].studyCommandNoMaterials,
 		)
-		b.SendMessage(msg.Chat.ID, "❌ Study Session 발송에 실패했습니다.")
 		return
 	}
 
-	slog.InfoContext(ctx, "Study session triggered from command",
-		"event", "telegram.study.command_triggered",
-		"user_id", user.ID,
-		"session_id", session.ID,
-		"limit", limit,
+	if err := b.PushStudySession(
+		ctx,
+		msg.Chat.ID,
+		session.ID,
+	); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to push study session from command",
+			"event",
+			"telegram.study.command_push_failed",
+			"user_id",
+			user.ID,
+			"session_id",
+			session.ID,
+			"error",
+			err,
+		)
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].studyCommandPushFailed,
+		)
+		return
+	}
+
+	slog.InfoContext(
+		ctx,
+		"Study session triggered from command",
+		"event",
+		"telegram.study.command_triggered",
+		"user_id",
+		user.ID,
+		"session_id",
+		session.ID,
+		"limit",
+		limit,
 	)
 }
 
@@ -618,73 +1006,129 @@ func parseStudyCommandLimit(args string) (int, error) {
 	}
 	limit, err := strconv.Atoi(fields[0])
 	if err != nil {
-		return 0, fmt.Errorf("parse study limit: %w", err)
+		return 0, fmt.Errorf(
+			"parse study limit: %w",
+			err,
+		)
 	}
 	if limit <= 0 || limit > service.MaxStudySessionMaterialCount {
-		return 0, fmt.Errorf("study limit out of range: %d", limit)
+		return 0, fmt.Errorf(
+			"study limit out of range: %d",
+			limit,
+		)
 	}
 	return limit, nil
 }
 
-func (b *Bot) handleTest(ctx context.Context, msg *tgbotapi.Message) {
+func (b *Bot) handleTest(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) {
 	// 1. Ensure user exists
-	user, err := b.services.User.GetUser(ctx, msg.From.ID, msg.From.UserName)
+	user, err := b.services.User.GetUser(
+		ctx,
+		msg.From.ID,
+		msg.From.UserName,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to get user for test session",
-			"event", "telegram.test.user_lookup_failed",
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to get user for test session",
+			"event",
+			"telegram.test.user_lookup_failed",
+			"error",
+			err,
 		)
-		b.SendMessage(msg.Chat.ID, "❌ 사용자 정보를 확인할 수 없습니다.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].userUnavailable,
+		)
 		return
 	}
 
 	// 2. Build a morning session (9 new + 6 review)
-	session, err := b.services.SessionBuilder.BuildMorningSession(ctx, user.ID, user.Language, user.ProficiencyLevel)
+	session, err := b.services.SessionBuilder.BuildMorningSession(
+		ctx,
+		user.ID,
+		user.Language,
+		user.ProficiencyLevel,
+	)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to build test session",
-			"event", "telegram.test.session_build_failed",
-			"user_id", user.ID,
-			"error", err,
+		slog.ErrorContext(
+			ctx,
+			"Failed to build test session",
+			"event",
+			"telegram.test.session_build_failed",
+			"user_id",
+			user.ID,
+			"error",
+			err,
 		)
-		b.SendMessage(msg.Chat.ID, "❌ 세션 생성 중 오류가 발생했습니다.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].testSessionBuildFailed,
+		)
 		return
 	}
 
 	if session == nil {
-		b.SendMessage(msg.Chat.ID, "⚠️ 현재 사용 가능한 문제가 없습니다. 컨텐츠가 수집되었는지 확인해 주세요.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].testSessionNoQuestions,
+		)
 		return
 	}
 
 	// 3. Push the session immediately
-	if err := b.PushSession(ctx, user.ID, session.ID, "morning"); err != nil {
-		slog.ErrorContext(ctx, "Failed to push test session",
-			"event", "telegram.test.session_push_failed",
-			"user_id", user.ID,
-			"session_id", session.ID,
-			"error", err,
+	if err := b.PushSession(
+		ctx,
+		user.ID,
+		session.ID,
+		"morning",
+	); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to push test session",
+			"event",
+			"telegram.test.session_push_failed",
+			"user_id",
+			user.ID,
+			"session_id",
+			session.ID,
+			"error",
+			err,
 		)
-		b.SendMessage(msg.Chat.ID, "❌ 세션 발송에 실패했습니다.")
+		b.SendMessage(
+			msg.Chat.ID,
+			botMessagesByLocale[botDefaultLocale].testSessionPushFailed,
+		)
 		return
 	}
 
-	slog.InfoContext(ctx, "Test session triggered",
-		"event", "telegram.test.session_triggered",
-		"user_id", user.ID,
-		"session_id", session.ID,
+	slog.InfoContext(
+		ctx,
+		"Test session triggered",
+		"event",
+		"telegram.test.session_triggered",
+		"user_id",
+		user.ID,
+		"session_id",
+		session.ID,
 	)
 }
 
 // languageDisplayName returns a human-readable name for the language code.
 func languageDisplayName(code string) string {
+	messages := botMessagesByLocale[botDefaultLocale]
 	switch code {
 	case "ja":
-		return "일본어"
+		return messages.languageJapanese
 	case "el":
-		return "그리스어"
+		return messages.languageGreek
 	case "en":
-		return "영어"
+		return messages.languageEnglish
 	case "ko":
-		return "한국어"
+		return messages.languageKorean
 	default:
 		return code
 	}
