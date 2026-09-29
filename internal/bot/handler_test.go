@@ -13,7 +13,11 @@ func TestHandleExit(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	mRdb := newTestInteractionStores()
 	chatID := int64(12345)
-	_ = mRdb.SetActiveQuestion(context.Background(), chatID, model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 2})
+	_ = mRdb.SetActiveQuestion(
+		context.Background(),
+		chatID,
+		model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 2},
+	)
 	b := &Bot{
 		api:   mAPI,
 		input: mRdb,
@@ -24,9 +28,15 @@ func TestHandleExit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	b.handleExit(ctx, msg)
+	b.handleExit(
+		ctx,
+		msg,
+	)
 
-	if question, _ := mRdb.GetActiveQuestion(context.Background(), chatID); question != nil {
+	if question, _ := mRdb.GetActiveQuestion(
+		context.Background(),
+		chatID,
+	); question != nil {
 		t.Error("active text question still exists")
 	}
 
@@ -42,7 +52,11 @@ func TestHandleExit(t *testing.T) {
 
 	expectedText := "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요."
 	if sentMsg.Text != expectedText {
-		t.Errorf("expected message text %q, got %q", expectedText, sentMsg.Text)
+		t.Errorf(
+			"expected message text %q, got %q",
+			expectedText,
+			sentMsg.Text,
+		)
 	}
 }
 
@@ -50,22 +64,41 @@ func TestClearInlineKeyboardOmitsReplyMarkup(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	b := &Bot{api: mAPI}
 
-	if err := b.ClearInlineKeyboard(12345, 678); err != nil {
-		t.Fatalf("ClearInlineKeyboard() error = %v", err)
+	if err := b.ClearInlineKeyboard(
+		12345,
+		678,
+	); err != nil {
+		t.Fatalf(
+			"ClearInlineKeyboard() error = %v",
+			err,
+		)
 	}
 
 	if len(mAPI.sentMessages) != 1 {
-		t.Fatalf("sent messages = %d, want 1", len(mAPI.sentMessages))
+		t.Fatalf(
+			"sent messages = %d, want 1",
+			len(mAPI.sentMessages),
+		)
 	}
 
 	edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig)
 	if !ok {
-		t.Fatalf("sent message type = %T, want EditMessageReplyMarkupConfig", mAPI.sentMessages[0])
+		t.Fatalf(
+			"sent message type = %T, want EditMessageReplyMarkupConfig",
+			mAPI.sentMessages[0],
+		)
 	}
 	if edit.ChatID != 12345 || edit.MessageID != 678 {
-		t.Fatalf("target = (%d, %d), want (12345, 678)", edit.ChatID, edit.MessageID)
+		t.Fatalf(
+			"target = (%d, %d), want (12345, 678)",
+			edit.ChatID,
+			edit.MessageID,
+		)
 	}
 	if edit.ReplyMarkup != nil {
-		t.Fatalf("ReplyMarkup = %#v, want nil", edit.ReplyMarkup)
+		t.Fatalf(
+			"ReplyMarkup = %#v, want nil",
+			edit.ReplyMarkup,
+		)
 	}
 }

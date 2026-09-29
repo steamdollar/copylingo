@@ -30,7 +30,10 @@ func TestRefreshStaleMiniAppMessages_EmptyBaseURL(t *testing.T) {
 	b.RefreshStaleMiniAppMessages(ctx)
 
 	if len(mAPI.sentMessages) != 0 {
-		t.Errorf("expected no messages when base URL empty, got %d", len(mAPI.sentMessages))
+		t.Errorf(
+			"expected no messages when base URL empty, got %d",
+			len(mAPI.sentMessages),
+		)
 	}
 }
 
@@ -39,7 +42,12 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	store := &sessionListStore{inProgress: nil}
-	sb := service.NewSessionBuilderService(nil, store, nil, nil)
+	sb := service.NewSessionBuilderService(
+		nil,
+		store,
+		nil,
+		nil,
+	)
 	cfg := &config.Config{}
 	cfg.Server.PublicBaseURL = "https://x.trycloudflare.com"
 	b := &Bot{
@@ -56,7 +64,10 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	b.RefreshStaleMiniAppMessages(ctx)
 
 	if len(mAPI.sentMessages) != 0 {
-		t.Errorf("expected no messages with no in-progress sessions, got %d", len(mAPI.sentMessages))
+		t.Errorf(
+			"expected no messages with no in-progress sessions, got %d",
+			len(mAPI.sentMessages),
+		)
 	}
 }
 
@@ -69,11 +80,15 @@ func (e *emptyQuestionFetcher) GetNewQuestions(
 	levels []string,
 	category string,
 	excludeIDs []int,
-	limit, kanjiRecallLimit int,
+	limit,
+	kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	return nil, nil
 }
-func (e *emptyQuestionFetcher) GetByID(ctx context.Context, id int) (*model.Question, error) {
+func (e *emptyQuestionFetcher) GetByID(
+	ctx context.Context,
+	id int,
+) (*model.Question, error) {
 	return nil, nil
 }
 
@@ -81,23 +96,41 @@ func TestHandleTest_NoQuestions(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	userSvc := service.NewUserService(&mockUserRepo{
-		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+		getOrCreateFn: func(
+			ctx context.Context,
+			id int64,
+			username string,
+		) (*model.User, error) {
 			return &model.User{ID: id, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
 	srs := service.NewSRSService(&mockSRSRepo{})
 	store := &sessionListStore{}
-	sb := service.NewSessionBuilderService(&emptyQuestionFetcher{}, store, &mockSessionQuestionStore{}, srs)
+	sb := service.NewSessionBuilderService(
+		&emptyQuestionFetcher{},
+		store,
+		&mockSessionQuestionStore{},
+		srs,
+	)
 	b := &Bot{
 		api: mAPI, cfg: &config.Config{},
 		services: &service.Services{User: userSvc, SessionBuilder: sb},
 	}
 
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
-	b.handleTest(ctx, msg)
+	b.handleTest(
+		ctx,
+		msg,
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "사용 가능한 문제가 없습니다") {
-		t.Errorf("expected no-questions notice, got %q", text)
+	if !strings.Contains(
+		text,
+		"사용 가능한 문제가 없습니다",
+	) {
+		t.Errorf(
+			"expected no-questions notice, got %q",
+			text,
+		)
 	}
 }

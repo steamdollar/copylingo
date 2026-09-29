@@ -14,15 +14,34 @@ import (
 )
 
 type mockSessionStore struct {
-	getSessionsByStatusFn func(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error)
-	startFn               func(ctx context.Context, id int) error
-	createSessionFn       func(ctx context.Context, s *model.Session) error
+	getSessionsByStatusFn func(
+		ctx context.Context,
+		userID int64,
+		status config.SessionStatus,
+	) ([]model.Session, error)
+	startFn func(
+		ctx context.Context,
+		id int,
+	) error
+	createSessionFn func(
+		ctx context.Context,
+		s *model.Session,
+	) error
 }
 
-func (m *mockSessionStore) CreateSession(ctx context.Context, s *model.Session) error {
-	return m.createSessionFn(ctx, s)
+func (m *mockSessionStore) CreateSession(
+	ctx context.Context,
+	s *model.Session,
+) error {
+	return m.createSessionFn(
+		ctx,
+		s,
+	)
 }
-func (m *mockSessionStore) GetByID(ctx context.Context, id int) (*model.Session, error) {
+func (m *mockSessionStore) GetByID(
+	ctx context.Context,
+	id int,
+) (*model.Session, error) {
 	return nil, nil
 }
 
@@ -31,24 +50,43 @@ func (m *mockSessionStore) GetSessionsByStatus(
 	userID int64,
 	status config.SessionStatus,
 ) ([]model.Session, error) {
-	return m.getSessionsByStatusFn(ctx, userID, status)
+	return m.getSessionsByStatusFn(
+		ctx,
+		userID,
+		status,
+	)
 }
 func (m *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
 	return nil, nil
 }
-func (m *mockSessionStore) Start(ctx context.Context, id int) error {
-	return m.startFn(ctx, id)
+func (m *mockSessionStore) Start(
+	ctx context.Context,
+	id int,
+) error {
+	return m.startFn(
+		ctx,
+		id,
+	)
 }
 
 func TestStartStudy_NoSessions(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	mSessionStore := &mockSessionStore{
-		getSessionsByStatusFn: func(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+		getSessionsByStatusFn: func(
+			ctx context.Context,
+			userID int64,
+			status config.SessionStatus,
+		) ([]model.Session, error) {
 			return nil, nil
 		},
 	}
-	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
+	sb := service.NewSessionBuilderService(
+		nil,
+		mSessionStore,
+		nil,
+		nil,
+	)
 	b := &Bot{
 		api: mAPI,
 		services: &service.Services{
@@ -65,14 +103,23 @@ func TestStartStudy_NoSessions(t *testing.T) {
 		},
 	}
 
-	sf.StartStudy(ctx, cb)
+	sf.StartStudy(
+		ctx,
+		cb,
+	)
 
 	if len(mAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
 	}
 	sent := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
-	if !strings.Contains(sent.Text, "대기 중인 학습 세션이 없습니다") {
-		t.Errorf("wrong text: %s", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"대기 중인 학습 세션이 없습니다",
+	) {
+		t.Errorf(
+			"wrong text: %s",
+			sent.Text,
+		)
 	}
 }
 
@@ -80,7 +127,11 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	mSessionStore := &mockSessionStore{
-		getSessionsByStatusFn: func(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+		getSessionsByStatusFn: func(
+			ctx context.Context,
+			userID int64,
+			status config.SessionStatus,
+		) ([]model.Session, error) {
 			if status == config.SessionStatusPending {
 				return []model.Session{{
 					ID:             10,
@@ -93,7 +144,12 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 			return nil, nil
 		},
 	}
-	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
+	sb := service.NewSessionBuilderService(
+		nil,
+		mSessionStore,
+		nil,
+		nil,
+	)
 	b := &Bot{
 		api: mAPI,
 		services: &service.Services{
@@ -110,23 +166,38 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 		},
 	}
 
-	sf.StartStudy(ctx, cb)
+	sf.StartStudy(
+		ctx,
+		cb,
+	)
 
 	if len(mAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
 	}
 	sent := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
-	if !strings.Contains(sent.Text, "Study Session 준비됨") {
-		t.Errorf("wrong text: %s", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"Study Session 준비됨",
+	) {
+		t.Errorf(
+			"wrong text: %s",
+			sent.Text,
+		)
 	}
 	if sent.ReplyMarkup == nil ||
 		len(sent.ReplyMarkup.InlineKeyboard) == 0 ||
 		len(sent.ReplyMarkup.InlineKeyboard[0]) == 0 ||
 		sent.ReplyMarkup.InlineKeyboard[0][0].CallbackData == nil {
-		t.Fatalf("unexpected reply markup: %+v", sent.ReplyMarkup)
+		t.Fatalf(
+			"unexpected reply markup: %+v",
+			sent.ReplyMarkup,
+		)
 	}
 	if got := *sent.ReplyMarkup.InlineKeyboard[0][0].CallbackData; got != "study:10:start" {
-		t.Fatalf("callback = %q, want study:10:start", got)
+		t.Fatalf(
+			"callback = %q, want study:10:start",
+			got,
+		)
 	}
 }
 
@@ -135,15 +206,28 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	mSessionStore := &mockSessionStore{
-		getSessionsByStatusFn: func(ctx context.Context, userID int64, status config.SessionStatus) ([]model.Session, error) {
+		getSessionsByStatusFn: func(
+			ctx context.Context,
+			userID int64,
+			status config.SessionStatus,
+		) ([]model.Session, error) {
 			if status == config.SessionStatusInProgress {
 				return []model.Session{{ID: 10}}, nil
 			}
 			return nil, nil
 		},
 	}
-	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
-	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
+	active := service.NewQuizActiveSessionService(
+		nil,
+		stateStores.quiz,
+		nil,
+	)
+	sb := service.NewSessionBuilderService(
+		nil,
+		mSessionStore,
+		nil,
+		nil,
+	)
 	b := &Bot{
 		api:   mAPI,
 		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
@@ -177,25 +261,43 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 			},
 		},
 	}
-	seedQuizState(stateStores, state)
+	seedQuizState(
+		stateStores,
+		state,
+	)
 
-	sf.StartStudy(ctx, cb)
+	sf.StartStudy(
+		ctx,
+		cb,
+	)
 
 	if len(mAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
 	}
 	sent := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
-	if !strings.Contains(sent.Text, "Q1") {
-		t.Errorf("expected prompt Q1, got %s", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"Q1",
+	) {
+		t.Errorf(
+			"expected prompt Q1, got %s",
+			sent.Text,
+		)
 	}
 }
 
 type mockSessionQuestionStore struct{}
 
-func (m *mockSessionQuestionStore) CreateSessionQuestions(ctx context.Context, sqs []model.SessionQuestion) error {
+func (m *mockSessionQuestionStore) CreateSessionQuestions(
+	ctx context.Context,
+	sqs []model.SessionQuestion,
+) error {
 	return nil
 }
-func (m *mockSessionQuestionStore) GetBySession(ctx context.Context, sessionID int) ([]model.SessionQuestion, error) {
+func (m *mockSessionQuestionStore) GetBySession(
+	ctx context.Context,
+	sessionID int,
+) ([]model.SessionQuestion, error) {
 	return nil, nil
 }
 
@@ -206,14 +308,22 @@ func TestStartReview_NoneDue(t *testing.T) {
 	srs := service.NewSRSService(mSRSRepo)
 
 	mSessionStore := &mockSessionStore{
-		createSessionFn: func(ctx context.Context, s *model.Session) error {
+		createSessionFn: func(
+			ctx context.Context,
+			s *model.Session,
+		) error {
 			s.ID = 100
 			s.TotalQuestions = 5
 			return nil
 		},
 	}
 	mSQStore := &mockSessionQuestionStore{}
-	sb := service.NewSessionBuilderService(nil, mSessionStore, mSQStore, srs)
+	sb := service.NewSessionBuilderService(
+		nil,
+		mSessionStore,
+		mSQStore,
+		srs,
+	)
 
 	b := &Bot{
 		api: mAPI,
@@ -239,7 +349,10 @@ func TestStartReview_NoneDue(t *testing.T) {
 		},
 	}
 
-	sf.StartReview(ctx, cb)
+	sf.StartReview(
+		ctx,
+		cb,
+	)
 
 	if len(mAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
@@ -251,8 +364,14 @@ func TestStartReview_NoneDue(t *testing.T) {
 	case tgbotapi.EditMessageTextConfig:
 		sentText = m.Text
 	}
-	if !strings.Contains(sentText, "복습 세션") {
-		t.Errorf("wrong text: %s", sentText)
+	if !strings.Contains(
+		sentText,
+		"복습 세션",
+	) {
+		t.Errorf(
+			"wrong text: %s",
+			sentText,
+		)
 	}
 }
 
@@ -264,13 +383,18 @@ type mockSRSRepoWithCount struct {
 func (m *mockSRSRepoWithCount) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, currentLevel string,
+	language,
+	currentLevel string,
 	levels []string,
-	limit, kanjiRecallLimit int,
+	limit,
+	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	if m.count > 0 {
-		return make([]model.Question, m.count), nil
+		return make(
+			[]model.Question,
+			m.count,
+		), nil
 	}
 	return nil, nil
 }
@@ -312,7 +436,10 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 		},
 	}
 
-	sf.StartReview(ctx, cb)
+	sf.StartReview(
+		ctx,
+		cb,
+	)
 
 	// In the fail/NoneDue path it might be MessageConfig or EditMessageTextConfig
 	var sentText string
@@ -323,8 +450,14 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 		sentText = m.Text
 	}
 
-	if !strings.Contains(sentText, "복습할 문제가 없습니다") {
-		t.Errorf("wrong text: %s", sentText)
+	if !strings.Contains(
+		sentText,
+		"복습할 문제가 없습니다",
+	) {
+		t.Errorf(
+			"wrong text: %s",
+			sentText,
+		)
 	}
 }
 
@@ -333,10 +466,24 @@ func TestHandleSessionCallback(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	mSessionStore := &mockSessionStore{
-		startFn: func(ctx context.Context, id int) error { return nil },
+		startFn: func(
+			ctx context.Context,
+			id int,
+		) error {
+			return nil
+		},
 	}
-	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
-	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
+	sb := service.NewSessionBuilderService(
+		nil,
+		mSessionStore,
+		nil,
+		nil,
+	)
+	active := service.NewQuizActiveSessionService(
+		nil,
+		stateStores.quiz,
+		nil,
+	)
 	b := &Bot{
 		api:   mAPI,
 		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
@@ -347,21 +494,27 @@ func TestHandleSessionCallback(t *testing.T) {
 	}
 	sf := NewSessionFlow(b)
 
-	t.Run("start action", func(t *testing.T) {
-		cb := &tgbotapi.CallbackQuery{
-			Data: "session:10:start",
-			Message: &tgbotapi.Message{
-				Chat:      &tgbotapi.Chat{ID: 123},
-				MessageID: 456,
-			},
-		}
-		// QuizActiveSession.CreateFromDB will fail because sessionStore.GetByID is nil.
-		// Let's just mock StartSession and see it logs and returns.
-		// Wait, startSession calls showQuestion which needs active session.
-		// I'll skip deep testing here as it requires complex mocks,
-		// but I can at least check it doesn't crash.
-		sf.HandleSessionCallback(ctx, cb)
-	})
+	t.Run(
+		"start action",
+		func(t *testing.T) {
+			cb := &tgbotapi.CallbackQuery{
+				Data: "session:10:start",
+				Message: &tgbotapi.Message{
+					Chat:      &tgbotapi.Chat{ID: 123},
+					MessageID: 456,
+				},
+			}
+			// QuizActiveSession.CreateFromDB will fail because sessionStore.GetByID is nil.
+			// Let's just mock StartSession and see it logs and returns.
+			// Wait, startSession calls showQuestion which needs active session.
+			// I'll skip deep testing here as it requires complex mocks,
+			// but I can at least check it doesn't crash.
+			sf.HandleSessionCallback(
+				ctx,
+				cb,
+			)
+		},
+	)
 }
 
 func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
@@ -370,13 +523,25 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 	stateStores := newTestInteractionStores()
 	startCalls := 0
 	mSessionStore := &mockSessionStore{
-		startFn: func(ctx context.Context, id int) error {
+		startFn: func(
+			ctx context.Context,
+			id int,
+		) error {
 			startCalls++
 			return nil
 		},
 	}
-	sb := service.NewSessionBuilderService(nil, mSessionStore, nil, nil)
-	active := service.NewQuizActiveSessionService(nil, stateStores.quiz, nil)
+	sb := service.NewSessionBuilderService(
+		nil,
+		mSessionStore,
+		nil,
+		nil,
+	)
+	active := service.NewQuizActiveSessionService(
+		nil,
+		stateStores.quiz,
+		nil,
+	)
 	b := &Bot{
 		api:   mAPI,
 		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
@@ -408,28 +573,65 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
-	cb := cbWithMessage("session:31:start", 123, 456, 123)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
+	cb := cbWithMessage(
+		"session:31:start",
+		123,
+		456,
+		123,
+	)
 
-	sf.HandleSessionCallback(ctx, cb)
-	sf.HandleSessionCallback(ctx, cb)
+	sf.HandleSessionCallback(
+		ctx,
+		cb,
+	)
+	sf.HandleSessionCallback(
+		ctx,
+		cb,
+	)
 
 	if startCalls != 2 {
-		t.Fatalf("StartSession calls = %d, want 2 callback invocations", startCalls)
+		t.Fatalf(
+			"StartSession calls = %d, want 2 callback invocations",
+			startCalls,
+		)
 	}
 	if len(mAPI.sentMessages) != 2 {
-		t.Fatalf("rendered messages = %d, want 2", len(mAPI.sentMessages))
+		t.Fatalf(
+			"rendered messages = %d, want 2",
+			len(mAPI.sentMessages),
+		)
 	}
 	last, ok := mAPI.sentMessages[1].(tgbotapi.EditMessageTextConfig)
 	if !ok {
-		t.Fatalf("last message type = %T, want edit", mAPI.sentMessages[1])
+		t.Fatalf(
+			"last message type = %T, want edit",
+			mAPI.sentMessages[1],
+		)
 	}
-	if !strings.Contains(last.Text, "두 번째 문제") {
-		t.Fatalf("repeated start should resume next unanswered question, got %q", last.Text)
+	if !strings.Contains(
+		last.Text,
+		"두 번째 문제",
+	) {
+		t.Fatalf(
+			"repeated start should resume next unanswered question, got %q",
+			last.Text,
+		)
 	}
-	resumed, err := active.Get(ctx, sessionID)
+	resumed, err := active.Get(
+		ctx,
+		sessionID,
+	)
 	if err != nil {
-		t.Fatalf("active state read failed: %v", err)
+		t.Fatalf(
+			"active state read failed: %v",
+			err,
+		)
 	}
 	if resumed.Items[0].SessionQuestion.IsCorrect == nil {
 		t.Fatal("repeated start must preserve answered state")
@@ -447,7 +649,10 @@ func (r *quizStartActiveRepo) LoadQuestionSessionWithStateBySessionID(
 	return r.state, nil
 }
 
-func (r *quizStartActiveRepo) FlushQuizActiveSession(ctx context.Context, state *model.QuizActiveSessionState) error {
+func (r *quizStartActiveRepo) FlushQuizActiveSession(
+	ctx context.Context,
+	state *model.QuizActiveSessionState,
+) error {
 	return nil
 }
 
@@ -477,30 +682,65 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 	}
 	repo := &quizStartActiveRepo{state: dbState}
 	store := &mockSessionStore{
-		startFn: func(ctx context.Context, sessionID int) error {
+		startFn: func(
+			ctx context.Context,
+			sessionID int,
+		) error {
 			repo.state.Session.Status = model.SessionInProgress
 			return nil
 		},
 	}
-	active := service.NewQuizActiveSessionService(repo, stateStores.quiz, nil)
+	active := service.NewQuizActiveSessionService(
+		repo,
+		stateStores.quiz,
+		nil,
+	)
 	b := &Bot{
 		api:   mAPI,
 		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 		services: &service.Services{
-			SessionBuilder:    service.NewSessionBuilderService(nil, store, nil, nil),
+			SessionBuilder: service.NewSessionBuilderService(
+				nil,
+				store,
+				nil,
+				nil,
+			),
 			QuizActiveSession: active,
 		},
 	}
-	storeActiveState(t, stateStores, 32, dbState)
+	storeActiveState(
+		t,
+		stateStores,
+		32,
+		dbState,
+	)
 
-	NewSessionFlow(b).HandleSessionCallback(ctx, cbWithMessage("session:32:start", 123, 456, 123))
+	NewSessionFlow(b).HandleSessionCallback(
+		ctx,
+		cbWithMessage(
+			"session:32:start",
+			123,
+			456,
+			123,
+		),
+	)
 
-	state, err := active.Get(ctx, 32)
+	state, err := active.Get(
+		ctx,
+		32,
+	)
 	if err != nil {
-		t.Fatalf("active state read failed: %v", err)
+		t.Fatalf(
+			"active state read failed: %v",
+			err,
+		)
 	}
 	if state.Session.Status != model.SessionInProgress {
-		t.Fatalf("active status = %s, want %s after DB start", state.Session.Status, model.SessionInProgress)
+		t.Fatalf(
+			"active status = %s, want %s after DB start",
+			state.Session.Status,
+			model.SessionInProgress,
+		)
 	}
 }
 
@@ -509,16 +749,33 @@ func TestPushSession(t *testing.T) {
 	b := &Bot{api: mAPI}
 	sf := NewSessionFlow(b)
 
-	err := sf.PushSession(context.Background(), 123, 10, "morning")
+	err := sf.PushSession(
+		context.Background(),
+		123,
+		10,
+		"morning",
+	)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(
+			"unexpected error: %v",
+			err,
+		)
 	}
 
 	if len(mAPI.sentMessages) != 1 {
-		t.Fatalf("expected 1 message, got %d", len(mAPI.sentMessages))
+		t.Fatalf(
+			"expected 1 message, got %d",
+			len(mAPI.sentMessages),
+		)
 	}
 	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "세션이 도착했습니다") {
-		t.Errorf("wrong text: %s", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"세션이 도착했습니다",
+	) {
+		t.Errorf(
+			"wrong text: %s",
+			sent.Text,
+		)
 	}
 }

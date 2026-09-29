@@ -25,7 +25,10 @@ func storeActiveState(
 ) {
 	t.Helper()
 	state.Session.ID = sessionID
-	seedQuizState(stateStores, state)
+	seedQuizState(
+		stateStores,
+		state,
+	)
 }
 
 // graderUserRepoStub satisfies the grader's user repo (UpdateStreak).
@@ -33,7 +36,10 @@ type graderUserRepoStub struct {
 	updated bool
 }
 
-func (g *graderUserRepoStub) UpdateStreak(ctx context.Context, userID int64) error {
+func (g *graderUserRepoStub) UpdateStreak(
+	ctx context.Context,
+	userID int64,
+) error {
 	g.updated = true
 	return nil
 }
@@ -49,7 +55,10 @@ func (a *activeRepoStub) LoadQuestionSessionWithStateBySessionID(
 ) (*model.QuizActiveSessionState, error) {
 	return nil, nil
 }
-func (a *activeRepoStub) FlushQuizActiveSession(ctx context.Context, state *model.QuizActiveSessionState) error {
+func (a *activeRepoStub) FlushQuizActiveSession(
+	ctx context.Context,
+	state *model.QuizActiveSessionState,
+) error {
 	a.flushed = true
 	return nil
 }
@@ -61,8 +70,16 @@ func botWithActive(
 	userRepo *graderUserRepoStub,
 ) (*Bot, *mockBotAPI) {
 	mAPI := &mockBotAPI{}
-	active := service.NewQuizActiveSessionService(repo, stateStores.quiz, &mockSRS{})
-	grader := service.NewGraderService(userRepo, active, &mockLLM{})
+	active := service.NewQuizActiveSessionService(
+		repo,
+		stateStores.quiz,
+		&mockSRS{},
+	)
+	grader := service.NewGraderService(
+		userRepo,
+		active,
+		&mockLLM{},
+	)
 	b := &Bot{
 		api:   mAPI,
 		input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
@@ -75,7 +92,12 @@ func botWithActive(
 	return b, mAPI
 }
 
-func cbWithMessage(data string, chatID int64, msgID int, userID int64) *tgbotapi.CallbackQuery {
+func cbWithMessage(
+	data string,
+	chatID int64,
+	msgID int,
+	userID int64,
+) *tgbotapi.CallbackQuery {
 	return &tgbotapi.CallbackQuery{
 		Data: data,
 		From: &tgbotapi.User{ID: userID},
@@ -108,7 +130,11 @@ func TestFinishSession_Summary(t *testing.T) {
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
 	userRepo := &graderUserRepoStub{}
-	b, mAPI := botWithActive(stateStores, repo, userRepo)
+	b, mAPI := botWithActive(
+		stateStores,
+		repo,
+		userRepo,
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID := 10
@@ -134,10 +160,24 @@ func TestFinishSession_Summary(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
-	cb := cbWithMessage("session:10:finish", 123, 456, userID)
-	sf.finishSession(ctx, cb, sessionID)
+	cb := cbWithMessage(
+		"session:10:finish",
+		123,
+		456,
+		userID,
+	)
+	sf.finishSession(
+		ctx,
+		cb,
+		sessionID,
+	)
 
 	if !repo.flushed {
 		t.Error("expected FlushActiveSession to be called")
@@ -146,14 +186,32 @@ func TestFinishSession_Summary(t *testing.T) {
 		t.Error("expected UpdateStreak to be called")
 	}
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "세션 완료") {
-		t.Errorf("expected completion summary, got %q", text)
+	if !strings.Contains(
+		text,
+		"세션 완료",
+	) {
+		t.Errorf(
+			"expected completion summary, got %q",
+			text,
+		)
 	}
-	if !strings.Contains(text, "1/2") {
-		t.Errorf("expected score 1/2 in summary, got %q", text)
+	if !strings.Contains(
+		text,
+		"1/2",
+	) {
+		t.Errorf(
+			"expected score 1/2 in summary, got %q",
+			text,
+		)
 	}
-	if !strings.Contains(text, "틀린 문제") {
-		t.Errorf("expected wrong-answer section, got %q", text)
+	if !strings.Contains(
+		text,
+		"틀린 문제",
+	) {
+		t.Errorf(
+			"expected wrong-answer section, got %q",
+			text,
+		)
 	}
 }
 
@@ -164,7 +222,11 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
 	userRepo := &graderUserRepoStub{}
-	b, mAPI := botWithActive(stateStores, repo, userRepo)
+	b, mAPI := botWithActive(
+		stateStores,
+		repo,
+		userRepo,
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID := 11
@@ -180,9 +242,22 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
-	sf.HandleSessionCallback(ctx, cbWithMessage("session:11:finish", 123, 456, userID))
+	sf.HandleSessionCallback(
+		ctx,
+		cbWithMessage(
+			"session:11:finish",
+			123,
+			456,
+			userID,
+		),
+	)
 
 	if !repo.flushed {
 		t.Error("expected finish action to flush the session")
@@ -194,13 +269,33 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 
 func TestHandleSessionCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	b, _ := botWithActive(newTestInteractionStores(), &activeRepoStub{}, &graderUserRepoStub{})
+	b, _ := botWithActive(
+		newTestInteractionStores(),
+		&activeRepoStub{},
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	// fewer than 3 parts -> early return, must not panic
-	sf.HandleSessionCallback(ctx, cbWithMessage("session:onlytwo", 1, 2, 3))
+	sf.HandleSessionCallback(
+		ctx,
+		cbWithMessage(
+			"session:onlytwo",
+			1,
+			2,
+			3,
+		),
+	)
 	// non-numeric session id -> early return
-	sf.HandleSessionCallback(ctx, cbWithMessage("session:abc:start", 1, 2, 3))
+	sf.HandleSessionCallback(
+		ctx,
+		cbWithMessage(
+			"session:abc:start",
+			1,
+			2,
+			3,
+		),
+	)
 }
 
 // --- HandleAnswerCallback --------------------------------------------------
@@ -209,7 +304,11 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
-	b, mAPI := botWithActive(stateStores, repo, &graderUserRepoStub{})
+	b, mAPI := botWithActive(
+		stateStores,
+		repo,
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID := 20
@@ -228,22 +327,45 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
 	// q:{session}:{question}:{optionIdx} -> select option 0 ("apple", correct)
 	data := "q:20:5:0"
-	sf.HandleAnswerCallback(ctx, cbWithMessage(data, 123, 456, 1))
+	sf.HandleAnswerCallback(
+		ctx,
+		cbWithMessage(
+			data,
+			123,
+			456,
+			1,
+		),
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "정답") {
-		t.Errorf("expected correct-answer feedback, got %q", text)
+	if !strings.Contains(
+		text,
+		"정답",
+	) {
+		t.Errorf(
+			"expected correct-answer feedback, got %q",
+			text,
+		)
 	}
 }
 
 func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
+	b, mAPI := botWithActive(
+		stateStores,
+		&activeRepoStub{},
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID := 21
@@ -257,26 +379,65 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
 	// q:{session}:next:{idx} with current question unanswered -> prompt to submit first
-	sf.HandleAnswerCallback(ctx, cbWithMessage("q:21:next:0", 123, 456, 1))
+	sf.HandleAnswerCallback(
+		ctx,
+		cbWithMessage(
+			"q:21:next:0",
+			123,
+			456,
+			1,
+		),
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "손글씨") {
-		t.Errorf("expected handwriting submit prompt, got %q", text)
+	if !strings.Contains(
+		text,
+		"손글씨",
+	) {
+		t.Errorf(
+			"expected handwriting submit prompt, got %q",
+			text,
+		)
 	}
 }
 
 func TestHandleAnswerCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	b, _ := botWithActive(newTestInteractionStores(), &activeRepoStub{}, &graderUserRepoStub{})
+	b, _ := botWithActive(
+		newTestInteractionStores(),
+		&activeRepoStub{},
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	// fewer than 4 parts -> early return, no panic
-	sf.HandleAnswerCallback(ctx, cbWithMessage("q:20:5", 1, 2, 3))
+	sf.HandleAnswerCallback(
+		ctx,
+		cbWithMessage(
+			"q:20:5",
+			1,
+			2,
+			3,
+		),
+	)
 	// non-numeric session id
-	sf.HandleAnswerCallback(ctx, cbWithMessage("q:x:5:0", 1, 2, 3))
+	sf.HandleAnswerCallback(
+		ctx,
+		cbWithMessage(
+			"q:x:5:0",
+			1,
+			2,
+			3,
+		),
+	)
 }
 
 // --- showQuestion / renderByType -------------------------------------------
@@ -284,7 +445,11 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
+	b, mAPI := botWithActive(
+		stateStores,
+		&activeRepoStub{},
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID := 30
@@ -304,34 +469,64 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
-	sf.showQuestion(ctx, 123, nil, sessionID, 0)
+	sf.showQuestion(
+		ctx,
+		123,
+		nil,
+		sessionID,
+		0,
+	)
 
 	if len(mAPI.sentMessages) == 0 {
 		t.Fatal("expected a question message")
 	}
 	msg, ok := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !ok {
-		t.Fatalf("expected MessageConfig, got %T", mAPI.sentMessages[0])
+		t.Fatalf(
+			"expected MessageConfig, got %T",
+			mAPI.sentMessages[0],
+		)
 	}
-	if !strings.Contains(msg.Text, "Pick one") {
-		t.Errorf("expected prompt text, got %q", msg.Text)
+	if !strings.Contains(
+		msg.Text,
+		"Pick one",
+	) {
+		t.Errorf(
+			"expected prompt text, got %q",
+			msg.Text,
+		)
 	}
 	kb, ok := msg.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
 	if !ok {
-		t.Fatalf("expected inline keyboard, got %T", msg.ReplyMarkup)
+		t.Fatalf(
+			"expected inline keyboard, got %T",
+			msg.ReplyMarkup,
+		)
 	}
 	// 4 options -> 2 rows of 2
 	if len(kb.InlineKeyboard) != 2 {
-		t.Errorf("expected 2 option rows, got %d", len(kb.InlineKeyboard))
+		t.Errorf(
+			"expected 2 option rows, got %d",
+			len(kb.InlineKeyboard),
+		)
 	}
 }
 
 func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
+	b, mAPI := botWithActive(
+		stateStores,
+		&activeRepoStub{},
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID := 31
@@ -342,21 +537,42 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 			{SessionQuestion: model.SessionQuestion{QuestionID: 1}, Question: model.Question{ID: 1}},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
 	// questionIdx beyond items -> finish button branch
-	sf.showQuestion(ctx, 123, nil, sessionID, 5)
+	sf.showQuestion(
+		ctx,
+		123,
+		nil,
+		sessionID,
+		5,
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "모든 문제를 풀었습니다") {
-		t.Errorf("expected all-answered message, got %q", text)
+	if !strings.Contains(
+		text,
+		"모든 문제를 풀었습니다",
+	) {
+		t.Errorf(
+			"expected all-answered message, got %q",
+			text,
+		)
 	}
 }
 
 func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
+	b, mAPI := botWithActive(
+		stateStores,
+		&activeRepoStub{},
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID := 32
@@ -370,13 +586,30 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
-	sf.showQuestion(ctx, 123, nil, sessionID, 0)
+	sf.showQuestion(
+		ctx,
+		123,
+		nil,
+		sessionID,
+		0,
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "텍스트로 입력") {
-		t.Errorf("expected subjective input prompt, got %q", text)
+	if !strings.Contains(
+		text,
+		"텍스트로 입력",
+	) {
+		t.Errorf(
+			"expected subjective input prompt, got %q",
+			text,
+		)
 	}
 	if _, ok := stateStores.active[123]; !ok {
 		t.Error("expected active question to be stored for subjective question")
@@ -388,7 +621,11 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 func TestProcessAnswerText_Wrong(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(stateStores, &activeRepoStub{}, &graderUserRepoStub{})
+	b, mAPI := botWithActive(
+		stateStores,
+		&activeRepoStub{},
+		&graderUserRepoStub{},
+	)
 	sf := NewSessionFlow(b)
 
 	sessionID, questionID := 40, 1
@@ -407,16 +644,41 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
-	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "banana", nil)
+	sf.processAnswerText(
+		ctx,
+		123,
+		nil,
+		sessionID,
+		questionID,
+		"banana",
+		nil,
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "오답") {
-		t.Errorf("expected wrong-answer feedback, got %q", text)
+	if !strings.Contains(
+		text,
+		"오답",
+	) {
+		t.Errorf(
+			"expected wrong-answer feedback, got %q",
+			text,
+		)
 	}
-	if !strings.Contains(text, "apple") {
-		t.Errorf("expected correct answer shown, got %q", text)
+	if !strings.Contains(
+		text,
+		"apple",
+	) {
+		t.Errorf(
+			"expected correct answer shown, got %q",
+			text,
+		)
 	}
 }
 
@@ -424,14 +686,27 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	mAPI := &mockBotAPI{}
-	active := service.NewQuizActiveSessionService(&activeRepoStub{}, stateStores.quiz, &mockSRS{})
+	active := service.NewQuizActiveSessionService(
+		&activeRepoStub{},
+		stateStores.quiz,
+		&mockSRS{},
+	)
 	// LLM returns AI-unavailable error
 	llm := &mockLLM{
-		gradeFn: func(ctx context.Context, prompt, correctAnswer, userAnswer string) (external.GradeResult, error) {
+		gradeFn: func(
+			ctx context.Context,
+			prompt,
+			correctAnswer,
+			userAnswer string,
+		) (external.GradeResult, error) {
 			return external.GradeResult{}, service.ErrAIUnavailable
 		},
 	}
-	grader := service.NewGraderService(&graderUserRepoStub{}, active, llm)
+	grader := service.NewGraderService(
+		&graderUserRepoStub{},
+		active,
+		llm,
+	)
 	b := &Bot{
 		api:      mAPI,
 		input:    stateStores,
@@ -460,13 +735,32 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 			},
 		},
 	}
-	storeActiveState(t, stateStores, sessionID, state)
+	storeActiveState(
+		t,
+		stateStores,
+		sessionID,
+		state,
+	)
 
-	sf.processAnswerText(ctx, 123, nil, sessionID, questionID, "answer", nil)
+	sf.processAnswerText(
+		ctx,
+		123,
+		nil,
+		sessionID,
+		questionID,
+		"answer",
+		nil,
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "AI 주관식 채점이 불가능") {
-		t.Errorf("expected AI-unavailable notice, got %q", text)
+	if !strings.Contains(
+		text,
+		"AI 주관식 채점이 불가능",
+	) {
+		t.Errorf(
+			"expected AI-unavailable notice, got %q",
+			text,
+		)
 	}
 }
 
@@ -474,22 +768,34 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 
 type analyzerUserRepoStub struct{ streak int }
 
-func (a *analyzerUserRepoStub) GetByID(ctx context.Context, id int64) (*model.User, error) {
+func (a *analyzerUserRepoStub) GetByID(
+	ctx context.Context,
+	id int64,
+) (*model.User, error) {
 	return &model.User{ID: id, StreakDays: a.streak, Language: "ja", ProficiencyLevel: "N5"}, nil
 }
 
 type statRepoStub struct{}
 
-func (s *statRepoStub) GetTodayStats(ctx context.Context, userID int64) (int, int, error) {
+func (s *statRepoStub) GetTodayStats(
+	ctx context.Context,
+	userID int64,
+) (int, int, error) {
 	return 10, 7, nil
 }
-func (s *statRepoStub) GetCategoryAccuracy(ctx context.Context, userID int64) (map[string]float64, error) {
+func (s *statRepoStub) GetCategoryAccuracy(
+	ctx context.Context,
+	userID int64,
+) (map[string]float64, error) {
 	return map[string]float64{"vocabulary": 80, "grammar": 60}, nil
 }
 
 func botWithAnalyzer() (*Bot, *mockBotAPI) {
 	mAPI := &mockBotAPI{}
-	analyzer := service.NewAnalyzerService(&analyzerUserRepoStub{streak: 5}, &statRepoStub{})
+	analyzer := service.NewAnalyzerService(
+		&analyzerUserRepoStub{streak: 5},
+		&statRepoStub{},
+	)
 	b := &Bot{
 		api: mAPI, cfg: &config.Config{},
 		services: &service.Services{Analyzer: analyzer},
@@ -501,14 +807,29 @@ func TestHandleStats(t *testing.T) {
 	b, mAPI := botWithAnalyzer()
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
 
-	b.handleStats(context.Background(), msg)
+	b.handleStats(
+		context.Background(),
+		msg,
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "학습 통계") {
-		t.Errorf("expected stats text, got %q", text)
+	if !strings.Contains(
+		text,
+		"학습 통계",
+	) {
+		t.Errorf(
+			"expected stats text, got %q",
+			text,
+		)
 	}
-	if !strings.Contains(text, "5일") {
-		t.Errorf("expected streak in stats, got %q", text)
+	if !strings.Contains(
+		text,
+		"5일",
+	) {
+		t.Errorf(
+			"expected streak in stats, got %q",
+			text,
+		)
 	}
 }
 
@@ -516,36 +837,66 @@ func TestHandleStreak(t *testing.T) {
 	b, mAPI := botWithAnalyzer()
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
 
-	b.handleStreak(context.Background(), msg)
+	b.handleStreak(
+		context.Background(),
+		msg,
+	)
 
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "스트릭") {
-		t.Errorf("expected streak text, got %q", text)
+	if !strings.Contains(
+		text,
+		"스트릭",
+	) {
+		t.Errorf(
+			"expected streak text, got %q",
+			text,
+		)
 	}
 }
 
 func TestHandleStatsCallback(t *testing.T) {
 	b, mAPI := botWithAnalyzer()
-	cb := cbWithMessage("menu:stats", 1, 2, 3)
+	cb := cbWithMessage(
+		"menu:stats",
+		1,
+		2,
+		3,
+	)
 
-	b.handleStatsCallback(context.Background(), cb)
+	b.handleStatsCallback(
+		context.Background(),
+		cb,
+	)
 
 	if len(mAPI.sentMessages) == 0 {
 		t.Fatal("expected stats edit message")
 	}
 	edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
-		t.Fatalf("expected EditMessageTextConfig, got %T", mAPI.sentMessages[0])
+		t.Fatalf(
+			"expected EditMessageTextConfig, got %T",
+			mAPI.sentMessages[0],
+		)
 	}
-	if !strings.Contains(edit.Text, "학습 통계") {
-		t.Errorf("expected stats text, got %q", edit.Text)
+	if !strings.Contains(
+		edit.Text,
+		"학습 통계",
+	) {
+		t.Errorf(
+			"expected stats text, got %q",
+			edit.Text,
+		)
 	}
 }
 
 func TestHandleMenu(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	userSvc := service.NewUserService(&mockUserRepo{
-		getOrCreateFn: func(ctx context.Context, id int64, username string) (*model.User, error) {
+		getOrCreateFn: func(
+			ctx context.Context,
+			id int64,
+			username string,
+		) (*model.User, error) {
 			return &model.User{ID: id, StreakDays: 3, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
@@ -556,14 +907,23 @@ func TestHandleMenu(t *testing.T) {
 	}
 
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
-	b.handleMenu(context.Background(), msg)
+	b.handleMenu(
+		context.Background(),
+		msg,
+	)
 
 	if len(mAPI.sentMessages) == 0 {
 		t.Fatal("expected menu message")
 	}
 	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
-	if !strings.Contains(sent.Text, "CopyLingo") {
-		t.Errorf("expected menu text, got %q", sent.Text)
+	if !strings.Contains(
+		sent.Text,
+		"CopyLingo",
+	) {
+		t.Errorf(
+			"expected menu text, got %q",
+			sent.Text,
+		)
 	}
 }
 
@@ -575,17 +935,33 @@ func TestEditMessageReplyMarkup(t *testing.T) {
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("x", "data"),
+			tgbotapi.NewInlineKeyboardButtonData(
+				"x",
+				"data",
+			),
 		),
 	)
-	if err := b.EditMessageReplyMarkup(123, 456, markup); err != nil {
-		t.Fatalf("EditMessageReplyMarkup error = %v", err)
+	if err := b.EditMessageReplyMarkup(
+		123,
+		456,
+		markup,
+	); err != nil {
+		t.Fatalf(
+			"EditMessageReplyMarkup error = %v",
+			err,
+		)
 	}
 	if len(mAPI.sentMessages) != 1 {
-		t.Fatalf("expected 1 sent, got %d", len(mAPI.sentMessages))
+		t.Fatalf(
+			"expected 1 sent, got %d",
+			len(mAPI.sentMessages),
+		)
 	}
 	if _, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig); !ok {
-		t.Fatalf("expected EditMessageReplyMarkupConfig, got %T", mAPI.sentMessages[0])
+		t.Fatalf(
+			"expected EditMessageReplyMarkupConfig, got %T",
+			mAPI.sentMessages[0],
+		)
 	}
 }
 
@@ -594,11 +970,25 @@ func TestBotPushSession(t *testing.T) {
 	b := &Bot{api: mAPI}
 	b.flow = NewSessionFlow(b)
 
-	if err := b.PushSession(context.Background(), 123, 10, "evening"); err != nil {
-		t.Fatalf("PushSession error = %v", err)
+	if err := b.PushSession(
+		context.Background(),
+		123,
+		10,
+		"evening",
+	); err != nil {
+		t.Fatalf(
+			"PushSession error = %v",
+			err,
+		)
 	}
 	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(text, "세션이 도착했습니다") {
-		t.Errorf("expected push message, got %q", text)
+	if !strings.Contains(
+		text,
+		"세션이 도착했습니다",
+	) {
+		t.Errorf(
+			"expected push message, got %q",
+			text,
+		)
 	}
 }

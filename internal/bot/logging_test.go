@@ -15,7 +15,10 @@ import (
 func TestHandleUpdateLogsTelegramCorrelationWithoutMessageBody(t *testing.T) {
 	var output bytes.Buffer
 	previous := slog.Default()
-	slog.SetDefault(slog.New(observability.NewContextHandler(slog.NewJSONHandler(&output, nil))))
+	slog.SetDefault(slog.New(observability.NewContextHandler(slog.NewJSONHandler(
+		&output,
+		nil,
+	))))
 	defer slog.SetDefault(previous)
 
 	b := &Bot{api: &mockBotAPI{}}
@@ -32,8 +35,15 @@ func TestHandleUpdateLogsTelegramCorrelationWithoutMessageBody(t *testing.T) {
 	})
 
 	var entry map[string]any
-	if err := json.Unmarshal(output.Bytes(), &entry); err != nil {
-		t.Fatalf("json.Unmarshal(%q) error = %v", output.Bytes(), err)
+	if err := json.Unmarshal(
+		output.Bytes(),
+		&entry,
+	); err != nil {
+		t.Fatalf(
+			"json.Unmarshal(%q) error = %v",
+			output.Bytes(),
+			err,
+		)
 	}
 	for key, want := range map[string]any{
 		"interaction_id": "tg-42",
@@ -44,11 +54,22 @@ func TestHandleUpdateLogsTelegramCorrelationWithoutMessageBody(t *testing.T) {
 		"chat_id":        float64(456),
 	} {
 		if got := entry[key]; got != want {
-			t.Fatalf("entry[%q] = %#v, want %#v", key, got, want)
+			t.Fatalf(
+				"entry[%q] = %#v, want %#v",
+				key,
+				got,
+				want,
+			)
 		}
 	}
-	if strings.Contains(output.String(), "secret-payload") {
-		t.Fatalf("Telegram log leaked message body: %s", output.String())
+	if strings.Contains(
+		output.String(),
+		"secret-payload",
+	) {
+		t.Fatalf(
+			"Telegram log leaked message body: %s",
+			output.String(),
+		)
 	}
 }
 
@@ -75,7 +96,12 @@ func TestTelegramUpdateAttrsExtractCallbackIDsWithoutRawData(t *testing.T) {
 		"question_id":    int64(11),
 	} {
 		if value := got[key]; value != want {
-			t.Fatalf("attrs[%q] = %#v, want %#v", key, value, want)
+			t.Fatalf(
+				"attrs[%q] = %#v, want %#v",
+				key,
+				value,
+				want,
+			)
 		}
 	}
 }
