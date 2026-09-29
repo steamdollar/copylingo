@@ -303,8 +303,8 @@ Quiz와 Study 담당 서비스는 기존 `service` 패키지의 구성요소다.
 flowchart TB
     adapters["bot · scheduler · miniapp"]
     subgraph service ["service 패키지"]
-        t1["Tier1 (exported): Quiz · Study · User · Preference · Stats · Tip · LLMQuestion"]
-        t2["Tier2 (unexported): selection · progress(+SRS) · grading · sessionQuery · llm"]
+        t1["Tier1 (exported): Session(Quiz+Study) · User · Preference · Stats · Tip · LLMQuestion · Audio"]
+        t2["Tier2 (unexported): selection · progress(+SRS) · grading · llm"]
         t1 --> t2
     end
     lower["repository · redisstore · external"]
@@ -347,3 +347,20 @@ flowchart TB
 | E | `go list` 기반 import 경계 테스트 | 금지 import가 CI에서 실패 |
 
 B를 C보다 먼저 한다. 반대로 하면 Flow가 받는 인터페이스를 두 번 바꿔야 한다. A는 B·C와 독립적이어서 먼저 수행한다.
+
+### 8.6 B단계 세부 결정 (2026-09-30)
+
+B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이 확정한다. 위 다이어그램은 이 결정을 반영했다.
+
+| 대상 | 결정 | 근거 |
+|---|---|---|
+| Quiz·Study | 하나의 Tier1 `SessionService`로 합친다. 파일은 모드 공통(`session.go`, `session_query.go`, `session_dispatch.go`)과 모드별(`session_quiz_*.go`, `session_study_*.go`)로 나눈다. | scheduler의 slot별 Quiz/Study 생성 분기와 모드 공통 조회(미완료 세션, 상태별 목록)가 한 곳에 모인다. 호출자는 C단계에서 좁은 인터페이스로 받으므로 타입 크기가 호출자에 전파되지 않는다. |
+| 시작·완료 | 모드별 메서드로 유지한다(`StartQuiz`/`StartStudy`, `CompleteQuiz`/`FinishStudy`). | 상태 타입이 다르고 정책도 다르다(Quiz 완료만 streak 갱신). 유형별 정책을 임의로 통일하지 않는다. |
+| `SessionQuery` | `SessionService`에 흡수한다. 미사용 `CountUnfinished`는 삭제한다. | 로직 없이 repo를 전달만 하는 37줄 서비스이고 호출자는 scheduler뿐이다. |
+| `TipGenerator` | `TipService`에 흡수하고 unexport한다. LLM client가 없을 때의 nil 허용 동작은 유지한다. | Tier1 "Tip" 하나가 조회·후보 저장·보충을 담당한다. |
+| `Audio` | leaf Tier1로 공개 유지한다. | TTS·S3 의존과 key 부재 시 nil 동작이 채점·진행 상태와 무관하다. 합치면 SessionDeps가 4개 늘고 nil 검사가 퍼진다. |
+| `LLMQuestion` | 답변 생성 → 팁 후보 저장만 흡수한다. 문맥 프롬프트 조립은 bot에 남긴다. | 문맥 조립은 bot locale 문구와 `renderStudyMaterial` HTML 렌더에 묶여 있다. |
+| Stats·Preference | 기존 `AnalyzerService`·`MaterialPreferenceService` 이름을 유지한다. | leaf이며 이름 변경의 동작상 이득이 없다. |
+| Redis 진행 상태 저장소 | Quiz·Study 저장소를 한 타입으로 합치지 않는다. `SessionDeps`는 기존 `SessionStores{Quiz, Study}`를 필드 하나로 받는다. | Redis 연결은 이미 하나(`rdb`)이고 두 저장소는 제네릭 `SessionStore[T]`의 타입별 인스턴스다. 합치면 ADR-062에서 제거한 전달 계층이 되살아나고 테스트 대역이 넓어진다. |
+
+`SessionService`의 의존은 repo 7개·`SessionStores`·LLM·DB로 10개이며 §8.3에 따라 `SessionDeps`의 이름 있는 필드로 받는다. 구현 계획은 [B단계 계획](../todos/adr059_stage_b_plan.md)에 있다.
