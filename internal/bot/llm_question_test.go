@@ -208,10 +208,9 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 		return &Bot{
 			input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
 			services: &service.Services{
-				StudyActiveSession: service.NewStudyActiveSessionService(
-					nil,
-					nil,
-					stateStores.study,
+				Session: newTestSessionService(
+					stateStores,
+					service.SessionDeps{},
 				),
 			},
 		}
@@ -542,10 +541,9 @@ func TestHandleStudyAskLLMQuestion(t *testing.T) {
 			recovery: stateStores,
 			timing:   stateStores,
 			services: &service.Services{
-				StudyActiveSession: service.NewStudyActiveSessionService(
-					nil,
-					nil,
-					stateStores.study,
+				Session: newTestSessionService(
+					stateStores,
+					service.SessionDeps{},
 				),
 			},
 		}

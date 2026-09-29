@@ -152,7 +152,10 @@ func (s *commandStudyMaterialStore) GetMaterialsByPlan(
 	return s.materials, nil
 }
 
+// commandStudySessionStore records Study creation; the embedded nil
+// SessionRepo makes any other sessions-table call panic.
 type commandStudySessionStore struct {
+	service.SessionRepo
 	nextID             int
 	created            []*model.Session
 	createdMaterialIDs []int
@@ -725,10 +728,13 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 		telegram: newTelegramClient(api),
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
-			StudySession: service.NewStudySessionService(
-				materialStore,
-				sessionStore,
-				botTestDB,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{
+					MaterialRepo: materialStore,
+					SessionRepo:  sessionStore,
+					DB:           botTestDB,
+				},
 			),
 		},
 	}
@@ -1080,10 +1086,13 @@ func botWithStudyCommandDeps(
 		telegram: newTelegramClient(api),
 		services: &service.Services{
 			User: service.NewUserService(userRepo),
-			StudySession: service.NewStudySessionService(
-				materialStore,
-				sessionStore,
-				botTestDB,
+			Session: newTestSessionService(
+				nil,
+				service.SessionDeps{
+					MaterialRepo: materialStore,
+					SessionRepo:  sessionStore,
+					DB:           botTestDB,
+				},
 			),
 		},
 	}

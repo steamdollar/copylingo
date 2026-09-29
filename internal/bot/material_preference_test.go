@@ -143,12 +143,11 @@ func newPreferenceStudyBot(
 		},
 	}
 	stateStores := newTestInteractionStores()
-	active := service.NewStudyActiveSessionService(
-		activeRepo,
-		nil,
-		stateStores.study,
+	session := newTestSessionService(
+		stateStores,
+		service.SessionDeps{StudyActiveSessionRepo: activeRepo},
 	)
-	if _, err := active.LoadOwnedStudySessionState(
+	if _, err := session.StudyProgress(
 		context.Background(),
 		77,
 		42,
@@ -157,7 +156,7 @@ func newPreferenceStudyBot(
 	}
 	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
 	b := &Bot{telegram: newTelegramClient(&mockBotAPI{}), services: &service.Services{
-		StudyActiveSession: active,
+		Session:            session,
 		MaterialPreference: service.NewMaterialPreferenceService(repo),
 	}}
 	return b, repo, stateStores, activeRepo

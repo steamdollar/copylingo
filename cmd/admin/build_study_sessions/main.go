@@ -56,11 +56,11 @@ func main() {
 
 	ctx := context.Background()
 	repos := repository.NewRepositories(db)
-	study := service.NewStudySessionService(
-		repos.Material,
-		repos.Session,
-		db,
-	)
+	sessions := service.NewSessionService(service.SessionDeps{
+		MaterialRepo: repos.Material,
+		SessionRepo:  repos.Session,
+		DB:           db,
+	})
 
 	users, err := repos.User.GetAllUsers(ctx)
 	if err != nil {
@@ -72,11 +72,9 @@ func main() {
 
 	created := 0
 	for _, user := range users {
-		session, err := study.BuildStudySession(
+		session, err := sessions.BuildStudy(
 			ctx,
-			user.ID,
-			user.Language,
-			user.ProficiencyLevel,
+			user,
 			service.StudyProfileMorning,
 			0,
 		)

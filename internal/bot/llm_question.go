@@ -292,11 +292,11 @@ func (b *Bot) loadStudyMaterialContext(
 	input model.PendingLLMInput,
 	userID int64,
 ) string {
-	if input.Kind != model.PendingLLMStudyMaterial || b.services == nil || b.services.StudyActiveSession == nil {
+	if input.Kind != model.PendingLLMStudyMaterial || b.services == nil || b.services.Session == nil {
 		return ""
 	}
 
-	state, err := b.services.StudyActiveSession.LoadOwnedStudySessionState(
+	state, err := b.services.Session.StudyProgress(
 		ctx,
 		input.SessionID,
 		userID,

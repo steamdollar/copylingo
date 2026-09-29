@@ -228,10 +228,10 @@ func (sf *StudyFlow) handleMaterialPreference(
 		}
 	}
 	if sf.bot.services == nil || sf.bot.services.MaterialPreference == nil ||
-		sf.bot.services.StudyActiveSession == nil {
+		sf.bot.services.Session == nil {
 		return
 	}
-	state, err := sf.bot.services.StudyActiveSession.LoadOwnedStudySessionState(
+	state, err := sf.bot.services.Session.StudyProgress(
 		ctx,
 		sessionID,
 		cb.From.ID,

@@ -800,11 +800,9 @@ func (b *Bot) handleStudy(
 		return
 	}
 
-	session, err := b.services.StudySession.BuildStudySession(
+	session, err := b.services.Session.BuildStudy(
 		ctx,
-		user.ID,
-		user.Language,
-		user.ProficiencyLevel,
+		*user,
 		service.StudyProfileMorning,
 		limit,
 	)

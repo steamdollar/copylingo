@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
+
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
@@ -69,6 +71,17 @@ type SessionRepo interface {
 		ctx context.Context,
 		userIDs []int64,
 	) (map[int64]int, error)
+	CreateSessionInTx(
+		ctx context.Context,
+		tx *sqlx.Tx,
+		session *model.Session,
+	) (int, error)
+	CreateSessionMaterialsInTx(
+		ctx context.Context,
+		tx *sqlx.Tx,
+		sessionID int,
+		materialIDs []int,
+	) error
 }
 
 // SessionQuestionRepo stores the ordered question list of a new Quiz session.
@@ -89,6 +102,30 @@ type QuizActiveSessionRepo interface {
 		ctx context.Context,
 		state *model.QuizActiveSessionState,
 	) error
+}
+
+// StudyActiveSessionRepo loads a Study working set from DB and flushes it back on completion.
+type StudyActiveSessionRepo interface {
+	LoadStudySessionWithStateBySessionID(
+		ctx context.Context,
+		sessionID int,
+	) (*model.StudyActiveSessionState, error)
+	FlushStudyActiveSession(
+		ctx context.Context,
+		state *model.StudyActiveSessionState,
+	) error
+}
+
+// MaterialRepo selects Study materials for a session plan.
+type MaterialRepo interface {
+	GetMaterialsByPlan(
+		ctx context.Context,
+		userID int64,
+		language,
+		level string,
+		levels []string,
+		plan model.StudySessionPlan,
+	) ([]model.Material, error)
 }
 
 // QuizGradingLLM grades answers that need AI judgment (subjective text and handwriting).
@@ -117,13 +154,17 @@ type SessionUserRepo interface {
 
 // SessionDeps lists every external boundary SessionService touches (ADR-059 §8.3).
 type SessionDeps struct {
-	QuestionRepo          QuestionRepo
-	SessionRepo           SessionRepo
-	SessionQuestionRepo   SessionQuestionRepo
-	QuizActiveSessionRepo QuizActiveSessionRepo
-	UserRepo              SessionUserRepo
-	Stores                SessionStores
-	LLM                   QuizGradingLLM
+	QuestionRepo           QuestionRepo
+	SessionRepo            SessionRepo
+	SessionQuestionRepo    SessionQuestionRepo
+	QuizActiveSessionRepo  QuizActiveSessionRepo
+	StudyActiveSessionRepo StudyActiveSessionRepo
+	MaterialRepo           MaterialRepo
+	UserRepo               SessionUserRepo
+	Stores                 SessionStores
+	LLM                    QuizGradingLLM
+	// DB lets Study creation own its transaction boundary (ADR-061).
+	DB *sqlx.DB
 }
 
 // SessionService is the Tier1 entry point for Quiz and Study sessions
@@ -137,6 +178,8 @@ type SessionService struct {
 	srs            *SRSService
 	grader         *GraderService
 	strokeRenderer StrokeRenderer
+	studyBuilder   *StudySessionService
+	studyProgress  *StudyActiveSessionService
 }
 
 func NewSessionService(deps SessionDeps) *SessionService {
@@ -162,5 +205,15 @@ func NewSessionService(deps SessionDeps) *SessionService {
 			deps.LLM,
 		),
 		strokeRenderer: NewDefaultPNGStrokeRenderer(),
+		studyBuilder: NewStudySessionService(
+			deps.MaterialRepo,
+			deps.SessionRepo,
+			deps.DB,
+		),
+		studyProgress: NewStudyActiveSessionService(
+			deps.StudyActiveSessionRepo,
+			deps.SessionRepo,
+			deps.Stores.Study,
+		),
 	}
 }

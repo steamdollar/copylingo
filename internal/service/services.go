@@ -13,8 +13,6 @@ type Services struct {
 	Content            *ContentService
 	User               *UserService
 	Session            *SessionService
-	StudySession       *StudySessionService
-	StudyActiveSession *StudyActiveSessionService
 	MaterialPreference *MaterialPreferenceService
 	Analyzer           *AnalyzerService
 	Tip                *TipService
@@ -59,29 +57,22 @@ func NewServices(
 	}
 
 	session := NewSessionService(SessionDeps{
-		QuestionRepo:          repos.Question,
-		SessionRepo:           repos.Session,
-		SessionQuestionRepo:   repos.SessionQuestion,
-		QuizActiveSessionRepo: repos.QuizActiveSession,
-		UserRepo:              repos.User,
-		Stores:                stores,
-		LLM:                   llm,
+		QuestionRepo:           repos.Question,
+		SessionRepo:            repos.Session,
+		SessionQuestionRepo:    repos.SessionQuestion,
+		QuizActiveSessionRepo:  repos.QuizActiveSession,
+		StudyActiveSessionRepo: repos.StudyActiveSession,
+		MaterialRepo:           repos.Material,
+		DB:                     db,
+		UserRepo:               repos.User,
+		Stores:                 stores,
+		LLM:                    llm,
 	})
 
 	return &Services{
-		Content: NewContentService(repos.Content),
-		User:    NewUserService(repos.User),
-		Session: session,
-		StudySession: NewStudySessionService(
-			repos.Material,
-			repos.Session,
-			db,
-		),
-		StudyActiveSession: NewStudyActiveSessionService(
-			repos.StudyActiveSession,
-			repos.Session,
-			stores.Study,
-		),
+		Content:            NewContentService(repos.Content),
+		User:               NewUserService(repos.User),
+		Session:            session,
 		MaterialPreference: NewMaterialPreferenceService(repos.MaterialPreference),
 		Analyzer: NewAnalyzerService(
 			repos.User,

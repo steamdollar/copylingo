@@ -172,176 +172,100 @@ func (d *sessionDispatcher) dispatchUser(
 	}
 
 	// 3. Build & push session
-	switch slot {
-	case model.SessionSlotMorningStudy:
-		return d.buildAndPushStudy(
-			ctx,
-			user,
-			service.StudyProfileMorning,
-		)
-	case model.SessionSlotMorningQuiz:
-		return d.buildAndPushQuiz(
-			ctx,
-			user,
-			model.SessionMorning,
-		)
-	case model.SessionSlotEveningStudy:
-		return d.buildAndPushStudy(
-			ctx,
-			user,
-			service.StudyProfileEvening,
-		)
-	case model.SessionSlotEveningQuiz:
-		return d.buildAndPushQuiz(
-			ctx,
-			user,
-			model.SessionEvening,
-		)
-	default:
-		return fmt.Errorf(
-			"unsupported session slot: %s",
-			slot,
-		)
-	}
-}
-
-func (d *sessionDispatcher) buildAndPushStudy(
-	ctx context.Context,
-	user model.User,
-	profile service.StudySessionProfile,
-) error {
-	if d.services == nil || d.services.StudySession == nil {
-		return fmt.Errorf("study session service unavailable")
-	}
-	session, err := d.services.StudySession.BuildStudySession(
-		ctx,
-		user.ID,
-		user.Language,
-		user.ProficiencyLevel,
-		profile,
-		0,
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"build study session user_id=%d: %w",
-			user.ID,
-			err,
-		)
-	}
-	if session == nil {
-		slog.WarnContext(
-			ctx,
-			"No study materials available for session",
-			"event",
-			"scheduler.study_session.empty",
-			"user_id",
-			user.ID,
-		)
-		return nil
-	}
-
-	if err := d.bot.PushStudySession(
-		ctx,
-		user.ID,
-		session.ID,
-	); err != nil {
-		return fmt.Errorf(
-			"push study session user_id=%d session_id=%d: %w",
-			user.ID,
-			session.ID,
-			err,
-		)
-	}
-
-	slog.InfoContext(
-		ctx,
-		"Study session pushed",
-		"event",
-		"scheduler.study_session.pushed",
-		"user_id",
-		user.ID,
-		"session_id",
-		session.ID,
-		"total_materials",
-		session.TotalQuestions,
-	)
-	return nil
-}
-
-func (d *sessionDispatcher) buildAndPushQuiz(
-	ctx context.Context,
-	user model.User,
-	sessionType model.SessionType,
-) error {
 	if d.services == nil || d.services.Session == nil {
 		return fmt.Errorf("session service unavailable")
 	}
-
-	var session *model.Session
-	var err error
-
-	switch sessionType {
-	case model.SessionMorning:
-		session, err = d.services.Session.BuildMorningQuiz(
-			ctx,
-			user,
-		)
-	case model.SessionEvening:
-		session, err = d.services.Session.BuildEveningQuiz(
-			ctx,
-			user,
-		)
-	default:
-		return fmt.Errorf(
-			"unsupported quiz session type: %s",
-			sessionType,
-		)
-	}
-
+	session, err := d.services.Session.BuildForSlot(
+		ctx,
+		user,
+		slot,
+	)
 	if err != nil {
 		return fmt.Errorf(
-			"build quiz session user_id=%d: %w",
+			"build session user_id=%d slot=%s: %w",
 			user.ID,
+			slot,
 			err,
 		)
 	}
 	if session == nil {
 		slog.WarnContext(
 			ctx,
-			"No questions available for session",
+			"No content available for session slot",
 			"event",
 			"scheduler.session.empty",
 			"user_id",
 			user.ID,
+			"slot",
+			slot,
+		)
+		return nil
+	}
+	return d.pushBuiltSession(
+		ctx,
+		user.ID,
+		session,
+	)
+}
+
+// pushBuiltSession sends a freshly built session with the push matching its mode.
+func (d *sessionDispatcher) pushBuiltSession(
+	ctx context.Context,
+	userID int64,
+	session *model.Session,
+) error {
+	if session.Mode == model.SessionModeStudy {
+		if err := d.bot.PushStudySession(
+			ctx,
+			userID,
+			session.ID,
+		); err != nil {
+			return fmt.Errorf(
+				"push study session user_id=%d session_id=%d: %w",
+				userID,
+				session.ID,
+				err,
+			)
+		}
+		slog.InfoContext(
+			ctx,
+			"Study session pushed",
+			"event",
+			"scheduler.study_session.pushed",
+			"user_id",
+			userID,
+			"session_id",
+			session.ID,
+			"total_materials",
+			session.TotalQuestions,
 		)
 		return nil
 	}
 
 	if err := d.bot.PushSession(
 		ctx,
-		user.ID,
+		userID,
 		session.ID,
-		string(sessionType),
+		string(session.Type),
 	); err != nil {
 		return fmt.Errorf(
 			"push quiz session user_id=%d session_id=%d: %w",
-			user.ID,
+			userID,
 			session.ID,
 			err,
 		)
 	}
-
 	slog.InfoContext(
 		ctx,
 		"Session pushed",
 		"event",
 		"scheduler.session.pushed",
 		"user_id",
-		user.ID,
+		userID,
 		"session_id",
 		session.ID,
 		"session_type",
-		sessionType,
+		session.Type,
 		"total_questions",
 		session.TotalQuestions,
 	)

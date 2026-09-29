@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/model"
+	"github.com/lsj/copylingo/internal/service"
 )
 
 // StudyFlow handles material-based study sessions.
@@ -157,7 +159,7 @@ func (sf *StudyFlow) startSession(
 	sessionID int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	state, err := sf.bot.services.StudyActiveSession.Start(
+	state, err := sf.bot.services.Session.StartStudy(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -209,7 +211,7 @@ func (sf *StudyFlow) nextMaterial(
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
 	// update study proceeding state
-	state, err := sf.bot.services.StudyActiveSession.MarkStudied(
+	state, err := sf.bot.services.Session.MarkStudied(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -252,7 +254,7 @@ func (sf *StudyFlow) prevMaterial(
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	state, err := sf.bot.services.StudyActiveSession.LoadOwnedStudySessionState(
+	state, err := sf.bot.services.Session.StudyProgress(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -293,35 +295,34 @@ func (sf *StudyFlow) finishSession(
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if _, err := sf.bot.services.StudyActiveSession.MarkStudied(
+	if err := sf.bot.services.Session.FinishStudy(
 		ctx,
 		sessionID,
 		cb.From.ID,
 		currentOrder,
 	); err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to mark final study material",
-			"event",
-			"telegram.study.final_material_mark_failed",
-			"session_id",
-			sessionID,
-			"material_order",
-			currentOrder,
-			"error",
+		if errors.Is(
 			err,
-		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
-			messages.saveCompletionFailed,
-		)
-		return
-	}
-	if err := sf.bot.services.StudyActiveSession.Complete(
-		ctx,
-		sessionID,
-		cb.From.ID,
-	); err != nil {
+			service.ErrStudyFinalMarkFailed,
+		) {
+			slog.ErrorContext(
+				ctx,
+				"Failed to mark final study material",
+				"event",
+				"telegram.study.final_material_mark_failed",
+				"session_id",
+				sessionID,
+				"material_order",
+				currentOrder,
+				"error",
+				err,
+			)
+			sf.telegram.SendMessage(
+				cb.Message.Chat.ID,
+				messages.saveCompletionFailed,
+			)
+			return
+		}
 		slog.ErrorContext(
 			ctx,
 			"Failed to complete study session",
@@ -367,7 +368,7 @@ func (sf *StudyFlow) showMaterial(
 		materialOrder = 0
 	}
 	if materialOrder >= len(items) {
-		if err := sf.bot.services.StudyActiveSession.Complete(
+		if err := sf.bot.services.Session.CompleteStudy(
 			ctx,
 			state.Session.ID,
 			state.Session.UserID,
@@ -545,7 +546,7 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 	if err != nil {
 		return
 	}
-	if sf.bot.input == nil || sf.bot.services == nil || sf.bot.services.StudyActiveSession == nil {
+	if sf.bot.input == nil || sf.bot.services == nil || sf.bot.services.Session == nil {
 		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.llmQuestionActivationFailed,
@@ -553,7 +554,7 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		return
 	}
 
-	state, err := sf.bot.services.StudyActiveSession.LoadOwnedStudySessionState(
+	state, err := sf.bot.services.Session.StudyProgress(
 		ctx,
 		sessionID,
 		cb.From.ID,

@@ -29,7 +29,10 @@ func (s *botStudyMaterialStore) GetMaterialsByPlan(
 	return nil, nil
 }
 
+// botStudySessionStore drives Study creation, start and completion; the
+// embedded nil SessionRepo makes any other sessions-table call panic.
 type botStudySessionStore struct {
+	service.SessionRepo
 	session    *model.Session
 	started    []int
 	completed  []int
@@ -166,21 +169,19 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
-	studyActiveService := service.NewStudyActiveSessionService(
-		activeRepo,
-		sessionStore,
-		stateStores.study,
-	)
-	studyService := service.NewStudySessionService(
-		&botStudyMaterialStore{},
-		sessionStore,
-		botTestDB,
+	session := newTestSessionService(
+		stateStores,
+		service.SessionDeps{
+			MaterialRepo:           &botStudyMaterialStore{},
+			SessionRepo:            sessionStore,
+			StudyActiveSessionRepo: activeRepo,
+			DB:                     botTestDB,
+		},
 	)
 	b := &Bot{
 		telegram: newTelegramClient(api),
 		services: &service.Services{
-			StudySession:       studyService,
-			StudyActiveSession: studyActiveService,
+			Session: session,
 		},
 	}
 	flow := NewStudyFlow(b)
@@ -239,7 +240,7 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 			userID,
 		),
 	)
-	state, err := studyActiveService.LoadOwnedStudySessionState(
+	state, err := session.StudyProgress(
 		ctx,
 		sessionID,
 		userID,
@@ -362,15 +363,17 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
-	studyActiveService := service.NewStudyActiveSessionService(
-		activeRepo,
-		sessionStore,
-		stateStores.study,
+	session := newTestSessionService(
+		stateStores,
+		service.SessionDeps{
+			SessionRepo:            sessionStore,
+			StudyActiveSessionRepo: activeRepo,
+		},
 	)
 	b := &Bot{
 		telegram: newTelegramClient(api),
 		services: &service.Services{
-			StudyActiveSession: studyActiveService,
+			Session: session,
 		},
 	}
 	flow := NewStudyFlow(b)
@@ -432,7 +435,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	}
 
 	// 뒤로 가기는 studied 상태를 되돌리지 않는다.
-	state, err := studyActiveService.LoadOwnedStudySessionState(
+	state, err := session.StudyProgress(
 		ctx,
 		sessionID,
 		userID,
@@ -551,21 +554,18 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
-	studyActiveService := service.NewStudyActiveSessionService(
-		activeRepo,
-		sessionStore,
-		stateStores.study,
-	)
-	studyService := service.NewStudySessionService(
-		&botStudyMaterialStore{},
-		sessionStore,
-		botTestDB,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(api),
 		services: &service.Services{
-			StudySession:       studyService,
-			StudyActiveSession: studyActiveService,
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{
+					MaterialRepo:           &botStudyMaterialStore{},
+					SessionRepo:            sessionStore,
+					StudyActiveSessionRepo: activeRepo,
+					DB:                     botTestDB,
+				},
+			),
 		},
 	}
 	flow := NewStudyFlow(b)
@@ -652,21 +652,18 @@ func TestStudyFlowReadingRendering(t *testing.T) {
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
-	studyActiveService := service.NewStudyActiveSessionService(
-		activeRepo,
-		sessionStore,
-		stateStores.study,
-	)
-	studyService := service.NewStudySessionService(
-		&botStudyMaterialStore{},
-		sessionStore,
-		botTestDB,
-	)
 	b := &Bot{
 		telegram: newTelegramClient(api),
 		services: &service.Services{
-			StudySession:       studyService,
-			StudyActiveSession: studyActiveService,
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{
+					MaterialRepo:           &botStudyMaterialStore{},
+					SessionRepo:            sessionStore,
+					StudyActiveSessionRepo: activeRepo,
+					DB:                     botTestDB,
+				},
+			),
 		},
 	}
 	flow := NewStudyFlow(b)
