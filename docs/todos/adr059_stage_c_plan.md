@@ -43,6 +43,24 @@ flowchart LR
 - `cfg`는 Flow에 넘기지 않는다. 필요한 값(`PublicBaseURL`)만 넘긴다.
 - scheduler의 `*service.Services` 인자와 cmd/server의 `Services` 묶음은 그대로 둔다. 이것은 D단계 범위다.
 
+### 구현 중 추가 결정 (2026-10-01)
+
+- **테스트 헬퍼**: Flow별 헬퍼를 쓴다(사용자 결정). `newTestSessionFlow(api, stores, SessionFlowDeps)`·`newTestStudyFlow(...)`는 Telegram을 api로, 비어 있는 store 필드를 stores로 채우고 service 의존은 테스트가 명시한다. Bot 디스패치 테스트는 `newTestBot(api, stores, services)`를 쓴다. 커밋 2에서 `newTestSettingsFlow`·`newTestLLMQuestionFlow`를 같은 모양으로 추가한다. 공통 fixture struct는 만들지 않는다.
+- **nil 방어 분기 범위**: service 의존(Session·User·MaterialPreference·LLMQuestion)의 nil 분기만 제거한다. store nil 분기는 유지한다. `Audio`는 production에서 nil일 수 있으므로(TTS key 없음) 선택 의존으로 남긴다. 조립부는 `services.Audio != nil`일 때만 `Deps.Audio`에 넣는다(typed-nil 방지).
+  - 결과: 연결 자료 설정 버튼이 MaterialPreference 주입 여부와 무관하게 표시된다(production은 항상 주입하므로 동작 변화 없음).
+
+## 진행 상황
+
+| # | 상태 | 커밋 |
+|---|---|---|
+| docs | 완료 | `8b5fe6d` 계획서 추가 |
+| 0 | 완료 | `131c4f1` interactions.go·router.go·main.go goparams |
+| 1 | 완료 | `05cd660` SessionFlow·StudyFlow Deps. 임시로 `NewBot` → `newBot(telegram, cfg, services, stores)`가 Flow를 조립하고, `Bot.RefreshStaleMiniAppMessages`는 SessionFlow에 위임한다 |
+| 2 | 다음 | — |
+| 3·4 | 대기 | — |
+
+커밋 1 시점의 Bot 필드는 `telegram, services, input, flow, study, stopCh`다. Settings·LLM·메뉴 테스트는 아직 `&Bot{telegram, services, input}` 리터럴을 쓴다. 커밋 2에서 이 테스트들을 새 헬퍼로 옮긴다.
+
 ## 3. Discovery 결과 (2026-10-01, commit f35f8a5 기준)
 
 ### 역참조와 교차 호출
