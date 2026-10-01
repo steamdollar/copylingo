@@ -13,7 +13,10 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatalf("Application terminated with error: %v", err)
+		log.Fatalf(
+			"Application terminated with error: %v",
+			err,
+		)
 	}
 }
 
@@ -21,7 +24,10 @@ func run() error {
 	// load config
 	cfg, err := config.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf(
+			"failed to load config: %w",
+			err,
+		)
 	}
 
 	// set logger
@@ -32,7 +38,10 @@ func run() error {
 		Timezone:      cfg.Logging.Timezone,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to initialize logging: %w", err)
+		return fmt.Errorf(
+			"failed to initialize logging: %w",
+			err,
+		)
 	}
 	defer closeLogger()
 	slog.SetDefault(logger)
@@ -40,24 +49,50 @@ func run() error {
 	// db, redis set up
 	db, rdb, cleanup, err := initInfra(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to init infrastructure: %w", err)
+		return fmt.Errorf(
+			"failed to init infrastructure: %w",
+			err,
+		)
 	}
 	defer cleanup()
 
 	// initialize application components
-	services, botHandler, err := initApp(cfg, db, rdb)
+	services, botHandler, err := initApp(
+		cfg,
+		db,
+		rdb,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to init app: %w", err)
+		return fmt.Errorf(
+			"failed to init app: %w",
+			err,
+		)
 	}
 
-	stopWorkers := startWorkers(services, botHandler, rdb)
+	stopWorkers := startWorkers(
+		services,
+		botHandler,
+		rdb,
+	)
 	defer stopWorkers()
 
-	router := setupRouter(cfg, db, rdb, services, botHandler)
-	srv := startHTTPServer(cfg, router)
+	router := setupRouter(
+		cfg,
+		db,
+		rdb,
+		services,
+		botHandler,
+	)
+	srv := startHTTPServer(
+		cfg,
+		router,
+	)
 
 	// wait for shutdown
-	waitForShutdown(srv, botHandler)
+	waitForShutdown(
+		srv,
+		botHandler,
+	)
 
 	return nil
 }

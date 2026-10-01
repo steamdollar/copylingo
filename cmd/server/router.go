@@ -28,36 +28,57 @@ func setupRouter(
 	}
 
 	r := gin.New()
-	r.Use(requestLoggingMiddleware(), structuredRecoveryMiddleware())
+	r.Use(
+		requestLoggingMiddleware(),
+		structuredRecoveryMiddleware(),
+	)
 
 	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		// Check DB
-		if err := db.Ping(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status": "unhealthy",
-				"error":  "database connection failed",
-			})
-			return
-		}
+	r.GET(
+		"/health",
+		func(c *gin.Context) {
+			// Check DB
+			if err := db.Ping(); err != nil {
+				c.JSON(
+					http.StatusServiceUnavailable,
+					gin.H{
+						"status": "unhealthy",
+						"error":  "database connection failed",
+					},
+				)
+				return
+			}
 
-		// Check Redis
-		if err := rdb.Ping(c.Request.Context()).Err(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status": "unhealthy",
-				"error":  "redis connection failed",
-			})
-			return
-		}
+			// Check Redis
+			if err := rdb.Ping(c.Request.Context()).Err(); err != nil {
+				c.JSON(
+					http.StatusServiceUnavailable,
+					gin.H{
+						"status": "unhealthy",
+						"error":  "redis connection failed",
+					},
+				)
+				return
+			}
 
-		c.JSON(http.StatusOK, gin.H{
-			"status": "healthy",
-			"time":   time.Now().Format(time.RFC3339),
-		})
-	})
+			c.JSON(
+				http.StatusOK,
+				gin.H{
+					"status": "healthy",
+					"time":   time.Now().Format(time.RFC3339),
+				},
+			)
+		},
+	)
 
 	// The HTTP handler reads message references through its narrow storage contract.
-	miniapp.RegisterRoutes(r, cfg, services, redisstore.NewInteractions(rdb), botHandler)
+	miniapp.RegisterRoutes(
+		r,
+		cfg,
+		services,
+		redisstore.NewInteractions(rdb),
+		botHandler,
+	)
 
 	return r
 }
