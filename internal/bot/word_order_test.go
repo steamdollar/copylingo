@@ -20,16 +20,16 @@ func newWordOrderFixture(
 	t.Helper()
 	stateStores := newTestInteractionStores()
 	api := &mockBotAPI{}
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		api,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{LLM: &mockLLM{}},
 			),
 		},
-	}
+	)
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: 7, UserID: 42},
@@ -56,7 +56,7 @@ func newWordOrderFixture(
 		7,
 		state,
 	)
-	return NewSessionFlow(b), stateStores, api
+	return sf, stateStores, api
 }
 
 func mustTestJSON(
@@ -367,7 +367,7 @@ func TestWordOrderSubmitExactAndIdempotent(t *testing.T) {
 			42,
 		),
 	)
-	state, err := sf.bot.services.Session.QuizProgress(
+	state, err := sf.session.QuizProgress(
 		ctx,
 		7,
 	)

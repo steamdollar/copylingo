@@ -164,8 +164,11 @@ func TestMainMenuKeyboard(t *testing.T) {
 
 func TestShowSessionFetchError(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
-	sf := NewSessionFlow(b)
+	sf := newTestSessionFlow(
+		mAPI,
+		nil,
+		SessionFlowDeps{},
+	)
 
 	cb := &tgbotapi.CallbackQuery{
 		Message: &tgbotapi.Message{
@@ -200,8 +203,11 @@ func TestShowSessionFetchError(t *testing.T) {
 
 func TestShowQuizActiveSessionUnavailable(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
-	sf := NewSessionFlow(b)
+	sf := newTestSessionFlow(
+		mAPI,
+		nil,
+		SessionFlowDeps{},
+	)
 
 	t.Run(
 		"with editMessageID",

@@ -12,7 +12,7 @@ import (
 // RefreshStaleMiniAppMessages is called once at server startup to check in-progress sessions.
 // If the next unanswered question is a handwriting task and the Mini App URL has changed,
 // it re-sends the question with a fresh URL.
-func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
+func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 	ctx = observability.WithAttrs(
 		ctx,
 		slog.String(
@@ -24,7 +24,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			"telegram.restart_recovery",
 		),
 	)
-	baseURL := b.cfg.Server.PublicBaseURL
+	baseURL := sf.publicBaseURL
 	if baseURL == "" {
 		slog.InfoContext(
 			ctx,
@@ -36,7 +36,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 	}
 	currentFp := callback.MiniAppURLFingerprint(baseURL)
 
-	sessions, err := b.services.Session.ListInProgressQuizzes(ctx)
+	sessions, err := sf.session.ListInProgressQuizzes(ctx)
 	if err != nil {
 		slog.ErrorContext(
 			ctx,
@@ -51,8 +51,8 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 
 	for _, s := range sessions {
 		// Skip if fingerprint unchanged
-		if b.recovery != nil {
-			if last, _ := b.recovery.GetMiniAppFingerprint(
+		if sf.recovery != nil {
+			if last, _ := sf.recovery.GetMiniAppFingerprint(
 				ctx,
 				s.ID,
 			); last == currentFp {
@@ -60,7 +60,7 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			}
 		}
 
-		state, err := b.services.Session.QuizProgress(
+		state, err := sf.session.QuizProgress(
 			ctx,
 			s.ID,
 		)
@@ -89,13 +89,13 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 		}
 
 		// Best-effort: edit the old message to strip its stale buttons.
-		if b.messages != nil {
-			if ref, err := b.messages.GetHandwritingMessage(
+		if sf.messages != nil {
+			if ref, err := sf.messages.GetHandwritingMessage(
 				ctx,
 				s.ID,
 				q.ID,
 			); err == nil && ref != nil {
-				_ = b.telegram.ClearInlineKeyboard(
+				_ = sf.telegram.ClearInlineKeyboard(
 					ref.ChatID,
 					ref.MessageID,
 				)
@@ -113,11 +113,11 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			"user_id",
 			s.UserID,
 		)
-		b.telegram.SendMessage(
+		sf.telegram.SendMessage(
 			s.UserID,
 			botMessagesByLocale[botDefaultLocale].handwritingLinkUpdated,
 		)
-		b.flow.showQuestion(
+		sf.showQuestion(
 			ctx,
 			s.UserID,
 			nil,
@@ -125,8 +125,8 @@ func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
 			idx,
 		)
 
-		if b.recovery != nil {
-			_ = b.recovery.SetMiniAppFingerprint(
+		if sf.recovery != nil {
+			_ = sf.recovery.SetMiniAppFingerprint(
 				ctx,
 				s.ID,
 				currentFp,

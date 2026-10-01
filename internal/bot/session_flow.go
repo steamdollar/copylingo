@@ -17,16 +17,151 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// SessionFlow handles the question-answering interaction flow.
-type SessionFlow struct {
-	bot      *Bot
-	telegram *telegramClient
+// quizSession is the Quiz part of service.SessionService that SessionFlow
+// drives: start/resume, per-type answer submission, completion, and the
+// working-set reads used to render and recover questions.
+type quizSession interface {
+	StartQuiz(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+	) (*model.QuizActiveSessionState, error)
+	ShowQuizQuestion(
+		ctx context.Context,
+		sessionID,
+		questionIdx int,
+	) (*model.QuizActiveSessionState, error)
+	SubmitQuizOption(
+		ctx context.Context,
+		sessionID,
+		questionID,
+		optionIdx int,
+	) (*service.QuizAnswerResult, error)
+	SubmitQuizText(
+		ctx context.Context,
+		answer service.QuizTextAnswer,
+	) (*service.QuizAnswerResult, error)
+	SubmitQuizWordOrder(
+		ctx context.Context,
+		sessionID,
+		questionID int,
+		selection []int,
+	) (*service.QuizAnswerResult, error)
+	CompleteQuiz(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+	) (*service.QuizCompletion, error)
+	BuildReviewQuiz(
+		ctx context.Context,
+		user model.User,
+	) (*model.Session, error)
+	ListByStatus(
+		ctx context.Context,
+		userID int64,
+		status config.SessionStatus,
+	) ([]model.Session, error)
+	QuizProgress(
+		ctx context.Context,
+		sessionID int,
+	) (*model.QuizActiveSessionState, error)
+	ListInProgressQuizzes(ctx context.Context) ([]model.Session, error)
 }
 
-func NewSessionFlow(bot *Bot) *SessionFlow {
+// userReader loads (or lazily registers) the Telegram user behind an update.
+type userReader interface {
+	GetUser(
+		ctx context.Context,
+		telegramID int64,
+		username string,
+	) (*model.User, error)
+}
+
+// listeningAudio serves listening clips. It is optional: without a TTS key
+// the service is absent and listening questions degrade to text only.
+type listeningAudio interface {
+	GetClip(
+		ctx context.Context,
+		key string,
+	) ([]byte, error)
+	CacheFileID(
+		ctx context.Context,
+		questionID int,
+		fileID string,
+	) error
+}
+
+// quizInputStore is the transient input state SessionFlow owns: the active
+// typed-answer question and the in-quiz "ask the LLM" pending token.
+type quizInputStore interface {
+	GetActiveQuestion(
+		ctx context.Context,
+		chatID int64,
+	) (*model.ActiveQuestionRef, error)
+	SetActiveQuestion(
+		ctx context.Context,
+		chatID int64,
+		question model.ActiveQuestionRef,
+	) error
+	DeleteActiveQuestion(
+		ctx context.Context,
+		chatID int64,
+	) error
+	SetLLMPending(
+		ctx context.Context,
+		userID int64,
+		input model.PendingLLMInput,
+	) error
+}
+
+// SessionFlowDeps wires SessionFlow. Audio may be left nil (see listeningAudio);
+// every other dependency is required.
+type SessionFlowDeps struct {
+	Telegram           *telegramClient
+	Session            quizSession
+	User               userReader
+	MaterialPreference materialPreferences
+	Audio              listeningAudio
+	Input              quizInputStore
+	Drafts             WordOrderDraftStore
+	Messages           HandwritingMessageStore
+	Recovery           MiniAppRecoveryStore
+	Timing             QuestionTimingStore
+	// Study resumes an in-progress Study session from the main menu.
+	Study         *StudyFlow
+	PublicBaseURL string
+}
+
+// SessionFlow handles the question-answering interaction flow.
+type SessionFlow struct {
+	telegram           *telegramClient
+	session            quizSession
+	user               userReader
+	materialPreference materialPreferences
+	audio              listeningAudio
+	input              quizInputStore
+	drafts             WordOrderDraftStore
+	messages           HandwritingMessageStore
+	recovery           MiniAppRecoveryStore
+	timing             QuestionTimingStore
+	study              *StudyFlow
+	publicBaseURL      string
+}
+
+func NewSessionFlow(deps SessionFlowDeps) *SessionFlow {
 	return &SessionFlow{
-		bot:      bot,
-		telegram: bot.telegram,
+		telegram:           deps.Telegram,
+		session:            deps.Session,
+		user:               deps.User,
+		materialPreference: deps.MaterialPreference,
+		audio:              deps.Audio,
+		input:              deps.Input,
+		drafts:             deps.Drafts,
+		messages:           deps.Messages,
+		recovery:           deps.Recovery,
+		timing:             deps.Timing,
+		study:              deps.Study,
+		publicBaseURL:      deps.PublicBaseURL,
 	}
 }
 
@@ -82,7 +217,7 @@ func (sf *SessionFlow) getPendingSessions(
 	cb *tgbotapi.CallbackQuery,
 ) error {
 	chatID := cb.Message.Chat.ID
-	sessions, err := sf.bot.services.Session.ListByStatus(
+	sessions, err := sf.session.ListByStatus(
 		ctx,
 		cb.From.ID,
 		config.SessionStatusPending,
@@ -175,7 +310,7 @@ func (sf *SessionFlow) getInProgressSessions(
 	cb *tgbotapi.CallbackQuery,
 ) (bool, error) {
 	chatID := cb.Message.Chat.ID
-	inProgressSessions, err := sf.bot.services.Session.ListByStatus(
+	inProgressSessions, err := sf.session.ListByStatus(
 		ctx,
 		cb.From.ID,
 		config.SessionStatusInProgress,
@@ -184,10 +319,7 @@ func (sf *SessionFlow) getInProgressSessions(
 		return false, err
 	}
 	if studySession, ok := firstStudySession(inProgressSessions); ok {
-		if sf.bot.study == nil {
-			sf.bot.study = NewStudyFlow(sf.bot)
-		}
-		sf.bot.study.startSession(
+		sf.study.startSession(
 			ctx,
 			cb,
 			studySession.ID,
@@ -241,7 +373,7 @@ func (sf *SessionFlow) StartReview(
 	userID := cb.From.ID
 	chatID := cb.Message.Chat.ID
 
-	user, err := sf.bot.services.User.GetUser(
+	user, err := sf.user.GetUser(
 		ctx,
 		userID,
 		cb.From.UserName,
@@ -254,7 +386,7 @@ func (sf *SessionFlow) StartReview(
 		return
 	}
 
-	session, err := sf.bot.services.Session.BuildReviewQuiz(
+	session, err := sf.session.BuildReviewQuiz(
 		ctx,
 		*user,
 	)
@@ -389,7 +521,7 @@ func (sf *SessionFlow) HandleAnswerCallback(
 		) {
 			if isStaleMiniAppCallback(
 				parts,
-				sf.bot.cfg.Server.PublicBaseURL,
+				sf.publicBaseURL,
 			) {
 				sf.telegram.ClearInlineKeyboard(
 					cb.Message.Chat.ID,
@@ -481,14 +613,14 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 		return
 	}
 	// owner gate를 callback에서도 재검증한다 (버튼은 owner에게만 렌더되지만 callback은 위조 가능).
-	if !sf.bot.isLLMAllowed(cb.From) {
+	if !isLLMAllowed(cb.From) {
 		return
 	}
 	questionID, err := strconv.Atoi(questionIDStr)
 	if err != nil {
 		return
 	}
-	if sf.bot.input == nil {
+	if sf.input == nil {
 		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].llmQuestionActivationFailed,
@@ -497,7 +629,7 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 	}
 
 	input := model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion, SessionID: sessionID, QuestionID: questionID}
-	if err := sf.bot.input.SetLLMPending(
+	if err := sf.input.SetLLMPending(
 		ctx,
 		cb.From.ID,
 		input,
@@ -532,7 +664,7 @@ func (sf *SessionFlow) startSession(
 	cb *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
-	state, err := sf.bot.services.Session.StartQuiz(
+	state, err := sf.session.StartQuiz(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -586,8 +718,8 @@ func (sf *SessionFlow) startSession(
 		return
 	}
 
-	if sf.bot.timing != nil {
-		_ = sf.bot.timing.RecordQuestionStart(
+	if sf.timing != nil {
+		_ = sf.timing.RecordQuestionStart(
 			ctx,
 			sessionID,
 			time.Now(),
@@ -609,7 +741,7 @@ func (sf *SessionFlow) finishSession(
 	cb *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
-	result, err := sf.bot.services.Session.CompleteQuiz(
+	result, err := sf.session.CompleteQuiz(
 		ctx,
 		sessionID,
 		cb.From.ID,

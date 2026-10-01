@@ -10,7 +10,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -28,13 +27,16 @@ func TestIsStaleMiniAppCallbackWrapper(t *testing.T) {
 
 func TestHandwritingMiniAppURL(t *testing.T) {
 	t.Parallel()
-	b := &Bot{cfg: &config.Config{}}
-	sf := NewSessionFlow(b)
+	sf := newTestSessionFlow(
+		nil,
+		nil,
+		SessionFlowDeps{},
+	)
 
 	t.Run(
 		"empty base url",
 		func(t *testing.T) {
-			b.cfg.Server.PublicBaseURL = ""
+			sf.publicBaseURL = ""
 			_, err := sf.handwritingMiniAppURL(
 				1,
 				1,
@@ -52,7 +54,7 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 	t.Run(
 		"valid url",
 		func(t *testing.T) {
-			b.cfg.Server.PublicBaseURL = "https://api.example.com/"
+			sf.publicBaseURL = "https://api.example.com/"
 			prompt := "뜻 <b>'학교'</b>에 해당하는 일본어 단어를 손글씨로 쓰세요"
 			got, err := sf.handwritingMiniAppURL(
 				123,
@@ -142,12 +144,16 @@ func TestHandwritingCellCountExcludesSokuon(t *testing.T) {
 func TestQuestionNavigation(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	sf := NewSessionFlow(&Bot{services: &service.Services{
-		Session: newTestSessionService(
-			stateStores,
-			service.SessionDeps{},
-		),
-	}})
+	sf := newTestSessionFlow(
+		nil,
+		nil,
+		SessionFlowDeps{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
+		},
+	)
 
 	trueVal := true
 	state := &model.QuizActiveSessionState{
@@ -288,12 +294,13 @@ func TestRenderByType(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		cfg: &config.Config{Server: config.ServerConfig{PublicBaseURL: "https://ex.com"}},
-	}
-	sf := NewSessionFlow(b)
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
+			PublicBaseURL: "https://ex.com",
+		},
+	)
 
 	t.Run(
 		"MultipleChoice",
@@ -484,12 +491,14 @@ func TestRenderByType_Listening(t *testing.T) {
 		"cached file_id fast path",
 		func(t *testing.T) {
 			mAPI := &mockBotAPI{}
-			b := &Bot{
-				telegram: newTelegramClient(mAPI),
-				input:    newTestInteractionStores(),
-				services: &service.Services{Audio: audio},
-			}
-			sf := NewSessionFlow(b)
+			sf := newTestSessionFlow(
+				mAPI,
+				nil,
+				SessionFlowDeps{
+					Input: newTestInteractionStores(),
+					Audio: audio,
+				},
+			)
 			q := model.Question{
 				ID:          5,
 				Type:        model.QuestionListening,
@@ -552,12 +561,14 @@ func TestRenderByType_Listening(t *testing.T) {
 		func(t *testing.T) {
 			store.getCalls = 0
 			mAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
-			b := &Bot{
-				telegram: newTelegramClient(mAPI),
-				input:    newTestInteractionStores(),
-				services: &service.Services{Audio: audio},
-			}
-			sf := NewSessionFlow(b)
+			sf := newTestSessionFlow(
+				mAPI,
+				nil,
+				SessionFlowDeps{
+					Input: newTestInteractionStores(),
+					Audio: audio,
+				},
+			)
 			q := model.Question{
 				ID:        9,
 				Type:      model.QuestionListening,
@@ -598,12 +609,14 @@ func TestRenderByType_Listening(t *testing.T) {
 		"no audio available degrades softly",
 		func(t *testing.T) {
 			mAPI := &mockBotAPI{}
-			b := &Bot{
-				telegram: newTelegramClient(mAPI),
-				input:    newTestInteractionStores(),
-				services: &service.Services{Audio: audio},
-			}
-			sf := NewSessionFlow(b)
+			sf := newTestSessionFlow(
+				mAPI,
+				nil,
+				SessionFlowDeps{
+					Audio: audio,
+					Input: newTestInteractionStores(),
+				},
+			)
 			q := model.Question{
 				ID:      1,
 				Type:    model.QuestionListening,
@@ -644,21 +657,16 @@ func TestShowQuestion_Finish(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores,
-		drafts:   stateStores,
-		messages: stateStores,
-		recovery: stateStores,
-		timing:   stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,

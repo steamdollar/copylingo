@@ -14,6 +14,22 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
+// materialPreferences reads and changes one user's review mode for a linked
+// material from the Quiz and Study screens.
+type materialPreferences interface {
+	Get(
+		ctx context.Context,
+		userID int64,
+		materialID int,
+	) (*model.MaterialPreference, error)
+	Set(
+		ctx context.Context,
+		userID int64,
+		materialID int,
+		mode model.MaterialReviewMode,
+	) error
+}
+
 // Quiz callbacks carry a question ID, never a trusted material ID. Resolve it
 // from the owner's session before showing or changing the linked preference.
 func (sf *SessionFlow) handleQuizMaterialPreference(
@@ -24,8 +40,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil || len(cb.Data) > 64 ||
 		len(parts) < 4 || len(parts) > 5 || parts[0] != callback.QuestionRoot ||
 		(parts[2] != callback.QuestionActionPolicy &&
-			(parts[2] != callbackActionExclude || len(parts) != 4)) ||
-		sf.bot.services == nil || sf.bot.services.Session == nil || sf.bot.services.MaterialPreference == nil {
+			(parts[2] != callbackActionExclude || len(parts) != 4)) {
 		return
 	}
 	sessionID, sessionOK := materialPreferenceInt(
@@ -39,7 +54,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	if !sessionOK || !questionOK {
 		return
 	}
-	state, err := sf.bot.services.Session.QuizProgress(
+	state, err := sf.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -69,7 +84,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 		if mode != model.MaterialReviewMaintenance && mode != model.MaterialReviewExcluded {
 			return
 		}
-		if err := sf.bot.services.MaterialPreference.Set(
+		if err := sf.materialPreference.Set(
 			ctx,
 			cb.From.ID,
 			*item.Question.MaterialID,
@@ -105,7 +120,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 		)
 		return
 	}
-	preference, err := sf.bot.services.MaterialPreference.Get(
+	preference, err := sf.materialPreference.Get(
 		ctx,
 		cb.From.ID,
 		*item.Question.MaterialID,
@@ -227,11 +242,7 @@ func (sf *StudyFlow) handleMaterialPreference(
 			return
 		}
 	}
-	if sf.bot.services == nil || sf.bot.services.MaterialPreference == nil ||
-		sf.bot.services.Session == nil {
-		return
-	}
-	state, err := sf.bot.services.Session.StudyProgress(
+	state, err := sf.session.StudyProgress(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -278,14 +289,15 @@ func (sf *StudyFlow) handleMaterialPreference(
 		return
 	}
 	if len(parts) == 5 {
-		if err := sf.bot.services.MaterialPreference.Set(
+		if err := sf.materialPreference.Set(
 			ctx,
 			cb.From.ID,
 			materialID,
 			mode,
 		); err != nil {
-			sf.bot.materialPreferenceError(
+			materialPreferenceError(
 				ctx,
+				sf.telegram,
 				cb,
 				"set",
 				err,
@@ -297,14 +309,15 @@ func (sf *StudyFlow) handleMaterialPreference(
 			botMessagesByLocale[botDefaultLocale].materialPreferenceAppliedNotice,
 		)
 	} else {
-		preference, err := sf.bot.services.MaterialPreference.Get(
+		preference, err := sf.materialPreference.Get(
 			ctx,
 			cb.From.ID,
 			materialID,
 		)
 		if err != nil {
-			sf.bot.materialPreferenceError(
+			materialPreferenceError(
 				ctx,
+				sf.telegram,
 				cb,
 				"get",
 				err,
@@ -473,8 +486,9 @@ func (b *Bot) handleMaterialPreferencesCallback(
 			materialID,
 			model.MaterialReviewNormal,
 		); err != nil {
-			b.materialPreferenceError(
+			materialPreferenceError(
 				ctx,
+				b.telegram,
 				cb,
 				"restore",
 				err,
@@ -492,8 +506,9 @@ func (b *Bot) handleMaterialPreferencesCallback(
 		page,
 	)
 	if err != nil {
-		b.materialPreferenceError(
+		materialPreferenceError(
 			ctx,
+			b.telegram,
 			cb,
 			"list",
 			err,
@@ -614,8 +629,11 @@ func materialPreferenceInt(
 	return value, err == nil && value >= 0 && (allowZero || value > 0) && strconv.Itoa(value) == raw
 }
 
-func (b *Bot) materialPreferenceError(
+// materialPreferenceError logs a failed preference read/write and tells the
+// user through a callback alert, shared by the Quiz, Study and Settings screens.
+func materialPreferenceError(
 	ctx context.Context,
+	telegram *telegramClient,
 	cb *tgbotapi.CallbackQuery,
 	action string,
 	err error,
@@ -630,7 +648,7 @@ func (b *Bot) materialPreferenceError(
 		"error",
 		err,
 	)
-	b.telegram.AnswerCallbackAlert(
+	telegram.AnswerCallbackAlert(
 		cb.ID,
 		botMessagesByLocale[botDefaultLocale].materialPreferenceFailed,
 	)

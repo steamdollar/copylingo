@@ -43,13 +43,8 @@ type BotAPI interface {
 // Bot wraps the Telegram bot API with CopyLingo business logic.
 type Bot struct {
 	telegram *telegramClient
-	cfg      *config.Config
 	services *service.Services
 	input    InputStateStore
-	drafts   WordOrderDraftStore
-	messages HandwritingMessageStore
-	recovery MiniAppRecoveryStore
-	timing   QuestionTimingStore
 	flow     *SessionFlow
 	study    *StudyFlow
 	stopCh   chan struct{}
@@ -74,22 +69,60 @@ func NewBot(
 		api.Self.UserName,
 	)
 
-	bot := &Bot{
-		telegram: newTelegramClient(api),
-		cfg:      cfg,
+	return newBot(
+		newTelegramClient(api),
+		cfg,
+		services,
+		stores,
+	), nil
+}
+
+// newBot assembles the feature flows over one Telegram client. It moves to
+// cmd/server once every flow has its own Deps (ADR-059 §8 step C).
+func newBot(
+	telegram *telegramClient,
+	cfg *config.Config,
+	services *service.Services,
+	stores StateStores,
+) *Bot {
+	study := NewStudyFlow(StudyFlowDeps{
+		Telegram:           telegram,
+		Session:            services.Session,
+		MaterialPreference: services.MaterialPreference,
+		Input:              stores.Input,
+	})
+	sessionDeps := SessionFlowDeps{
+		Telegram:           telegram,
+		Session:            services.Session,
+		User:               services.User,
+		MaterialPreference: services.MaterialPreference,
+		Input:              stores.Input,
+		Drafts:             stores.Drafts,
+		Messages:           stores.Messages,
+		Recovery:           stores.Recovery,
+		Timing:             stores.Timing,
+		Study:              study,
+		PublicBaseURL:      cfg.Server.PublicBaseURL,
+	}
+	// Audio is nil without a TTS key; assigning a nil *AudioService would make
+	// a non-nil interface and bypass SessionFlow's "audio unavailable" path.
+	if services.Audio != nil {
+		sessionDeps.Audio = services.Audio
+	}
+	return &Bot{
+		telegram: telegram,
 		services: services,
 		input:    stores.Input,
-		drafts:   stores.Drafts,
-		messages: stores.Messages,
-		recovery: stores.Recovery,
-		timing:   stores.Timing,
+		flow:     NewSessionFlow(sessionDeps),
+		study:    study,
 		stopCh:   make(chan struct{}),
 	}
+}
 
-	bot.flow = NewSessionFlow(bot)
-	bot.study = NewStudyFlow(bot)
-
-	return bot, nil
+// RefreshStaleMiniAppMessages re-sends handwriting questions whose Mini App
+// link went stale across a restart; SessionFlow owns the work.
+func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
+	b.flow.RefreshStaleMiniAppMessages(ctx)
 }
 
 // Start begins listening for Telegram updates.
@@ -140,9 +173,6 @@ func (b *Bot) PushStudySession(
 	chatID int64,
 	sessionID int,
 ) error {
-	if b.study == nil {
-		b.study = NewStudyFlow(b)
-	}
 	return b.study.PushSession(
 		ctx,
 		chatID,
@@ -381,14 +411,10 @@ func (b *Bot) handleMessage(
 			return
 		}
 		// Route plain text to session flow for FillBlank questions
-		if b.flow != nil {
-			if handled := b.flow.HandleTextInput(
-				ctx,
-				msg,
-			); !handled {
-				// Optional: Fallback to chat or ignore
-			}
-		}
+		b.flow.HandleTextInput(
+			ctx,
+			msg,
+		)
 		return
 	}
 
@@ -517,9 +543,6 @@ func (b *Bot) handleCallback(
 		data,
 		callbackPrefixStudy,
 	):
-		if b.study == nil {
-			b.study = NewStudyFlow(b)
-		}
 		b.study.HandleCallback(
 			ctx,
 			cb,

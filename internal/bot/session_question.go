@@ -24,7 +24,7 @@ func (sf *SessionFlow) showQuestion(
 	questionIdx int,
 ) {
 	// Loads the working set and moves its cursor to questionIdx in one call.
-	state, err := sf.bot.services.Session.ShowQuizQuestion(
+	state, err := sf.session.ShowQuizQuestion(
 		ctx,
 		sessionID,
 		questionIdx,
@@ -97,7 +97,7 @@ func (sf *SessionFlow) showQuestion(
 	}
 	// Keep the current question intact; changing its linked material setting
 	// only affects which questions future sessions may select.
-	if question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
+	if question.MaterialID != nil {
 		if keyboard == nil {
 			keyboard = &tgbotapi.InlineKeyboardMarkup{}
 		}
@@ -116,8 +116,8 @@ func (sf *SessionFlow) showQuestion(
 		)
 	}
 
-	if sf.bot.timing != nil {
-		_ = sf.bot.timing.RecordQuestionStart(
+	if sf.timing != nil {
+		_ = sf.timing.RecordQuestionStart(
 			ctx,
 			sessionID,
 			time.Now(),
@@ -192,7 +192,7 @@ func (sf *SessionFlow) renderByType(
 		nextData := callback.FormatHandwritingNext(
 			sessionID,
 			questionIdx,
-			sf.bot.cfg.Server.PublicBaseURL,
+			sf.publicBaseURL,
 		)
 		text += messages.handwritingPrompt
 		replyMarkup := webAppKeyboardMarkup{
@@ -207,7 +207,7 @@ func (sf *SessionFlow) renderByType(
 				)},
 			},
 		}
-		if question.MaterialID != nil && sf.bot.services != nil && sf.bot.services.MaterialPreference != nil {
+		if question.MaterialID != nil {
 			replyMarkup.InlineKeyboard = append(
 				replyMarkup.InlineKeyboard,
 				[]webAppButton{
@@ -254,8 +254,8 @@ func (sf *SessionFlow) renderByType(
 			)
 			return "", nil, true
 		}
-		if sf.bot.messages != nil {
-			err := sf.bot.messages.SaveHandwritingMessage(
+		if sf.messages != nil {
+			err := sf.messages.SaveHandwritingMessage(
 				ctx,
 				sessionID,
 				question.ID,
@@ -313,8 +313,8 @@ func (sf *SessionFlow) renderByType(
 		return text + "\n\n" + wordOrderText, keyboard, false
 
 	case model.QuestionFillBlank, model.QuestionSubjective:
-		if sf.bot.input != nil {
-			_ = sf.bot.input.SetActiveQuestion(
+		if sf.input != nil {
+			_ = sf.input.SetActiveQuestion(
 				ctx,
 				chatID,
 				model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIdx},
@@ -411,7 +411,7 @@ func (sf *SessionFlow) sendListeningAudio(
 	chatID int64,
 	q *model.Question,
 ) bool {
-	audio := sf.bot.services.Audio
+	audio := sf.audio
 	if audio == nil || q.AudioPath == nil || *q.AudioPath == "" {
 		return false
 	}
@@ -499,7 +499,7 @@ func (sf *SessionFlow) isQuestionAnswered(
 	sessionID,
 	questionIdx int,
 ) bool {
-	state, err := sf.bot.services.Session.QuizProgress(
+	state, err := sf.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -513,7 +513,7 @@ func (sf *SessionFlow) nextUnansweredQuestionIndex(
 	ctx context.Context,
 	sessionID int,
 ) (int, error) {
-	state, err := sf.bot.services.Session.QuizProgress(
+	state, err := sf.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -534,7 +534,7 @@ func (sf *SessionFlow) handwritingMiniAppURL(
 	cells int,
 ) (string, error) {
 	baseURL := strings.TrimRight(
-		sf.bot.cfg.Server.PublicBaseURL,
+		sf.publicBaseURL,
 		"/",
 	)
 	if baseURL == "" {

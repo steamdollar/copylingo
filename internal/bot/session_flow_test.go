@@ -154,12 +154,16 @@ func TestSessionFlowUsesQuizActiveSessionProgress(t *testing.T) {
 		stateStores,
 		state,
 	)
-	sf := NewSessionFlow(&Bot{services: &service.Services{
-		Session: newTestSessionService(
-			stateStores,
-			service.SessionDeps{},
-		),
-	}})
+	sf := newTestSessionFlow(
+		nil,
+		nil,
+		SessionFlowDeps{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
+		},
+	)
 
 	idx, err := sf.nextUnansweredQuestionIndex(
 		ctx,

@@ -248,7 +248,11 @@ func TestLanguageDisplayName(t *testing.T) {
 
 func TestHandleUpdate_Dispatch(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
+	b := newTestBot(
+		mAPI,
+		nil,
+		nil,
+	)
 
 	t.Run(
 		"Message update",
@@ -344,7 +348,11 @@ func TestHandleHelp(t *testing.T) {
 
 func TestHandleMessage_UnknownCommand(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
+	b := newTestBot(
+		mAPI,
+		nil,
+		nil,
+	)
 	ctx := context.Background()
 	msg := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: 123},
@@ -374,10 +382,11 @@ func TestHandleMessage_UnknownCommand(t *testing.T) {
 func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
 	api := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-	}
+	b := newTestBot(
+		api,
+		stateStores,
+		nil,
+	)
 
 	allowedUserID := llmAllowedTelegramUserIDs[0]
 	b.handleMessage(
@@ -438,7 +447,11 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 		otherUserID,
 		model.PendingLLMInput{Kind: model.PendingLLMPlain},
 	)
-	b := &Bot{telegram: newTelegramClient(api), input: stateStores}
+	b := newTestBot(
+		api,
+		stateStores,
+		nil,
+	)
 
 	b.handleCallback(
 		context.Background(),
@@ -488,10 +501,11 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {
 	api := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-	}
+	b := newTestBot(
+		api,
+		stateStores,
+		nil,
+	)
 
 	b.handleMessage(
 		context.Background(),
@@ -545,10 +559,10 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 		},
 	}
 	var gotQuestion string
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	b := newTestBot(
+		api,
+		stateStores,
+		&service.Services{
 			User: service.NewUserService(userRepo),
 			LLMQuestion: service.NewLLMQuestionService(
 				&mockLLM{
@@ -568,7 +582,7 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 				"test-model",
 			),
 		},
-	}
+	)
 
 	b.handleMessage(
 		context.Background(),
@@ -646,10 +660,10 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	}
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	b := newTestBot(
+		api,
+		stateStores,
+		&service.Services{
 			User: service.NewUserService(userRepo),
 			LLMQuestion: service.NewLLMQuestionService(
 				&mockLLM{
@@ -668,7 +682,7 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 				"test-model",
 			),
 		},
-	}
+	)
 
 	b.handleMessage(
 		context.Background(),
@@ -727,9 +741,10 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 		},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		services: &service.Services{
+	b := newTestBot(
+		api,
+		nil,
+		&service.Services{
 			User: service.NewUserService(userRepo),
 			Session: newTestSessionService(
 				nil,
@@ -740,7 +755,7 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 				},
 			),
 		},
-	}
+	)
 
 	b.handleMessage(
 		ctx,
@@ -1085,9 +1100,10 @@ func botWithStudyCommandDeps(
 			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	}
-	return &Bot{
-		telegram: newTelegramClient(api),
-		services: &service.Services{
+	return newTestBot(
+		api,
+		nil,
+		&service.Services{
 			User: service.NewUserService(userRepo),
 			Session: newTestSessionService(
 				nil,
@@ -1098,7 +1114,7 @@ func botWithStudyCommandDeps(
 				},
 			),
 		},
-	}
+	)
 }
 
 func commandMessage(

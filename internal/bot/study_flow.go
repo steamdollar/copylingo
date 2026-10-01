@@ -18,16 +18,69 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// StudyFlow handles material-based study sessions.
-type StudyFlow struct {
-	bot      *Bot
-	telegram *telegramClient
+// studySession is the Study part of service.SessionService that StudyFlow
+// drives: start, per-card progress, finish/complete, and owner-checked reads.
+type studySession interface {
+	StartStudy(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+	) (*model.StudyActiveSessionState, error)
+	MarkStudied(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+		materialOrder int,
+	) (*model.StudyActiveSessionState, error)
+	FinishStudy(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+		lastMaterialOrder int,
+	) error
+	CompleteStudy(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+	) error
+	StudyProgress(
+		ctx context.Context,
+		sessionID int,
+		userID int64,
+	) (*model.StudyActiveSessionState, error)
 }
 
-func NewStudyFlow(bot *Bot) *StudyFlow {
+// studyInputStore arms the per-card "ask the LLM" pending token.
+type studyInputStore interface {
+	SetLLMPending(
+		ctx context.Context,
+		userID int64,
+		input model.PendingLLMInput,
+	) error
+}
+
+// StudyFlowDeps wires StudyFlow; every dependency is required.
+type StudyFlowDeps struct {
+	Telegram           *telegramClient
+	Session            studySession
+	MaterialPreference materialPreferences
+	Input              studyInputStore
+}
+
+// StudyFlow handles material-based study sessions.
+type StudyFlow struct {
+	telegram           *telegramClient
+	session            studySession
+	materialPreference materialPreferences
+	input              studyInputStore
+}
+
+func NewStudyFlow(deps StudyFlowDeps) *StudyFlow {
 	return &StudyFlow{
-		bot:      bot,
-		telegram: bot.telegram,
+		telegram:           deps.Telegram,
+		session:            deps.Session,
+		materialPreference: deps.MaterialPreference,
+		input:              deps.Input,
 	}
 }
 
@@ -159,7 +212,7 @@ func (sf *StudyFlow) startSession(
 	sessionID int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	state, err := sf.bot.services.Session.StartStudy(
+	state, err := sf.session.StartStudy(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -211,7 +264,7 @@ func (sf *StudyFlow) nextMaterial(
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
 	// update study proceeding state
-	state, err := sf.bot.services.Session.MarkStudied(
+	state, err := sf.session.MarkStudied(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -254,7 +307,7 @@ func (sf *StudyFlow) prevMaterial(
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	state, err := sf.bot.services.Session.StudyProgress(
+	state, err := sf.session.StudyProgress(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -295,7 +348,7 @@ func (sf *StudyFlow) finishSession(
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if err := sf.bot.services.Session.FinishStudy(
+	if err := sf.session.FinishStudy(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -368,7 +421,7 @@ func (sf *StudyFlow) showMaterial(
 		materialOrder = 0
 	}
 	if materialOrder >= len(items) {
-		if err := sf.bot.services.Session.CompleteStudy(
+		if err := sf.session.CompleteStudy(
 			ctx,
 			state.Session.ID,
 			state.Session.UserID,
@@ -423,23 +476,21 @@ func (sf *StudyFlow) showMaterial(
 		item.SessionMaterial.MaterialOrder,
 		idx == 0,
 		idx == len(items)-1,
-		sf.bot.isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
+		isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
 	)
-	if sf.bot.services != nil && sf.bot.services.MaterialPreference != nil {
-		keyboard.InlineKeyboard = append(
-			keyboard.InlineKeyboard,
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData(
-					messages.studySettingsButton,
-					fmt.Sprintf(
-						formatStudyPolicy,
-						state.Session.ID,
-						item.SessionMaterial.MaterialID,
-					),
+	keyboard.InlineKeyboard = append(
+		keyboard.InlineKeyboard,
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.studySettingsButton,
+				fmt.Sprintf(
+					formatStudyPolicy,
+					state.Session.ID,
+					item.SessionMaterial.MaterialID,
 				),
 			),
-		)
-	}
+		),
+	)
 
 	if editMessageID != nil {
 		sf.telegram.EditMessage(
@@ -539,14 +590,14 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 	materialOrderStr string,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if cb.Message == nil || !sf.bot.isLLMAllowed(cb.From) {
+	if cb.Message == nil || !isLLMAllowed(cb.From) {
 		return
 	}
 	materialOrder, err := strconv.Atoi(materialOrderStr)
 	if err != nil {
 		return
 	}
-	if sf.bot.input == nil || sf.bot.services == nil || sf.bot.services.Session == nil {
+	if sf.input == nil {
 		sf.telegram.SendMessage(
 			cb.Message.Chat.ID,
 			messages.llmQuestionActivationFailed,
@@ -554,7 +605,7 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		return
 	}
 
-	state, err := sf.bot.services.Session.StudyProgress(
+	state, err := sf.session.StudyProgress(
 		ctx,
 		sessionID,
 		cb.From.ID,
@@ -591,7 +642,7 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		SessionID:     sessionID,
 		MaterialOrder: materialOrder,
 	}
-	if err := sf.bot.input.SetLLMPending(
+	if err := sf.input.SetLLMPending(
 		ctx,
 		cb.From.ID,
 		input,

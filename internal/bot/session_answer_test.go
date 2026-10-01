@@ -8,7 +8,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -19,17 +18,16 @@ func TestHandleTextInput(t *testing.T) {
 	mLLM := &mockLLM{}
 
 	mAPI := &mockBotAPI{}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{LLM: mLLM},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	chatID := int64(123)
 	msg := &tgbotapi.Message{
@@ -104,17 +102,16 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 	stateStores := newTestInteractionStores()
 	mLLM := &mockLLM{}
 	mAPI := &mockBotAPI{}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{LLM: mLLM},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	sessionID := 10
 	questionID := 1
@@ -170,17 +167,16 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 	stateStores := newTestInteractionStores()
 	mAPI := &mockBotAPI{}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	sessionID := 10
 	questionID := 1
@@ -236,18 +232,16 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	mAPI := &mockBotAPI{}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		cfg: &config.Config{},
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	sessionID := 11
 	firstAnswered := true

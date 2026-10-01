@@ -10,7 +10,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -111,7 +110,7 @@ func preferenceCallback(
 
 func newPreferenceStudyBot(
 	t *testing.T,
-) (*Bot, *botMaterialPreferenceRepo, *testInteractionStores, *botStudyActiveRepo) {
+) (*StudyFlow, *botMaterialPreferenceRepo, *testInteractionStores, *botStudyActiveRepo) {
 	t.Helper()
 	activeRepo := &botStudyActiveRepo{
 		session: &model.Session{ID: 77, UserID: 42, Mode: model.SessionModeStudy, Status: model.SessionInProgress},
@@ -155,14 +154,18 @@ func newPreferenceStudyBot(
 		t.Fatal(err)
 	}
 	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
-	b := &Bot{telegram: newTelegramClient(&mockBotAPI{}), services: &service.Services{
-		Session:            session,
-		MaterialPreference: service.NewMaterialPreferenceService(repo),
-	}}
-	return b, repo, stateStores, activeRepo
+	flow := newTestStudyFlow(
+		&mockBotAPI{},
+		nil,
+		StudyFlowDeps{
+			Session:            session,
+			MaterialPreference: service.NewMaterialPreferenceService(repo),
+		},
+	)
+	return flow, repo, stateStores, activeRepo
 }
 
-func newPreferenceQuizBot(t *testing.T) (*Bot, *botMaterialPreferenceRepo, *testInteractionStores) {
+func newPreferenceQuizBot(t *testing.T) (*SessionFlow, *botMaterialPreferenceRepo, *testInteractionStores) {
 	t.Helper()
 	linkedMaterialID := 10
 	stateStores := newTestInteractionStores()
@@ -185,28 +188,23 @@ func newPreferenceQuizBot(t *testing.T) (*Bot, *botMaterialPreferenceRepo, *test
 		},
 	)
 	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
-	bot := &Bot{
-		telegram: newTelegramClient(&mockBotAPI{}),
-		input:    stateStores,
-		drafts:   stateStores,
-		messages: stateStores,
-		recovery: stateStores,
-		timing:   stateStores,
-		cfg:      &config.Config{Server: config.ServerConfig{PublicBaseURL: "https://example.com"}},
-		services: &service.Services{
+	flow := newTestSessionFlow(
+		&mockBotAPI{},
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{},
 			),
 			MaterialPreference: service.NewMaterialPreferenceService(repo),
+			PublicBaseURL:      "https://example.com",
 		},
-	}
-	return bot, repo, stateStores
+	)
+	return flow, repo, stateStores
 }
 
 func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
-	bot, repo, stateStores := newPreferenceQuizBot(t)
-	flow := NewSessionFlow(bot)
+	flow, repo, stateStores := newPreferenceQuizBot(t)
 	before, err := stateStores.quiz.Load(
 		context.Background(),
 		77,
@@ -253,7 +251,7 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 			repo,
 		)
 	}
-	messages := bot.telegram.api.(*mockBotAPI).sentMessages
+	messages := flow.telegram.api.(*mockBotAPI).sentMessages
 	menu, ok := messages[len(messages)-1].(tgbotapi.MessageConfig)
 	if !ok || !strings.Contains(
 		menu.Text,
@@ -312,7 +310,7 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 		)
 		edit := lastEditMessage(
 			t,
-			bot.telegram.api.(*mockBotAPI),
+			flow.telegram.api.(*mockBotAPI),
 		)
 		if !strings.Contains(
 			edit.Text,
@@ -353,8 +351,7 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 }
 
 func TestQuizMaterialPreferenceButtonFollowsLinkedQuestions(t *testing.T) {
-	bot, _, _ := newPreferenceQuizBot(t)
-	flow := NewSessionFlow(bot)
+	flow, _, _ := newPreferenceQuizBot(t)
 	flow.showQuestion(
 		context.Background(),
 		42,
@@ -362,7 +359,7 @@ func TestQuizMaterialPreferenceButtonFollowsLinkedQuestions(t *testing.T) {
 		77,
 		0,
 	)
-	api := bot.telegram.api.(*mockBotAPI)
+	api := flow.telegram.api.(*mockBotAPI)
 	message, ok := api.sentMessages[len(api.sentMessages)-1].(tgbotapi.MessageConfig)
 	if !ok {
 		t.Fatalf(
@@ -429,8 +426,7 @@ func TestQuizMaterialPreferenceButtonFollowsLinkedQuestions(t *testing.T) {
 }
 
 func TestStudyMaterialPreferenceDoesNotChangeSessionProgress(t *testing.T) {
-	b, repo, stateStores, activeRepo := newPreferenceStudyBot(t)
-	flow := NewStudyFlow(b)
+	flow, repo, stateStores, activeRepo := newPreferenceStudyBot(t)
 	before, err := stateStores.study.Load(
 		context.Background(),
 		77,
@@ -481,7 +477,7 @@ func TestStudyMaterialPreferenceDoesNotChangeSessionProgress(t *testing.T) {
 	}
 	edit := lastEditMessage(
 		t,
-		b.telegram.api.(*mockBotAPI),
+		flow.telegram.api.(*mockBotAPI),
 	)
 	if !strings.Contains(
 		edit.Text,
@@ -512,8 +508,8 @@ func TestStudyMaterialPreferenceRequiresOwnerAndMembership(t *testing.T) {
 		t.Run(
 			tc.name,
 			func(t *testing.T) {
-				b, repo, _, _ := newPreferenceStudyBot(t)
-				NewStudyFlow(b).HandleCallback(
+				flow, repo, _, _ := newPreferenceStudyBot(t)
+				flow.HandleCallback(
 					context.Background(),
 					preferenceCallback(
 						tc.data,
@@ -532,8 +528,8 @@ func TestStudyMaterialPreferenceRequiresOwnerAndMembership(t *testing.T) {
 }
 
 func TestStudyMaterialPreferenceEscapesHTMLAndExplainsMaintenance(t *testing.T) {
-	b, _, _, _ := newPreferenceStudyBot(t)
-	NewStudyFlow(b).HandleCallback(
+	flow, _, _, _ := newPreferenceStudyBot(t)
+	flow.HandleCallback(
 		context.Background(),
 		preferenceCallback(
 			"study:77:policy:10:maintenance",
@@ -542,7 +538,7 @@ func TestStudyMaterialPreferenceEscapesHTMLAndExplainsMaintenance(t *testing.T) 
 	)
 	edit := lastEditMessage(
 		t,
-		b.telegram.api.(*mockBotAPI),
+		flow.telegram.api.(*mockBotAPI),
 	)
 	for _, want := range []string{"&lt;水 &amp; 물&gt;", "30일", "60→120→최대 180일", "오답이면 일반 학습", "새로 만드는 세션부터 적용"} {
 		if !strings.Contains(
@@ -706,7 +702,7 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 }
 
 func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
-	b, repo, _, _ := newPreferenceStudyBot(t)
+	flow, repo, _, _ := newPreferenceStudyBot(t)
 	for _, data := range []string{
 		"study:77:policy", "study:77:policy:0", "study:77:policy:-1", "study:77:policy:10:bogus",
 		"study:77:policy:10:normal:extra", "study:77:policy:10:", "study:0:policy:10:normal",
@@ -716,13 +712,17 @@ func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
 			65,
 		),
 	} {
-		NewStudyFlow(b).HandleCallback(
+		flow.HandleCallback(
 			context.Background(),
 			preferenceCallback(
 				data,
 				42,
 			),
 		)
+	}
+	b := &Bot{
+		telegram: flow.telegram,
+		services: &service.Services{MaterialPreference: service.NewMaterialPreferenceService(repo)},
 	}
 	for _, data := range []string{
 		"settings:materials", "settings:restore",

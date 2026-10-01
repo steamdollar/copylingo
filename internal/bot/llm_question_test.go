@@ -74,11 +74,7 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	b := &Bot{
-		input:    stateStores,
-		drafts:   stateStores,
-		messages: stateStores,
-		recovery: stateStores,
-		timing:   stateStores,
+		input: stateStores,
 		services: &service.Services{
 			Session: newTestSessionService(
 				stateStores,
@@ -206,7 +202,7 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 			state,
 		)
 		return &Bot{
-			input: stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
+			input: stateStores,
 			services: &service.Services{
 				Session: newTestSessionService(
 					stateStores,
@@ -276,21 +272,16 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 		stateStores *testInteractionStores,
 		mAPI *mockBotAPI,
 	) *SessionFlow {
-		b := &Bot{
-			telegram: newTelegramClient(mAPI),
-			input:    stateStores,
-			drafts:   stateStores,
-			messages: stateStores,
-			recovery: stateStores,
-			timing:   stateStores,
-			services: &service.Services{
+		return newTestSessionFlow(
+			mAPI,
+			stateStores,
+			SessionFlowDeps{
 				Session: newTestSessionService(
 					stateStores,
 					service.SessionDeps{LLM: &mockLLM{}},
 				),
 			},
-		}
-		return NewSessionFlow(b)
+		)
 	}
 
 	mcQuestion := model.Question{
@@ -410,16 +401,11 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 		stateStores *testInteractionStores,
 		mAPI *mockBotAPI,
 	) *SessionFlow {
-		b := &Bot{
-			telegram: newTelegramClient(mAPI),
-			input:    stateStores,
-			drafts:   stateStores,
-			messages: stateStores,
-			recovery: stateStores,
-			timing:   stateStores,
-			services: &service.Services{},
-		}
-		return NewSessionFlow(b)
+		return newTestSessionFlow(
+			mAPI,
+			stateStores,
+			SessionFlowDeps{},
+		)
 	}
 	cbFor := func(from *tgbotapi.User) *tgbotapi.CallbackQuery {
 		return &tgbotapi.CallbackQuery{From: from, Message: &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 123}}}
@@ -533,21 +519,16 @@ func TestHandleStudyAskLLMQuestion(t *testing.T) {
 			},
 		)
 		api := &mockBotAPI{}
-		b := &Bot{
-			telegram: newTelegramClient(api),
-			input:    stateStores,
-			drafts:   stateStores,
-			messages: stateStores,
-			recovery: stateStores,
-			timing:   stateStores,
-			services: &service.Services{
+		return newTestStudyFlow(
+			api,
+			stateStores,
+			StudyFlowDeps{
 				Session: newTestSessionService(
 					stateStores,
 					service.SessionDeps{},
 				),
 			},
-		}
-		return NewStudyFlow(b), stateStores, api
+		), stateStores, api
 	}
 	callback := func(
 		from *tgbotapi.User,

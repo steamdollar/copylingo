@@ -8,7 +8,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -63,18 +62,17 @@ func (a *activeRepoStub) FlushQuizActiveSession(
 	return nil
 }
 
-// botWithActive wires a Bot whose QuizActiveSession + Grader use the given repo/redis.
+// botWithActive wires a SessionFlow whose QuizActiveSession + Grader use the given repo/redis.
 func botWithActive(
 	stateStores *testInteractionStores,
 	repo *activeRepoStub,
 	userRepo *streakRepoStub,
-) (*Bot, *mockBotAPI) {
+) (*SessionFlow, *mockBotAPI) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		cfg: &config.Config{},
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{
@@ -84,8 +82,8 @@ func botWithActive(
 				},
 			),
 		},
-	}
-	return b, mAPI
+	)
+	return sf, mAPI
 }
 
 func cbWithMessage(
@@ -126,12 +124,11 @@ func TestFinishSession_Summary(t *testing.T) {
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
 	userRepo := &streakRepoStub{}
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		repo,
 		userRepo,
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID := 10
 	userID := int64(999)
@@ -218,12 +215,11 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
 	userRepo := &streakRepoStub{}
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		repo,
 		userRepo,
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID := 11
 	userID := int64(7)
@@ -265,12 +261,11 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 
 func TestHandleSessionCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	b, _ := botWithActive(
+	sf, _ := botWithActive(
 		newTestInteractionStores(),
 		&activeRepoStub{},
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	// fewer than 3 parts -> early return, must not panic
 	sf.HandleSessionCallback(
@@ -300,12 +295,11 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
 	repo := &activeRepoStub{}
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		repo,
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID := 20
 	questionID := 5
@@ -357,12 +351,11 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID := 21
 	state := &model.QuizActiveSessionState{
@@ -407,12 +400,11 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 
 func TestHandleAnswerCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	b, _ := botWithActive(
+	sf, _ := botWithActive(
 		newTestInteractionStores(),
 		&activeRepoStub{},
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	// fewer than 4 parts -> early return, no panic
 	sf.HandleAnswerCallback(
@@ -441,12 +433,11 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID := 30
 	opts, _ := json.Marshal([]string{"A", "B", "C", "D"})
@@ -518,12 +509,11 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID := 31
 	state := &model.QuizActiveSessionState{
@@ -564,12 +554,11 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID := 32
 	state := &model.QuizActiveSessionState{
@@ -616,12 +605,11 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 
 func TestProcessAnswerText_Wrong(t *testing.T) {
 	stateStores := newTestInteractionStores()
-	b, mAPI := botWithActive(
+	sf, mAPI := botWithActive(
 		stateStores,
 		&activeRepoStub{},
 		&streakRepoStub{},
 	)
-	sf := NewSessionFlow(b)
 
 	sessionID, questionID := 40, 1
 	state := &model.QuizActiveSessionState{
@@ -692,22 +680,16 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 			return external.GradeResult{}, service.ErrAIUnavailable
 		},
 	}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores,
-		drafts:   stateStores,
-		messages: stateStores,
-		recovery: stateStores,
-		timing:   stateStores,
-		cfg:      &config.Config{},
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{LLM: llm, QuizActiveSessionRepo: &activeRepoStub{}},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	sessionID, questionID := 41, 1
 	state := &model.QuizActiveSessionState{
@@ -788,7 +770,7 @@ func botWithAnalyzer() (*Bot, *mockBotAPI) {
 		&statRepoStub{},
 	)
 	b := &Bot{
-		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
+		telegram: newTelegramClient(mAPI),
 		services: &service.Services{Analyzer: analyzer},
 	}
 	return b, mAPI
@@ -892,7 +874,7 @@ func TestHandleMenu(t *testing.T) {
 		},
 	})
 	b := &Bot{
-		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
+		telegram: newTelegramClient(mAPI),
 		services: &service.Services{
 			User: userSvc,
 			Session: newTestSessionService(
@@ -963,8 +945,11 @@ func TestEditMessageReplyMarkup(t *testing.T) {
 
 func TestBotPushSession(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
-	b.flow = NewSessionFlow(b)
+	b := newTestBot(
+		mAPI,
+		nil,
+		nil,
+	)
 
 	if err := b.PushSession(
 		context.Background(),

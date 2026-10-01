@@ -8,6 +8,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -155,7 +156,75 @@ func answerByText(
 }
 
 func (s *testInteractionStores) stateStores() StateStores {
+	if s == nil {
+		return StateStores{}
+	}
 	return StateStores{Input: s, Drafts: s, Messages: s, Recovery: s, Timing: s}
+}
+
+// newTestSessionFlow wires SessionFlow over the shared test fakes: Telegram
+// from api, and each store field deps leaves nil from stores. Service deps
+// left unset stay nil so an unexpected call fails loudly.
+func newTestSessionFlow(
+	api *mockBotAPI,
+	stores *testInteractionStores,
+	deps SessionFlowDeps,
+) *SessionFlow {
+	if api != nil {
+		deps.Telegram = newTelegramClient(api)
+	}
+	if stores != nil {
+		if deps.Input == nil {
+			deps.Input = stores
+		}
+		if deps.Drafts == nil {
+			deps.Drafts = stores
+		}
+		if deps.Messages == nil {
+			deps.Messages = stores
+		}
+		if deps.Recovery == nil {
+			deps.Recovery = stores
+		}
+		if deps.Timing == nil {
+			deps.Timing = stores
+		}
+	}
+	return NewSessionFlow(deps)
+}
+
+// newTestStudyFlow wires StudyFlow the same way as newTestSessionFlow.
+func newTestStudyFlow(
+	api *mockBotAPI,
+	stores *testInteractionStores,
+	deps StudyFlowDeps,
+) *StudyFlow {
+	if api != nil {
+		deps.Telegram = newTelegramClient(api)
+	}
+	if stores != nil && deps.Input == nil {
+		deps.Input = stores
+	}
+	return NewStudyFlow(deps)
+}
+
+// newTestBot assembles the router with every flow wired the way production
+// does, for tests that dispatch updates through handleMessage/handleCallback.
+// A nil services means no service dependency is wired.
+func newTestBot(
+	api *mockBotAPI,
+	stores *testInteractionStores,
+	services *service.Services,
+) *Bot {
+	if services == nil {
+		services = &service.Services{}
+	}
+	return newBot(
+		newTelegramClient(api),
+		&config.Config{},
+		services,
+		stores.stateStores(),
+	)
 }
 
 func (s *testQuizSessionStore) Load(

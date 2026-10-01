@@ -17,7 +17,7 @@ func (b *Bot) handleLLM(
 	msg *tgbotapi.Message,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if !b.isLLMAllowed(msg.From) {
+	if !isLLMAllowed(msg.From) {
 		slog.WarnContext(
 			ctx,
 			"Unauthorized LLM command ignored",
@@ -136,7 +136,7 @@ func (b *Bot) handleLLMQuestion(
 		return false
 	}
 
-	if !b.isLLMAllowed(msg.From) {
+	if !isLLMAllowed(msg.From) {
 		slog.WarnContext(
 			ctx,
 			"Unauthorized LLM question ignored",
@@ -318,7 +318,8 @@ func (b *Bot) loadStudyMaterialContext(
 	)
 }
 
-func (b *Bot) isLLMAllowed(from *tgbotapi.User) bool {
+// isLLMAllowed gates the owner-only LLM features to the allowlisted Telegram users.
+func isLLMAllowed(from *tgbotapi.User) bool {
 	if from == nil {
 		return false
 	}

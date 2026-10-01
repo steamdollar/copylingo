@@ -32,7 +32,7 @@ func (sf *SessionFlow) processAnswer(
 		),
 	)
 	editMessageID := cb.Message.MessageID
-	result, err := sf.bot.services.Session.SubmitQuizOption(
+	result, err := sf.session.SubmitQuizOption(
 		ctx,
 		sessionID,
 		questionID,
@@ -64,17 +64,17 @@ func (sf *SessionFlow) HandleTextInput(
 	ctx context.Context,
 	msg *tgbotapi.Message,
 ) bool {
-	if sf.bot.input == nil {
+	if sf.input == nil {
 		return false
 	}
-	activeQuestion, err := sf.bot.input.GetActiveQuestion(
+	activeQuestion, err := sf.input.GetActiveQuestion(
 		ctx,
 		msg.Chat.ID,
 	)
 	if err != nil || activeQuestion == nil {
 		return false
 	}
-	_ = sf.bot.input.DeleteActiveQuestion(
+	_ = sf.input.DeleteActiveQuestion(
 		ctx,
 		msg.Chat.ID,
 	)
@@ -87,7 +87,7 @@ func (sf *SessionFlow) HandleTextInput(
 			sessionID,
 		),
 	)
-	result, err := sf.bot.services.Session.SubmitQuizText(
+	result, err := sf.session.SubmitQuizText(
 		ctx,
 		service.QuizTextAnswer{
 			SessionID:     sessionID,
@@ -247,7 +247,7 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 		),
 	)
 	// owner에게만 "이 문제 질문" 버튼을 노출한다 (LLM 비용/abuse gate, ADR-028·029).
-	if sf.bot.isLLMAllowed(from) {
+	if isLLMAllowed(from) {
 		row = append(
 			row,
 			tgbotapi.NewInlineKeyboardButtonData(
@@ -261,7 +261,7 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 		)
 	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(row)
-	if question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
+	if question.MaterialID != nil {
 		keyboard.InlineKeyboard = append(
 			keyboard.InlineKeyboard,
 			tgbotapi.NewInlineKeyboardRow(

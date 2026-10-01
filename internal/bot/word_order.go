@@ -58,10 +58,10 @@ func (sf *SessionFlow) getWordOrderDraft(
 	questionID,
 	optionCount int,
 ) ([]int, error) {
-	if sf.bot == nil || sf.bot.drafts == nil {
+	if sf.drafts == nil {
 		return nil, nil
 	}
-	selection, err := sf.bot.drafts.GetWordOrderDraft(
+	selection, err := sf.drafts.GetWordOrderDraft(
 		ctx,
 		sessionID,
 		questionID,
@@ -74,7 +74,7 @@ func (sf *SessionFlow) getWordOrderDraft(
 		optionCount,
 	) {
 		// A corrupt/stale draft must not make a question impossible to answer.
-		_ = sf.bot.drafts.DeleteWordOrderDraft(
+		_ = sf.drafts.DeleteWordOrderDraft(
 			ctx,
 			sessionID,
 			questionID,
@@ -90,10 +90,10 @@ func (sf *SessionFlow) setWordOrderDraft(
 	questionID int,
 	selection []int,
 ) error {
-	if sf.bot == nil || sf.bot.drafts == nil {
+	if sf.drafts == nil {
 		return fmt.Errorf("word order draft redis is unavailable")
 	}
-	return sf.bot.drafts.SetWordOrderDraft(
+	return sf.drafts.SetWordOrderDraft(
 		ctx,
 		sessionID,
 		questionID,
@@ -106,8 +106,8 @@ func (sf *SessionFlow) deleteWordOrderDraft(
 	sessionID,
 	questionID int,
 ) {
-	if sf.bot != nil && sf.bot.drafts != nil {
-		_ = sf.bot.drafts.DeleteWordOrderDraft(
+	if sf.drafts != nil {
+		_ = sf.drafts.DeleteWordOrderDraft(
 			ctx,
 			sessionID,
 			questionID,
@@ -267,11 +267,10 @@ func (sf *SessionFlow) wordOrderCurrentItem(
 	sessionID,
 	questionID int,
 ) (*model.QuizActiveSessionState, *model.QuizActiveSessionQuestion, bool) {
-	if cb == nil || cb.From == nil || sf.bot == nil || sf.bot.services == nil ||
-		sf.bot.services.Session == nil {
+	if cb == nil || cb.From == nil {
 		return nil, nil, false
 	}
-	state, err := sf.bot.services.Session.QuizProgress(
+	state, err := sf.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -399,7 +398,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 			return
 		}
 		editMessageID := cb.Message.MessageID
-		result, err := sf.bot.services.Session.SubmitQuizWordOrder(
+		result, err := sf.session.SubmitQuizWordOrder(
 			ctx,
 			sessionID,
 			questionID,
@@ -477,7 +476,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 		options,
 		selection,
 	)
-	if item.Question.MaterialID != nil && sf.bot.services.MaterialPreference != nil {
+	if item.Question.MaterialID != nil {
 		kb.InlineKeyboard = append(
 			kb.InlineKeyboard,
 			tgbotapi.NewInlineKeyboardRow(

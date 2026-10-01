@@ -7,7 +7,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -25,7 +24,11 @@ func (s *sessionListStore) ListInProgress(ctx context.Context) ([]model.Session,
 func TestRefreshStaleMiniAppMessages_EmptyBaseURL(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI), cfg: &config.Config{}} // PublicBaseURL empty
+	b := newTestBot(
+		mAPI,
+		nil,
+		nil,
+	) // PublicBaseURL empty
 
 	b.RefreshStaleMiniAppMessages(ctx)
 
@@ -42,23 +45,17 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	store := &sessionListStore{inProgress: nil}
-	cfg := &config.Config{}
-	cfg.Server.PublicBaseURL = "https://x.trycloudflare.com"
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores,
-		drafts:   stateStores,
-		messages: stateStores,
-		recovery: stateStores,
-		timing:   stateStores,
-		cfg:      cfg,
-		services: &service.Services{
+	b := newTestBot(
+		mAPI,
+		stateStores,
+		&service.Services{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{SessionRepo: store},
 			),
 		},
-	}
+	)
+	b.flow.publicBaseURL = "https://x.trycloudflare.com"
 
 	b.RefreshStaleMiniAppMessages(ctx)
 
@@ -100,9 +97,10 @@ func TestHandleTest_NoQuestions(t *testing.T) {
 			return &model.User{ID: id, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
-	b := &Bot{
-		telegram: newTelegramClient(mAPI), cfg: &config.Config{},
-		services: &service.Services{
+	b := newTestBot(
+		mAPI,
+		nil,
+		&service.Services{
 			User: userSvc,
 			Session: newTestSessionService(
 				nil,
@@ -113,7 +111,7 @@ func TestHandleTest_NoQuestions(t *testing.T) {
 				},
 			),
 		},
-	}
+	)
 
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
 	b.handleTest(

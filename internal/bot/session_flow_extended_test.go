@@ -84,16 +84,16 @@ func TestStartStudy_NoSessions(t *testing.T) {
 			return nil, nil
 		},
 	}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		nil,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				nil,
 				service.SessionDeps{SessionRepo: mSessionStore},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	cb := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
@@ -144,16 +144,16 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 			return nil, nil
 		},
 	}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		nil,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				nil,
 				service.SessionDeps{SessionRepo: mSessionStore},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	cb := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
@@ -214,17 +214,16 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 			return nil, nil
 		},
 	}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{SessionRepo: mSessionStore},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	cb := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
@@ -306,9 +305,10 @@ func TestStartReview_NoneDue(t *testing.T) {
 	}
 	mSQStore := &mockSessionQuestionStore{}
 
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		nil,
+		SessionFlowDeps{
 			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
 				context.Context,
 				int64,
@@ -325,8 +325,7 @@ func TestStartReview_NoneDue(t *testing.T) {
 				},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	cb := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
@@ -399,9 +398,10 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
 	mSRSRepo := &mockSRSRepoWithCount{count: 0}
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		nil,
+		SessionFlowDeps{
 			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
 				context.Context,
 				int64,
@@ -414,8 +414,7 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 				service.SessionDeps{QuestionRepo: mSRSRepo},
 			),
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	cb := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
@@ -466,14 +465,13 @@ func TestHandleSessionCallback(t *testing.T) {
 		stateStores,
 		service.SessionDeps{SessionRepo: mSessionStore},
 	)
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: session,
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	t.Run(
 		"start action",
@@ -517,14 +515,13 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 		stateStores,
 		service.SessionDeps{SessionRepo: mSessionStore},
 	)
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
 			Session: session,
 		},
-	}
-	sf := NewSessionFlow(b)
+	)
 
 	sessionID := 31
 	answered := true
@@ -671,13 +668,11 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 			QuizActiveSessionRepo: repo,
 		},
 	)
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    stateStores, drafts: stateStores, messages: stateStores, recovery: stateStores, timing: stateStores,
-		services: &service.Services{
-			Session: session,
-		},
-	}
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{Session: session},
+	)
 	storeActiveState(
 		t,
 		stateStores,
@@ -685,7 +680,7 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 		dbState,
 	)
 
-	NewSessionFlow(b).HandleSessionCallback(
+	sf.HandleSessionCallback(
 		ctx,
 		cbWithMessage(
 			"session:32:start",
@@ -716,8 +711,11 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 
 func TestPushSession(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
-	sf := NewSessionFlow(b)
+	sf := newTestSessionFlow(
+		mAPI,
+		nil,
+		SessionFlowDeps{},
+	)
 
 	err := sf.PushSession(
 		context.Background(),

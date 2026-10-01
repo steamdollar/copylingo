@@ -178,13 +178,13 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 			DB:                     botTestDB,
 		},
 	)
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		services: &service.Services{
+	flow := newTestStudyFlow(
+		api,
+		nil,
+		StudyFlowDeps{
 			Session: session,
 		},
-	}
-	flow := NewStudyFlow(b)
+	)
 
 	flow.HandleCallback(
 		ctx,
@@ -370,13 +370,13 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 			StudyActiveSessionRepo: activeRepo,
 		},
 	)
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		services: &service.Services{
+	flow := newTestStudyFlow(
+		api,
+		nil,
+		StudyFlowDeps{
 			Session: session,
 		},
-	}
-	flow := NewStudyFlow(b)
+	)
 
 	flow.HandleCallback(
 		ctx,
@@ -554,9 +554,10 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		services: &service.Services{
+	flow := newTestStudyFlow(
+		api,
+		nil,
+		StudyFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{
@@ -567,8 +568,7 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 				},
 			),
 		},
-	}
-	flow := NewStudyFlow(b)
+	)
 
 	flow.HandleCallback(
 		ctx,
@@ -652,9 +652,10 @@ func TestStudyFlowReadingRendering(t *testing.T) {
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
-	b := &Bot{
-		telegram: newTelegramClient(api),
-		services: &service.Services{
+	flow := newTestStudyFlow(
+		api,
+		nil,
+		StudyFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{
@@ -665,8 +666,7 @@ func TestStudyFlowReadingRendering(t *testing.T) {
 				},
 			),
 		},
-	}
-	flow := NewStudyFlow(b)
+	)
 
 	flow.HandleCallback(
 		ctx,
@@ -906,7 +906,9 @@ func rowCallbackData(
 	edit tgbotapi.EditMessageTextConfig,
 ) []string {
 	t.Helper()
-	if edit.ReplyMarkup == nil || len(edit.ReplyMarkup.InlineKeyboard) != 1 {
+	// Every Study card carries the navigation row plus the study settings row;
+	// only the navigation row (first) is inspected.
+	if edit.ReplyMarkup == nil || len(edit.ReplyMarkup.InlineKeyboard) != 2 {
 		t.Fatalf(
 			"unexpected reply markup: %+v",
 			edit.ReplyMarkup,
