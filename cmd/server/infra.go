@@ -11,18 +11,19 @@ import (
 	"github.com/lsj/copylingo/internal/config"
 )
 
-// initInfra opens the shared connections and returns their cleanup function.
-func initInfra(cfg *config.Config) (*sqlx.DB, *redis.Client, func(), error) {
+// initInfra opens the shared DB and Redis connections. If Redis fails, the
+// DB connection is closed before returning.
+func initInfra(cfg *config.Config) (*sqlx.DB, *redis.Client, error) {
 	db, err := initDB(cfg)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	rdb, err := initRedis(cfg)
 	if err != nil {
 		db.Close()
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	return db, rdb, func() { db.Close(); rdb.Close() }, nil
+	return db, rdb, nil
 }
 
 func initDB(cfg *config.Config) (*sqlx.DB, error) {

@@ -1,14 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
+	"os/signal"
+	"syscall"
 
 	_ "github.com/lib/pq"
 
 	"github.com/lsj/copylingo/internal/config"
-	"github.com/lsj/copylingo/internal/miniapp"
 	"github.com/lsj/copylingo/internal/observability"
 )
 
@@ -47,63 +49,22 @@ func run() error {
 	defer closeLogger()
 	slog.SetDefault(logger)
 
-	// db, redis set up
-	db, rdb, cleanup, err := initInfra(cfg)
-	if err != nil {
-		return fmt.Errorf(
-			"failed to init infrastructure: %w",
-			err,
-		)
-	}
-	defer cleanup()
-
-	// initialize application components
-	svc, components, err := initApp(
-		cfg,
-		db,
-		rdb,
-	)
+	app, err := initApp(cfg)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to init app: %w",
 			err,
 		)
 	}
+	defer app.Close()
 
-	stopWorkers := startWorkers(
-		svc,
-		components,
-		rdb,
+	// Signals are caught only once the app is assembled; until then the
+	// default handler still terminates a slow startup.
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		syscall.SIGINT,
+		syscall.SIGTERM,
 	)
-	defer stopWorkers()
-
-	// The Mini App only reports a graded handwriting answer; SessionFlow
-	// refreshes the Telegram message.
-	miniappHandler := miniapp.NewHandler(miniapp.HandlerDeps{
-		Session: svc.session,
-		Tip:     svc.tip,
-		Verifier: miniapp.NewInitDataVerifier(
-			cfg.Telegram.Token,
-			miniapp.InitDataMaxAge,
-		),
-		HandwritingScreen: components.sessionFlow,
-	})
-	router := setupRouter(
-		cfg,
-		db,
-		rdb,
-		miniappHandler,
-	)
-	srv := startHTTPServer(
-		cfg,
-		router,
-	)
-
-	// wait for shutdown
-	waitForShutdown(
-		srv,
-		components.router,
-	)
-
-	return nil
+	defer stop()
+	return app.Run(ctx)
 }
