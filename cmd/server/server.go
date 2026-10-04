@@ -153,13 +153,21 @@ func initScheduler(
 	components botComponents,
 	rdb redis.Cmdable,
 ) (*scheduler.Scheduler, func()) {
-	sched := scheduler.New(scheduler.Deps{
-		Services:    services,
+	schedDeps := scheduler.Deps{
+		User:        services.User,
+		Session:     services.Session,
+		Tip:         services.Tip,
 		QuizPusher:  components.sessionFlow,
 		StudyPusher: components.studyFlow,
 		Cron:        cron.New(),
 		Claims:      redisstore.NewPushClaims(rdb),
-	})
+	}
+	// Same typed-nil guard as SessionFlowDeps.Audio: without a TTS key the
+	// scheduler must see a nil interface and skip the audio top-up.
+	if services.Audio != nil {
+		schedDeps.Audio = services.Audio
+	}
+	sched := scheduler.New(schedDeps)
 	return sched, func() { sched.Stop() }
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/robfig/cron/v3"
 
+	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/pipeline"
 )
@@ -151,4 +152,97 @@ func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
 			want,
 		)
 	}
+}
+
+// recordingTopUp records each (language, level) bucket it was asked to fill.
+type recordingTopUp struct {
+	buckets []string
+}
+
+func (r *recordingTopUp) record(
+	language,
+	level string,
+) error {
+	r.buckets = append(
+		r.buckets,
+		language+"/"+level,
+	)
+	return nil
+}
+
+func (r *recordingTopUp) TopUpBucket(
+	_ context.Context,
+	language,
+	level string,
+) error {
+	return r.record(
+		language,
+		level,
+	)
+}
+
+func (r *recordingTopUp) TopUpAudio(
+	_ context.Context,
+	language,
+	level string,
+) error {
+	return r.record(
+		language,
+		level,
+	)
+}
+
+func TestTopUpFillsEachDistinctBucketAndSkipsUnsetAudio(t *testing.T) {
+	users := []model.User{
+		{ID: 1, Language: "ja", ProficiencyLevel: "N5"},
+		{ID: 2, Language: "ja", ProficiencyLevel: "N5"},
+		{ID: 3, Language: "ja", ProficiencyLevel: "N4"},
+	}
+	want := "ja/N5,ja/N4"
+
+	tips := &recordingTopUp{}
+	audio := &recordingTopUp{}
+	withAudio := New(Deps{
+		Tip:   tips,
+		Audio: audio,
+		Cron:  cron.New(),
+	})
+	withAudio.topUpTips(
+		context.Background(),
+		users,
+	)
+	withAudio.topUpAudio(
+		context.Background(),
+		users,
+	)
+	if got := strings.Join(
+		tips.buckets,
+		",",
+	); got != want {
+		t.Fatalf(
+			"tip buckets = %s, want %s",
+			got,
+			want,
+		)
+	}
+	if got := strings.Join(
+		audio.buckets,
+		",",
+	); got != want {
+		t.Fatalf(
+			"audio buckets = %s, want %s",
+			got,
+			want,
+		)
+	}
+
+	// Without a TTS key cmd/server leaves Audio unset; the top-up is a no-op.
+	withoutAudio := New(Deps{
+		Tip:  &recordingTopUp{},
+		Cron: cron.New(),
+	})
+	withoutAudio.topUpAudio(
+		context.Background(),
+		users,
+	)
 }

@@ -122,12 +122,10 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 	// Stub session query returning an unfinished session so reminder succeeds
 	unfinishedSession := &model.Session{ID: 10, Mode: model.SessionModeStudy}
 	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
-	services := &service.Services{
-		Session: newSchedulerSessionService(sqStub),
-	}
+	sessions := newSchedulerSessionService(sqStub)
 
 	d := newSessionDispatcher(
-		services,
+		sessions,
 		pusher,
 		pusher.study(),
 		claims,
@@ -200,13 +198,11 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 func TestDispatcher_ClaimErrorFailsOpen(t *testing.T) {
 	claims := &mockPushClaims{err: errors.New("redis unavailable")}
 	pusher := &mockDispatcherPusher{}
-	services := &service.Services{
-		Session: newSchedulerSessionService(&schedulerSessionQueryRepoStub{
-			session: &model.Session{ID: 10, Mode: model.SessionModeStudy},
-		}),
-	}
+	sessions := newSchedulerSessionService(&schedulerSessionQueryRepoStub{
+		session: &model.Session{ID: 10, Mode: model.SessionModeStudy},
+	})
 	d := newSessionDispatcher(
-		services,
+		sessions,
 		pusher,
 		pusher.study(),
 		claims,
@@ -237,12 +233,10 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 
 	unfinishedSession := &model.Session{ID: 99, Type: model.SessionMorning, Mode: model.SessionModeQuiz}
 	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
-	services := &service.Services{
-		Session: newSchedulerSessionService(sqStub),
-	}
+	sessions := newSchedulerSessionService(sqStub)
 
 	d := newSessionDispatcher(
-		services,
+		sessions,
 		pusher,
 		pusher.study(),
 		nil,
@@ -294,12 +288,10 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 
 	unfinishedSession := &model.Session{ID: 1, Mode: model.SessionModeStudy}
 	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
-	services := &service.Services{
-		Session: newSchedulerSessionService(sqStub),
-	}
+	sessions := newSchedulerSessionService(sqStub)
 
 	d := newSessionDispatcher(
-		services,
+		sessions,
 		pusher,
 		pusher.study(),
 		nil,

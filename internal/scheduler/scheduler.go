@@ -11,7 +11,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/pipeline"
-	"github.com/lsj/copylingo/internal/service"
 )
 
 // userPushCron matches the 30-minute choices in each user's schedule settings.
@@ -19,10 +18,52 @@ const userPushCron = "*/30 * * * *"
 
 // Scheduler runs the periodic user-session dispatch and retains content collection for future use.
 type Scheduler struct {
-	services     *service.Services
+	user         slotUsers
+	session      slotSessions
+	tip          tipTopUp
+	audio        audioTopUp
 	orchestrator *pipeline.Orchestrator
 	cron         *cron.Cron
 	dispatcher   *sessionDispatcher
+}
+
+// slotUsers finds the timezones in use and the users due at a slot time.
+type slotUsers interface {
+	GetActiveTimezones(ctx context.Context) ([]string, error)
+	GetUsersBySlot(
+		ctx context.Context,
+		slot model.SessionSlot,
+		localTime string,
+		timezone string,
+	) ([]model.User, error)
+}
+
+// slotSessions counts unfinished sessions for the backlog limit and serves the
+// dispatcher's build/remind calls.
+type slotSessions interface {
+	CountUnfinishedBatch(
+		ctx context.Context,
+		userIDs []int64,
+	) (map[int64]int, error)
+	dispatchSessions
+}
+
+// tipTopUp fills a (language, level) tip bucket.
+type tipTopUp interface {
+	TopUpBucket(
+		ctx context.Context,
+		language,
+		level string,
+	) error
+}
+
+// audioTopUp fills a (language, level) bucket's missing listening clips.
+type audioTopUp interface {
+	TopUpAudio(
+		ctx context.Context,
+		language,
+		level string,
+	) error
 }
 
 // quizPusher sends the "Quiz session arrived" message (bot SessionFlow).
@@ -53,10 +94,13 @@ type pushClaims interface {
 	) (bool, error)
 }
 
-// Deps wires Scheduler. Services is still the whole bundle until ADR-059 §8
-// step D replaces it with the narrow services the dispatcher calls.
+// Deps wires Scheduler with the service calls it makes. Audio is optional:
+// it stays nil without a TTS key and the audio top-up is skipped.
 type Deps struct {
-	Services     *service.Services
+	User         slotUsers
+	Session      slotSessions
+	Tip          tipTopUp
+	Audio        audioTopUp
 	QuizPusher   quizPusher
 	StudyPusher  studyPusher
 	Orchestrator *pipeline.Orchestrator
@@ -66,12 +110,15 @@ type Deps struct {
 
 func New(deps Deps) *Scheduler {
 	s := &Scheduler{
-		services:     deps.Services,
+		user:         deps.User,
+		session:      deps.Session,
+		tip:          deps.Tip,
+		audio:        deps.Audio,
 		orchestrator: deps.Orchestrator,
 		cron:         deps.Cron,
 	}
 	s.dispatcher = newSessionDispatcher(
-		deps.Services,
+		deps.Session,
 		deps.QuizPusher,
 		deps.StudyPusher,
 		deps.Claims,
@@ -241,11 +288,7 @@ func (s *Scheduler) runJob(
 
 // tick executes 30-minute interval dynamic dispatch across distinct timezones and slots.
 func (s *Scheduler) tick(ctx context.Context) error {
-	if s.services == nil || s.services.User == nil {
-		return fmt.Errorf("user service unavailable")
-	}
-
-	timezones, err := s.services.User.GetActiveTimezones(ctx)
+	timezones, err := s.user.GetActiveTimezones(ctx)
 	if err != nil {
 		slog.WarnContext(
 			ctx,
@@ -292,7 +335,7 @@ func (s *Scheduler) tick(ctx context.Context) error {
 		)
 
 		for _, slot := range slots {
-			users, err := s.services.User.GetUsersBySlot(
+			users, err := s.user.GetUsersBySlot(
 				ctx,
 				slot,
 				localTime,
@@ -334,21 +377,19 @@ func (s *Scheduler) tick(ctx context.Context) error {
 			}
 
 			var unfinishedCounts map[int64]int
-			if s.services.Session != nil {
-				counts, err := s.services.Session.CountUnfinishedBatch(
+			counts, err := s.session.CountUnfinishedBatch(
+				ctx,
+				userIDs,
+			)
+			if err != nil {
+				slog.WarnContext(
 					ctx,
-					userIDs,
+					"Failed to batch count unfinished sessions",
+					"error",
+					err,
 				)
-				if err != nil {
-					slog.WarnContext(
-						ctx,
-						"Failed to batch count unfinished sessions",
-						"error",
-						err,
-					)
-				} else {
-					unfinishedCounts = counts
-				}
+			} else {
+				unfinishedCounts = counts
 			}
 
 			if err := s.dispatcher.dispatchBatch(
@@ -419,11 +460,8 @@ func (s *Scheduler) topUpTips(
 	ctx context.Context,
 	users []model.User,
 ) {
-	if s.services == nil || s.services.Tip == nil {
-		return
-	}
 	for _, p := range distinctLangLevelPairs(users) {
-		if err := s.services.Tip.TopUpBucket(
+		if err := s.tip.TopUpBucket(
 			ctx,
 			p.Language,
 			p.Level,
@@ -450,11 +488,11 @@ func (s *Scheduler) topUpAudio(
 	ctx context.Context,
 	users []model.User,
 ) {
-	if s.services == nil || s.services.Audio == nil {
+	if s.audio == nil {
 		return
 	}
 	for _, p := range distinctLangLevelPairs(users) {
-		if err := s.services.Audio.TopUpAudio(
+		if err := s.audio.TopUpAudio(
 			ctx,
 			p.Language,
 			p.Level,

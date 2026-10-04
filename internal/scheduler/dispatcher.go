@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/lsj/copylingo/internal/model"
-	"github.com/lsj/copylingo/internal/service"
 )
 
 const maxUnfinishedSessions = 3
@@ -19,28 +18,42 @@ type pushJob struct {
 	unfinishedCount int
 }
 
+// dispatchSessions builds a slot's session or finds the oldest unfinished one
+// to remind about.
+type dispatchSessions interface {
+	BuildForSlot(
+		ctx context.Context,
+		user model.User,
+		slot model.SessionSlot,
+	) (*model.Session, error)
+	OldestUnfinished(
+		ctx context.Context,
+		userID int64,
+	) (*model.Session, error)
+}
+
 type sessionDispatcher struct {
-	services *service.Services
-	quiz     quizPusher
-	study    studyPusher
-	claims   pushClaims
-	limiter  *rateLimiter
-	workers  int
+	session dispatchSessions
+	quiz    quizPusher
+	study   studyPusher
+	claims  pushClaims
+	limiter *rateLimiter
+	workers int
 }
 
 func newSessionDispatcher(
-	services *service.Services,
+	session dispatchSessions,
 	quiz quizPusher,
 	study studyPusher,
 	claims pushClaims,
 ) *sessionDispatcher {
 	return &sessionDispatcher{
-		services: services,
-		quiz:     quiz,
-		study:    study,
-		claims:   claims,
-		limiter:  newRateLimiter(25), // 25 msg/sec rate limit (Telegram safety margin)
-		workers:  4,
+		session: session,
+		quiz:    quiz,
+		study:   study,
+		claims:  claims,
+		limiter: newRateLimiter(25), // 25 msg/sec rate limit (Telegram safety margin)
+		workers: 4,
 	}
 }
 
@@ -175,10 +188,7 @@ func (d *sessionDispatcher) dispatchUser(
 	}
 
 	// 3. Build & push session
-	if d.services == nil || d.services.Session == nil {
-		return fmt.Errorf("session service unavailable")
-	}
-	session, err := d.services.Session.BuildForSlot(
+	session, err := d.session.BuildForSlot(
 		ctx,
 		user,
 		slot,
@@ -279,14 +289,11 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 	ctx context.Context,
 	userID int64,
 ) (bool, error) {
-	if d.services == nil || d.services.Session == nil {
-		return false, fmt.Errorf("session service unavailable")
-	}
 	if d.quiz == nil || d.study == nil {
 		return false, fmt.Errorf("session pusher unavailable")
 	}
 
-	session, err := d.services.Session.OldestUnfinished(
+	session, err := d.session.OldestUnfinished(
 		ctx,
 		userID,
 	)
