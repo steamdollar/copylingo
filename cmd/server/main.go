@@ -57,7 +57,7 @@ func run() error {
 	defer cleanup()
 
 	// initialize application components
-	services, botHandler, err := initApp(
+	services, components, err := initApp(
 		cfg,
 		db,
 		rdb,
@@ -71,7 +71,7 @@ func run() error {
 
 	stopWorkers := startWorkers(
 		services,
-		botHandler,
+		components,
 		rdb,
 	)
 	defer stopWorkers()
@@ -81,7 +81,7 @@ func run() error {
 		db,
 		rdb,
 		services,
-		botHandler,
+		components.sessionFlow,
 	)
 	srv := startHTTPServer(
 		cfg,
@@ -91,7 +91,7 @@ func run() error {
 	// wait for shutdown
 	waitForShutdown(
 		srv,
-		botHandler,
+		components.router,
 	)
 
 	return nil

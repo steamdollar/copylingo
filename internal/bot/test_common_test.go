@@ -8,7 +8,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
@@ -155,13 +154,6 @@ func answerByText(
 	}
 }
 
-func (s *testInteractionStores) stateStores() StateStores {
-	if s == nil {
-		return StateStores{}
-	}
-	return StateStores{Input: s, Drafts: s, Messages: s, Recovery: s, Timing: s}
-}
-
 // newTestSessionFlow wires SessionFlow over the shared test fakes: Telegram
 // from api, and each store field deps leaves nil from stores. Service deps
 // left unset stay nil so an unexpected call fails loudly.
@@ -235,9 +227,10 @@ func newTestLLMQuestionFlow(
 	return NewLLMQuestionFlow(deps)
 }
 
-// newTestBot assembles the router with every flow wired the way production
+// newTestBot assembles the router with every flow wired the way cmd/server
 // does, for tests that dispatch updates through handleMessage/handleCallback.
-// A nil services means no service dependency is wired.
+// A nil services means no service dependency is wired; a nil stores leaves
+// every store unset.
 func newTestBot(
 	api *mockBotAPI,
 	stores *testInteractionStores,
@@ -246,12 +239,56 @@ func newTestBot(
 	if services == nil {
 		services = &service.Services{}
 	}
-	return newBot(
-		newTelegramClient(api),
-		&config.Config{},
-		services,
-		stores.stateStores(),
+	studyFlow := newTestStudyFlow(
+		api,
+		stores,
+		StudyFlowDeps{
+			Session:            services.Session,
+			MaterialPreference: services.MaterialPreference,
+		},
 	)
+	sessionDeps := SessionFlowDeps{
+		Session:            services.Session,
+		User:               services.User,
+		MaterialPreference: services.MaterialPreference,
+		Study:              studyFlow,
+	}
+	if services.Audio != nil {
+		sessionDeps.Audio = services.Audio
+	}
+	deps := BotDeps{
+		Telegram: newTelegramClient(api),
+		User:     services.User,
+		Session:  services.Session,
+		Analyzer: services.Analyzer,
+		SessionFlow: newTestSessionFlow(
+			api,
+			stores,
+			sessionDeps,
+		),
+		StudyFlow: studyFlow,
+		SettingsFlow: newTestSettingsFlow(
+			api,
+			SettingsFlowDeps{
+				User:               services.User,
+				MaterialPreference: services.MaterialPreference,
+			},
+		),
+		LLMQuestionFlow: newTestLLMQuestionFlow(
+			api,
+			stores,
+			LLMQuestionFlowDeps{
+				User:        services.User,
+				LLMQuestion: services.LLMQuestion,
+				Session:     services.Session,
+			},
+		),
+	}
+	// A nil *testInteractionStores in the interface would be a non-nil Input.
+	if stores != nil {
+		deps.Input = stores
+	}
+	return NewBot(deps)
 }
 
 func (s *testQuizSessionStore) Load(

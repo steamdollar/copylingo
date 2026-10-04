@@ -1,33 +1,58 @@
 package bot
 
 import (
+	"fmt"
+	"log"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// telegramClient owns every call to the Telegram Bot API: update polling,
+// TelegramClient owns every call to the Telegram Bot API: update polling,
 // outbound messages/edits/voice, callback answers, and chat actions. Flows
 // depend on it directly instead of reaching the API through *Bot.
-type telegramClient struct {
+type TelegramClient struct {
 	api BotAPI
 }
 
-func newTelegramClient(api BotAPI) *telegramClient {
-	return &telegramClient{api: api}
+// NewTelegramClient authorizes the bot token against the Telegram Bot API.
+// cmd/server creates one client and shares it with every flow and the router.
+func NewTelegramClient(
+	token string,
+	debug bool,
+) (*TelegramClient, error) {
+	api, err := tgbotapi.NewBotAPI(token)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to create Telegram bot: %w",
+			err,
+		)
+	}
+
+	api.Debug = debug
+	log.Printf(
+		"Telegram bot authorized as @%s",
+		api.Self.UserName,
+	)
+	return newTelegramClient(api), nil
+}
+
+func newTelegramClient(api BotAPI) *TelegramClient {
+	return &TelegramClient{api: api}
 }
 
 // Updates starts long polling and returns the update channel.
-func (c *telegramClient) Updates(pollConfig tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
+func (c *TelegramClient) Updates(pollConfig tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
 	return c.api.GetUpdatesChan(pollConfig)
 }
 
 // StopUpdates stops long polling started by Updates.
-func (c *telegramClient) StopUpdates() {
+func (c *TelegramClient) StopUpdates() {
 	c.api.StopReceivingUpdates()
 }
 
 // TODO: sendMessage, SendMessageWithKeyboard 굳이 따로 두는 이유가?
 // SendMessage sends a text message to a chat.
-func (c *telegramClient) SendMessage(
+func (c *TelegramClient) SendMessage(
 	chatID int64,
 	text string,
 ) error {
@@ -41,7 +66,7 @@ func (c *telegramClient) SendMessage(
 }
 
 // SendMessageWithKeyboard sends a message with an inline keyboard.
-func (c *telegramClient) SendMessageWithKeyboard(
+func (c *TelegramClient) SendMessageWithKeyboard(
 	chatID int64,
 	text string,
 	keyboard tgbotapi.InlineKeyboardMarkup,
@@ -59,7 +84,7 @@ func (c *telegramClient) SendMessageWithKeyboard(
 }
 
 // SendMessageWithReplyMarkup sends a message with custom Telegram reply markup.
-func (c *telegramClient) SendMessageWithReplyMarkup(
+func (c *TelegramClient) SendMessageWithReplyMarkup(
 	chatID int64,
 	text string,
 	replyMarkup interface{},
@@ -78,7 +103,7 @@ func (c *telegramClient) SendMessageWithReplyMarkup(
 }
 
 // SendVoiceFileID sends a voice message by reusing a cached Telegram file_id.
-func (c *telegramClient) SendVoiceFileID(
+func (c *TelegramClient) SendVoiceFileID(
 	chatID int64,
 	fileID string,
 ) error {
@@ -92,7 +117,7 @@ func (c *telegramClient) SendVoiceFileID(
 
 // SendVoiceBytes uploads raw OGG/Opus bytes as a voice message and returns the
 // Telegram file_id assigned to it, so callers can cache it for later re-sends.
-func (c *telegramClient) SendVoiceBytes(
+func (c *TelegramClient) SendVoiceBytes(
 	chatID int64,
 	data []byte,
 ) (string, error) {
@@ -111,7 +136,7 @@ func (c *telegramClient) SendVoiceBytes(
 }
 
 // EditMessageReplyMarkup updates the inline keyboard of an existing message.
-func (c *telegramClient) EditMessageReplyMarkup(
+func (c *TelegramClient) EditMessageReplyMarkup(
 	chatID int64,
 	messageID int,
 	markup tgbotapi.InlineKeyboardMarkup,
@@ -126,7 +151,7 @@ func (c *telegramClient) EditMessageReplyMarkup(
 }
 
 // EditMessage edits an existing message.
-func (c *telegramClient) EditMessage(
+func (c *TelegramClient) EditMessage(
 	chatID int64,
 	messageID int,
 	text string,
@@ -146,7 +171,7 @@ func (c *telegramClient) EditMessage(
 }
 
 // ClearInlineKeyboard removes inline buttons from an existing bot message.
-func (c *telegramClient) ClearInlineKeyboard(
+func (c *TelegramClient) ClearInlineKeyboard(
 	chatID int64,
 	messageID int,
 ) error {
@@ -161,7 +186,7 @@ func (c *telegramClient) ClearInlineKeyboard(
 }
 
 // AnswerCallback acknowledges a callback query with an optional toast text.
-func (c *telegramClient) AnswerCallback(
+func (c *TelegramClient) AnswerCallback(
 	callbackID string,
 	text string,
 ) error {
@@ -173,7 +198,7 @@ func (c *telegramClient) AnswerCallback(
 }
 
 // AnswerCallbackAlert acknowledges a callback query with a modal alert.
-func (c *telegramClient) AnswerCallbackAlert(
+func (c *TelegramClient) AnswerCallbackAlert(
 	callbackID string,
 	text string,
 ) error {
@@ -185,7 +210,7 @@ func (c *telegramClient) AnswerCallbackAlert(
 }
 
 // SendChatAction shows a transient status such as "typing" in the chat.
-func (c *telegramClient) SendChatAction(
+func (c *TelegramClient) SendChatAction(
 	chatID int64,
 	action string,
 ) error {

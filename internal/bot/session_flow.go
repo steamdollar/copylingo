@@ -117,7 +117,7 @@ type quizInputStore interface {
 // SessionFlowDeps wires SessionFlow. Audio may be left nil (see listeningAudio);
 // every other dependency is required.
 type SessionFlowDeps struct {
-	Telegram           *telegramClient
+	Telegram           *TelegramClient
 	Session            quizSession
 	User               userReader
 	MaterialPreference materialPreferences
@@ -134,7 +134,7 @@ type SessionFlowDeps struct {
 
 // SessionFlow handles the question-answering interaction flow.
 type SessionFlow struct {
-	telegram           *telegramClient
+	telegram           *TelegramClient
 	session            quizSession
 	user               userReader
 	materialPreference materialPreferences

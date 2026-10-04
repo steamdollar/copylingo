@@ -3,11 +3,13 @@ package bot
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -305,6 +307,135 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 		t.Fatalf(
 			"expected redirect to next question, got %q",
 			msg.Text,
+		)
+	}
+}
+
+// ShowHandwritingGraded edits the stored handwriting message only while the
+// graded question is still current, taking its position from progress.
+func TestShowHandwritingGraded(t *testing.T) {
+	const (
+		sessionID     = 7
+		questionID    = 3
+		publicBaseURL = "https://x.trycloudflare.com"
+	)
+	materialID := 11
+	tests := []struct {
+		name           string
+		gradedQuestion int
+		storeMessage   bool
+		wantEdit       bool
+	}{
+		{
+			name:           "current question gets next and material buttons",
+			gradedQuestion: questionID,
+			storeMessage:   true,
+			wantEdit:       true,
+		},
+		{name: "question no longer current is left alone", gradedQuestion: questionID + 1, storeMessage: true},
+		{name: "missing message is left alone", gradedQuestion: questionID},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				stateStores := newTestInteractionStores()
+				seedQuizState(
+					stateStores,
+					&model.QuizActiveSessionState{
+						Version: model.QuizActiveSessionStateVersion,
+						Session: model.Session{ID: sessionID},
+						Items: []model.QuizActiveSessionQuestion{{
+							SessionQuestion: model.SessionQuestion{QuestionID: questionID},
+							Question:        model.Question{ID: questionID, MaterialID: &materialID},
+						}},
+					},
+				)
+				if tt.storeMessage {
+					stateStores.messages[handwritingMessageKey{sessionID, tt.gradedQuestion}] = model.TelegramMessageRef{
+						ChatID:    55,
+						MessageID: 66,
+					}
+				}
+				mAPI := &mockBotAPI{}
+				sf := newTestSessionFlow(
+					mAPI,
+					stateStores,
+					SessionFlowDeps{
+						Session: newTestSessionService(
+							stateStores,
+							service.SessionDeps{},
+						),
+						PublicBaseURL: publicBaseURL,
+					},
+				)
+
+				sf.ShowHandwritingGraded(
+					context.Background(),
+					sessionID,
+					tt.gradedQuestion,
+				)
+
+				if !tt.wantEdit {
+					if len(mAPI.sentMessages) != 0 {
+						t.Fatalf(
+							"sent %d Telegram calls, want none",
+							len(mAPI.sentMessages),
+						)
+					}
+					return
+				}
+				if len(mAPI.sentMessages) != 1 {
+					t.Fatalf(
+						"sent %d Telegram calls, want 1",
+						len(mAPI.sentMessages),
+					)
+				}
+				edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig)
+				if !ok {
+					t.Fatalf(
+						"sent %T, want EditMessageReplyMarkupConfig",
+						mAPI.sentMessages[0],
+					)
+				}
+				if edit.ChatID != 55 || edit.MessageID != 66 {
+					t.Fatalf(
+						"edited chat %d message %d, want 55/66",
+						edit.ChatID,
+						edit.MessageID,
+					)
+				}
+				wantCallbacks := []string{
+					callback.FormatHandwritingNext(
+						sessionID,
+						0,
+						publicBaseURL,
+					),
+					fmt.Sprintf(
+						callback.FormatQuestionPolicy,
+						sessionID,
+						questionID,
+					),
+				}
+				rows := edit.ReplyMarkup.InlineKeyboard
+				if len(rows) != len(wantCallbacks) {
+					t.Fatalf(
+						"keyboard rows = %d, want %d",
+						len(rows),
+						len(wantCallbacks),
+					)
+				}
+				for i, want := range wantCallbacks {
+					if got := *rows[i][0].CallbackData; got != want {
+						t.Errorf(
+							"row %d callback = %q, want %q",
+							i,
+							got,
+							want,
+						)
+					}
+				}
+			},
 		)
 	}
 }

@@ -57,7 +57,7 @@ type llmInputStore interface {
 
 // LLMQuestionFlowDeps wires LLMQuestionFlow; every dependency is required.
 type LLMQuestionFlowDeps struct {
-	Telegram    *telegramClient
+	Telegram    *TelegramClient
 	User        userReader
 	LLMQuestion llmQuestionAnswerer
 	Session     llmContextSession
@@ -67,7 +67,7 @@ type LLMQuestionFlowDeps struct {
 // LLMQuestionFlow handles the owner-only /llm mode: arming it, cancelling it,
 // and answering the next message with optional Quiz/Study context.
 type LLMQuestionFlow struct {
-	telegram    *telegramClient
+	telegram    *TelegramClient
 	user        userReader
 	llmQuestion llmQuestionAnswerer
 	session     llmContextSession

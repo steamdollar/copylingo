@@ -11,7 +11,6 @@ import (
 	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/miniapp"
-	"github.com/lsj/copylingo/internal/redisstore"
 	"github.com/lsj/copylingo/internal/service"
 )
 
@@ -21,7 +20,7 @@ func setupRouter(
 	db *sqlx.DB,
 	rdb *redis.Client,
 	services *service.Services,
-	botHandler *bot.Bot,
+	handwritingScreen *bot.SessionFlow,
 ) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -71,13 +70,13 @@ func setupRouter(
 		},
 	)
 
-	// The HTTP handler reads message references through its narrow storage contract.
+	// The Mini App only reports a graded handwriting answer; SessionFlow
+	// refreshes the Telegram message.
 	miniapp.RegisterRoutes(
 		r,
 		cfg,
 		services,
-		redisstore.NewInteractions(rdb),
-		botHandler,
+		handwritingScreen,
 	)
 
 	return r

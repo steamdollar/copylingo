@@ -13,7 +13,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/lsj/copylingo/internal/callback"
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
@@ -81,7 +80,7 @@ type inputClearer interface {
 
 // BotDeps wires the router; every dependency is required.
 type BotDeps struct {
-	Telegram        *telegramClient
+	Telegram        *TelegramClient
 	User            userReader
 	Session         commandSession
 	Analyzer        userStatsReader
@@ -95,7 +94,7 @@ type BotDeps struct {
 // Bot routes Telegram updates to the feature flows and serves the menu,
 // stats, streak, help, exit, study and test commands itself.
 type Bot struct {
-	telegram        *telegramClient
+	telegram        *TelegramClient
 	user            userReader
 	session         commandSession
 	analyzer        userStatsReader
@@ -107,91 +106,9 @@ type Bot struct {
 	stopCh          chan struct{}
 }
 
-func NewBot(
-	cfg *config.Config,
-	services *service.Services,
-	stores StateStores,
-) (*Bot, error) {
-	api, err := tgbotapi.NewBotAPI(cfg.Telegram.Token)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to create Telegram bot: %w",
-			err,
-		)
-	}
-
-	api.Debug = cfg.Telegram.Debug
-	log.Printf(
-		"Telegram bot authorized as @%s",
-		api.Self.UserName,
-	)
-
-	return newBot(
-		newTelegramClient(api),
-		cfg,
-		services,
-		stores,
-	), nil
-}
-
-// newBot assembles the feature flows over one Telegram client. It moves to
-// cmd/server once every flow has its own Deps (ADR-059 §8 step C).
-func newBot(
-	telegram *telegramClient,
-	cfg *config.Config,
-	services *service.Services,
-	stores StateStores,
-) *Bot {
-	study := NewStudyFlow(StudyFlowDeps{
-		Telegram:           telegram,
-		Session:            services.Session,
-		MaterialPreference: services.MaterialPreference,
-		Input:              stores.Input,
-	})
-	sessionDeps := SessionFlowDeps{
-		Telegram:           telegram,
-		Session:            services.Session,
-		User:               services.User,
-		MaterialPreference: services.MaterialPreference,
-		Input:              stores.Input,
-		Drafts:             stores.Drafts,
-		Messages:           stores.Messages,
-		Recovery:           stores.Recovery,
-		Timing:             stores.Timing,
-		Study:              study,
-		PublicBaseURL:      cfg.Server.PublicBaseURL,
-	}
-	// Audio is nil without a TTS key; assigning a nil *AudioService would make
-	// a non-nil interface and bypass SessionFlow's "audio unavailable" path.
-	if services.Audio != nil {
-		sessionDeps.Audio = services.Audio
-	}
-	return newRouter(BotDeps{
-		Telegram:    telegram,
-		User:        services.User,
-		Session:     services.Session,
-		Analyzer:    services.Analyzer,
-		Input:       stores.Input,
-		SessionFlow: NewSessionFlow(sessionDeps),
-		StudyFlow:   study,
-		SettingsFlow: NewSettingsFlow(SettingsFlowDeps{
-			Telegram:           telegram,
-			User:               services.User,
-			MaterialPreference: services.MaterialPreference,
-		}),
-		LLMQuestionFlow: NewLLMQuestionFlow(LLMQuestionFlowDeps{
-			Telegram:    telegram,
-			User:        services.User,
-			LLMQuestion: services.LLMQuestion,
-			Session:     services.Session,
-			Input:       stores.Input,
-		}),
-	})
-}
-
-// newRouter builds the router over already-assembled flows. It becomes
-// NewBot once cmd/server assembles the flows (ADR-059 §8 step C).
-func newRouter(deps BotDeps) *Bot {
+// NewBot builds the router over flows that cmd/server has already assembled
+// on one shared TelegramClient.
+func NewBot(deps BotDeps) *Bot {
 	return &Bot{
 		telegram:        deps.Telegram,
 		user:            deps.User,
@@ -204,12 +121,6 @@ func newRouter(deps BotDeps) *Bot {
 		llmQuestionFlow: deps.LLMQuestionFlow,
 		stopCh:          make(chan struct{}),
 	}
-}
-
-// RefreshStaleMiniAppMessages re-sends handwriting questions whose Mini App
-// link went stale across a restart; SessionFlow owns the work.
-func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
-	b.sessionFlow.RefreshStaleMiniAppMessages(ctx)
 }
 
 // Start begins listening for Telegram updates.
@@ -237,48 +148,6 @@ func (b *Bot) Start() {
 func (b *Bot) Stop() {
 	close(b.stopCh)
 	b.telegram.StopUpdates()
-}
-
-// PushSession: push session container message to user
-func (b *Bot) PushSession(
-	ctx context.Context,
-	chatID int64,
-	sessionID int,
-	sessionType string,
-) error {
-	return b.sessionFlow.PushSession(
-		ctx,
-		chatID,
-		sessionID,
-		sessionType,
-	)
-}
-
-// PushStudySession: sends a material-based study session start message.
-func (b *Bot) PushStudySession(
-	ctx context.Context,
-	chatID int64,
-	sessionID int,
-) error {
-	return b.studyFlow.PushSession(
-		ctx,
-		chatID,
-		sessionID,
-	)
-}
-
-// EditMessageReplyMarkup satisfies the Mini App's TelegramMessenger contract.
-// It moves to a narrow Flow contract when flows are split (ADR-059 §8 step C).
-func (b *Bot) EditMessageReplyMarkup(
-	chatID int64,
-	messageID int,
-	markup tgbotapi.InlineKeyboardMarkup,
-) error {
-	return b.telegram.EditMessageReplyMarkup(
-		chatID,
-		messageID,
-		markup,
-	)
 }
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
@@ -943,7 +812,7 @@ func (b *Bot) handleStudy(
 		return
 	}
 
-	if err := b.PushStudySession(
+	if err := b.studyFlow.PushSession(
 		ctx,
 		msg.Chat.ID,
 		session.ID,
@@ -1064,7 +933,7 @@ func (b *Bot) handleTest(
 	}
 
 	// 3. Push the session immediately
-	if err := b.PushSession(
+	if err := b.sessionFlow.PushSession(
 		ctx,
 		user.ID,
 		session.ID,

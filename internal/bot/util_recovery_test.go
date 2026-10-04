@@ -24,13 +24,13 @@ func (s *sessionListStore) ListInProgress(ctx context.Context) ([]model.Session,
 func TestRefreshStaleMiniAppMessages_EmptyBaseURL(t *testing.T) {
 	ctx := context.Background()
 	mAPI := &mockBotAPI{}
-	b := newTestBot(
+	sf := newTestSessionFlow(
 		mAPI,
 		nil,
-		nil,
+		SessionFlowDeps{},
 	) // PublicBaseURL empty
 
-	b.RefreshStaleMiniAppMessages(ctx)
+	sf.RefreshStaleMiniAppMessages(ctx)
 
 	if len(mAPI.sentMessages) != 0 {
 		t.Errorf(
@@ -45,19 +45,19 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	mAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	store := &sessionListStore{inProgress: nil}
-	b := newTestBot(
+	sf := newTestSessionFlow(
 		mAPI,
 		stateStores,
-		&service.Services{
+		SessionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{SessionRepo: store},
 			),
+			PublicBaseURL: "https://x.trycloudflare.com",
 		},
 	)
-	b.sessionFlow.publicBaseURL = "https://x.trycloudflare.com"
 
-	b.RefreshStaleMiniAppMessages(ctx)
+	sf.RefreshStaleMiniAppMessages(ctx)
 
 	if len(mAPI.sentMessages) != 0 {
 		t.Errorf(

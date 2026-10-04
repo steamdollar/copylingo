@@ -629,7 +629,7 @@ func materialPreferenceInt(
 // user through a callback alert, shared by the Quiz, Study and Settings screens.
 func materialPreferenceError(
 	ctx context.Context,
-	telegram *telegramClient,
+	telegram *TelegramClient,
 	cb *tgbotapi.CallbackQuery,
 	action string,
 	err error,

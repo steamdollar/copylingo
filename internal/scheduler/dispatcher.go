@@ -21,7 +21,8 @@ type pushJob struct {
 
 type sessionDispatcher struct {
 	services *service.Services
-	bot      sessionPusher
+	quiz     quizPusher
+	study    studyPusher
 	claims   pushClaims
 	limiter  *rateLimiter
 	workers  int
@@ -29,12 +30,14 @@ type sessionDispatcher struct {
 
 func newSessionDispatcher(
 	services *service.Services,
-	bot sessionPusher,
+	quiz quizPusher,
+	study studyPusher,
 	claims pushClaims,
 ) *sessionDispatcher {
 	return &sessionDispatcher{
 		services: services,
-		bot:      bot,
+		quiz:     quiz,
+		study:    study,
 		claims:   claims,
 		limiter:  newRateLimiter(25), // 25 msg/sec rate limit (Telegram safety margin)
 		workers:  4,
@@ -215,7 +218,7 @@ func (d *sessionDispatcher) pushBuiltSession(
 	session *model.Session,
 ) error {
 	if session.Mode == model.SessionModeStudy {
-		if err := d.bot.PushStudySession(
+		if err := d.study.PushSession(
 			ctx,
 			userID,
 			session.ID,
@@ -242,7 +245,7 @@ func (d *sessionDispatcher) pushBuiltSession(
 		return nil
 	}
 
-	if err := d.bot.PushSession(
+	if err := d.quiz.PushSession(
 		ctx,
 		userID,
 		session.ID,
@@ -279,7 +282,7 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 	if d.services == nil || d.services.Session == nil {
 		return false, fmt.Errorf("session service unavailable")
 	}
-	if d.bot == nil {
+	if d.quiz == nil || d.study == nil {
 		return false, fmt.Errorf("session pusher unavailable")
 	}
 
@@ -300,7 +303,7 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 
 	switch session.Mode {
 	case model.SessionModeStudy:
-		if err := d.bot.PushStudySession(
+		if err := d.study.PushSession(
 			ctx,
 			userID,
 			session.ID,
@@ -324,7 +327,7 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 		)
 		return true, nil
 	case model.SessionModeQuiz, "":
-		if err := d.bot.PushSession(
+		if err := d.quiz.PushSession(
 			ctx,
 			userID,
 			session.ID,

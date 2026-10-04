@@ -909,9 +909,9 @@ func TestHandleMenu(t *testing.T) {
 
 func ptr(s string) *string { return &s }
 
-func TestEditMessageReplyMarkup(t *testing.T) {
+func TestTelegramClientEditMessageReplyMarkup(t *testing.T) {
 	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
+	client := newTelegramClient(mAPI)
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -921,7 +921,7 @@ func TestEditMessageReplyMarkup(t *testing.T) {
 			),
 		),
 	)
-	if err := b.EditMessageReplyMarkup(
+	if err := client.EditMessageReplyMarkup(
 		123,
 		456,
 		markup,
@@ -941,37 +941,6 @@ func TestEditMessageReplyMarkup(t *testing.T) {
 		t.Fatalf(
 			"expected EditMessageReplyMarkupConfig, got %T",
 			mAPI.sentMessages[0],
-		)
-	}
-}
-
-func TestBotPushSession(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	b := newTestBot(
-		mAPI,
-		nil,
-		nil,
-	)
-
-	if err := b.PushSession(
-		context.Background(),
-		123,
-		10,
-		"evening",
-	); err != nil {
-		t.Fatalf(
-			"PushSession error = %v",
-			err,
-		)
-	}
-	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(
-		text,
-		"세션이 도착했습니다",
-	) {
-		t.Errorf(
-			"expected push message, got %q",
-			text,
 		)
 	}
 }

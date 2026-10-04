@@ -90,15 +90,25 @@ func (p *mockDispatcherPusher) PushSession(
 	return nil
 }
 
-func (p *mockDispatcherPusher) PushStudySession(
+// study returns the Study push contract over the same recorder, so a test
+// can assert which kind of push each user received.
+func (p *mockDispatcherPusher) study() mockStudyPusher {
+	return mockStudyPusher{recorder: p}
+}
+
+type mockStudyPusher struct {
+	recorder *mockDispatcherPusher
+}
+
+func (p mockStudyPusher) PushSession(
 	ctx context.Context,
 	chatID int64,
 	sessionID int,
 ) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.studyPushes = append(
-		p.studyPushes,
+	p.recorder.mu.Lock()
+	defer p.recorder.mu.Unlock()
+	p.recorder.studyPushes = append(
+		p.recorder.studyPushes,
 		chatID,
 	)
 	return nil
@@ -119,6 +129,7 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 	d := newSessionDispatcher(
 		services,
 		pusher,
+		pusher.study(),
 		claims,
 	)
 	user := model.User{ID: 1001, Language: "ja", ProficiencyLevel: "N5"}
@@ -197,6 +208,7 @@ func TestDispatcher_ClaimErrorFailsOpen(t *testing.T) {
 	d := newSessionDispatcher(
 		services,
 		pusher,
+		pusher.study(),
 		claims,
 	)
 
@@ -232,6 +244,7 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 	d := newSessionDispatcher(
 		services,
 		pusher,
+		pusher.study(),
 		nil,
 	)
 	user := model.User{ID: 2002, Language: "ja", ProficiencyLevel: "N5"}
@@ -288,6 +301,7 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 	d := newSessionDispatcher(
 		services,
 		pusher,
+		pusher.study(),
 		nil,
 	)
 	// Higher limiter rate for fast testing

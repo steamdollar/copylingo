@@ -24,11 +24,19 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
+// botComponents is the Telegram side initApp assembles. It stays inside
+// cmd/server: each consumer receives only the flow it calls (ADR-059 §8.3).
+type botComponents struct {
+	router      *bot.Bot
+	sessionFlow *bot.SessionFlow
+	studyFlow   *bot.StudyFlow
+}
+
 func initApp(
 	cfg *config.Config,
 	db *sqlx.DB,
 	rdb *redis.Client,
-) (*service.Services, *bot.Bot, error) {
+) (*service.Services, botComponents, error) {
 	repos := repository.NewRepositories(db)
 	// Only the storage implementations know Redis commands and serialized keys.
 	services := service.NewServices(
@@ -40,54 +48,118 @@ func initApp(
 			Study: redisstore.NewStudySessions(rdb),
 		},
 	)
-	interactions := redisstore.NewInteractions(rdb)
-	botHandler, err := bot.NewBot(
+	components, err := initBot(
 		cfg,
 		services,
-		bot.StateStores{
-			Input: interactions, Drafts: interactions, Messages: interactions,
-			Recovery: interactions, Timing: interactions,
-		},
+		redisstore.NewInteractions(rdb),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf(
+		return nil, botComponents{}, fmt.Errorf(
 			"failed to initialize Telegram bot: %w",
 			err,
 		)
 	}
-	return services, botHandler, nil
+	return services, components, nil
+}
+
+// initBot creates one Telegram client, each feature flow over the services
+// and Redis interaction state it uses, and the router over the flows.
+func initBot(
+	cfg *config.Config,
+	services *service.Services,
+	interactions *redisstore.Interactions,
+) (botComponents, error) {
+	telegram, err := bot.NewTelegramClient(
+		cfg.Telegram.Token,
+		cfg.Telegram.Debug,
+	)
+	if err != nil {
+		return botComponents{}, err
+	}
+
+	studyFlow := bot.NewStudyFlow(bot.StudyFlowDeps{
+		Telegram:           telegram,
+		Session:            services.Session,
+		MaterialPreference: services.MaterialPreference,
+		Input:              interactions,
+	})
+	sessionDeps := bot.SessionFlowDeps{
+		Telegram:           telegram,
+		Session:            services.Session,
+		User:               services.User,
+		MaterialPreference: services.MaterialPreference,
+		Input:              interactions,
+		Drafts:             interactions,
+		Messages:           interactions,
+		Recovery:           interactions,
+		Timing:             interactions,
+		Study:              studyFlow,
+		PublicBaseURL:      cfg.Server.PublicBaseURL,
+	}
+	// Audio is nil without a TTS key; assigning a nil *AudioService would make
+	// a non-nil interface and bypass SessionFlow's "audio unavailable" path.
+	if services.Audio != nil {
+		sessionDeps.Audio = services.Audio
+	}
+	sessionFlow := bot.NewSessionFlow(sessionDeps)
+
+	router := bot.NewBot(bot.BotDeps{
+		Telegram:    telegram,
+		User:        services.User,
+		Session:     services.Session,
+		Analyzer:    services.Analyzer,
+		Input:       interactions,
+		SessionFlow: sessionFlow,
+		StudyFlow:   studyFlow,
+		SettingsFlow: bot.NewSettingsFlow(bot.SettingsFlowDeps{
+			Telegram:           telegram,
+			User:               services.User,
+			MaterialPreference: services.MaterialPreference,
+		}),
+		LLMQuestionFlow: bot.NewLLMQuestionFlow(bot.LLMQuestionFlowDeps{
+			Telegram:    telegram,
+			User:        services.User,
+			LLMQuestion: services.LLMQuestion,
+			Session:     services.Session,
+			Input:       interactions,
+		}),
+	})
+	return botComponents{
+		router:      router,
+		sessionFlow: sessionFlow,
+		studyFlow:   studyFlow,
+	}, nil
 }
 
 func startWorkers(
 	services *service.Services,
-	botHandler *bot.Bot,
+	components botComponents,
 	rdb redis.Cmdable,
 ) func() {
 	// Content collection has no scheduled job; keep its pipeline builder for future use.
 	sched, stopSched := initScheduler(
 		services,
-		botHandler,
+		components,
 		rdb,
 	)
 	sched.Start()
-	go botHandler.Start()
-	go botHandler.RefreshStaleMiniAppMessages(context.Background())
+	go components.router.Start()
+	go components.sessionFlow.RefreshStaleMiniAppMessages(context.Background())
 	return stopSched
 }
 
 func initScheduler(
 	services *service.Services,
-	botHandler *bot.Bot,
+	components botComponents,
 	rdb redis.Cmdable,
 ) (*scheduler.Scheduler, func()) {
-	cronScheduler := cron.New()
-	sched := scheduler.New(
-		services,
-		botHandler,
-		nil,
-		cronScheduler,
-		redisstore.NewPushClaims(rdb),
-	)
+	sched := scheduler.New(scheduler.Deps{
+		Services:    services,
+		QuizPusher:  components.sessionFlow,
+		StudyPusher: components.studyFlow,
+		Cron:        cron.New(),
+		Claims:      redisstore.NewPushClaims(rdb),
+	})
 	return sched, func() { sched.Stop() }
 }
 

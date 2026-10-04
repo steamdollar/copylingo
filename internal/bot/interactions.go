@@ -7,40 +7,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type InputStateStore interface {
-	SetLLMPending(
-		ctx context.Context,
-		userID int64,
-		input model.PendingLLMInput,
-	) error
-	TakeLLMPending(
-		ctx context.Context,
-		userID int64,
-	) (model.PendingLLMInput, bool, error)
-	DeleteLLMPending(
-		ctx context.Context,
-		userID int64,
-	) error
-	GetActiveQuestion(
-		ctx context.Context,
-		chatID int64,
-	) (*model.ActiveQuestionRef, error)
-	SetActiveQuestion(
-		ctx context.Context,
-		chatID int64,
-		question model.ActiveQuestionRef,
-	) error
-	DeleteActiveQuestion(
-		ctx context.Context,
-		chatID int64,
-	) error
-	ClearInput(
-		ctx context.Context,
-		chatID int64,
-		userID *int64,
-	) error
-}
-
 type WordOrderDraftStore interface {
 	GetWordOrderDraft(
 		ctx context.Context,
@@ -92,13 +58,4 @@ type QuestionTimingStore interface {
 		sessionID int,
 		startedAt time.Time,
 	) error
-}
-
-// StateStores keeps each bot use of transient Redis state behind its own narrow contract.
-type StateStores struct {
-	Input    InputStateStore
-	Drafts   WordOrderDraftStore
-	Messages HandwritingMessageStore
-	Recovery MiniAppRecoveryStore
-	Timing   QuestionTimingStore
 }

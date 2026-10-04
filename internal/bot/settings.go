@@ -35,7 +35,7 @@ type settingsUser interface {
 
 // SettingsFlowDeps wires SettingsFlow; every dependency is required.
 type SettingsFlowDeps struct {
-	Telegram           *telegramClient
+	Telegram           *TelegramClient
 	User               settingsUser
 	MaterialPreference materialPreferenceList
 }
@@ -43,7 +43,7 @@ type SettingsFlowDeps struct {
 // SettingsFlow handles the /settings screens: push schedule, timezone, and
 // the list of materials whose review mode the user changed.
 type SettingsFlow struct {
-	telegram           *telegramClient
+	telegram           *TelegramClient
 	user               settingsUser
 	materialPreference materialPreferenceList
 }

@@ -78,6 +78,41 @@ func TestRefreshHandwritingMessagePreservesParentCorrelation(t *testing.T) {
 	}
 }
 
+// fakeHandwritingScreen records the graded question the Mini App reports.
+type fakeHandwritingScreen struct {
+	sessionID   int
+	questionID  int
+	hasDeadline bool
+}
+
+func (f *fakeHandwritingScreen) ShowHandwritingGraded(
+	ctx context.Context,
+	sessionID,
+	questionID int,
+) {
+	f.sessionID = sessionID
+	f.questionID = questionID
+	_, f.hasDeadline = ctx.Deadline()
+}
+
+func TestRefreshHandwritingMessageReportsGradedQuestionWithTimeout(t *testing.T) {
+	screen := &fakeHandwritingScreen{}
+	handler := NewHandler(HandlerDeps{HandwritingScreen: screen})
+
+	handler.refreshHandwritingMessage(
+		context.Background(),
+		1,
+		2,
+	)
+
+	if screen.sessionID != 1 || screen.questionID != 2 || !screen.hasDeadline {
+		t.Fatalf(
+			"screen got %+v, want session 1 question 2 with a deadline",
+			*screen,
+		)
+	}
+}
+
 func (m *mockTipRepo) ListActive(
 	ctx context.Context,
 	language,
@@ -310,8 +345,7 @@ func TestListTips(t *testing.T) {
 	)
 }
 
-// mockQuizSession fakes service.SessionService's Mini App surface. Progress
-// lookups fail, so the background button refresh stops early.
+// mockQuizSession fakes service.SessionService's Mini App surface.
 type mockQuizSession struct {
 	submitHandwritingFn func(
 		ctx context.Context,
@@ -327,13 +361,6 @@ func (m *mockQuizSession) SubmitHandwriting(
 		ctx,
 		req,
 	)
-}
-
-func (m *mockQuizSession) QuizProgress(
-	context.Context,
-	int,
-) (*model.QuizActiveSessionState, error) {
-	return nil, errors.New("progress not configured")
 }
 
 type mockVerifier struct {

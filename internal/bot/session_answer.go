@@ -9,6 +9,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/lsj/copylingo/internal/callback"
+	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -292,6 +293,140 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 			keyboard,
 		)
 	}
+}
+
+// ShowHandwritingGraded swaps the keyboard of a handwriting question message
+// once the Mini App has graded it: "next question" plus the linked-material
+// action. The Mini App calls it in the background, so failures are logged
+// under handwriting.cleanup.* instead of returned.
+func (sf *SessionFlow) ShowHandwritingGraded(
+	ctx context.Context,
+	sessionID,
+	questionID int,
+) {
+	message, err := sf.messages.GetHandwritingMessage(
+		ctx,
+		sessionID,
+		questionID,
+	)
+	if err != nil {
+		if errors.Is(
+			err,
+			model.ErrInvalidTelegramMessageRef,
+		) {
+			slog.ErrorContext(
+				ctx,
+				"Invalid handwriting message ID format",
+				"event",
+				"handwriting.cleanup.invalid_message_id",
+				"error",
+				err,
+			)
+		} else {
+			slog.ErrorContext(
+				ctx,
+				"Failed to get handwriting message ID",
+				"event",
+				"handwriting.cleanup.message_lookup_failed",
+				"error",
+				err,
+			)
+		}
+		return
+	}
+	if message == nil {
+		return
+	}
+
+	// The "next" callback carries the question position, so re-read progress
+	// instead of trusting the Mini App request.
+	state, err := sf.session.QuizProgress(
+		ctx,
+		sessionID,
+	)
+	if err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to get active session state for handwriting cleanup",
+			"event",
+			"handwriting.cleanup.session_lookup_failed",
+			"error",
+			err,
+		)
+		return
+	}
+	item, questionIdx, ok := state.CurrentItemByQuestionID(questionID)
+	if !ok {
+		slog.WarnContext(
+			ctx,
+			"Question not found in session for handwriting cleanup",
+			"event",
+			"handwriting.cleanup.question_not_found",
+		)
+		return
+	}
+
+	markup := sf.handwritingGradedKeyboard(
+		sessionID,
+		questionIdx,
+		item.Question,
+	)
+	if err := sf.telegram.EditMessageReplyMarkup(
+		message.ChatID,
+		message.MessageID,
+		markup,
+	); err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to edit handwriting message reply markup",
+			"event",
+			"handwriting.cleanup.reply_markup_failed",
+			"chat_id",
+			message.ChatID,
+			"message_id",
+			message.MessageID,
+			"error",
+			err,
+		)
+	}
+}
+
+// handwritingGradedKeyboard replaces the Mini App answer button after
+// grading. The linked-material action stays available.
+func (sf *SessionFlow) handwritingGradedKeyboard(
+	sessionID,
+	questionIdx int,
+	question model.Question,
+) tgbotapi.InlineKeyboardMarkup {
+	messages := botMessagesByLocale[botDefaultLocale]
+	markup := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.nextQuestionButton,
+				callback.FormatHandwritingNext(
+					sessionID,
+					questionIdx,
+					sf.publicBaseURL,
+				),
+			),
+		),
+	)
+	if question.MaterialID != nil {
+		markup.InlineKeyboard = append(
+			markup.InlineKeyboard,
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData(
+					messages.linkedMaterialSettingsButton,
+					fmt.Sprintf(
+						callback.FormatQuestionPolicy,
+						sessionID,
+						question.ID,
+					),
+				),
+			),
+		)
+	}
+	return markup
 }
 
 // redirectToNextUnansweredQuestion repairs delayed answer callbacks by

@@ -61,7 +61,7 @@ type studyInputStore interface {
 
 // StudyFlowDeps wires StudyFlow; every dependency is required.
 type StudyFlowDeps struct {
-	Telegram           *telegramClient
+	Telegram           *TelegramClient
 	Session            studySession
 	MaterialPreference materialPreferences
 	Input              studyInputStore
@@ -69,7 +69,7 @@ type StudyFlowDeps struct {
 
 // StudyFlow handles material-based study sessions.
 type StudyFlow struct {
-	telegram           *telegramClient
+	telegram           *TelegramClient
 	session            studySession
 	materialPreference materialPreferences
 	input              studyInputStore

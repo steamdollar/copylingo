@@ -118,13 +118,10 @@ func TestRunJobLogsFailure(t *testing.T) {
 
 func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
 	cronScheduler := cron.New()
-	scheduler := New(
-		nil,
-		nil,
-		pipeline.NewOrchestrator(),
-		cronScheduler,
-		nil,
-	)
+	scheduler := New(Deps{
+		Orchestrator: pipeline.NewOrchestrator(),
+		Cron:         cronScheduler,
+	})
 
 	scheduler.Start()
 	defer scheduler.Stop()

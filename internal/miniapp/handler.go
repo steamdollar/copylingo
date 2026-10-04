@@ -3,7 +3,6 @@ package miniapp
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -11,34 +10,31 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
 
-type TelegramMessenger interface {
-	EditMessageReplyMarkup(
-		chatID int64,
-		messageID int,
-		markup tgbotapi.InlineKeyboardMarkup,
-	) error
-}
-
 // quizSession is the Quiz part of service.SessionService used by the Mini App:
-// grading a handwriting submission and re-reading progress to refresh buttons.
+// grading a handwriting submission.
 type quizSession interface {
 	SubmitHandwriting(
 		ctx context.Context,
 		req service.HandwritingSubmitRequest,
 	) (*service.HandwritingSubmitResult, error)
-	QuizProgress(
+}
+
+// handwritingScreen is the bot-side Telegram message of a handwriting
+// question. The bot owns finding the message, re-reading progress, and
+// building the keyboard; the Mini App only reports that grading finished.
+type handwritingScreen interface {
+	ShowHandwritingGraded(
 		ctx context.Context,
-		sessionID int,
-	) (*model.QuizActiveSessionState, error)
+		sessionID,
+		questionID int,
+	)
 }
 
 type tipService interface {
@@ -50,34 +46,22 @@ type tipService interface {
 	) ([]model.Tip, error)
 }
 
-type HandwritingMessageStore interface {
-	GetHandwritingMessage(
-		ctx context.Context,
-		sessionID,
-		questionID int,
-	) (*model.TelegramMessageRef, error)
-}
-
 type verifier interface {
 	Verify(initData string) (*TelegramUser, error)
 }
 
 type Handler struct {
-	session             quizSession
-	tip                 tipService
-	verifier            verifier
-	handwritingMessages HandwritingMessageStore
-	messenger           TelegramMessenger
-	cfg                 *config.Config
+	session           quizSession
+	tip               tipService
+	verifier          verifier
+	handwritingScreen handwritingScreen
 }
 
 type HandlerDeps struct {
-	Session             quizSession
-	Tip                 tipService
-	Verifier            verifier
-	HandwritingMessages HandwritingMessageStore
-	Messenger           TelegramMessenger
-	Config              *config.Config
+	Session           quizSession
+	Tip               tipService
+	Verifier          verifier
+	HandwritingScreen handwritingScreen
 }
 
 type handwritingSubmitRequest struct {
@@ -89,12 +73,10 @@ type handwritingSubmitRequest struct {
 
 func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
-		session:             deps.Session,
-		tip:                 deps.Tip,
-		verifier:            deps.Verifier,
-		handwritingMessages: deps.HandwritingMessages,
-		messenger:           deps.Messenger,
-		cfg:                 deps.Config,
+		session:           deps.Session,
+		tip:               deps.Tip,
+		verifier:          deps.Verifier,
+		handwritingScreen: deps.HandwritingScreen,
 	}
 }
 
@@ -102,8 +84,7 @@ func RegisterRoutes(
 	r *gin.Engine,
 	cfg *config.Config,
 	services *service.Services,
-	handwritingMessages HandwritingMessageStore,
-	messenger TelegramMessenger,
+	handwritingScreen handwritingScreen,
 ) {
 	handler := NewHandler(HandlerDeps{
 		Session: services.Session,
@@ -112,9 +93,7 @@ func RegisterRoutes(
 			cfg.Telegram.Token,
 			24*time.Hour,
 		),
-		HandwritingMessages: handwritingMessages,
-		Messenger:           messenger,
-		Config:              cfg,
+		HandwritingScreen: handwritingScreen,
 	})
 
 	r.Static(
@@ -356,7 +335,7 @@ func (h *Handler) refreshHandwritingMessage(
 			questionID,
 		),
 	)
-	if h.handwritingMessages == nil || h.messenger == nil || h.cfg == nil {
+	if h.handwritingScreen == nil {
 		slog.WarnContext(
 			parent,
 			"Handwriting cleanup skipped because dependency is missing",
@@ -372,116 +351,9 @@ func (h *Handler) refreshHandwritingMessage(
 	)
 	defer cancel()
 
-	message, err := h.handwritingMessages.GetHandwritingMessage(
+	h.handwritingScreen.ShowHandwritingGraded(
 		ctx,
 		sessionID,
 		questionID,
 	)
-	if err != nil {
-		if errors.Is(
-			err,
-			model.ErrInvalidTelegramMessageRef,
-		) {
-			slog.ErrorContext(
-				ctx,
-				"Invalid handwriting message ID format",
-				"event",
-				"handwriting.cleanup.invalid_message_id",
-				"error",
-				err,
-			)
-		} else {
-			slog.ErrorContext(
-				ctx,
-				"Failed to get handwriting message ID",
-				"event",
-				"handwriting.cleanup.message_lookup_failed",
-				"error",
-				err,
-			)
-		}
-		return
-	}
-	if message == nil {
-		return
-	}
-
-	// We need to know the question index to format the "Next" button.
-	state, err := h.session.QuizProgress(
-		ctx,
-		sessionID,
-	)
-	if err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to get active session state for handwriting cleanup",
-			"event",
-			"handwriting.cleanup.session_lookup_failed",
-			"error",
-			err,
-		)
-		return
-	}
-
-	item, questionIdx, ok := state.CurrentItemByQuestionID(questionID)
-	if !ok {
-		slog.WarnContext(
-			ctx,
-			"Question not found in session for handwriting cleanup",
-			"event",
-			"handwriting.cleanup.question_not_found",
-		)
-		return
-	}
-
-	nextData := callback.FormatHandwritingNext(
-		sessionID,
-		questionIdx,
-		h.cfg.Server.PublicBaseURL,
-	)
-
-	markup := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				"다음 문제 →",
-				nextData,
-			),
-		),
-	)
-	// Keep the linked-material action available after the Mini App replaces
-	// the original handwriting keyboard with the next-question button.
-	if item.Question.MaterialID != nil {
-		markup.InlineKeyboard = append(
-			markup.InlineKeyboard,
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData(
-					"⚙️ 연결 자료 설정",
-					fmt.Sprintf(
-						callback.FormatQuestionPolicy,
-						sessionID,
-						questionID,
-					),
-				),
-			),
-		)
-	}
-
-	if err := h.messenger.EditMessageReplyMarkup(
-		message.ChatID,
-		message.MessageID,
-		markup,
-	); err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to edit handwriting message reply markup",
-			"event",
-			"handwriting.cleanup.reply_markup_failed",
-			"chat_id",
-			message.ChatID,
-			"message_id",
-			message.MessageID,
-			"error",
-			err,
-		)
-	}
 }

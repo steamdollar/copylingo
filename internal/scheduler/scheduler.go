@@ -25,14 +25,19 @@ type Scheduler struct {
 	dispatcher   *sessionDispatcher
 }
 
-type sessionPusher interface {
+// quizPusher sends the "Quiz session arrived" message (bot SessionFlow).
+type quizPusher interface {
 	PushSession(
 		ctx context.Context,
 		chatID int64,
 		sessionID int,
 		sessionType string,
 	) error
-	PushStudySession(
+}
+
+// studyPusher sends the "Study session arrived" message (bot StudyFlow).
+type studyPusher interface {
+	PushSession(
 		ctx context.Context,
 		chatID int64,
 		sessionID int,
@@ -48,22 +53,28 @@ type pushClaims interface {
 	) (bool, error)
 }
 
-func New(
-	services *service.Services,
-	bot sessionPusher,
-	orchestrator *pipeline.Orchestrator,
-	c *cron.Cron,
-	claims pushClaims,
-) *Scheduler {
+// Deps wires Scheduler. Services is still the whole bundle until ADR-059 §8
+// step D replaces it with the narrow services the dispatcher calls.
+type Deps struct {
+	Services     *service.Services
+	QuizPusher   quizPusher
+	StudyPusher  studyPusher
+	Orchestrator *pipeline.Orchestrator
+	Cron         *cron.Cron
+	Claims       pushClaims
+}
+
+func New(deps Deps) *Scheduler {
 	s := &Scheduler{
-		services:     services,
-		orchestrator: orchestrator,
-		cron:         c,
+		services:     deps.Services,
+		orchestrator: deps.Orchestrator,
+		cron:         deps.Cron,
 	}
 	s.dispatcher = newSessionDispatcher(
-		services,
-		bot,
-		claims,
+		deps.Services,
+		deps.QuizPusher,
+		deps.StudyPusher,
+		deps.Claims,
 	)
 	return s
 }
