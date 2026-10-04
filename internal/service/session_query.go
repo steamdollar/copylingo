@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -36,7 +35,7 @@ func (s *SessionService) OldestUnfinished(
 func (s *SessionService) ListByStatus(
 	ctx context.Context,
 	userID int64,
-	status config.SessionStatus,
+	status model.SessionStatus,
 ) ([]model.Session, error) {
 	return s.sessionRepo.GetSessionsByStatus(
 		ctx,

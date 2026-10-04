@@ -8,7 +8,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -260,7 +259,7 @@ func (r *SessionRepository) CountUnfinishedBatch(
 func (r *SessionRepository) GetSessionsByStatus(
 	ctx context.Context,
 	userID int64,
-	status config.SessionStatus,
+	status model.SessionStatus,
 ) ([]model.Session, error) {
 	var sessions []model.Session
 	if err := r.db.SelectContext(

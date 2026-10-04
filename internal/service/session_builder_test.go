@@ -6,7 +6,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -70,7 +69,7 @@ type mockSessionStore struct {
 	getSessionsByStatusFn func(
 		ctx context.Context,
 		userID int64,
-		status config.SessionStatus,
+		status model.SessionStatus,
 	) ([]model.Session, error)
 	listInProgressFn func(ctx context.Context) ([]model.Session, error)
 	startFn          func(
@@ -101,7 +100,7 @@ func (m *mockSessionStore) GetByID(
 func (m *mockSessionStore) GetSessionsByStatus(
 	ctx context.Context,
 	userID int64,
-	status config.SessionStatus,
+	status model.SessionStatus,
 ) ([]model.Session, error) {
 	return m.getSessionsByStatusFn(
 		ctx,

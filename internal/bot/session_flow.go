@@ -12,7 +12,6 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
 	"github.com/lsj/copylingo/internal/callback"
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -59,7 +58,7 @@ type quizSession interface {
 	ListByStatus(
 		ctx context.Context,
 		userID int64,
-		status config.SessionStatus,
+		status model.SessionStatus,
 	) ([]model.Session, error)
 	QuizProgress(
 		ctx context.Context,
@@ -220,7 +219,7 @@ func (sf *SessionFlow) getPendingSessions(
 	sessions, err := sf.session.ListByStatus(
 		ctx,
 		cb.From.ID,
-		config.SessionStatusPending,
+		model.SessionPending,
 	)
 	if err != nil {
 		return err
@@ -313,7 +312,7 @@ func (sf *SessionFlow) getInProgressSessions(
 	inProgressSessions, err := sf.session.ListByStatus(
 		ctx,
 		cb.From.ID,
-		config.SessionStatusInProgress,
+		model.SessionInProgress,
 	)
 	if err != nil {
 		return false, err

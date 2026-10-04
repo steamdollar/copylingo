@@ -8,7 +8,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -20,7 +19,7 @@ type mockSessionStore struct {
 	getSessionsByStatusFn func(
 		ctx context.Context,
 		userID int64,
-		status config.SessionStatus,
+		status model.SessionStatus,
 	) ([]model.Session, error)
 	startFn func(
 		ctx context.Context,
@@ -51,7 +50,7 @@ func (m *mockSessionStore) GetByID(
 func (m *mockSessionStore) GetSessionsByStatus(
 	ctx context.Context,
 	userID int64,
-	status config.SessionStatus,
+	status model.SessionStatus,
 ) ([]model.Session, error) {
 	return m.getSessionsByStatusFn(
 		ctx,
@@ -79,7 +78,7 @@ func TestStartStudy_NoSessions(t *testing.T) {
 		getSessionsByStatusFn: func(
 			ctx context.Context,
 			userID int64,
-			status config.SessionStatus,
+			status model.SessionStatus,
 		) ([]model.Session, error) {
 			return nil, nil
 		},
@@ -130,9 +129,9 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 		getSessionsByStatusFn: func(
 			ctx context.Context,
 			userID int64,
-			status config.SessionStatus,
+			status model.SessionStatus,
 		) ([]model.Session, error) {
-			if status == config.SessionStatusPending {
+			if status == model.SessionPending {
 				return []model.Session{{
 					ID:             10,
 					Type:           model.SessionStudy,
@@ -206,9 +205,9 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 		getSessionsByStatusFn: func(
 			ctx context.Context,
 			userID int64,
-			status config.SessionStatus,
+			status model.SessionStatus,
 		) ([]model.Session, error) {
-			if status == config.SessionStatusInProgress {
+			if status == model.SessionInProgress {
 				return []model.Session{{ID: 10}}, nil
 			}
 			return nil, nil

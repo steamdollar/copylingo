@@ -5,7 +5,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 )
@@ -60,7 +59,7 @@ type SessionRepo interface {
 	GetSessionsByStatus(
 		ctx context.Context,
 		userID int64,
-		status config.SessionStatus,
+		status model.SessionStatus,
 	) ([]model.Session, error)
 	ListInProgress(ctx context.Context) ([]model.Session, error)
 	GetOldestUnfinished(
