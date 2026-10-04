@@ -1,7 +1,7 @@
 # ADR-059: 기능별 호출 경계와 서버 초기화 구조 단순화
 
 - 날짜: 2026-09-26
-- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중 — A·B 완료(2026-09-30), 다음 C**
+- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중 — A·B 완료(2026-09-30), C 완료(2026-10-04), 다음 D**
 - 보강: 2026-09-30 — 서비스 2계층·생성자 규칙·하위 계층 규칙 추가 (§8)
 - 범위: 패키지 간 호출 경계, Quiz·Study 책임 배치, Redis 접근, 서버 인스턴스 생성·주입
 - 관련 결정: [ADR-057·058·060](ADR_from_41_to_60.md), [1단계 구현 기록](../workthrough/2609/2609262045_redis_access_boundary.md)
@@ -377,3 +377,18 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 | 어순 문제 제출 | `SubmitQuizWordOrder(sessionID, questionID, selection []int)`로 받고, service가 현재 문항 옵션으로 답을 조립하며 순열 여부를 검증한다. | 선택지 제출과 같은 index 입력이고, 답 조립을 도메인 쪽에 둔다. 범용 문자열 제출 입구는 만들지 않는다. draft 관리는 bot에 남긴다. |
 | 손글씨 | `HandwritingService` 타입을 없애고 `SessionService.SubmitHandwriting`으로 옮긴다. 렌더러는 기본 PNG 렌더러로 생성자 안에서 만든다. | 흐름은 그대로이고 전달 계층만 사라진다. |
 | Tip·LLMQuestion 생성자 | `NewTipService(repo, generatorLLM, sourceModel)`가 generator를 내부에서 만든다. `NewLLMQuestionService(llm, tips, sourceModel)`는 답변 후 `TipService`로 후보를 저장한다. | 팁 후보의 source model을 bot 설정에서 읽지 않는다. `GenerateTips` concrete 단언은 D단계에서 제거할 때까지 `NewServices`에 남긴다. |
+
+### 8.7 C단계 결정 (2026-10-01~04)
+
+구현 기록은 [C단계 workthrough](../workthrough/2610/2610042335_adr059_stage_c_feature_flows.md)에 있다. 계획서(`docs/todos/adr059_stage_c_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
+
+| 대상 | 결정 | 근거 |
+|---|---|---|
+| Flow 분리 범위 | `SessionFlow`·`StudyFlow`·`SettingsFlow`·`LLMQuestionFlow` 4개로 나눈다. `Bot`은 update 라우팅과 메뉴·통계·streak·help·exit·study·test 명령만 맡는다. | 기능별 의존이 각 Flow의 `Deps` 필드 목록으로 드러난다. Settings·LLM을 `Bot`에 남기면 `Bot`이 User·MaterialPreference·LLMQuestion을 계속 모아 갖는다. |
+| 조립 위치 | cmd/server가 `TelegramClient` → 각 Flow → `Bot` 순으로 만들고, scheduler·Mini App에 Flow를 직접 넘긴다. 조립 결과 묶음(`botComponents`)은 cmd/server 안에서만 쓴다. | `NewBot` 내부 조립 + getter 방식은 `Bot`을 다시 의존 보관소로 만든다. 묶음 struct는 조립부에서만 쓴다(§8.3). |
+| Deps 필드 타입 | bot 패키지가 정의한 unexported 인터페이스에 실제 호출 메서드만 넣는다. Flow 간 참조(`Bot`→Flow, `SessionFlow`→`StudyFlow`)는 concrete 포인터다. | Mini App `quizSession` 선례. Flow 간 참조는 같은 패키지 안이라 대역이 필요 없다. |
+| Mini App 손글씨 갱신 | Mini App은 `handwritingScreen.ShowHandwritingGraded(ctx, sessionID, questionID)`만 호출한다. 메시지 조회·`QuizProgress` 재조회·키보드·Edit는 `SessionFlow`가 한다. goroutine·15초 timeout·source 속성은 Mini App에 남긴다. | 봇이 Telegram 표현을 소유한다(§3). Mini App이 `tgbotapi`·`callback`을 import하지 않는다. 키보드 문구는 bot locale의 같은 문구 키(`nextQuestionButton`·`linkedMaterialSettingsButton`)를 쓴다. |
+| scheduler 계약 | `New(Deps)`로 받고 push 계약을 `quizPusher`(SessionFlow)·`studyPusher`(StudyFlow)로 나눈다. `Deps.Services`는 D단계까지 유지한다. | 한 타입이 두 push를 모두 구현할 필요가 없어진다. `Services` 제거는 D단계 범위다. |
+| nil 방어 | service 의존(Session·User·MaterialPreference·LLMQuestion)의 nil 분기는 제거하고 store nil 분기는 유지한다. Audio는 선택 의존으로 남기며 조립부가 `services.Audio != nil`일 때만 넣는다. | 생성자가 Deps를 채우므로 service nil은 조립 오류다. Audio는 TTS key가 없으면 production에서도 nil이고, nil 포인터를 인터페이스에 넣으면 non-nil이 된다. |
+| `StateStores` | `StateStores`·`InputStateStore`를 삭제한다. 각 Flow Deps가 필요한 store 계약만 받는다. | §8.1 마지막 항목. 다섯 필드가 모두 같은 `interactions`였다. |
+| 테스트 조립 | Flow별 헬퍼(`newTestSessionFlow`·`newTestStudyFlow`·`newTestSettingsFlow`·`newTestLLMQuestionFlow`)와 디스패치용 `newTestBot`을 쓴다. 공통 fixture struct는 만들지 않는다. | 테스트가 필요한 service 의존을 명시하고, 빠진 의존은 nil로 남아 호출 시 바로 실패한다. |
