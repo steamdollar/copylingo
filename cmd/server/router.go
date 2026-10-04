@@ -8,10 +8,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/miniapp"
-	"github.com/lsj/copylingo/internal/service"
 )
 
 // setupRouter registers the infrastructure health probe and Mini App routes.
@@ -19,8 +17,7 @@ func setupRouter(
 	cfg *config.Config,
 	db *sqlx.DB,
 	rdb *redis.Client,
-	services *service.Services,
-	handwritingScreen *bot.SessionFlow,
+	miniappHandler *miniapp.Handler,
 ) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -70,13 +67,9 @@ func setupRouter(
 		},
 	)
 
-	// The Mini App only reports a graded handwriting answer; SessionFlow
-	// refreshes the Telegram message.
 	miniapp.RegisterRoutes(
 		r,
-		cfg,
-		services,
-		handwritingScreen,
+		miniappHandler,
 	)
 
 	return r

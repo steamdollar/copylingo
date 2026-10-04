@@ -80,22 +80,12 @@ func NewHandler(deps HandlerDeps) *Handler {
 	}
 }
 
+// RegisterRoutes serves the handwriting Mini App assets and its API on handler,
+// which cmd/server builds with its dependencies.
 func RegisterRoutes(
 	r *gin.Engine,
-	cfg *config.Config,
-	services *service.Services,
-	handwritingScreen handwritingScreen,
+	handler *Handler,
 ) {
-	handler := NewHandler(HandlerDeps{
-		Session: services.Session,
-		Tip:     services.Tip,
-		Verifier: NewInitDataVerifier(
-			cfg.Telegram.Token,
-			24*time.Hour,
-		),
-		HandwritingScreen: handwritingScreen,
-	})
-
 	r.Static(
 		"/miniapp/handwriting/assets",
 		"./web/miniapp/handwriting",

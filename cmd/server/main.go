@@ -8,6 +8,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/miniapp"
 	"github.com/lsj/copylingo/internal/observability"
 )
 
@@ -76,12 +77,22 @@ func run() error {
 	)
 	defer stopWorkers()
 
+	// The Mini App only reports a graded handwriting answer; SessionFlow
+	// refreshes the Telegram message.
+	miniappHandler := miniapp.NewHandler(miniapp.HandlerDeps{
+		Session: services.Session,
+		Tip:     services.Tip,
+		Verifier: miniapp.NewInitDataVerifier(
+			cfg.Telegram.Token,
+			miniapp.InitDataMaxAge,
+		),
+		HandwritingScreen: components.sessionFlow,
+	})
 	router := setupRouter(
 		cfg,
 		db,
 		rdb,
-		services,
-		components.sessionFlow,
+		miniappHandler,
 	)
 	srv := startHTTPServer(
 		cfg,
