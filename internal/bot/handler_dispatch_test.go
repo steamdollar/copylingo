@@ -299,13 +299,17 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 				},
 			}
 			mSRSRepo := &mockSRSRepo{}
-			b.services = &service.Services{
-				User: service.NewUserService(mUserRepo),
-				Session: newTestSessionService(
-					nil,
-					service.SessionDeps{QuestionRepo: mSRSRepo},
-				),
-			}
+			b := newTestBot(
+				mAPI,
+				nil,
+				&service.Services{
+					User: service.NewUserService(mUserRepo),
+					Session: newTestSessionService(
+						nil,
+						service.SessionDeps{QuestionRepo: mSRSRepo},
+					),
+				},
+			)
 
 			b.handleUpdate(update)
 			if len(mAPI.sentMessages) == 0 {

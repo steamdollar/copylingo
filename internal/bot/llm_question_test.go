@@ -73,15 +73,16 @@ func keyboardHasCallback(
 func TestLoadQuizQuestionContext(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b := &Bot{
-		input: stateStores,
-		services: &service.Services{
+	b := newTestLLMQuestionFlow(
+		nil,
+		stateStores,
+		LLMQuestionFlowDeps{
 			Session: newTestSessionService(
 				stateStores,
 				service.SessionDeps{},
 			),
 		},
-	}
+	)
 
 	sessionID, questionID := 10, 1
 	userAnswer := "が"
@@ -194,28 +195,29 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 		},
 	}
 
-	newBot := func() *Bot {
+	newFlow := func() *LLMQuestionFlow {
 		stateStores := newTestInteractionStores()
 		storeStudyState(
 			t,
 			stateStores,
 			state,
 		)
-		return &Bot{
-			input: stateStores,
-			services: &service.Services{
+		return newTestLLMQuestionFlow(
+			nil,
+			stateStores,
+			LLMQuestionFlowDeps{
 				Session: newTestSessionService(
 					stateStores,
 					service.SessionDeps{},
 				),
 			},
-		}
+		)
 	}
 
 	t.Run(
 		"valid token includes rendered material and requires ownership",
 		func(t *testing.T) {
-			b := newBot()
+			b := newFlow()
 			got := b.loadStudyMaterialContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMStudyMaterial, SessionID: 20, MaterialOrder: 0},
@@ -249,7 +251,7 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 	t.Run(
 		"malformed or unknown material token yields no context",
 		func(t *testing.T) {
-			b := newBot()
+			b := newFlow()
 			if got := b.loadStudyMaterialContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion},

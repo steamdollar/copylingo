@@ -39,7 +39,6 @@ type botMessages struct {
 	cancelUnavailable                  string
 	modeCancelled                      string
 	emptyQuestion                      string
-	questionUnavailable                string
 	userUnavailable                    string
 	answerGenerating                   string
 	answerFailed                       string
@@ -231,7 +230,6 @@ var botMessagesByLocale = map[string]botMessages{
 		cancelUnavailable:                  "❌ LLM mode를 취소할 수 없습니다.",
 		modeCancelled:                      "✅ LLM mode를 취소했습니다.",
 		emptyQuestion:                      "⚠️ 질문 내용이 비어 있습니다. /llm 으로 다시 시작해 주세요.",
-		questionUnavailable:                "❌ LLM 질문 기능이 준비되지 않았습니다.",
 		userUnavailable:                    "❌ 사용자 정보를 확인할 수 없습니다.",
 		answerGenerating:                   "🤖 AI가 답변을 생성 중입니다...",
 		answerFailed:                       "❌ AI 답변 생성 중 오류가 발생했습니다. 다시 질문하려면 /llm 을 입력해 주세요.",

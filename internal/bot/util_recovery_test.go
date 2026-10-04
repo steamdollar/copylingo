@@ -55,7 +55,7 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 			),
 		},
 	)
-	b.flow.publicBaseURL = "https://x.trycloudflare.com"
+	b.sessionFlow.publicBaseURL = "https://x.trycloudflare.com"
 
 	b.RefreshStaleMiniAppMessages(ctx)
 

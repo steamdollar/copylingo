@@ -208,6 +208,33 @@ func newTestStudyFlow(
 	return NewStudyFlow(deps)
 }
 
+// newTestSettingsFlow wires SettingsFlow with Telegram from api. It has no
+// store dependency, so service deps are the only other fields.
+func newTestSettingsFlow(
+	api *mockBotAPI,
+	deps SettingsFlowDeps,
+) *SettingsFlow {
+	if api != nil {
+		deps.Telegram = newTelegramClient(api)
+	}
+	return NewSettingsFlow(deps)
+}
+
+// newTestLLMQuestionFlow wires LLMQuestionFlow the same way as newTestSessionFlow.
+func newTestLLMQuestionFlow(
+	api *mockBotAPI,
+	stores *testInteractionStores,
+	deps LLMQuestionFlowDeps,
+) *LLMQuestionFlow {
+	if api != nil {
+		deps.Telegram = newTelegramClient(api)
+	}
+	if stores != nil && deps.Input == nil {
+		deps.Input = stores
+	}
+	return NewLLMQuestionFlow(deps)
+}
+
 // newTestBot assembles the router with every flow wired the way production
 // does, for tests that dispatch updates through handleMessage/handleCallback.
 // A nil services means no service dependency is wired.

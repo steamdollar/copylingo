@@ -571,7 +571,6 @@ func TestStudyMaterialPreferenceEscapesHTMLAndExplainsMaintenance(t *testing.T) 
 }
 
 func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
-	b, _, api := newSettingsTestBot()
 	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
 	for materialID := 1; materialID <= 9; materialID++ {
 		repo.items[[2]int64{42, int64(materialID)}] = model.MaterialPreference{
@@ -591,7 +590,11 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 		MaterialTitle: "other-user-secret",
 		ReviewMode:    model.MaterialReviewExcluded,
 	}
-	b.services.MaterialPreference = service.NewMaterialPreferenceService(repo)
+	api := &mockBotAPI{}
+	b := newTestSettingsFlow(
+		api,
+		SettingsFlowDeps{MaterialPreference: service.NewMaterialPreferenceService(repo)},
+	)
 	b.handleSettingsCallback(
 		context.Background(),
 		preferenceCallback(
@@ -720,10 +723,13 @@ func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
 			),
 		)
 	}
-	b := &Bot{
-		telegram: flow.telegram,
-		services: &service.Services{MaterialPreference: service.NewMaterialPreferenceService(repo)},
-	}
+	b := newTestSettingsFlow(
+		nil,
+		SettingsFlowDeps{
+			Telegram:           flow.telegram,
+			MaterialPreference: service.NewMaterialPreferenceService(repo),
+		},
+	)
 	for _, data := range []string{
 		"settings:materials", "settings:restore",
 		"settings:materials:-1", "settings:materials:x", "settings:materials:+1", "settings:materials:0:extra",
@@ -751,16 +757,7 @@ func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
 }
 
 func TestMaterialPreferenceKeyboardAvailabilityAndCallbackLength(t *testing.T) {
-	b, _, _ := newSettingsTestBot()
-	keyboard := b.settingsKeyboard(&model.User{})
-	if hasPreferenceCallback(
-		&keyboard,
-		"settings:materials:0",
-	) {
-		t.Fatal("preference menu shown without service")
-	}
-	b.services.MaterialPreference = service.NewMaterialPreferenceService(&botMaterialPreferenceRepo{})
-	keyboard = b.settingsKeyboard(&model.User{})
+	keyboard := buildSettingsKeyboard(&model.User{})
 	if !hasPreferenceCallback(
 		&keyboard,
 		"settings:materials:0",

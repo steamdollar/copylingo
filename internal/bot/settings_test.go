@@ -65,7 +65,7 @@ func (m *settingsMockUserRepo) UpdateTimezone(
 	return nil
 }
 
-func newSettingsTestBot() (*Bot, *settingsMockUserRepo, *mockBotAPI) {
+func newSettingsTestFlow() (*SettingsFlow, *settingsMockUserRepo, *mockBotAPI) {
 	mStudy := "08:00"
 	mQuiz := "12:00"
 	eStudy := "16:30"
@@ -88,21 +88,16 @@ func newSettingsTestBot() (*Bot, *settingsMockUserRepo, *mockBotAPI) {
 		slotUpdates: make(map[model.SessionSlot]*string),
 	}
 
-	userSvc := service.NewUserService(repo)
-	services := &service.Services{
-		User: userSvc,
-	}
-
 	mockAPI := &mockBotAPI{}
-	bot := &Bot{
-		telegram: newTelegramClient(mockAPI),
-		services: services,
-	}
-	return bot, repo, mockAPI
+	flow := newTestSettingsFlow(
+		mockAPI,
+		SettingsFlowDeps{User: service.NewUserService(repo)},
+	)
+	return flow, repo, mockAPI
 }
 
 func TestHandleSettingsCommand(t *testing.T) {
-	bot, _, mockAPI := newSettingsTestBot()
+	flow, _, mockAPI := newSettingsTestFlow()
 
 	msg := &tgbotapi.Message{
 		MessageID: 100,
@@ -111,7 +106,7 @@ func TestHandleSettingsCommand(t *testing.T) {
 		Text:      "/settings",
 	}
 
-	bot.handleSettingsCommand(
+	flow.handleSettingsCommand(
 		context.Background(),
 		msg,
 	)
@@ -164,9 +159,10 @@ func TestHandleSettingsCommand(t *testing.T) {
 			sentMsg.ReplyMarkup,
 		)
 	}
-	if len(markup.InlineKeyboard) != 6 {
+	// 4 slots, timezone, linked-material list, main menu.
+	if len(markup.InlineKeyboard) != 7 {
 		t.Fatalf(
-			"expected 6 rows of buttons, got %d",
+			"expected 7 rows of buttons, got %d",
 			len(markup.InlineKeyboard),
 		)
 	}
@@ -191,7 +187,7 @@ func TestFormatSlotTimeNormalizesDatabaseTimestamp(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_View(t *testing.T) {
-	bot, _, mockAPI := newSettingsTestBot()
+	flow, _, mockAPI := newSettingsTestFlow()
 
 	cb := &tgbotapi.CallbackQuery{
 		ID:   "cb_1",
@@ -203,7 +199,7 @@ func TestHandleSettingsCallback_View(t *testing.T) {
 		},
 	}
 
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -231,7 +227,7 @@ func TestHandleSettingsCallback_View(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
-	bot, _, mockAPI := newSettingsTestBot()
+	flow, _, mockAPI := newSettingsTestFlow()
 
 	cb := &tgbotapi.CallbackQuery{
 		ID:   "cb_2",
@@ -243,7 +239,7 @@ func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 		},
 	}
 
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -304,7 +300,7 @@ func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_SlotPickerAll(t *testing.T) {
-	bot, _, mockAPI := newSettingsTestBot()
+	flow, _, mockAPI := newSettingsTestFlow()
 
 	cb := &tgbotapi.CallbackQuery{
 		ID:   "cb_3",
@@ -316,7 +312,7 @@ func TestHandleSettingsCallback_SlotPickerAll(t *testing.T) {
 		},
 	}
 
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -349,7 +345,7 @@ func TestHandleSettingsCallback_SlotPickerAll(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_SetSlotTime(t *testing.T) {
-	bot, repo, mockAPI := newSettingsTestBot()
+	flow, repo, mockAPI := newSettingsTestFlow()
 
 	cb := &tgbotapi.CallbackQuery{
 		ID:   "cb_4",
@@ -361,7 +357,7 @@ func TestHandleSettingsCallback_SetSlotTime(t *testing.T) {
 		},
 	}
 
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -394,7 +390,7 @@ func TestHandleSettingsCallback_SetSlotTime(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
-	bot, repo, mockAPI := newSettingsTestBot()
+	flow, repo, mockAPI := newSettingsTestFlow()
 
 	cb := &tgbotapi.CallbackQuery{
 		ID:   "cb_5",
@@ -406,7 +402,7 @@ func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
 		},
 	}
 
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -442,7 +438,7 @@ func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_Timezone(t *testing.T) {
-	bot, _, mockAPI := newSettingsTestBot()
+	flow, _, mockAPI := newSettingsTestFlow()
 
 	cb := &tgbotapi.CallbackQuery{
 		ID:   "cb_6",
@@ -454,7 +450,7 @@ func TestHandleSettingsCallback_Timezone(t *testing.T) {
 		},
 	}
 
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -496,7 +492,7 @@ func TestHandleSettingsCallback_Timezone(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
-	bot, repo, mockAPI := newSettingsTestBot()
+	flow, repo, mockAPI := newSettingsTestFlow()
 
 	cb := &tgbotapi.CallbackQuery{
 		ID:   "cb_7",
@@ -508,7 +504,7 @@ func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
 		},
 	}
 
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -540,7 +536,7 @@ func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
-	bot, repo, _ := newSettingsTestBot()
+	flow, repo, _ := newSettingsTestFlow()
 
 	// Invalid slot
 	cb := &tgbotapi.CallbackQuery{
@@ -552,7 +548,7 @@ func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
 			Chat:      &tgbotapi.Chat{ID: 12345},
 		},
 	}
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cb,
 	)
@@ -567,7 +563,7 @@ func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
 			Chat:      &tgbotapi.Chat{ID: 12345},
 		},
 	}
-	bot.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		cbTz,
 	)

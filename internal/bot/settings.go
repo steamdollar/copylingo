@@ -12,12 +12,56 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
+// settingsUser loads the user behind an update and saves their push
+// schedule and timezone.
+type settingsUser interface {
+	GetUser(
+		ctx context.Context,
+		telegramID int64,
+		username string,
+	) (*model.User, error)
+	UpdateSlotTime(
+		ctx context.Context,
+		userID int64,
+		slot model.SessionSlot,
+		timeVal *string,
+	) error
+	UpdateTimezone(
+		ctx context.Context,
+		userID int64,
+		tz string,
+	) error
+}
+
+// SettingsFlowDeps wires SettingsFlow; every dependency is required.
+type SettingsFlowDeps struct {
+	Telegram           *telegramClient
+	User               settingsUser
+	MaterialPreference materialPreferenceList
+}
+
+// SettingsFlow handles the /settings screens: push schedule, timezone, and
+// the list of materials whose review mode the user changed.
+type SettingsFlow struct {
+	telegram           *telegramClient
+	user               settingsUser
+	materialPreference materialPreferenceList
+}
+
+func NewSettingsFlow(deps SettingsFlowDeps) *SettingsFlow {
+	return &SettingsFlow{
+		telegram:           deps.Telegram,
+		user:               deps.User,
+		materialPreference: deps.MaterialPreference,
+	}
+}
+
 // handleSettingsCommand handles /settings command by displaying the schedule configuration menu.
-func (b *Bot) handleSettingsCommand(
+func (sf *SettingsFlow) handleSettingsCommand(
 	ctx context.Context,
 	msg *tgbotapi.Message,
 ) {
-	user, err := b.services.User.GetUser(
+	user, err := sf.user.GetUser(
 		ctx,
 		msg.From.ID,
 		msg.From.UserName,
@@ -31,7 +75,7 @@ func (b *Bot) handleSettingsCommand(
 				err,
 			),
 		)
-		b.telegram.SendMessage(
+		sf.telegram.SendMessage(
 			msg.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].settingsLoadFailed,
 		)
@@ -39,8 +83,8 @@ func (b *Bot) handleSettingsCommand(
 	}
 
 	text := buildSettingsOverviewText(user)
-	keyboard := b.settingsKeyboard(user)
-	b.telegram.SendMessageWithKeyboard(
+	keyboard := buildSettingsKeyboard(user)
+	sf.telegram.SendMessageWithKeyboard(
 		msg.Chat.ID,
 		text,
 		keyboard,
@@ -48,7 +92,7 @@ func (b *Bot) handleSettingsCommand(
 }
 
 // handleSettingsCallback routes callbacks related to push schedule & timezone settings.
-func (b *Bot) handleSettingsCallback(
+func (sf *SettingsFlow) handleSettingsCallback(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
 ) {
@@ -60,13 +104,13 @@ func (b *Bot) handleSettingsCallback(
 		":",
 	)
 	if len(parts) >= 2 && (parts[1] == callbackActionMaterials || parts[1] == callbackActionRestore) {
-		b.handleMaterialPreferencesCallback(
+		sf.handleMaterialPreferencesCallback(
 			ctx,
 			cb,
 		)
 		return
 	}
-	user, err := b.services.User.GetUser(
+	user, err := sf.user.GetUser(
 		ctx,
 		cb.From.ID,
 		cb.From.UserName,
@@ -80,7 +124,7 @@ func (b *Bot) handleSettingsCallback(
 				err,
 			),
 		)
-		b.telegram.AnswerCallbackAlert(
+		sf.telegram.AnswerCallbackAlert(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].settingsUserLoadFailed,
 		)
@@ -90,14 +134,14 @@ func (b *Bot) handleSettingsCallback(
 	data := cb.Data
 	switch {
 	case data == callbackMenuSettings || data == callbackSettingsView:
-		b.renderSettingsView(
+		sf.renderSettingsView(
 			ctx,
 			cb,
 			user,
 		)
 
 	case data == callbackSettingsTimezone:
-		b.renderTimezoneView(
+		sf.renderTimezoneView(
 			ctx,
 			cb,
 			user,
@@ -111,7 +155,7 @@ func (b *Bot) handleSettingsCallback(
 			data,
 			callbackPrefixSettingsTimezone,
 		)
-		if err := b.services.User.UpdateTimezone(
+		if err := sf.user.UpdateTimezone(
 			ctx,
 			user.ID,
 			tz,
@@ -128,18 +172,18 @@ func (b *Bot) handleSettingsCallback(
 					err,
 				),
 			)
-			b.telegram.AnswerCallbackAlert(
+			sf.telegram.AnswerCallbackAlert(
 				cb.ID,
 				botMessagesByLocale[botDefaultLocale].settingsTimezoneInvalid,
 			)
 			return
 		}
 		user.Timezone = tz
-		b.telegram.AnswerCallback(
+		sf.telegram.AnswerCallback(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].settingsTimezoneChanged,
 		)
-		b.renderSettingsView(
+		sf.renderSettingsView(
 			ctx,
 			cb,
 			user,
@@ -176,7 +220,7 @@ func (b *Bot) handleSettingsCallback(
 			)
 			return
 		}
-		b.renderSlotPickerView(
+		sf.renderSlotPickerView(
 			ctx,
 			cb,
 			user,
@@ -223,7 +267,7 @@ func (b *Bot) handleSettingsCallback(
 		}
 
 		if timeVal == callbackActionOff {
-			if err := b.services.User.UpdateSlotTime(
+			if err := sf.user.UpdateSlotTime(
 				ctx,
 				user.ID,
 				slot,
@@ -241,7 +285,7 @@ func (b *Bot) handleSettingsCallback(
 						err,
 					),
 				)
-				b.telegram.AnswerCallbackAlert(
+				sf.telegram.AnswerCallbackAlert(
 					cb.ID,
 					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
 				)
@@ -252,12 +296,12 @@ func (b *Bot) handleSettingsCallback(
 				slot,
 				nil,
 			)
-			b.telegram.AnswerCallback(
+			sf.telegram.AnswerCallback(
 				cb.ID,
 				botMessagesByLocale[botDefaultLocale].settingsNotificationsDisabled,
 			)
 		} else {
-			if err := b.services.User.UpdateSlotTime(
+			if err := sf.user.UpdateSlotTime(
 				ctx,
 				user.ID,
 				slot,
@@ -279,7 +323,7 @@ func (b *Bot) handleSettingsCallback(
 						err,
 					),
 				)
-				b.telegram.AnswerCallbackAlert(
+				sf.telegram.AnswerCallbackAlert(
 					cb.ID,
 					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
 				)
@@ -290,7 +334,7 @@ func (b *Bot) handleSettingsCallback(
 				slot,
 				&timeVal,
 			)
-			b.telegram.AnswerCallback(
+			sf.telegram.AnswerCallback(
 				cb.ID,
 				fmt.Sprintf(
 					botMessagesByLocale[botDefaultLocale].settingsNotificationTimeSetFormat,
@@ -298,7 +342,7 @@ func (b *Bot) handleSettingsCallback(
 				),
 			)
 		}
-		b.renderSettingsView(
+		sf.renderSettingsView(
 			ctx,
 			cb,
 			user,
@@ -306,15 +350,15 @@ func (b *Bot) handleSettingsCallback(
 	}
 }
 
-func (b *Bot) renderSettingsView(
+func (sf *SettingsFlow) renderSettingsView(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
 	u *model.User,
 ) {
 	text := buildSettingsOverviewText(u)
-	keyboard := b.settingsKeyboard(u)
+	keyboard := buildSettingsKeyboard(u)
 	if cb.Message != nil {
-		b.telegram.EditMessage(
+		sf.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			text,
@@ -323,7 +367,7 @@ func (b *Bot) renderSettingsView(
 	}
 }
 
-func (b *Bot) renderTimezoneView(
+func (sf *SettingsFlow) renderTimezoneView(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
 	u *model.User,
@@ -331,7 +375,7 @@ func (b *Bot) renderTimezoneView(
 	text := buildTimezoneText(u)
 	keyboard := buildTimezoneKeyboard()
 	if cb.Message != nil {
-		b.telegram.EditMessage(
+		sf.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			text,
@@ -340,7 +384,7 @@ func (b *Bot) renderTimezoneView(
 	}
 }
 
-func (b *Bot) renderSlotPickerView(
+func (sf *SettingsFlow) renderSlotPickerView(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
 	u *model.User,
@@ -356,7 +400,7 @@ func (b *Bot) renderSlotPickerView(
 		isAll,
 	)
 	if cb.Message != nil {
-		b.telegram.EditMessage(
+		sf.telegram.EditMessage(
 			cb.Message.Chat.ID,
 			cb.Message.MessageID,
 			text,
@@ -458,6 +502,15 @@ func buildSettingsKeyboard(u *model.User) tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData(
 				messages.settingsTimezoneChangeButton,
 				callbackSettingsTimezone,
+			),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.materialSettingsListButton,
+				fmt.Sprintf(
+					formatMaterialPreferences,
+					0,
+				),
 			),
 		),
 		tgbotapi.NewInlineKeyboardRow(

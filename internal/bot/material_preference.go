@@ -30,6 +30,22 @@ type materialPreferences interface {
 	) error
 }
 
+// materialPreferenceList pages one user's changed material preferences and
+// restores one to normal from the Settings screen.
+type materialPreferenceList interface {
+	List(
+		ctx context.Context,
+		userID int64,
+		page int,
+	) ([]model.MaterialPreference, bool, error)
+	Set(
+		ctx context.Context,
+		userID int64,
+		materialID int,
+		mode model.MaterialReviewMode,
+	) error
+}
+
 // Quiz callbacks carry a question ID, never a trusted material ID. Resolve it
 // from the owner's session before showing or changing the linked preference.
 func (sf *SessionFlow) handleQuizMaterialPreference(
@@ -411,31 +427,11 @@ func materialReviewModeLabel(mode model.MaterialReviewMode) string {
 	}
 }
 
-func (b *Bot) settingsKeyboard(user *model.User) tgbotapi.InlineKeyboardMarkup {
-	keyboard := buildSettingsKeyboard(user)
-	if b.services != nil && b.services.MaterialPreference != nil {
-		row := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
-			botMessagesByLocale[botDefaultLocale].materialSettingsListButton,
-			fmt.Sprintf(
-				formatMaterialPreferences,
-				0,
-			),
-		))
-		last := len(keyboard.InlineKeyboard) - 1
-		keyboard.InlineKeyboard = append(
-			keyboard.InlineKeyboard[:last],
-			row,
-			keyboard.InlineKeyboard[last],
-		)
-	}
-	return keyboard
-}
-
-func (b *Bot) handleMaterialPreferencesCallback(
+func (sf *SettingsFlow) handleMaterialPreferencesCallback(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
 ) {
-	if len(cb.Data) > 64 || b.services == nil || b.services.MaterialPreference == nil {
+	if len(cb.Data) > 64 {
 		return
 	}
 	parts := strings.Split(
@@ -480,7 +476,7 @@ func (b *Bot) handleMaterialPreferencesCallback(
 	if parts[1] == callbackActionRestore {
 		// The service restores only this user's preference and treats an already
 		// restored or absent preference as normal, so repeated callbacks are safe.
-		if err := b.services.MaterialPreference.Set(
+		if err := sf.materialPreference.Set(
 			ctx,
 			cb.From.ID,
 			materialID,
@@ -488,19 +484,19 @@ func (b *Bot) handleMaterialPreferencesCallback(
 		); err != nil {
 			materialPreferenceError(
 				ctx,
-				b.telegram,
+				sf.telegram,
 				cb,
 				"restore",
 				err,
 			)
 			return
 		}
-		b.telegram.AnswerCallback(
+		sf.telegram.AnswerCallback(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].materialPreferenceRestoredNotice,
 		)
 	}
-	items, hasNext, err := b.services.MaterialPreference.List(
+	items, hasNext, err := sf.materialPreference.List(
 		ctx,
 		cb.From.ID,
 		page,
@@ -508,7 +504,7 @@ func (b *Bot) handleMaterialPreferencesCallback(
 	if err != nil {
 		materialPreferenceError(
 			ctx,
-			b.telegram,
+			sf.telegram,
 			cb,
 			"list",
 			err,
@@ -520,7 +516,7 @@ func (b *Bot) handleMaterialPreferencesCallback(
 		page,
 		hasNext,
 	)
-	b.telegram.EditMessage(
+	sf.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		text,

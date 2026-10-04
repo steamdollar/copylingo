@@ -14,6 +14,7 @@ import (
 
 	"github.com/lsj/copylingo/internal/callback"
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -40,14 +41,70 @@ type BotAPI interface {
 	StopReceivingUpdates()
 }
 
-// Bot wraps the Telegram bot API with CopyLingo business logic.
+// commandSession is the part of service.SessionService the main menu and
+// the /study, /test commands use.
+type commandSession interface {
+	DueReviewCount(
+		ctx context.Context,
+		userID int64,
+		language,
+		level string,
+	) (int, error)
+	BuildStudy(
+		ctx context.Context,
+		user model.User,
+		profile service.StudySessionProfile,
+		limit int,
+	) (*model.Session, error)
+	BuildMorningQuiz(
+		ctx context.Context,
+		user model.User,
+	) (*model.Session, error)
+}
+
+// userStatsReader computes the numbers behind /stats and /streak.
+type userStatsReader interface {
+	GetUserStats(
+		ctx context.Context,
+		userID int64,
+	) (*model.UserStats, error)
+}
+
+// inputClearer drops a chat's pending typed answer and LLM mode on /exit.
+type inputClearer interface {
+	ClearInput(
+		ctx context.Context,
+		chatID int64,
+		userID *int64,
+	) error
+}
+
+// BotDeps wires the router; every dependency is required.
+type BotDeps struct {
+	Telegram        *telegramClient
+	User            userReader
+	Session         commandSession
+	Analyzer        userStatsReader
+	Input           inputClearer
+	SessionFlow     *SessionFlow
+	StudyFlow       *StudyFlow
+	SettingsFlow    *SettingsFlow
+	LLMQuestionFlow *LLMQuestionFlow
+}
+
+// Bot routes Telegram updates to the feature flows and serves the menu,
+// stats, streak, help, exit, study and test commands itself.
 type Bot struct {
-	telegram *telegramClient
-	services *service.Services
-	input    InputStateStore
-	flow     *SessionFlow
-	study    *StudyFlow
-	stopCh   chan struct{}
+	telegram        *telegramClient
+	user            userReader
+	session         commandSession
+	analyzer        userStatsReader
+	input           inputClearer
+	sessionFlow     *SessionFlow
+	studyFlow       *StudyFlow
+	settingsFlow    *SettingsFlow
+	llmQuestionFlow *LLMQuestionFlow
+	stopCh          chan struct{}
 }
 
 func NewBot(
@@ -109,20 +166,50 @@ func newBot(
 	if services.Audio != nil {
 		sessionDeps.Audio = services.Audio
 	}
+	return newRouter(BotDeps{
+		Telegram:    telegram,
+		User:        services.User,
+		Session:     services.Session,
+		Analyzer:    services.Analyzer,
+		Input:       stores.Input,
+		SessionFlow: NewSessionFlow(sessionDeps),
+		StudyFlow:   study,
+		SettingsFlow: NewSettingsFlow(SettingsFlowDeps{
+			Telegram:           telegram,
+			User:               services.User,
+			MaterialPreference: services.MaterialPreference,
+		}),
+		LLMQuestionFlow: NewLLMQuestionFlow(LLMQuestionFlowDeps{
+			Telegram:    telegram,
+			User:        services.User,
+			LLMQuestion: services.LLMQuestion,
+			Session:     services.Session,
+			Input:       stores.Input,
+		}),
+	})
+}
+
+// newRouter builds the router over already-assembled flows. It becomes
+// NewBot once cmd/server assembles the flows (ADR-059 §8 step C).
+func newRouter(deps BotDeps) *Bot {
 	return &Bot{
-		telegram: telegram,
-		services: services,
-		input:    stores.Input,
-		flow:     NewSessionFlow(sessionDeps),
-		study:    study,
-		stopCh:   make(chan struct{}),
+		telegram:        deps.Telegram,
+		user:            deps.User,
+		session:         deps.Session,
+		analyzer:        deps.Analyzer,
+		input:           deps.Input,
+		sessionFlow:     deps.SessionFlow,
+		studyFlow:       deps.StudyFlow,
+		settingsFlow:    deps.SettingsFlow,
+		llmQuestionFlow: deps.LLMQuestionFlow,
+		stopCh:          make(chan struct{}),
 	}
 }
 
 // RefreshStaleMiniAppMessages re-sends handwriting questions whose Mini App
 // link went stale across a restart; SessionFlow owns the work.
 func (b *Bot) RefreshStaleMiniAppMessages(ctx context.Context) {
-	b.flow.RefreshStaleMiniAppMessages(ctx)
+	b.sessionFlow.RefreshStaleMiniAppMessages(ctx)
 }
 
 // Start begins listening for Telegram updates.
@@ -159,7 +246,7 @@ func (b *Bot) PushSession(
 	sessionID int,
 	sessionType string,
 ) error {
-	return b.flow.PushSession(
+	return b.sessionFlow.PushSession(
 		ctx,
 		chatID,
 		sessionID,
@@ -173,7 +260,7 @@ func (b *Bot) PushStudySession(
 	chatID int64,
 	sessionID int,
 ) error {
-	return b.study.PushSession(
+	return b.studyFlow.PushSession(
 		ctx,
 		chatID,
 		sessionID,
@@ -404,14 +491,14 @@ func (b *Bot) handleMessage(
 ) {
 	// if it is nor bot command, check if it is active question answer, if not, ignore or route to chat.
 	if !msg.IsCommand() {
-		if handled := b.handleLLMQuestion(
+		if handled := b.llmQuestionFlow.handleLLMQuestion(
 			ctx,
 			msg,
 		); handled {
 			return
 		}
 		// Route plain text to session flow for FillBlank questions
-		b.flow.HandleTextInput(
+		b.sessionFlow.HandleTextInput(
 			ctx,
 			msg,
 		)
@@ -442,7 +529,7 @@ func (b *Bot) handleMessage(
 			msg,
 		)
 	case commandLLM:
-		b.handleLLM(
+		b.llmQuestionFlow.handleLLM(
 			ctx,
 			msg,
 		)
@@ -462,7 +549,7 @@ func (b *Bot) handleMessage(
 			msg,
 		)
 	case commandSettings:
-		b.handleSettingsCommand(
+		b.settingsFlow.handleSettingsCommand(
 			ctx,
 			msg,
 		)
@@ -488,7 +575,7 @@ func (b *Bot) handleCallback(
 
 	switch {
 	case data == callbackLLMCancel:
-		b.handleLLMCancel(
+		b.llmQuestionFlow.handleLLMCancel(
 			ctx,
 			cb,
 		)
@@ -499,12 +586,12 @@ func (b *Bot) handleCallback(
 			cb.From,
 		)
 	case data == callbackMenuStudy:
-		b.flow.StartStudy(
+		b.sessionFlow.StartStudy(
 			ctx,
 			cb,
 		)
 	case data == callbackMenuReview:
-		b.flow.StartReview(
+		b.sessionFlow.StartReview(
 			ctx,
 			cb,
 		)
@@ -517,7 +604,7 @@ func (b *Bot) handleCallback(
 		data,
 		callbackPrefixSettings,
 	):
-		b.handleSettingsCallback(
+		b.settingsFlow.handleSettingsCallback(
 			ctx,
 			cb,
 		)
@@ -527,7 +614,7 @@ func (b *Bot) handleCallback(
 		data,
 		callbackPrefixSession,
 	):
-		b.flow.HandleSessionCallback(
+		b.sessionFlow.HandleSessionCallback(
 			ctx,
 			cb,
 		)
@@ -535,7 +622,7 @@ func (b *Bot) handleCallback(
 		data,
 		callback.QuestionPrefix,
 	):
-		b.flow.HandleAnswerCallback(
+		b.sessionFlow.HandleAnswerCallback(
 			ctx,
 			cb,
 		)
@@ -543,7 +630,7 @@ func (b *Bot) handleCallback(
 		data,
 		callbackPrefixStudy,
 	):
-		b.study.HandleCallback(
+		b.studyFlow.HandleCallback(
 			ctx,
 			cb,
 		)
@@ -573,7 +660,7 @@ func (b *Bot) showMainMenu(
 	chatID int64,
 	from *tgbotapi.User,
 ) {
-	user, err := b.services.User.GetUser(
+	user, err := b.user.GetUser(
 		ctx,
 		from.ID,
 		from.UserName,
@@ -602,7 +689,7 @@ func (b *Bot) showMainMenu(
 		lang = user.Language
 		level = user.ProficiencyLevel
 	}
-	reviewCount, _ := b.services.Session.DueReviewCount(
+	reviewCount, _ := b.session.DueReviewCount(
 		ctx,
 		from.ID,
 		lang,
@@ -658,7 +745,7 @@ func (b *Bot) handleStats(
 	ctx context.Context,
 	msg *tgbotapi.Message,
 ) {
-	stats, err := b.services.Analyzer.GetUserStats(
+	stats, err := b.analyzer.GetUserStats(
 		ctx,
 		msg.From.ID,
 	)
@@ -692,7 +779,7 @@ func (b *Bot) handleStatsCallback(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
 ) {
-	stats, err := b.services.Analyzer.GetUserStats(
+	stats, err := b.analyzer.GetUserStats(
 		ctx,
 		cb.From.ID,
 	)
@@ -733,7 +820,7 @@ func (b *Bot) handleStreak(
 	ctx context.Context,
 	msg *tgbotapi.Message,
 ) {
-	stats, err := b.services.Analyzer.GetUserStats(
+	stats, err := b.analyzer.GetUserStats(
 		ctx,
 		msg.From.ID,
 	)
@@ -802,7 +889,7 @@ func (b *Bot) handleStudy(
 		return
 	}
 
-	user, err := b.services.User.GetUser(
+	user, err := b.user.GetUser(
 		ctx,
 		msg.From.ID,
 		msg.From.UserName,
@@ -823,7 +910,7 @@ func (b *Bot) handleStudy(
 		return
 	}
 
-	session, err := b.services.Session.BuildStudy(
+	session, err := b.session.BuildStudy(
 		ctx,
 		*user,
 		service.StudyProfileMorning,
@@ -924,7 +1011,7 @@ func (b *Bot) handleTest(
 	msg *tgbotapi.Message,
 ) {
 	// 1. Ensure user exists
-	user, err := b.services.User.GetUser(
+	user, err := b.user.GetUser(
 		ctx,
 		msg.From.ID,
 		msg.From.UserName,
@@ -946,7 +1033,7 @@ func (b *Bot) handleTest(
 	}
 
 	// 2. Build a morning session (9 new + 6 review)
-	session, err := b.services.Session.BuildMorningQuiz(
+	session, err := b.session.BuildMorningQuiz(
 		ctx,
 		*user,
 	)

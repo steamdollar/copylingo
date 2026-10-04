@@ -769,10 +769,11 @@ func botWithAnalyzer() (*Bot, *mockBotAPI) {
 		&analyzerUserRepoStub{streak: 5},
 		&statRepoStub{},
 	)
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		services: &service.Services{Analyzer: analyzer},
-	}
+	b := newTestBot(
+		mAPI,
+		nil,
+		&service.Services{Analyzer: analyzer},
+	)
 	return b, mAPI
 }
 
@@ -873,16 +874,17 @@ func TestHandleMenu(t *testing.T) {
 			return &model.User{ID: id, StreakDays: 3, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		services: &service.Services{
+	b := newTestBot(
+		mAPI,
+		nil,
+		&service.Services{
 			User: userSvc,
 			Session: newTestSessionService(
 				nil,
 				service.SessionDeps{QuestionRepo: &mockSRSRepo{}},
 			),
 		},
-	}
+	)
 
 	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
 	b.handleMenu(
