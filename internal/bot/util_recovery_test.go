@@ -67,6 +67,53 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	}
 }
 
+// fingerprintSpy counts fingerprint lookups, the first per-session step of
+// restart recovery.
+type fingerprintSpy struct {
+	MiniAppRecoveryStore
+	lookups int
+}
+
+func (s *fingerprintSpy) GetMiniAppFingerprint(
+	context.Context,
+	int,
+) (string, error) {
+	s.lookups++
+	return "", nil
+}
+
+func TestRefreshStaleMiniAppMessages_StopsWhenContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	mAPI := &mockBotAPI{}
+	stateStores := newTestInteractionStores()
+	recovery := &fingerprintSpy{}
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{SessionRepo: &sessionListStore{
+					inProgress: []model.Session{{ID: 1, UserID: 2, Mode: model.SessionModeQuiz}},
+				}},
+			),
+			Recovery:      recovery,
+			PublicBaseURL: "https://x.trycloudflare.com",
+		},
+	)
+
+	sf.RefreshStaleMiniAppMessages(ctx)
+
+	if recovery.lookups != 0 || len(mAPI.sentMessages) != 0 {
+		t.Fatalf(
+			"lookups = %d, sent = %d; want no per-session work after shutdown",
+			recovery.lookups,
+			len(mAPI.sentMessages),
+		)
+	}
+}
+
 // emptyQuestionFetcher has no new questions; due-review calls come from mockSRSRepo.
 type emptyQuestionFetcher struct {
 	mockSRSRepo

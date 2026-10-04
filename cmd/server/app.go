@@ -135,7 +135,8 @@ func initApp(cfg *config.Config) (_ *app, err error) {
 // Run binds the HTTP port first so a port conflict starts nothing, then
 // starts the scheduler, Telegram polling, the stale Mini App refresh and the
 // HTTP server. It returns after ctx is cancelled or the HTTP server fails,
-// once every worker has stopped.
+// once every worker has stopped accepting work. Only HTTP requests are
+// drained; an in-flight scheduler tick or Telegram update is not awaited.
 func (a *app) Run(ctx context.Context) error {
 	listener, err := net.Listen(
 		"tcp",

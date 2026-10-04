@@ -50,6 +50,10 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 	}
 
 	for _, s := range sessions {
+		// Shutdown cancels ctx; stop instead of failing every remaining session.
+		if ctx.Err() != nil {
+			return
+		}
 		// Skip if fingerprint unchanged
 		if sf.recovery != nil {
 			if last, _ := sf.recovery.GetMiniAppFingerprint(
