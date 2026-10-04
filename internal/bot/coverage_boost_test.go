@@ -772,7 +772,7 @@ func botWithAnalyzer() (*Bot, *mockBotAPI) {
 	b := newTestBot(
 		mAPI,
 		nil,
-		&service.Services{Analyzer: analyzer},
+		&testServices{Analyzer: analyzer},
 	)
 	return b, mAPI
 }
@@ -877,7 +877,7 @@ func TestHandleMenu(t *testing.T) {
 	b := newTestBot(
 		mAPI,
 		nil,
-		&service.Services{
+		&testServices{
 			User: userSvc,
 			Session: newTestSessionService(
 				nil,

@@ -302,7 +302,7 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 			b := newTestBot(
 				mAPI,
 				nil,
-				&service.Services{
+				&testServices{
 					User: service.NewUserService(mUserRepo),
 					Session: newTestSessionService(
 						nil,
@@ -566,7 +566,7 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 	b := newTestBot(
 		api,
 		stateStores,
-		&service.Services{
+		&testServices{
 			User: service.NewUserService(userRepo),
 			LLMQuestion: service.NewLLMQuestionService(
 				&mockLLM{
@@ -667,7 +667,7 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 	b := newTestBot(
 		api,
 		stateStores,
-		&service.Services{
+		&testServices{
 			User: service.NewUserService(userRepo),
 			LLMQuestion: service.NewLLMQuestionService(
 				&mockLLM{
@@ -748,7 +748,7 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	b := newTestBot(
 		api,
 		nil,
-		&service.Services{
+		&testServices{
 			User: service.NewUserService(userRepo),
 			Session: newTestSessionService(
 				nil,
@@ -1107,7 +1107,7 @@ func botWithStudyCommandDeps(
 	return newTestBot(
 		api,
 		nil,
-		&service.Services{
+		&testServices{
 			User: service.NewUserService(userRepo),
 			Session: newTestSessionService(
 				nil,

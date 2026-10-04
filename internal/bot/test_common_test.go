@@ -227,6 +227,17 @@ func newTestLLMQuestionFlow(
 	return NewLLMQuestionFlow(deps)
 }
 
+// testServices are the services newTestBot wires into the flows, mirroring
+// cmd/server's services struct. Unset fields stay nil.
+type testServices struct {
+	Session            *service.SessionService
+	User               *service.UserService
+	MaterialPreference *service.MaterialPreferenceService
+	Analyzer           *service.AnalyzerService
+	LLMQuestion        *service.LLMQuestionService
+	Audio              *service.AudioService
+}
+
 // newTestBot assembles the router with every flow wired the way cmd/server
 // does, for tests that dispatch updates through handleMessage/handleCallback.
 // A nil services means no service dependency is wired; a nil stores leaves
@@ -234,10 +245,10 @@ func newTestLLMQuestionFlow(
 func newTestBot(
 	api *mockBotAPI,
 	stores *testInteractionStores,
-	services *service.Services,
+	services *testServices,
 ) *Bot {
 	if services == nil {
-		services = &service.Services{}
+		services = &testServices{}
 	}
 	studyFlow := newTestStudyFlow(
 		api,

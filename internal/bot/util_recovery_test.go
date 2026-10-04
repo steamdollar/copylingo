@@ -100,7 +100,7 @@ func TestHandleTest_NoQuestions(t *testing.T) {
 	b := newTestBot(
 		mAPI,
 		nil,
-		&service.Services{
+		&testServices{
 			User: userSvc,
 			Session: newTestSessionService(
 				nil,

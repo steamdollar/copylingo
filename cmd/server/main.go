@@ -58,7 +58,7 @@ func run() error {
 	defer cleanup()
 
 	// initialize application components
-	services, components, err := initApp(
+	svc, components, err := initApp(
 		cfg,
 		db,
 		rdb,
@@ -71,7 +71,7 @@ func run() error {
 	}
 
 	stopWorkers := startWorkers(
-		services,
+		svc,
 		components,
 		rdb,
 	)
@@ -80,8 +80,8 @@ func run() error {
 	// The Mini App only reports a graded handwriting answer; SessionFlow
 	// refreshes the Telegram message.
 	miniappHandler := miniapp.NewHandler(miniapp.HandlerDeps{
-		Session: services.Session,
-		Tip:     services.Tip,
+		Session: svc.session,
+		Tip:     svc.tip,
 		Verifier: miniapp.NewInitDataVerifier(
 			cfg.Telegram.Token,
 			miniapp.InitDataMaxAge,

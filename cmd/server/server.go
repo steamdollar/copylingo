@@ -19,7 +19,6 @@ import (
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/pipeline"
 	"github.com/lsj/copylingo/internal/redisstore"
-	"github.com/lsj/copylingo/internal/repository"
 	"github.com/lsj/copylingo/internal/scheduler"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -36,37 +35,31 @@ func initApp(
 	cfg *config.Config,
 	db *sqlx.DB,
 	rdb *redis.Client,
-) (*service.Services, botComponents, error) {
-	repos := repository.NewRepositories(db)
-	// Only the storage implementations know Redis commands and serialized keys.
-	services := service.NewServices(
-		repos,
-		db,
+) (services, botComponents, error) {
+	svc := newServices(
 		cfg,
-		service.SessionStores{
-			Quiz:  redisstore.NewQuizSessions(rdb),
-			Study: redisstore.NewStudySessions(rdb),
-		},
+		db,
+		rdb,
 	)
 	components, err := initBot(
 		cfg,
-		services,
+		svc,
 		redisstore.NewInteractions(rdb),
 	)
 	if err != nil {
-		return nil, botComponents{}, fmt.Errorf(
+		return services{}, botComponents{}, fmt.Errorf(
 			"failed to initialize Telegram bot: %w",
 			err,
 		)
 	}
-	return services, components, nil
+	return svc, components, nil
 }
 
 // initBot creates one Telegram client, each feature flow over the services
 // and Redis interaction state it uses, and the router over the flows.
 func initBot(
 	cfg *config.Config,
-	services *service.Services,
+	svc services,
 	interactions *redisstore.Interactions,
 ) (botComponents, error) {
 	telegram, err := bot.NewTelegramClient(
@@ -79,15 +72,15 @@ func initBot(
 
 	studyFlow := bot.NewStudyFlow(bot.StudyFlowDeps{
 		Telegram:           telegram,
-		Session:            services.Session,
-		MaterialPreference: services.MaterialPreference,
+		Session:            svc.session,
+		MaterialPreference: svc.materialPreference,
 		Input:              interactions,
 	})
 	sessionDeps := bot.SessionFlowDeps{
 		Telegram:           telegram,
-		Session:            services.Session,
-		User:               services.User,
-		MaterialPreference: services.MaterialPreference,
+		Session:            svc.session,
+		User:               svc.user,
+		MaterialPreference: svc.materialPreference,
 		Input:              interactions,
 		Drafts:             interactions,
 		Messages:           interactions,
@@ -98,29 +91,29 @@ func initBot(
 	}
 	// Audio is nil without a TTS key; assigning a nil *AudioService would make
 	// a non-nil interface and bypass SessionFlow's "audio unavailable" path.
-	if services.Audio != nil {
-		sessionDeps.Audio = services.Audio
+	if svc.audio != nil {
+		sessionDeps.Audio = svc.audio
 	}
 	sessionFlow := bot.NewSessionFlow(sessionDeps)
 
 	router := bot.NewBot(bot.BotDeps{
 		Telegram:    telegram,
-		User:        services.User,
-		Session:     services.Session,
-		Analyzer:    services.Analyzer,
+		User:        svc.user,
+		Session:     svc.session,
+		Analyzer:    svc.analyzer,
 		Input:       interactions,
 		SessionFlow: sessionFlow,
 		StudyFlow:   studyFlow,
 		SettingsFlow: bot.NewSettingsFlow(bot.SettingsFlowDeps{
 			Telegram:           telegram,
-			User:               services.User,
-			MaterialPreference: services.MaterialPreference,
+			User:               svc.user,
+			MaterialPreference: svc.materialPreference,
 		}),
 		LLMQuestionFlow: bot.NewLLMQuestionFlow(bot.LLMQuestionFlowDeps{
 			Telegram:    telegram,
-			User:        services.User,
-			LLMQuestion: services.LLMQuestion,
-			Session:     services.Session,
+			User:        svc.user,
+			LLMQuestion: svc.llmQuestion,
+			Session:     svc.session,
 			Input:       interactions,
 		}),
 	})
@@ -132,13 +125,13 @@ func initBot(
 }
 
 func startWorkers(
-	services *service.Services,
+	svc services,
 	components botComponents,
 	rdb redis.Cmdable,
 ) func() {
 	// Content collection has no scheduled job; keep its pipeline builder for future use.
 	sched, stopSched := initScheduler(
-		services,
+		svc,
 		components,
 		rdb,
 	)
@@ -149,14 +142,14 @@ func startWorkers(
 }
 
 func initScheduler(
-	services *service.Services,
+	svc services,
 	components botComponents,
 	rdb redis.Cmdable,
 ) (*scheduler.Scheduler, func()) {
 	schedDeps := scheduler.Deps{
-		User:        services.User,
-		Session:     services.Session,
-		Tip:         services.Tip,
+		User:        svc.user,
+		Session:     svc.session,
+		Tip:         svc.tip,
 		QuizPusher:  components.sessionFlow,
 		StudyPusher: components.studyFlow,
 		Cron:        cron.New(),
@@ -164,8 +157,8 @@ func initScheduler(
 	}
 	// Same typed-nil guard as SessionFlowDeps.Audio: without a TTS key the
 	// scheduler must see a nil interface and skip the audio top-up.
-	if services.Audio != nil {
-		schedDeps.Audio = services.Audio
+	if svc.audio != nil {
+		schedDeps.Audio = svc.audio
 	}
 	sched := scheduler.New(schedDeps)
 	return sched, func() { sched.Stop() }
@@ -199,12 +192,14 @@ func startHTTPServer(
 	return srv
 }
 
-func initPipeline(services *service.Services) *pipeline.Orchestrator {
+// initPipeline is kept for re-enabling content collection (ADR-057): startup
+// does not build it, and a caller creates ContentService on that path.
+func initPipeline(content *service.ContentService) *pipeline.Orchestrator {
 	// NHK News Easy pipeline
 	nhkClient := external.NewNHKClient()
 	nhkFetcher := pipeline.NewNHKFetcher(nhkClient)
 	processor := pipeline.NewPassThroughProcessor()
-	saver := services.Content
+	saver := content
 
 	orchestrator := pipeline.NewOrchestrator()
 	orchestrator.Register(
