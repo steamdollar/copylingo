@@ -30,7 +30,10 @@ type InitDataVerifier struct {
 	now      func() time.Time
 }
 
-func NewInitDataVerifier(botToken string, maxAge time.Duration) *InitDataVerifier {
+func NewInitDataVerifier(
+	botToken string,
+	maxAge time.Duration,
+) *InitDataVerifier {
 	return &InitDataVerifier{
 		botToken: botToken,
 		maxAge:   maxAge,
@@ -48,7 +51,11 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 
 	values, err := url.ParseQuery(initData)
 	if err != nil {
-		return nil, fmt.Errorf("%w: parse query: %v", ErrInitDataInvalid, err)
+		return nil, fmt.Errorf(
+			"%w: parse query: %v",
+			ErrInitDataInvalid,
+			err,
+		)
 	}
 
 	gotHash := values.Get("hash")
@@ -62,28 +69,50 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 		if len(vals) == 0 {
 			continue
 		}
-		pairs = append(pairs, key+"="+vals[0])
+		pairs = append(
+			pairs,
+			key+"="+vals[0],
+		)
 	}
 	sort.Strings(pairs)
-	dataCheckString := strings.Join(pairs, "\n")
+	dataCheckString := strings.Join(
+		pairs,
+		"\n",
+	)
 
-	secret := hmacSHA256([]byte("WebAppData"), []byte(v.botToken))
-	expected := hmacSHA256(secret, []byte(dataCheckString))
+	secret := hmacSHA256(
+		[]byte("WebAppData"),
+		[]byte(v.botToken),
+	)
+	expected := hmacSHA256(
+		secret,
+		[]byte(dataCheckString),
+	)
 	got, err := hex.DecodeString(gotHash)
 	if err != nil {
 		return nil, ErrInitDataInvalid
 	}
-	if !hmac.Equal(got, expected) {
+	if !hmac.Equal(
+		got,
+		expected,
+	) {
 		return nil, ErrInitDataInvalid
 	}
 
 	if v.maxAge > 0 {
 		authDateRaw := values.Get("auth_date")
-		authDate, err := strconv.ParseInt(authDateRaw, 10, 64)
+		authDate, err := strconv.ParseInt(
+			authDateRaw,
+			10,
+			64,
+		)
 		if err != nil {
 			return nil, ErrInitDataInvalid
 		}
-		if v.now().Sub(time.Unix(authDate, 0)) > v.maxAge {
+		if v.now().Sub(time.Unix(
+			authDate,
+			0,
+		)) > v.maxAge {
 			return nil, ErrInitDataExpired
 		}
 	}
@@ -93,8 +122,15 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 		return nil, ErrInitDataInvalid
 	}
 	var user TelegramUser
-	if err := json.Unmarshal([]byte(userRaw), &user); err != nil {
-		return nil, fmt.Errorf("%w: parse user: %v", ErrInitDataInvalid, err)
+	if err := json.Unmarshal(
+		[]byte(userRaw),
+		&user,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"%w: parse user: %v",
+			ErrInitDataInvalid,
+			err,
+		)
 	}
 	if user.ID == 0 {
 		return nil, ErrInitDataInvalid
@@ -103,8 +139,14 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 	return &user, nil
 }
 
-func hmacSHA256(key, data []byte) []byte {
-	mac := hmac.New(sha256.New, key)
+func hmacSHA256(
+	key,
+	data []byte,
+) []byte {
+	mac := hmac.New(
+		sha256.New,
+		key,
+	)
 	mac.Write(data)
 	return mac.Sum(nil)
 }
