@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -58,7 +59,10 @@ func (s *LLMQuestionService) Answer(
 		prompt,
 	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf(
+			"answer llm learning question: %w",
+			err,
+		)
 	}
 
 	var sourceModel *string

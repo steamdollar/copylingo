@@ -28,19 +28,14 @@ func NewServices(
 	stores SessionStores,
 ) *Services {
 	// One LLM client serves Quiz grading, learner questions and tip generation.
-	llmClient := external.NewLLMClient(cfg)
-	llm := newLLMService(llmClient)
-
-	// GenerateTips lives on the concrete *DefaultLLMClient (not the LLMClient
-	// interface). Without it, pass a true nil (not a typed nil) so tip top-up
-	// reports ErrAIConfigMissing instead of calling a nil client.
-	var tipLLM tipGeneratorLLM
-	if concrete, ok := llmClient.(*external.DefaultLLMClient); ok {
-		tipLLM = concrete
-	}
+	llm := external.NewLLMClient(external.LLMOptions{
+		APIKey:  cfg.LLM.APIKey,
+		BaseURL: cfg.LLM.BaseURL,
+		Model:   cfg.LLM.Model,
+	})
 	tip := NewTipService(
 		repos.Tip,
-		tipLLM,
+		llm,
 		cfg.LLM.Model,
 	)
 
@@ -50,8 +45,21 @@ func NewServices(
 	if cfg.LLM.APIKey != "" {
 		audioService = NewAudioService(
 			repos.Question,
-			external.NewTTSClient(cfg),
-			external.NewS3AudioStore(cfg),
+			external.NewTTSClient(external.TTSOptions{
+				APIKey:  cfg.LLM.APIKey,
+				BaseURL: cfg.LLM.BaseURL,
+				Model:   cfg.LLM.TTSModel,
+				Voice:   cfg.LLM.TTSVoiceName,
+				VoiceB:  cfg.LLM.TTSVoiceNameB,
+			}),
+			external.NewS3AudioStore(external.S3Options{
+				Endpoint:     cfg.Storage.Endpoint,
+				Region:       cfg.Storage.Region,
+				Bucket:       cfg.Storage.Bucket,
+				AccessKey:    cfg.Storage.AccessKey,
+				SecretKey:    cfg.Storage.SecretKey,
+				UsePathStyle: cfg.Storage.UsePathStyle,
+			}),
 			cfg.LLM.TTSVoiceName,
 			cfg.LLM.TTSVoiceNameB,
 		)

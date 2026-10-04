@@ -11,33 +11,9 @@ import (
 
 	"github.com/sashabaranov/go-openai"
 
-	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 )
-
-// LLMClient defines AI-backed grading paths that cannot be handled by exact string matching.
-type LLMClient interface {
-	// GradeAnswer is for QuestionSubjective only: free-text semantic grading such as translated meaning or paraphrased answers.
-	GradeAnswer(
-		ctx context.Context,
-		questionPrompt,
-		correctAnswer,
-		userAnswer string,
-	) (GradeResult, error)
-	// GradeHandwriting is for QuestionKanaHandwriting only: binary visual verification of a rendered handwriting PNG.
-	GradeHandwriting(
-		ctx context.Context,
-		questionPrompt,
-		correctAnswer string,
-		pngImage []byte,
-	) (GradeResult, error)
-	// AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
-	AnswerLearningQuestion(
-		ctx context.Context,
-		question string,
-	) (string, error)
-}
 
 // GradeResult represents the structured JSON output from the LLM.
 type GradeResult struct {
@@ -58,21 +34,32 @@ const (
 	tipGenerationMaxTokens = 800
 )
 
+// LLMOptions are the settings NewLLMClient needs. An empty BaseURL keeps the
+// OpenAI default endpoint.
+type LLMOptions struct {
+	APIKey  string
+	BaseURL string
+	Model   string
+}
+
+// DefaultLLMClient serves every LLM call (Quiz grading, learner questions and
+// tip generation) over one OpenAI-compatible client. Services depend on their
+// own narrow interfaces, so the client is returned as a concrete type.
 type DefaultLLMClient struct {
 	client *openai.Client
 	model  string
 }
 
-// NewLLMClient initializes an LLMClient using the OpenAI compatible API.
-func NewLLMClient(cfg *config.Config) LLMClient {
-	config := openai.DefaultConfig(cfg.LLM.APIKey)
-	if cfg.LLM.BaseURL != "" {
-		config.BaseURL = cfg.LLM.BaseURL
+// NewLLMClient initializes the client using the OpenAI compatible API.
+func NewLLMClient(opts LLMOptions) *DefaultLLMClient {
+	clientConfig := openai.DefaultConfig(opts.APIKey)
+	if opts.BaseURL != "" {
+		clientConfig.BaseURL = opts.BaseURL
 	}
 
 	return &DefaultLLMClient{
-		client: openai.NewClientWithConfig(config),
-		model:  cfg.LLM.Model,
+		client: openai.NewClientWithConfig(clientConfig),
+		model:  opts.Model,
 	}
 }
 
@@ -161,6 +148,7 @@ Evaluate the User's Answer against the Expected Correct Answer and output JSON.`
 	return result, nil
 }
 
+// AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
 func (c *DefaultLLMClient) AnswerLearningQuestion(
 	ctx context.Context,
 	question string,
@@ -407,10 +395,6 @@ Evaluate whether the handwriting image matches the Expected Text and output JSON
 // GenerateTips asks the LLM for n short Korean learning tips for the given
 // (language, level, category). The model returns a JSON array of {"body": "..."}
 // objects; the eyebrow label is added by the caller via category.DisplayName().
-//
-// This is exposed only on the concrete client (not the LLMClient interface) so
-// that grading mocks elsewhere stay unaffected; the tip pipeline depends on a
-// narrow service-layer interface instead.
 func (c *DefaultLLMClient) GenerateTips(
 	ctx context.Context,
 	language,

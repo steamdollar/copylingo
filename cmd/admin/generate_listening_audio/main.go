@@ -123,8 +123,21 @@ func main() {
 
 	audio := service.NewAudioService(
 		repos.Question,
-		external.NewTTSClient(cfg),
-		external.NewS3AudioStore(cfg),
+		external.NewTTSClient(external.TTSOptions{
+			APIKey:  cfg.LLM.APIKey,
+			BaseURL: cfg.LLM.BaseURL,
+			Model:   cfg.LLM.TTSModel,
+			Voice:   cfg.LLM.TTSVoiceName,
+			VoiceB:  cfg.LLM.TTSVoiceNameB,
+		}),
+		external.NewS3AudioStore(external.S3Options{
+			Endpoint:     cfg.Storage.Endpoint,
+			Region:       cfg.Storage.Region,
+			Bucket:       cfg.Storage.Bucket,
+			AccessKey:    cfg.Storage.AccessKey,
+			SecretKey:    cfg.Storage.SecretKey,
+			UsePathStyle: cfg.Storage.UsePathStyle,
+		}),
 		cfg.LLM.TTSVoiceName,
 		cfg.LLM.TTSVoiceNameB,
 	)

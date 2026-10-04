@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	"github.com/sashabaranov/go-openai"
-
-	"github.com/lsj/copylingo/internal/config"
 )
 
 // newTestLLMClient builds a DefaultLLMClient pointed at the given httptest server URL.
@@ -30,19 +28,11 @@ func TestNewLLMClient(t *testing.T) {
 		"uses configured model and custom base URL",
 		func(t *testing.T) {
 			t.Parallel()
-			cfg := &config.Config{}
-			cfg.LLM.APIKey = "key"
-			cfg.LLM.BaseURL = "https://example.com/v1"
-			cfg.LLM.Model = "my-model"
-
-			client := NewLLMClient(cfg)
-			dc, ok := client.(*DefaultLLMClient)
-			if !ok {
-				t.Fatalf(
-					"NewLLMClient returned %T, want *DefaultLLMClient",
-					client,
-				)
-			}
+			dc := NewLLMClient(LLMOptions{
+				APIKey:  "key",
+				BaseURL: "https://example.com/v1",
+				Model:   "my-model",
+			})
 			if dc.model != "my-model" {
 				t.Fatalf(
 					"model = %q, want my-model",
@@ -59,12 +49,11 @@ func TestNewLLMClient(t *testing.T) {
 		"empty base URL keeps default and is still usable",
 		func(t *testing.T) {
 			t.Parallel()
-			cfg := &config.Config{}
-			cfg.LLM.APIKey = "key"
-			cfg.LLM.Model = "m"
-
-			dc, ok := NewLLMClient(cfg).(*DefaultLLMClient)
-			if !ok || dc.client == nil {
+			dc := NewLLMClient(LLMOptions{
+				APIKey: "key",
+				Model:  "m",
+			})
+			if dc.client == nil {
 				t.Fatal("NewLLMClient with empty base URL produced unusable client")
 			}
 		},

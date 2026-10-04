@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/lsj/copylingo/internal/config"
 )
 
 // Gemini native TTS returns raw PCM (ADR-031): signed 16-bit little-endian,
@@ -54,17 +52,28 @@ type GeminiTTSClient struct {
 	transcode  transcoder
 }
 
+// TTSOptions are the settings NewTTSClient needs. APIKey and BaseURL are the
+// LLM's (OpenAI-compat) values; Voice is used for single-speaker audio and
+// speaker A of dialogues, VoiceB for speaker B.
+type TTSOptions struct {
+	APIKey  string
+	BaseURL string
+	Model   string
+	Voice   string
+	VoiceB  string
+}
+
 // NewTTSClient builds a Gemini native TTS client. It reuses the LLM API key and
 // derives the native base URL from the LLM (OpenAI-compat) base URL so a single
 // endpoint swap moves both.
-func NewTTSClient(cfg *config.Config) *GeminiTTSClient {
+func NewTTSClient(opts TTSOptions) *GeminiTTSClient {
 	return &GeminiTTSClient{
 		httpClient: &http.Client{Timeout: ttsHTTPTimeout},
-		apiKey:     cfg.LLM.APIKey,
-		baseURL:    geminiNativeBaseURL(cfg.LLM.BaseURL),
-		model:      cfg.LLM.TTSModel,
-		voice:      cfg.LLM.TTSVoiceName,
-		voiceB:     cfg.LLM.TTSVoiceNameB,
+		apiKey:     opts.APIKey,
+		baseURL:    geminiNativeBaseURL(opts.BaseURL),
+		model:      opts.Model,
+		voice:      opts.Voice,
+		voiceB:     opts.VoiceB,
 		transcode:  ffmpegPCMToOGG,
 	}
 }

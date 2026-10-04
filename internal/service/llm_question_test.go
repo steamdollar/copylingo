@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/external"
@@ -25,18 +26,26 @@ func (f *fakeTipCandidates) CreateCandidate(
 	return f.err
 }
 
+// fakeLearningQuestionLLM returns a fixed answer or error.
+type fakeLearningQuestionLLM struct {
+	answer string
+	err    error
+}
+
+func (f *fakeLearningQuestionLLM) AnswerLearningQuestion(
+	context.Context,
+	string,
+) (string, error) {
+	return f.answer, f.err
+}
+
 func TestLLMQuestionServiceAnswer(t *testing.T) {
 	user := model.User{ID: 7, Language: "ja", ProficiencyLevel: "N4"}
 	answerWith := func(
 		answer string,
 		err error,
-	) *mockLLMClient {
-		return &mockLLMClient{answerFn: func(
-			context.Context,
-			string,
-		) (string, error) {
-			return answer, err
-		}}
+	) *fakeLearningQuestionLLM {
+		return &fakeLearningQuestionLLM{answer: answer, err: err}
 	}
 
 	t.Run(
@@ -132,9 +141,12 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 			); !errors.Is(
 				err,
 				llmErr,
+			) || !strings.Contains(
+				err.Error(),
+				"answer llm learning question: provider failed",
 			) {
 				t.Fatalf(
-					"error = %v, want %v",
+					"error = %v, want %v wrapped with the answer step",
 					err,
 					llmErr,
 				)

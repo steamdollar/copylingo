@@ -13,8 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
-
-	"github.com/lsj/copylingo/internal/config"
 )
 
 // AudioContentType is the MIME type stored for OGG/Opus voice clips.
@@ -74,15 +72,26 @@ type S3AudioStore struct {
 	bucket string
 }
 
+// S3Options are the settings NewS3AudioStore needs. An empty Endpoint uses the
+// AWS default for Region; UsePathStyle is true for MinIO.
+type S3Options struct {
+	Endpoint     string
+	Region       string
+	Bucket       string
+	AccessKey    string
+	SecretKey    string
+	UsePathStyle bool
+}
+
 // NewS3AudioStore constructs an S3 client from static credentials and an optional
 // custom endpoint (empty => AWS default for the region). Path-style addressing is
 // required by MinIO and harmless to leave off for AWS.
-func NewS3AudioStore(cfg *config.Config) *S3AudioStore {
+func NewS3AudioStore(opts S3Options) *S3AudioStore {
 	awsCfg := aws.Config{
-		Region: cfg.Storage.Region,
+		Region: opts.Region,
 		Credentials: credentials.NewStaticCredentialsProvider(
-			cfg.Storage.AccessKey,
-			cfg.Storage.SecretKey,
+			opts.AccessKey,
+			opts.SecretKey,
 			"",
 		),
 	}
@@ -90,14 +99,14 @@ func NewS3AudioStore(cfg *config.Config) *S3AudioStore {
 	client := s3.NewFromConfig(
 		awsCfg,
 		func(o *s3.Options) {
-			if endpoint := strings.TrimSpace(cfg.Storage.Endpoint); endpoint != "" {
+			if endpoint := strings.TrimSpace(opts.Endpoint); endpoint != "" {
 				o.BaseEndpoint = aws.String(endpoint)
 			}
-			o.UsePathStyle = cfg.Storage.UsePathStyle
+			o.UsePathStyle = opts.UsePathStyle
 		},
 	)
 
-	return &S3AudioStore{client: client, bucket: cfg.Storage.Bucket}
+	return &S3AudioStore{client: client, bucket: opts.Bucket}
 }
 
 func (s *S3AudioStore) Exists(
