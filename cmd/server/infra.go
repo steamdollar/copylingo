@@ -26,7 +26,10 @@ func initInfra(cfg *config.Config) (*sqlx.DB, *redis.Client, func(), error) {
 }
 
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
-	db, err := sqlx.Connect("postgres", cfg.DB.DSN())
+	db, err := sqlx.Connect(
+		"postgres",
+		cfg.DB.DSN(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +49,10 @@ func initRedis(cfg *config.Config) (*redis.Client, error) {
 		DB:       cfg.Redis.DB,
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		5*time.Second,
+	)
 	defer cancel()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {

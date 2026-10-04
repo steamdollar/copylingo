@@ -20,14 +20,23 @@ import (
 )
 
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
-	db, err := sqlx.Connect("postgres", cfg.DB.DSN())
+	db, err := sqlx.Connect(
+		"postgres",
+		cfg.DB.DSN(),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("connect database: %w", err)
+		return nil, fmt.Errorf(
+			"connect database: %w",
+			err,
+		)
 	}
 	return db, nil
 }
 
-func waitForNextCycle(ctx context.Context, delay time.Duration) error {
+func waitForNextCycle(
+	ctx context.Context,
+	delay time.Duration,
+) error {
 	if delay <= 0 {
 		return nil
 	}
@@ -43,15 +52,34 @@ func waitForNextCycle(ctx context.Context, delay time.Duration) error {
 }
 
 func main() {
-	language := flag.String("language", "ja", "question language")
-	level := flag.String("level", ja.DefaultProficiencyLevel(), "proficiency level")
-	timeout := flag.Duration("timeout", 10*time.Minute, "maximum duration for the complete batch")
-	batchDelay := flag.Duration("batch-delay", 0, "delay between TTS batches for provider rate limits")
+	language := flag.String(
+		"language",
+		"ja",
+		"question language",
+	)
+	level := flag.String(
+		"level",
+		ja.DefaultProficiencyLevel(),
+		"proficiency level",
+	)
+	timeout := flag.Duration(
+		"timeout",
+		10*time.Minute,
+		"maximum duration for the complete batch",
+	)
+	batchDelay := flag.Duration(
+		"batch-delay",
+		0,
+		"delay between TTS batches for provider rate limits",
+	)
 	flag.Parse()
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		log.Fatalf(
+			"load config: %v",
+			err,
+		)
 	}
 	if cfg.LLM.APIKey == "" {
 		log.Fatal("listening TTS requires llm.api_key")
@@ -59,19 +87,37 @@ func main() {
 
 	db, err := initDB(cfg)
 	if err != nil {
-		log.Fatalf("database connection failed: %v", err)
+		log.Fatalf(
+			"database connection failed: %v",
+			err,
+		)
 	}
 	defer db.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		*timeout,
+	)
 	defer cancel()
 	repos := repository.NewRepositories(db)
-	pending, err := repos.Question.GetListeningNeedingAudio(ctx, *language, *level, 1000)
+	pending, err := repos.Question.GetListeningNeedingAudio(
+		ctx,
+		*language,
+		*level,
+		1000,
+	)
 	if err != nil {
-		log.Fatalf("load pending listening audio: %v", err)
+		log.Fatalf(
+			"load pending listening audio: %v",
+			err,
+		)
 	}
 	if len(pending) == 0 {
-		log.Printf("listening audio already complete language=%s level=%s", *language, *level)
+		log.Printf(
+			"listening audio already complete language=%s level=%s",
+			*language,
+			*level,
+		)
 		return
 	}
 
@@ -91,22 +137,57 @@ func main() {
 		cycles,
 	)
 	for cycle := 1; cycle <= cycles; cycle++ {
-		if err := audio.TopUpAudio(ctx, *language, *level); err != nil {
-			log.Fatalf("generate listening audio cycle=%d/%d: %v", cycle, cycles, err)
+		if err := audio.TopUpAudio(
+			ctx,
+			*language,
+			*level,
+		); err != nil {
+			log.Fatalf(
+				"generate listening audio cycle=%d/%d: %v",
+				cycle,
+				cycles,
+				err,
+			)
 		}
 		if cycle < cycles {
-			if err := waitForNextCycle(ctx, *batchDelay); err != nil {
-				log.Fatalf("wait between listening audio cycles=%d/%d: %v", cycle, cycles, err)
+			if err := waitForNextCycle(
+				ctx,
+				*batchDelay,
+			); err != nil {
+				log.Fatalf(
+					"wait between listening audio cycles=%d/%d: %v",
+					cycle,
+					cycles,
+					err,
+				)
 			}
 		}
 	}
 
-	remaining, err := repos.Question.GetListeningNeedingAudio(ctx, *language, *level, 1000)
+	remaining, err := repos.Question.GetListeningNeedingAudio(
+		ctx,
+		*language,
+		*level,
+		1000,
+	)
 	if err != nil {
-		log.Fatalf("verify listening audio: %v", err)
+		log.Fatalf(
+			"verify listening audio: %v",
+			err,
+		)
 	}
 	if len(remaining) > 0 {
-		log.Fatalf("listening audio incomplete language=%s level=%s remaining=%d", *language, *level, len(remaining))
+		log.Fatalf(
+			"listening audio incomplete language=%s level=%s remaining=%d",
+			*language,
+			*level,
+			len(remaining),
+		)
 	}
-	log.Printf("listening audio complete language=%s level=%s generated_or_reused=%d", *language, *level, len(pending))
+	log.Printf(
+		"listening audio complete language=%s level=%s generated_or_reused=%d",
+		*language,
+		*level,
+		len(pending),
+	)
 }
