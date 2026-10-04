@@ -94,7 +94,7 @@ package repository
 ### `internal/repository/session_repo_integration_test.go`
 대상 [session_repo.go](../../internal/repository/session_repo.go):
 - `CreateSession`(ID 채번 확인) → `GetByID`
-- `GetSessionsByStatus`(config.SessionStatus 별 필터)
+- `GetSessionsByStatus`(model.SessionStatus 별 필터)
 - `ListInProgress`
 - `Start`(status/started_at 갱신) / `Complete`(correct_count, completed_at 갱신)
 - `GetTodaySessions`(날짜 경계 — 오늘 것만)
@@ -132,7 +132,7 @@ package repository
 
 기존 [miniapp/handler_test.go](../../internal/miniapp/handler_test.go)가 이미 `httptest` + gin(`gin.CreateTestContext`)으로 핸들러를 in-process 호출한다. 그 패턴을 확장.
 
-> ⚠️ **실제 코드(확인됨):** 핸들러 생성은 `NewHandler(HandlerDeps{...})`, 라우트 일괄 등록은 `RegisterRoutes(r, cfg, services, rdb, messenger)`. 핸들러 메서드는 **`(*Handler).ListTips`**, **`(*Handler).SubmitHandwriting`** (gin.HandlerFunc 형태). 인증은 미들웨어 함수가 아니라 **`InitDataVerifier`**: `NewInitDataVerifier(botToken, maxAge)` + `(*InitDataVerifier).Verify(initData)`. `handleGetQuestion`/`handleHealth`/`NewAuthMiddleware` 같은 이름은 **없다** — 위 이름만 사용.
+> ⚠️ **실제 코드(확인됨):** 핸들러 생성은 `NewHandler(HandlerDeps{...})`, 라우트 일괄 등록은 `RegisterRoutes(r, handler)`(2026-10-05 ADR-059 D단계 기준. handler는 `NewHandler(HandlerDeps{Session, Tip, Verifier, HandwritingScreen})`). 핸들러 메서드는 **`(*Handler).ListTips`**, **`(*Handler).SubmitHandwriting`** (gin.HandlerFunc 형태). 인증은 미들웨어 함수가 아니라 **`InitDataVerifier`**: `NewInitDataVerifier(botToken, maxAge)` + `(*InitDataVerifier).Verify(initData)`. `handleGetQuestion`/`handleHealth`/`NewAuthMiddleware` 같은 이름은 **없다** — 위 이름만 사용.
 
 두 갈래:
 - **(a) 서비스 mock 주입형 (build tag 불필요):** `HandlerDeps`에 mock 서비스를 끼워 `NewHandler(...)` → `gin.CreateTestContext` + `httptest.NewRecorder` 로 메서드 직접 호출. 기존 `TestListTips` 패턴 그대로. handler↔service 배선/직렬화/상태코드 회귀를 잡는다.

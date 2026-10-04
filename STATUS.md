@@ -6,7 +6,7 @@
 
 ## 🔨 진행 중
 
-- 아키텍처 단순화 2·3단계 — ADR-059 §8 세분화 순서 A~E (A: Telegram 호출 분리 완료, B: SessionService Tier1 통합 완료, C: 기능별 Flow 분리·cmd/server 조립 완료, 다음 D: `Services` 묶음 삭제·외부 클라이언트 생성 이동 — 계획서 미작성). see [ADR-059](docs/adr/ADR-059_architecture_simplification.md#8-보강-2026-09-30-계층-규칙과-세분화된-실행-순서), [C단계 기록](docs/workthrough/2610/2610042335_adr059_stage_c_feature_flows.md)
+- 아키텍처 단순화 2·3단계 — ADR-059 §8 세분화 순서 A~E (A: Telegram 호출 분리 완료, B: SessionService Tier1 통합 완료, C: 기능별 Flow 분리 완료, D: `Services` 묶음 삭제·cmd/server 조립 일원화·`app` 생명주기 완료, 다음 E: `go list` 기반 import 경계 테스트 — 계획서 미작성). see [ADR-059](docs/adr/ADR-059_architecture_simplification.md#8-보강-2026-09-30-계층-규칙과-세분화된-실행-순서), [D단계 기록](docs/workthrough/2610/2610050008_adr059_stage_d_assembly_lifecycle.md)
 
 ---
 

@@ -30,6 +30,8 @@
 
 ### 공용 하니스 — **패키지 배치 주의**
 
+> ⚠️ **2026-10-05 기준 낡은 절**: 아래 조립 예시는 ADR-059 B~D단계 이전 구조다. `service.NewServices`·`service.Services`, Tier2 생성자(`NewSRSService`·`NewGraderService` 등), `Bot` 필드 직접 조립, `NewSessionFlow(b)`는 모두 없어졌다. 착수 전에 현재 조립 기준(cmd/server `newServices`·`initBot`, bot 테스트 헬퍼 `newTestBot`·`newTestSessionFlow`, Tier1 `service.NewSessionService(service.SessionDeps{…, LLM: mockLLM})`)으로 이 절을 다시 쓴다.
+
 > ⚠️ **확인된 제약 두 가지가 e2e 패키지 위치를 결정한다:**
 > 1. `service.NewServices(repos, cfg, service.SessionStores{Quiz: quizStore, Study: studyStore})`는 내부에서 `external.NewLLMClient(cfg)`를 `service.NewLLMService(...)`로 감싸 **LLMService를 직접 생성**한다 → `NewServices`로는 mockLLM 주입 불가. **개별 생성자로 직접 조립**해야 한다(예: `service.NewGraderService(repos.User, activeSvc, mockLLM)`, `service.NewActiveSessionService(repos.ActiveSession, redisstore.NewQuizSessions(realRedis), srs)` 등 — 시그니처는 services.go 참조).
 > 2. `Bot` struct의 필드는 모두 **unexported**이고, `bot.New(...)`는 실제 텔레그램 토큰으로 `tgbotapi.NewBotAPI`를 호출(네트워크) → 외부 `test/e2e` 패키지에서는 mock api를 끼운 Bot을 만들 수 없다.
@@ -86,7 +88,7 @@ package bot   // bot 경유 시나리오는 내부 패키지로 둘 것
 ### E2E-3: 손글씨 제출 (MiniApp HTTP 경로)
 파일: `internal/miniapp/e2e_handwriting_test.go`(`package miniapp`, `//go:build e2e`) 또는 `test/e2e/`
 1. seed: kana 손글씨 문제 1개 + 진행 중 세션 (DB 직접 insert)
-2. `RegisterRoutes(r, cfg, services, redisstore.NewInteractions(realRedis), messenger)` 로 gin 엔진 구성 → `httptest.NewServer`/`ServeHTTP`로 `SubmitHandwriting` 엔드포인트 호출 — 유효 Telegram initData(올바른 HMAC 서명)와 JSON stroke 요청
+2. `RegisterRoutes(r, miniapp.NewHandler(miniapp.HandlerDeps{…}))` 로 gin 엔진 구성 → `httptest.NewServer`/`ServeHTTP`로 `SubmitHandwriting` 엔드포인트 호출 — 유효 Telegram initData(올바른 HMAC 서명)와 JSON stroke 요청
 3. 내부 `Grader`가 mockLLM(결정적)으로 채점 → 200 + 결과 JSON (`SubmitHandwriting` 응답 스키마 확인)
 4. session_questions에 답변/정답 여부가 **DB에 기록**됐는지 검증
 5. 인증 실패(위조 initData / 무서명) → 401, DB 변화 없음 (`InitDataVerifier.Verify` 경유)

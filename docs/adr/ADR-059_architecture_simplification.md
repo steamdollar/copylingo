@@ -1,7 +1,7 @@
 # ADR-059: 기능별 호출 경계와 서버 초기화 구조 단순화
 
 - 날짜: 2026-09-26
-- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중 — A·B 완료(2026-09-30), C 완료(2026-10-04), 다음 D**
+- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중 — A·B 완료(2026-09-30), C 완료(2026-10-04), D 완료(2026-10-05), 다음 E**
 - 보강: 2026-09-30 — 서비스 2계층·생성자 규칙·하위 계층 규칙 추가 (§8)
 - 범위: 패키지 간 호출 경계, Quiz·Study 책임 배치, Redis 접근, 서버 인스턴스 생성·주입
 - 관련 결정: [ADR-057·058·060](ADR_from_41_to_60.md), [1단계 구현 기록](../workthrough/2609/2609262045_redis_access_boundary.md)
@@ -331,7 +331,7 @@ flowchart TB
 - 구조는 유지한다. 테이블 단위 repository와 서비스의 트랜잭션 범위 결정(ADR-061), 소비자 정의 인터페이스 방식을 그대로 둔다. 기능별 repository 통합은 Quiz·Study가 같은 테이블을 공유해 중복만 늘리므로 기각한다.
 - 하위 계층은 `model`과 드라이버만 import한다. `config`·`service`·`bot`을 import하지 않는다.
   - 세션 상태는 `model`로 일원화한다(`repository/session_repo.go`의 `config.SessionStatus` 제거).
-  - `external` 생성자는 `*config.Config` 대신 필요한 값의 options struct를 받는다. `GenerateTips`를 인터페이스에 정식 포함해 `NewServices`의 concrete 타입 단언을 제거한다.
+  - `external` 생성자는 `*config.Config` 대신 필요한 값의 options struct를 받는다. `GenerateTips`를 인터페이스에 정식 포함해 `NewServices`의 concrete 타입 단언을 제거한다. (D단계에서 concrete client 반환·인터페이스 삭제로 대체했다. §8.8)
 - 서비스의 저장·외부 인터페이스는 Tier1 기준으로 다시 정의한다. Tier2 간 호출은 같은 패키지의 concrete 호출로 바꿀 수 있다.
 
 ### 8.5 세분화된 실행 순서
@@ -392,3 +392,18 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 | nil 방어 | service 의존(Session·User·MaterialPreference·LLMQuestion)의 nil 분기는 제거하고 store nil 분기는 유지한다. Audio는 선택 의존으로 남기며 조립부가 `services.Audio != nil`일 때만 넣는다. | 생성자가 Deps를 채우므로 service nil은 조립 오류다. Audio는 TTS key가 없으면 production에서도 nil이고, nil 포인터를 인터페이스에 넣으면 non-nil이 된다. |
 | `StateStores` | `StateStores`·`InputStateStore`를 삭제한다. 각 Flow Deps가 필요한 store 계약만 받는다. | §8.1 마지막 항목. 다섯 필드가 모두 같은 `interactions`였다. |
 | 테스트 조립 | Flow별 헬퍼(`newTestSessionFlow`·`newTestStudyFlow`·`newTestSettingsFlow`·`newTestLLMQuestionFlow`)와 디스패치용 `newTestBot`을 쓴다. 공통 fixture struct는 만들지 않는다. | 테스트가 필요한 service 의존을 명시하고, 빠진 의존은 nil로 남아 호출 시 바로 실패한다. |
+
+### 8.8 D단계 결정 (2026-10-04~05)
+
+구현 기록은 [D단계 workthrough](../workthrough/2610/2610050008_adr059_stage_d_assembly_lifecycle.md)에 있다. 계획서(`docs/todos/adr059_stage_d_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
+
+| 대상 | 결정 | 근거 |
+|---|---|---|
+| 서비스 전달 | cmd/server 내부 unexported `services` struct를 `newServices`가 만든다. `initApp`이 bot·scheduler·Mini App을 조립할 때 필드를 하나씩 넘긴다. | §8.3 묶음 규칙과 `botComponents` 선례. 소비자 패키지는 묶음을 보지 않는다. `initApp`에 모두 펼치면 약 200줄이 된다. |
+| LLM client | `NewLLMClient`가 `*DefaultLLMClient`를 반환한다. `external.LLMClient` 인터페이스와 Tier2 `llmService`를 삭제한다. §8.4의 "`GenerateTips`를 인터페이스에 정식 포함"을 이 방식으로 대체한다. | `llmService`는 도달하지 않는 nil 검사만 하는 전달 계층이고 cmd/server에서 만들 수 없다. 이를 지우면 남는 인터페이스는 소비자 없는 생산자 측 선언이다. 서비스는 이미 소비자 정의 인터페이스(`QuizGradingLLM`·`tipGeneratorLLM`·`LearningQuestionLLM`)로 범위를 좁힌다. |
+| external 설정 | `LLMOptions`·`TTSOptions`·`S3Options`를 받는다. cfg → options 매핑은 조립부(cmd/server, cmd/admin)가 한다. | §8.4. `observability.LoggerOptions` 선례. |
+| `app` | `initApp(cfg) (*app, error)`·`Run(ctx) error`·`Close()`. `Run`은 HTTP 포트를 먼저 bind한 뒤 scheduler → bot polling → 재시작 Mini App 갱신 → `Serve` 순으로 시작한다. ctx 취소나 serve 실패 시 bot → HTTP(10초) → scheduler 순으로 멈춘다. `Close`는 DB → Redis 순이다. signal은 `initApp` 성공 후 등록한다. | §4 "초기화 중간 실패 시 정리, 종료 순서 명확화". 포트 충돌이면 아무것도 시작하지 않고 오류를 반환한다(이전: goroutine 안의 `log.Fatalf`). 기동 중 Ctrl+C는 기존처럼 즉시 종료된다. |
+| scheduler 계약 | `Deps.Services`를 User·Session·Tip·Audio 좁은 인터페이스로 바꾼다. 서비스 nil 분기는 제거하고 Audio nil 분기는 유지한다. | §8.7 nil 방어 선례. Audio는 TTS key가 없으면 production에서도 nil이다. |
+| 콘텐츠 수집 | `initPipeline`은 `*service.ContentService`를 인자로 받는다. 기동 시 ContentService를 만들지 않는다. | ADR-057 "시작 시 만들지 않으며 관련 생성 코드는 유지". |
+| SessionFlow 이름 | 유지한다. | 모드와 무관한 세션 목록·재개도 맡아 QuizFlow는 책임과 어긋난다. 바꾸려면 책임 분리가 먼저다. |
+| 경로 상수 | `config.Path*`를 유지한다. | bot·miniapp이 공유하는 규약이며 §8.4 금지 대상(하위 계층)이 아니다. |
