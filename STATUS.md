@@ -6,7 +6,7 @@
 
 ## 🔨 진행 중
 
-- 아키텍처 단순화 2·3단계 — ADR-059 §8 세분화 순서 A~E (A: Telegram 호출 분리 완료, B: SessionService Tier1 통합 완료, C: 기능별 Flow 분리 완료, D: `Services` 묶음 삭제·cmd/server 조립 일원화·`app` 생명주기 완료, 다음 E: `go list` 기반 import 경계 테스트 — 계획서 미작성). see [ADR-059](docs/adr/ADR-059_architecture_simplification.md#8-보강-2026-09-30-계층-규칙과-세분화된-실행-순서), [D단계 기록](docs/workthrough/2610/2610050008_adr059_stage_d_assembly_lifecycle.md)
+- (없음)
 
 ---
 
@@ -36,6 +36,10 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-10-05 | `go list` 기반 import 경계 테스트로 internal 패키지 간 import와 드라이버 소유를 고정 — 아키텍처 단순화 2·3단계 완료 (ADR-059 §8 E) | [2610051328_adr059_stage_e_import_boundary.md](docs/workthrough/2610/2610051328_adr059_stage_e_import_boundary.md) |
+| 2026-10-05 | `Services` 묶음 삭제, 외부 클라이언트·서비스 생성을 cmd/server로 이동, `app` Run/Close 생명주기 (ADR-059 §8 D) | [2610050008_adr059_stage_d_assembly_lifecycle.md](docs/workthrough/2610/2610050008_adr059_stage_d_assembly_lifecycle.md) |
+| 2026-10-04 | 기능별 Flow 분리, `*Bot` 역참조 제거, scheduler·Mini App에 Flow의 좁은 계약 주입 (ADR-059 §8 C) | [2610042335_adr059_stage_c_feature_flows.md](docs/workthrough/2610/2610042335_adr059_stage_c_feature_flows.md) |
+| 2026-09-30 | Quiz·Study를 `SessionService` Tier1로 통합하고 Tier2를 unexported로 전환 (ADR-059 §8 B) | [2609300127_adr059_stage_b_session_service.md](docs/workthrough/2609/2609300127_adr059_stage_b_session_service.md) |
 | 2026-09-30 | Bot의 Telegram API 호출을 `telegramClient`로 분리, Flow가 전송 시 `*Bot`을 거치지 않도록 정리 (ADR-059 §8 A) | [2609300018_bot_telegram_client_extraction.md](docs/workthrough/2609/2609300018_bot_telegram_client_extraction.md) |
 | 2026-09-28 | Bot 한글 문구를 단일 locale map에 정리하고 bot 전용 callback·명령 상수를 bot 패키지로 이동 | [2609280142_bot_message_callback_constants.md](docs/workthrough/2609/2609280142_bot_message_callback_constants.md) |
 | 2026-09-28 | StudyFlow·LLM 질문 문구를 하나의 locale map 파일로 통합 | [2609280054_study_flow_message_map.md](docs/workthrough/2609/2609280054_study_flow_message_map.md) |

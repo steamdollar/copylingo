@@ -1,7 +1,7 @@
 # ADR-059: 기능별 호출 경계와 서버 초기화 구조 단순화
 
 - 날짜: 2026-09-26
-- 상태: **설계 방향 승인, 1단계 완료; 2·3단계는 §8의 세분화 순서(A~E)로 진행 중 — A·B 완료(2026-09-30), C 완료(2026-10-04), D 완료(2026-10-05), 다음 E**
+- 상태: **구현 완료(2026-10-05) — 1단계, 2·3단계(§8 세분화 순서 A~E) 모두 완료. A·B 2026-09-30, C 2026-10-04, D·E 2026-10-05**
 - 보강: 2026-09-30 — 서비스 2계층·생성자 규칙·하위 계층 규칙 추가 (§8)
 - 범위: 패키지 간 호출 경계, Quiz·Study 책임 배치, Redis 접근, 서버 인스턴스 생성·주입
 - 관련 결정: [ADR-057·058·060](ADR_from_41_to_60.md), [1단계 구현 기록](../workthrough/2609/2609262045_redis_access_boundary.md)
@@ -407,3 +407,16 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 | 콘텐츠 수집 | `initPipeline`은 `*service.ContentService`를 인자로 받는다. 기동 시 ContentService를 만들지 않는다. | ADR-057 "시작 시 만들지 않으며 관련 생성 코드는 유지". |
 | SessionFlow 이름 | 유지한다. | 모드와 무관한 세션 목록·재개도 맡아 QuizFlow는 책임과 어긋난다. 바꾸려면 책임 분리가 먼저다. |
 | 경로 상수 | `config.Path*`를 유지한다. | bot·miniapp이 공유하는 규약이며 §8.4 금지 대상(하위 계층)이 아니다. |
+
+### 8.9 E단계 결정 (2026-10-05)
+
+구현 기록은 [E단계 workthrough](../workthrough/2610/2610051328_adr059_stage_e_import_boundary.md)에 있다. 규칙의 원본은 [`internal/import_boundary_test.go`](../../internal/import_boundary_test.go)의 두 표다.
+
+| 대상 | 결정 | 근거 |
+|---|---|---|
+| 검사 방식 | `go list`로 `internal/...` 각 패키지의 non-test import를 읽어 패키지별 허용 목록(allowlist)과 비교한다. 목록에 없는 내부 import와 규칙이 없는 새 패키지는 실패한다. | 금지 목록은 새 패키지나 처음 생긴 경로를 놓친다. 허용 목록은 경계 변경을 같은 diff의 표 수정으로 드러낸다. depguard 같은 별도 lint 설정 없이 `make test`에서 돈다. |
+| 드라이버·SDK 소유 | go-redis → `redisstore`, `lib/pq` → `repository`, sqlx → `repository`·`service`·`testutil`, Telegram → `bot`, go-openai·AWS SDK → `external`. 그 밖의 third-party(gin·cron·viper 등)는 검사하지 않는다. | §3·§5 Redis 키·포맷 소유와 raw Redis 타입 노출 금지, §8.7 Mini App의 `tgbotapi` 금지, ADR-061 서비스 트랜잭션. 프레임워크는 계층 경계가 아니다. |
+| 검사 범위 | `internal/...`의 non-test 파일만. `cmd/*`와 `_test.go`는 제외한다. | `cmd/server`는 조립부라 모든 패키지를 import한다(§5). 테스트는 실제 구현을 조립하려고 다른 계층 타입을 쓴다(bot 테스트의 `external.GradeResult`, scheduler 테스트의 `service.NewSessionService`). |
+| `external`의 `observability` | 허용한다. §8.4 "하위 계층은 `model`과 드라이버만"의 유일한 예외다. | LLM 호출 로그 속성(`observability.WithAttrs`)만 쓰며 계층 의존을 만들지 않는다. |
+| 테스트 위치 | `internal/` 루트의 테스트 전용 패키지(`internal_test`). | 새 패키지 디렉터리를 만들지 않는다(§8.1 "패키지를 늘리지 않는다"). 검사 대상 트리의 루트라 찾기 쉽다. |
+| CI | 저장소에 CI 설정이 없다. `make test`(`go test ./...`) 실패를 §8.5 "CI에서 실패"의 완료 기준으로 본다. | CI를 도입하면 같은 `go test ./...`가 그대로 검사한다. |

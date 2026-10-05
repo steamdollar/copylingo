@@ -48,6 +48,10 @@ internal/
 
 콘텐츠 수집을 재연결할 때는 `pipeline`의 처리 결과를 `ContentService`가 받아 중복 확인·저장을 수행하고, 서비스만 `ContentRepository`를 사용한다. 현재 자동 수집은 실행되지 않는다.
 
+### 패키지 import 경계
+
+`internal/import_boundary_test.go`가 `go list`로 `internal/...` 각 패키지의 non-test import를 검사한다. 패키지별 허용 목록에 없는 내부 import, 규칙이 없는 새 패키지, 소유 패키지 밖의 드라이버·SDK import(go-redis·`lib/pq`·sqlx·Telegram·go-openai·AWS SDK)는 `make test`에서 실패한다. 경계를 바꾸려면 같은 diff에서 그 표를 고치고 근거를 남긴다. 규칙의 근거는 [ADR-059 §5·§8.4·§8.9](adr/ADR-059_architecture_simplification.md)에 있다.
+
 ### Redis 접근 경계
 
 `cmd/server`가 Redis 연결을 만들고 저장 구현을 조립한다. 각 호출자는 사용하는 기능의 인터페이스만 받는다. 연결 생성·종료와 `/health` Ping 외의 Redis 명령, 키 조합, 값 직렬화와 TTL은 `redisstore`가 소유한다.
