@@ -3778,5 +3778,1748 @@
     "kanji": "だんだん",
     "meaning_ko": "점점",
     "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_541",
+    "kana": "ああ",
+    "kanji": "ああ",
+    "meaning_ko": "아아/응",
+    "part_of_speech": "expression"
+  },
+  {
+    "id": "n5_word_542",
+    "kana": "あお",
+    "kanji": "青",
+    "meaning_ko": "파랑",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_543",
+    "kana": "あかい",
+    "kanji": "赤い",
+    "meaning_ko": "빨갛다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_544",
+    "kana": "あき",
+    "kanji": "秋",
+    "meaning_ko": "가을",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_545",
+    "kana": "あく",
+    "kanji": "開く",
+    "meaning_ko": "열리다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_546",
+    "kana": "あさって",
+    "kanji": "明後日",
+    "meaning_ko": "모레",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_547",
+    "kana": "あちら",
+    "kanji": "あちら",
+    "meaning_ko": "저쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_548",
+    "kana": "あつい",
+    "kanji": "熱い",
+    "meaning_ko": "뜨겁다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_549",
+    "kana": "あつい",
+    "kanji": "厚い",
+    "meaning_ko": "두껍다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_550",
+    "kana": "あっち",
+    "kanji": "あっち",
+    "meaning_ko": "저쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_551",
+    "kana": "あと",
+    "kanji": "後",
+    "meaning_ko": "나중/뒤",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_552",
+    "kana": "あに",
+    "kanji": "兄",
+    "meaning_ko": "형/오빠",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_553",
+    "kana": "あね",
+    "kanji": "姉",
+    "meaning_ko": "누나/언니",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_554",
+    "kana": "アパート",
+    "kanji": "アパート",
+    "meaning_ko": "아파트(연립주택)",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_555",
+    "kana": "あびる",
+    "kanji": "浴びる",
+    "meaning_ko": "끼얹다/쬐다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_556",
+    "kana": "あぶない",
+    "kanji": "危ない",
+    "meaning_ko": "위험하다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_557",
+    "kana": "あめ",
+    "kanji": "あめ",
+    "meaning_ko": "사탕",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_558",
+    "kana": "いかが",
+    "kanji": "いかが",
+    "meaning_ko": "어떻게",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_559",
+    "kana": "いけ",
+    "kanji": "池",
+    "meaning_ko": "연못",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_560",
+    "kana": "いちにち",
+    "kanji": "一日",
+    "meaning_ko": "하루",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_561",
+    "kana": "いちばん",
+    "kanji": "一番",
+    "meaning_ko": "가장/제일",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_562",
+    "kana": "いっしょ",
+    "kanji": "一緒",
+    "meaning_ko": "함께",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_563",
+    "kana": "いつつ",
+    "kanji": "五つ",
+    "meaning_ko": "다섯 개",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_564",
+    "kana": "いや",
+    "kanji": "嫌",
+    "meaning_ko": "싫음",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_565",
+    "kana": "いろいろ",
+    "kanji": "色々",
+    "meaning_ko": "여러 가지",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_566",
+    "kana": "うすい",
+    "kanji": "薄い",
+    "meaning_ko": "얇다/연하다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_567",
+    "kana": "うち",
+    "kanji": "うち",
+    "meaning_ko": "집/우리",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_568",
+    "kana": "うまれる",
+    "kanji": "生まれる",
+    "meaning_ko": "태어나다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_569",
+    "kana": "うるさい",
+    "kanji": "うるさい",
+    "meaning_ko": "시끄럽다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_570",
+    "kana": "うわぎ",
+    "kanji": "上着",
+    "meaning_ko": "겉옷",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_571",
+    "kana": "ええ",
+    "kanji": "ええ",
+    "meaning_ko": "네",
+    "part_of_speech": "expression"
+  },
+  {
+    "id": "n5_word_572",
+    "kana": "エレベーター",
+    "kanji": "エレベーター",
+    "meaning_ko": "엘리베이터",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_573",
+    "kana": "おおきな",
+    "kanji": "大きな",
+    "meaning_ko": "큰",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_574",
+    "kana": "おおぜい",
+    "kanji": "大勢",
+    "meaning_ko": "많은 사람",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_575",
+    "kana": "おく",
+    "kanji": "置く",
+    "meaning_ko": "두다/놓다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_576",
+    "kana": "おさけ",
+    "kanji": "お酒",
+    "meaning_ko": "술",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_577",
+    "kana": "おじさん",
+    "kanji": "おじさん",
+    "meaning_ko": "삼촌/아저씨",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_578",
+    "kana": "おてあらい",
+    "kanji": "お手洗い",
+    "meaning_ko": "화장실",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_579",
+    "kana": "おとこのこ",
+    "kanji": "男の子",
+    "meaning_ko": "남자아이",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_580",
+    "kana": "おととい",
+    "kanji": "一昨日",
+    "meaning_ko": "그저께",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_581",
+    "kana": "おととし",
+    "kanji": "おととし",
+    "meaning_ko": "재작년",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_582",
+    "kana": "おなじ",
+    "kanji": "同じ",
+    "meaning_ko": "같음",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_583",
+    "kana": "おばさん",
+    "kanji": "おばさん",
+    "meaning_ko": "이모/아주머니",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_584",
+    "kana": "おべんとう",
+    "kanji": "お弁当",
+    "meaning_ko": "도시락",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_585",
+    "kana": "おまわりさん",
+    "kanji": "おまわりさん",
+    "meaning_ko": "경찰관",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_586",
+    "kana": "おんなのこ",
+    "kanji": "女の子",
+    "meaning_ko": "여자아이",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_587",
+    "kana": "がいこくじん",
+    "kanji": "外国人",
+    "meaning_ko": "외국인",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_588",
+    "kana": "かいもの",
+    "kanji": "買い物",
+    "meaning_ko": "쇼핑",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_589",
+    "kana": "かえす",
+    "kanji": "返す",
+    "meaning_ko": "돌려주다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_590",
+    "kana": "かかる",
+    "kanji": "かかる",
+    "meaning_ko": "걸리다/들다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_591",
+    "kana": "かた",
+    "kanji": "方",
+    "meaning_ko": "분/방법",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_592",
+    "kana": "かたかな",
+    "kanji": "片仮名",
+    "meaning_ko": "가타카나",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_593",
+    "kana": "カップ",
+    "kanji": "カップ",
+    "meaning_ko": "컵",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_594",
+    "kana": "かびん",
+    "kanji": "花瓶",
+    "meaning_ko": "꽃병",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_595",
+    "kana": "カメラ",
+    "kanji": "カメラ",
+    "meaning_ko": "카메라",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_596",
+    "kana": "からだ",
+    "kanji": "体",
+    "meaning_ko": "몸",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_597",
+    "kana": "カレンダー",
+    "kanji": "カレンダー",
+    "meaning_ko": "달력",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_598",
+    "kana": "かわいい",
+    "kanji": "かわいい",
+    "meaning_ko": "귀엽다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_599",
+    "kana": "かんじ",
+    "kanji": "漢字",
+    "meaning_ko": "한자",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_600",
+    "kana": "きいろ",
+    "kanji": "黄色",
+    "meaning_ko": "노랑",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_601",
+    "kana": "きえる",
+    "kanji": "消える",
+    "meaning_ko": "사라지다/꺼지다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_602",
+    "kana": "きた",
+    "kanji": "北",
+    "meaning_ko": "북쪽",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_603",
+    "kana": "ギター",
+    "kanji": "ギター",
+    "meaning_ko": "기타",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_604",
+    "kana": "きたない",
+    "kanji": "汚い",
+    "meaning_ko": "더럽다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_605",
+    "kana": "きっさてん",
+    "kanji": "喫茶店",
+    "meaning_ko": "찻집",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_606",
+    "kana": "ぎゅうにく",
+    "kanji": "牛肉",
+    "meaning_ko": "소고기",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_607",
+    "kana": "きらい",
+    "kanji": "嫌い",
+    "meaning_ko": "싫어함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_608",
+    "kana": "キロ",
+    "kanji": "キロ",
+    "meaning_ko": "킬로",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_609",
+    "kana": "ください",
+    "kanji": "ください",
+    "meaning_ko": "주세요",
+    "part_of_speech": "expression"
+  },
+  {
+    "id": "n5_word_610",
+    "kana": "くに",
+    "kanji": "国",
+    "meaning_ko": "나라",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_611",
+    "kana": "くもる",
+    "kanji": "曇る",
+    "meaning_ko": "흐려지다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_612",
+    "kana": "クラス",
+    "kanji": "クラス",
+    "meaning_ko": "반",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_613",
+    "kana": "グラム",
+    "kanji": "グラム",
+    "meaning_ko": "그램",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_614",
+    "kana": "くろ",
+    "kanji": "黒",
+    "meaning_ko": "검정",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_615",
+    "kana": "けいかん",
+    "kanji": "警官",
+    "meaning_ko": "경찰관",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_616",
+    "kana": "けさ",
+    "kanji": "今朝",
+    "meaning_ko": "오늘 아침",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_617",
+    "kana": "けっこう",
+    "kanji": "結構",
+    "meaning_ko": "훌륭함/충분함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_618",
+    "kana": "こうちゃ",
+    "kanji": "紅茶",
+    "meaning_ko": "홍차",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_619",
+    "kana": "コート",
+    "kanji": "コート",
+    "meaning_ko": "코트",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_620",
+    "kana": "ここのか",
+    "kanji": "九日",
+    "meaning_ko": "9일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_621",
+    "kana": "ここのつ",
+    "kanji": "九つ",
+    "meaning_ko": "아홉 개",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_622",
+    "kana": "こちら",
+    "kanji": "こちら",
+    "meaning_ko": "이쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_623",
+    "kana": "こっち",
+    "kanji": "こっち",
+    "meaning_ko": "이쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_624",
+    "kana": "ことば",
+    "kanji": "言葉",
+    "meaning_ko": "말/단어",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_625",
+    "kana": "コピーする",
+    "kanji": "コピーする",
+    "meaning_ko": "복사하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_626",
+    "kana": "こんな",
+    "kanji": "こんな",
+    "meaning_ko": "이런",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_627",
+    "kana": "さあ",
+    "kanji": "さあ",
+    "meaning_ko": "자/글쎄",
+    "part_of_speech": "expression"
+  },
+  {
+    "id": "n5_word_628",
+    "kana": "さき",
+    "kanji": "先",
+    "meaning_ko": "앞/먼저",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_629",
+    "kana": "さく",
+    "kanji": "咲く",
+    "meaning_ko": "피다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_630",
+    "kana": "さす",
+    "kanji": "差す",
+    "meaning_ko": "쓰다(우산)/비치다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_631",
+    "kana": "ざっし",
+    "kanji": "雑誌",
+    "meaning_ko": "잡지",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_632",
+    "kana": "さとう",
+    "kanji": "砂糖",
+    "meaning_ko": "설탕",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_633",
+    "kana": "さらいねん",
+    "kanji": "さ来年",
+    "meaning_ko": "내후년",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_634",
+    "kana": "さんぽする",
+    "kanji": "散歩する",
+    "meaning_ko": "산책하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_635",
+    "kana": "しお",
+    "kanji": "塩",
+    "meaning_ko": "소금",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_636",
+    "kana": "じどうしゃ",
+    "kanji": "自動車",
+    "meaning_ko": "자동차",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_637",
+    "kana": "じびき",
+    "kanji": "字引",
+    "meaning_ko": "사전",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_638",
+    "kana": "じぶん",
+    "kanji": "自分",
+    "meaning_ko": "자신",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_639",
+    "kana": "しまる",
+    "kanji": "閉まる",
+    "meaning_ko": "닫히다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_640",
+    "kana": "しめる",
+    "kanji": "締める",
+    "meaning_ko": "조르다/매다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_641",
+    "kana": "じゃあ",
+    "kanji": "じゃあ",
+    "meaning_ko": "그럼",
+    "part_of_speech": "conjunction"
+  },
+  {
+    "id": "n5_word_642",
+    "kana": "シャワー",
+    "kanji": "シャワー",
+    "meaning_ko": "샤워",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_643",
+    "kana": "じゅぎょう",
+    "kanji": "授業",
+    "meaning_ko": "수업",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_644",
+    "kana": "じょうぶ",
+    "kanji": "丈夫",
+    "meaning_ko": "튼튼함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_645",
+    "kana": "しょうゆ",
+    "kanji": "しょうゆ",
+    "meaning_ko": "간장",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_646",
+    "kana": "しろ",
+    "kanji": "白",
+    "meaning_ko": "하양",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_647",
+    "kana": "すう",
+    "kanji": "吸う",
+    "meaning_ko": "들이마시다/피우다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_648",
+    "kana": "ストーブ",
+    "kanji": "ストーブ",
+    "meaning_ko": "난로",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_649",
+    "kana": "せい",
+    "kanji": "背",
+    "meaning_ko": "키",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_650",
+    "kana": "せいと",
+    "kanji": "生徒",
+    "meaning_ko": "학생",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_651",
+    "kana": "せびろ",
+    "kanji": "背広",
+    "meaning_ko": "양복",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_652",
+    "kana": "ゼロ",
+    "kanji": "ゼロ",
+    "meaning_ko": "영",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_653",
+    "kana": "そう",
+    "kanji": "そう",
+    "meaning_ko": "그렇게/그렇다",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_654",
+    "kana": "そして",
+    "kanji": "そして",
+    "meaning_ko": "그리고",
+    "part_of_speech": "conjunction"
+  },
+  {
+    "id": "n5_word_655",
+    "kana": "そちら",
+    "kanji": "そちら",
+    "meaning_ko": "그쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_656",
+    "kana": "そっち",
+    "kanji": "そっち",
+    "meaning_ko": "그쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_657",
+    "kana": "そと",
+    "kanji": "外",
+    "meaning_ko": "밖",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_658",
+    "kana": "それでは",
+    "kanji": "それでは",
+    "meaning_ko": "그러면",
+    "part_of_speech": "conjunction"
+  },
+  {
+    "id": "n5_word_659",
+    "kana": "たいしかん",
+    "kanji": "大使館",
+    "meaning_ko": "대사관",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_660",
+    "kana": "だいじょうぶ",
+    "kanji": "大丈夫",
+    "meaning_ko": "괜찮음",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_661",
+    "kana": "だいすき",
+    "kanji": "大好き",
+    "meaning_ko": "매우 좋아함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_662",
+    "kana": "たいせつ",
+    "kanji": "大切",
+    "meaning_ko": "소중함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_663",
+    "kana": "たて",
+    "kanji": "たて",
+    "meaning_ko": "세로",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_664",
+    "kana": "たのむ",
+    "kanji": "頼む",
+    "meaning_ko": "부탁하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_665",
+    "kana": "たばこ",
+    "kanji": "たばこ",
+    "meaning_ko": "담배",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_666",
+    "kana": "たべもの",
+    "kanji": "食べ物",
+    "meaning_ko": "음식",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_667",
+    "kana": "ちいさな",
+    "kanji": "小さな",
+    "meaning_ko": "작은",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_668",
+    "kana": "ちち",
+    "kanji": "父",
+    "meaning_ko": "아버지",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_669",
+    "kana": "ちょっと",
+    "kanji": "ちょっと",
+    "meaning_ko": "조금/잠깐",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_670",
+    "kana": "ついたち",
+    "kanji": "一日",
+    "meaning_ko": "1일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_671",
+    "kana": "つかれる",
+    "kanji": "疲れる",
+    "meaning_ko": "피곤하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_672",
+    "kana": "つぎ",
+    "kanji": "次",
+    "meaning_ko": "다음",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_673",
+    "kana": "つとめる",
+    "kanji": "勤める",
+    "meaning_ko": "근무하다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_674",
+    "kana": "つまらない",
+    "kanji": "つまらない",
+    "meaning_ko": "시시하다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_675",
+    "kana": "つめたい",
+    "kanji": "冷たい",
+    "meaning_ko": "차갑다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_676",
+    "kana": "テープ",
+    "kanji": "テープ",
+    "meaning_ko": "테이프",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_677",
+    "kana": "できる",
+    "kanji": "できる",
+    "meaning_ko": "할 수 있다/생기다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_678",
+    "kana": "では",
+    "kanji": "では",
+    "meaning_ko": "그러면",
+    "part_of_speech": "conjunction"
+  },
+  {
+    "id": "n5_word_679",
+    "kana": "でも",
+    "kanji": "でも",
+    "meaning_ko": "하지만",
+    "part_of_speech": "conjunction"
+  },
+  {
+    "id": "n5_word_680",
+    "kana": "と",
+    "kanji": "戸",
+    "meaning_ko": "문",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_681",
+    "kana": "どうして",
+    "kanji": "どうして",
+    "meaning_ko": "왜",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_682",
+    "kana": "どうぶつ",
+    "kanji": "動物",
+    "meaning_ko": "동물",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_683",
+    "kana": "とおか",
+    "kanji": "十日",
+    "meaning_ko": "10일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_684",
+    "kana": "ところ",
+    "kanji": "所",
+    "meaning_ko": "곳/장소",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_685",
+    "kana": "とし",
+    "kanji": "年",
+    "meaning_ko": "해/나이",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_686",
+    "kana": "どちら",
+    "kanji": "どちら",
+    "meaning_ko": "어느 쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_687",
+    "kana": "どっち",
+    "kanji": "どっち",
+    "meaning_ko": "어느 쪽",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_688",
+    "kana": "とても",
+    "kanji": "とても",
+    "meaning_ko": "매우",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_689",
+    "kana": "どなた",
+    "kanji": "どなた",
+    "meaning_ko": "어느 분",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_690",
+    "kana": "となり",
+    "kanji": "隣",
+    "meaning_ko": "옆/이웃",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_691",
+    "kana": "どの",
+    "kanji": "どの",
+    "meaning_ko": "어느",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_692",
+    "kana": "とぶ",
+    "kanji": "飛ぶ",
+    "meaning_ko": "날다/뛰다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_693",
+    "kana": "とりにく",
+    "kanji": "鶏肉",
+    "meaning_ko": "닭고기",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_694",
+    "kana": "ない",
+    "kanji": "ない",
+    "meaning_ko": "없다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_695",
+    "kana": "なく",
+    "kanji": "鳴く",
+    "meaning_ko": "울다(동물)",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_696",
+    "kana": "なくす",
+    "kanji": "無くす",
+    "meaning_ko": "잃어버리다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_697",
+    "kana": "なつやすみ",
+    "kanji": "夏休み",
+    "meaning_ko": "여름 방학",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_698",
+    "kana": "ななつ",
+    "kanji": "七つ",
+    "meaning_ko": "일곱 개",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_699",
+    "kana": "なのか",
+    "kanji": "七日",
+    "meaning_ko": "7일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_700",
+    "kana": "ならべる",
+    "kanji": "並べる",
+    "meaning_ko": "늘어놓다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_701",
+    "kana": "なる",
+    "kanji": "なる",
+    "meaning_ko": "되다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_702",
+    "kana": "にぎやか",
+    "kanji": "にぎやか",
+    "meaning_ko": "번화함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_703",
+    "kana": "にし",
+    "kanji": "西",
+    "meaning_ko": "서쪽",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_704",
+    "kana": "ニュース",
+    "kanji": "ニュース",
+    "meaning_ko": "뉴스",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_705",
+    "kana": "ぬるい",
+    "kanji": "ぬるい",
+    "meaning_ko": "미지근하다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_706",
+    "kana": "ネクタイ",
+    "kanji": "ネクタイ",
+    "meaning_ko": "넥타이",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_707",
+    "kana": "のぼる",
+    "kanji": "登る",
+    "meaning_ko": "오르다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_708",
+    "kana": "のみもの",
+    "kanji": "飲み物",
+    "meaning_ko": "음료",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_709",
+    "kana": "は",
+    "kanji": "歯",
+    "meaning_ko": "이",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_710",
+    "kana": "パーティー",
+    "kanji": "パーティー",
+    "meaning_ko": "파티",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_711",
+    "kana": "はいざら",
+    "kanji": "灰皿",
+    "meaning_ko": "재떨이",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_712",
+    "kana": "はこ",
+    "kanji": "箱",
+    "meaning_ko": "상자",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_713",
+    "kana": "はじめ",
+    "kanji": "初め",
+    "meaning_ko": "처음/시작",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_714",
+    "kana": "はじめて",
+    "kanji": "初めて",
+    "meaning_ko": "처음으로",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_715",
+    "kana": "バター",
+    "kanji": "バター",
+    "meaning_ko": "버터",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_716",
+    "kana": "はたち",
+    "kanji": "二十歳",
+    "meaning_ko": "스무 살",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_717",
+    "kana": "はつか",
+    "kanji": "二十日",
+    "meaning_ko": "20일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_718",
+    "kana": "はな",
+    "kanji": "花",
+    "meaning_ko": "꽃",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_719",
+    "kana": "はなし",
+    "kanji": "話",
+    "meaning_ko": "이야기",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_720",
+    "kana": "はは",
+    "kanji": "母",
+    "meaning_ko": "어머니",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_721",
+    "kana": "はやい",
+    "kanji": "早い",
+    "meaning_ko": "이르다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_722",
+    "kana": "はる",
+    "kanji": "貼る",
+    "meaning_ko": "붙이다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_723",
+    "kana": "はれる",
+    "kanji": "晴れる",
+    "meaning_ko": "개다/맑아지다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_724",
+    "kana": "ばん",
+    "kanji": "晩",
+    "meaning_ko": "저녁/밤",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_725",
+    "kana": "ひがし",
+    "kanji": "東",
+    "meaning_ko": "동쪽",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_726",
+    "kana": "ひく",
+    "kanji": "引く",
+    "meaning_ko": "당기다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_727",
+    "kana": "ひく",
+    "kanji": "弾く",
+    "meaning_ko": "연주하다(현악기)",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_728",
+    "kana": "ひくい",
+    "kanji": "低い",
+    "meaning_ko": "낮다/작다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_729",
+    "kana": "ひとつき",
+    "kanji": "一月",
+    "meaning_ko": "한 달",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_730",
+    "kana": "ひとり",
+    "kanji": "一人",
+    "meaning_ko": "한 사람",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_731",
+    "kana": "ひらがな",
+    "kanji": "平仮名",
+    "meaning_ko": "히라가나",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_732",
+    "kana": "フィルム",
+    "kanji": "フィルム",
+    "meaning_ko": "필름",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_733",
+    "kana": "プール",
+    "kanji": "プール",
+    "meaning_ko": "수영장",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_734",
+    "kana": "ふく",
+    "kanji": "吹く",
+    "meaning_ko": "불다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_735",
+    "kana": "ぶたにく",
+    "kanji": "豚肉",
+    "meaning_ko": "돼지고기",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_736",
+    "kana": "ふつか",
+    "kanji": "二日",
+    "meaning_ko": "2일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_737",
+    "kana": "ふとい",
+    "kanji": "太い",
+    "meaning_ko": "굵다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_738",
+    "kana": "ページ",
+    "kanji": "ページ",
+    "meaning_ko": "페이지",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_739",
+    "kana": "へた",
+    "kanji": "下手",
+    "meaning_ko": "서툼",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_740",
+    "kana": "ペット",
+    "kanji": "ペット",
+    "meaning_ko": "애완동물",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_741",
+    "kana": "へん",
+    "kanji": "辺",
+    "meaning_ko": "근처",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_742",
+    "kana": "ほか",
+    "kanji": "外",
+    "meaning_ko": "그 밖/다른 것",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_743",
+    "kana": "ポケット",
+    "kanji": "ポケット",
+    "meaning_ko": "주머니",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_744",
+    "kana": "ほしい",
+    "kanji": "欲しい",
+    "meaning_ko": "갖고 싶다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_745",
+    "kana": "ポスト",
+    "kanji": "ポスト",
+    "meaning_ko": "우체통",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_746",
+    "kana": "ほそい",
+    "kanji": "細い",
+    "meaning_ko": "가늘다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_747",
+    "kana": "ボタン",
+    "kanji": "ボタン",
+    "meaning_ko": "단추/버튼",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_748",
+    "kana": "ほんだな",
+    "kanji": "本棚",
+    "meaning_ko": "책장",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_749",
+    "kana": "ほんとう",
+    "kanji": "本当",
+    "meaning_ko": "사실/진짜",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_750",
+    "kana": "まずい",
+    "kanji": "まずい",
+    "meaning_ko": "맛없다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_751",
+    "kana": "また",
+    "kanji": "また",
+    "meaning_ko": "또/다시",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_752",
+    "kana": "まち",
+    "kanji": "町",
+    "meaning_ko": "마을/동네",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_753",
+    "kana": "まっすぐ",
+    "kanji": "まっすぐ",
+    "meaning_ko": "곧장/똑바로",
+    "part_of_speech": "adverb"
+  },
+  {
+    "id": "n5_word_754",
+    "kana": "マッチ",
+    "kanji": "マッチ",
+    "meaning_ko": "성냥",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_755",
+    "kana": "まるい",
+    "kanji": "丸い",
+    "meaning_ko": "둥글다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_756",
+    "kana": "まんねんひつ",
+    "kanji": "万年筆",
+    "meaning_ko": "만년필",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_757",
+    "kana": "みがく",
+    "kanji": "磨く",
+    "meaning_ko": "닦다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_758",
+    "kana": "みち",
+    "kanji": "道",
+    "meaning_ko": "길",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_759",
+    "kana": "みっか",
+    "kanji": "三日",
+    "meaning_ko": "3일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_760",
+    "kana": "みっつ",
+    "kanji": "三つ",
+    "meaning_ko": "세 개",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_761",
+    "kana": "みなさん",
+    "kanji": "皆さん",
+    "meaning_ko": "여러분",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_762",
+    "kana": "みなみ",
+    "kanji": "南",
+    "meaning_ko": "남쪽",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_763",
+    "kana": "みんな",
+    "kanji": "みんな",
+    "meaning_ko": "모두",
+    "part_of_speech": "pronoun"
+  },
+  {
+    "id": "n5_word_764",
+    "kana": "むいか",
+    "kanji": "六日",
+    "meaning_ko": "6일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_765",
+    "kana": "むっつ",
+    "kanji": "六つ",
+    "meaning_ko": "여섯 개",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_766",
+    "kana": "むら",
+    "kanji": "村",
+    "meaning_ko": "마을",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_767",
+    "kana": "メートル",
+    "kanji": "メートル",
+    "meaning_ko": "미터",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_768",
+    "kana": "もの",
+    "kanji": "物",
+    "meaning_ko": "물건",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_769",
+    "kana": "もん",
+    "kanji": "門",
+    "meaning_ko": "문",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_770",
+    "kana": "もんだい",
+    "kanji": "問題",
+    "meaning_ko": "문제",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_771",
+    "kana": "やおや",
+    "kanji": "八百屋",
+    "meaning_ko": "채소 가게",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_772",
+    "kana": "やさい",
+    "kanji": "野菜",
+    "meaning_ko": "채소",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_773",
+    "kana": "やさしい",
+    "kanji": "易しい",
+    "meaning_ko": "쉽다",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_774",
+    "kana": "やすみ",
+    "kanji": "休み",
+    "meaning_ko": "휴일/쉼",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_775",
+    "kana": "やっつ",
+    "kanji": "八つ",
+    "meaning_ko": "여덟 개",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_776",
+    "kana": "やる",
+    "kanji": "やる",
+    "meaning_ko": "하다/주다",
+    "part_of_speech": "verb"
+  },
+  {
+    "id": "n5_word_777",
+    "kana": "ゆうはん",
+    "kanji": "夕飯",
+    "meaning_ko": "저녁밥",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_778",
+    "kana": "ゆうべ",
+    "kanji": "昨夜",
+    "meaning_ko": "어젯밤",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_779",
+    "kana": "ようか",
+    "kanji": "八日",
+    "meaning_ko": "8일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_780",
+    "kana": "よこ",
+    "kanji": "横",
+    "meaning_ko": "옆/가로",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_781",
+    "kana": "よっか",
+    "kanji": "四日",
+    "meaning_ko": "4일",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_782",
+    "kana": "よっつ",
+    "kanji": "四つ",
+    "meaning_ko": "네 개",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_783",
+    "kana": "ラジオ",
+    "kanji": "ラジオ",
+    "meaning_ko": "라디오",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_784",
+    "kana": "りっぱ",
+    "kanji": "りっぱ",
+    "meaning_ko": "훌륭함",
+    "part_of_speech": "adjective"
+  },
+  {
+    "id": "n5_word_785",
+    "kana": "れい",
+    "kanji": "零",
+    "meaning_ko": "영",
+    "part_of_speech": "numeral"
+  },
+  {
+    "id": "n5_word_786",
+    "kana": "レコード",
+    "kanji": "レコード",
+    "meaning_ko": "레코드판",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_787",
+    "kana": "レストラン",
+    "kanji": "レストラン",
+    "meaning_ko": "레스토랑",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_788",
+    "kana": "ワイシャツ",
+    "kanji": "ワイシャツ",
+    "meaning_ko": "와이셔츠",
+    "part_of_speech": "noun"
+  },
+  {
+    "id": "n5_word_789",
+    "kana": "わたる",
+    "kanji": "渡る",
+    "meaning_ko": "건너다",
+    "part_of_speech": "verb"
   }
 ]

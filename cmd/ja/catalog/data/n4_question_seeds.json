@@ -9600,6 +9600,5556 @@
     "difficulty": 3
   },
   {
+    "source_id": "n4_seed_vocab_kanji_reading_0601",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0601",
+    "prompt": "다음 한자 「踏む」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ふむ",
+    "explanation": "踏む은(는) ふむ로 읽습니다. 뜻은 '밟다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0602",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0602",
+    "prompt": "彼女は椅子から__立ち上がりました。",
+    "options": [
+      "すっと",
+      "たくさん",
+      "とても",
+      "まだ"
+    ],
+    "correct_answer": "すっと",
+    "explanation": "すっと는 동작이 가볍고 재빠르게 이루어지는 모양을 나타내므로 '일어서다'와 어울립니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0603",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0603",
+    "prompt": "「たいてい」의 올바른 표기를 고르세요. (뜻: 대개)",
+    "options": [
+      "大抵",
+      "大雨",
+      "大事",
+      "大体"
+    ],
+    "correct_answer": "大抵",
+    "explanation": "「たいてい」는 大抵로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0604",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0604",
+    "prompt": "「ガソリン」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "車のガソリンが少なくなったので、入れに行きました。",
+      "台所のガソリンをつけて、お湯をわかしました。",
+      "冬は、ストーブにガソリンを入れて部屋を暖めます。",
+      "電気だけで走る車には、ガソリンを入れます。"
+    ],
+    "correct_answer": "車のガソリンが少なくなったので、入れに行きました。",
+    "explanation": "정답: 車のガソリンが少なくなったので、入れに行きました。(차의 휘발유가 적어져서 넣으러 갔습니다.)\n'ガソリン'은 자동차 등의 연료로 쓰는 휘발유입니다.\n\n오답:\n1. 台所のガソリンをつけて、お湯をわかしました。(부엌의 휘발유를 켜서 물을 끓였습니다.)\n   부엌에서 불을 켜 요리하거나 물을 끓이는 것은 'ガス(가스)'입니다. 'ガソリン'과 혼동하기 쉽지만 다른 말입니다.\n2. 冬は、ストーブにガソリンを入れて部屋を暖めます。(겨울에는 난로에 휘발유를 넣어 방을 따뜻하게 합니다.)\n   가정용 난로에 넣는 연료는 '灯油(등유)'입니다. 'ガソリン'은 자동차 연료이며 난로에 넣으면 위험합니다.\n3. 電気だけで走る車には、ガソリンを入れます。(전기만으로 달리는 차에는 휘발유를 넣습니다.)\n   전기로만 달리는 차에는 휘발유가 아니라 전기를 충전합니다. 'ガソリン'은 휘발유로 달리는 차에 넣습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0605",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0605",
+    "prompt": "다음 한자 「鳴る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "なる",
+    "explanation": "鳴る은(는) なる로 읽습니다. 뜻은 '울리다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0606",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0606",
+    "prompt": "ドアが開かないように、ひもを__結んでください。",
+    "options": [
+      "ときどき",
+      "しっかり",
+      "たぶん",
+      "ぜんぜん"
+    ],
+    "correct_answer": "しっかり",
+    "explanation": "しっかり는 단단하고 확실하게 한다는 뜻이므로 '묶다'와 어울립니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0607",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0607",
+    "prompt": "「にがい」의 올바른 표기를 고르세요. (뜻: 쓰다 (맛))",
+    "options": [
+      "苦い",
+      "彼ら",
+      "残念",
+      "勝負"
+    ],
+    "correct_answer": "苦い",
+    "explanation": "「にがい」는 苦い로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0608",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0608",
+    "prompt": "다음 한자 「沸く」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "わく",
+    "explanation": "沸く은(는) わく로 읽습니다. 뜻은 '끓다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0609",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0609",
+    "prompt": "「やはり」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "彼は来ると思っていたのに、やはり来ませんでした。",
+      "難しいと思っていましたが、やはり試験は難しかったです。",
+      "私は昨日、やはり初めて京都へ行きました。",
+      "あの店は高いと思っていたのに、やはり安かったです。"
+    ],
+    "correct_answer": "難しいと思っていましたが、やはり試験は難しかったです。",
+    "explanation": "정답: 難しいと思っていましたが、やはり試験は難しかったです。(어려울 것이라 생각했는데 역시 시험은 어려웠습니다.)\n'やはり'는 예상이나 짐작했던 대로 되었음을 나타낼 때 사용합니다.\n\n오답:\n1. 彼は来ると思っていたのに、やはり来ませんでした。(그는 올 거라고 생각했는데 역시 오지 않았습니다.)\n   'やはり'는 예상대로의 결과에 쓰므로, 예상과 반대되는 결과에는 쓸 수 없습니다. 'でも'나 'ところが'가 자연스럽습니다.\n2. 私は昨日、やはり初めて京都へ行きました。(저는 어제 역시 처음으로 교토에 갔습니다.)\n   '初めて'는 예상할 근거가 없는 일이므로 '予想どおり'를 뜻하는 'やはり'와 어울리지 않습니다.\n3. あの店は高いと思っていたのに、やはり安かったです。(그 가게는 비쌀 거라 생각했는데 역시 쌌습니다.)\n   예상과 다른 결과이므로 'やはり'를 쓸 수 없습니다. '意外に'나 'でも'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0610",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0610",
+    "prompt": "「まんが」의 올바른 표기를 고르세요. (뜻: 만화)",
+    "options": [
+      "漫画",
+      "計画",
+      "届く",
+      "滑る"
+    ],
+    "correct_answer": "漫画",
+    "explanation": "「まんが」는 漫画로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0611",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0611",
+    "prompt": "この__で音楽を聞くと、音がとてもきれいです。",
+    "options": [
+      "スクリーン",
+      "ストーブ",
+      "ステレオ",
+      "カメラ"
+    ],
+    "correct_answer": "ステレオ",
+    "explanation": "ステレオ는 음악을 재생하는 음향 기기이므로 '음악을 들으면 소리가 깨끗하다'는 문장에 알맞습니다. スクリーン(스크린)은 영상을 비추는 화면, ストーブ(난로)는 난방 기구, カメラ(카메라)는 사진을 찍는 기계입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0612",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0612",
+    "prompt": "다음 한자 「医学」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "いがく",
+    "explanation": "医学은(는) いがく로 읽습니다. 뜻은 '의학'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0613",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0613",
+    "prompt": "「テキスト」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "昨日の英語のテキストは難しくて、五十点しか取れませんでした。",
+      "分からない言葉があったら、テキストを引いて調べます。",
+      "この授業のテキストは、駅の前の本屋で買えます。",
+      "授業の後で、テキストを三枚書いて、先生に出しました。"
+    ],
+    "correct_answer": "この授業のテキストは、駅の前の本屋で買えます。",
+    "explanation": "정답: この授業のテキストは、駅の前の本屋で買えます。(이 수업의 교재는 역 앞 서점에서 살 수 있습니다.)\n'テキスト'는 수업이나 공부에 쓰는 교재를 뜻합니다.\n\n오답:\n1. 昨日の英語のテキストは難しくて、五十点しか取れませんでした。(어제 영어 교재는 어려워서 50점밖에 받지 못했습니다.)\n   점수를 받는 것은 시험이므로 'テスト'를 써야 합니다. 'テキスト'와 'テスト'는 모양이 비슷하지만 뜻이 다릅니다.\n2. 分からない言葉があったら、テキストを引いて調べます。(모르는 말이 있으면 교재를 찾아서 조사합니다.)\n   '引く'와 함께 써서 모르는 말을 찾아보는 것은 '辞書(사전)'입니다. '辞書を引く'가 맞습니다.\n3. 授業の後で、テキストを三枚書いて、先生に出しました。(수업 후에 교재를 세 장 써서 선생님께 냈습니다.)\n   학생이 써서 제출하는 것은 'レポート(리포트)'입니다. 'テキスト'는 읽으며 공부하는 책입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0614",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0614",
+    "prompt": "「うかがう」의 올바른 표기를 고르세요. (뜻: 찾아뵙다/여쭙다)",
+    "options": [
+      "伺う",
+      "通す",
+      "連休",
+      "塗る"
+    ],
+    "correct_answer": "伺う",
+    "explanation": "「うかがう」는 伺う로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0615",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0615",
+    "prompt": "다음 한자 「聞こえる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "きこえる",
+    "explanation": "聞こえる은(는) きこえる로 읽습니다. 뜻은 '들리다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0616",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0616",
+    "prompt": "「ぼく」의 올바른 표기를 고르세요. (뜻: 나 (남성))",
+    "options": [
+      "僕",
+      "鍋",
+      "米",
+      "雲"
+    ],
+    "correct_answer": "僕",
+    "explanation": "「ぼく」는 僕로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0617",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0617",
+    "prompt": "다음 한자 「床屋」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "とこや",
+    "explanation": "床屋은(는) とこや로 읽습니다. 뜻은 '이발소'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0618",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0618",
+    "prompt": "「やむ」의 올바른 표기를 고르세요. (뜻: 그치다)",
+    "options": [
+      "止む",
+      "禁止",
+      "停止",
+      "止める"
+    ],
+    "correct_answer": "止む",
+    "explanation": "「やむ」는 止む로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0619",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0619",
+    "prompt": "다음 한자 「大学生」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "だいがくせい",
+    "explanation": "大学生은(는) だいがくせい로 읽습니다. 뜻은 '대학생'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0620",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0620",
+    "prompt": "「うんてんしゅ」의 올바른 표기를 고르세요. (뜻: 운전기사)",
+    "options": [
+      "運転手",
+      "運転",
+      "運賃",
+      "握手"
+    ],
+    "correct_answer": "運転手",
+    "explanation": "「うんてんしゅ」는 運転手로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0621",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0621",
+    "prompt": "다음 한자 「心配する」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "しんぱいする",
+    "explanation": "心配する은(는) しんぱいする로 읽습니다. 뜻은 '걱정하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0622",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0622",
+    "prompt": "「べつ」의 올바른 표기를 고르세요. (뜻: 별개)",
+    "options": [
+      "別",
+      "別れる",
+      "特別",
+      "差別"
+    ],
+    "correct_answer": "別",
+    "explanation": "「べつ」는 別로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0623",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0623",
+    "prompt": "다음 한자 「非常に」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ひじょうに",
+    "explanation": "非常に은(는) ひじょうに로 읽습니다. 뜻은 '매우'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0624",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0624",
+    "prompt": "「おたく」의 올바른 표기를 고르세요. (뜻: 댁)",
+    "options": [
+      "お宅",
+      "場所",
+      "旅費",
+      "修理"
+    ],
+    "correct_answer": "お宅",
+    "explanation": "「おたく」는 お宅로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0625",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0625",
+    "prompt": "다음 한자 「柔らかい」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "やわらかい",
+    "explanation": "柔らかい은(는) やわらかい로 읽습니다. 뜻은 '부드럽다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0626",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0626",
+    "prompt": "「き」의 올바른 표기를 고르세요. (뜻: 마음/기운)",
+    "options": [
+      "気",
+      "電気代",
+      "天気予報",
+      "気に入る"
+    ],
+    "correct_answer": "気",
+    "explanation": "「き」는 気로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0627",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0627",
+    "prompt": "宿題は__終わりました。",
+    "options": [
+      "あまり",
+      "全然",
+      "まだ",
+      "ほとんど"
+    ],
+    "correct_answer": "ほとんど",
+    "explanation": "ほとんど는 '거의'라는 뜻으로 긍정문에서 거의 다 끝났음을 나타냅니다. あまり와 全然은 부정문에 쓰고, まだ는 과거형 긍정문과 어울리지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0628",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0628",
+    "prompt": "「つもり」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "雨が降るつもりですから、傘を持っていきます。",
+      "明日は朝から天気がいいつもりです。",
+      "このかばんは軽いつもりですから、とても便利です。",
+      "来年の春、日本へ留学するつもりです。"
+    ],
+    "correct_answer": "来年の春、日本へ留学するつもりです。",
+    "explanation": "정답: 来年の春、日本へ留学するつもりです。(내년 봄에 일본으로 유학 갈 작정입니다.)\n'つもり'는 자신이 하려고 마음먹은 계획이나 의도를 나타낼 때 사용합니다.\n\n오답:\n1. 雨が降るつもりですから、傘を持っていきます。(비가 올 작정이니까 우산을 가지고 갑니다.)\n   'つもり'는 사람의 의도에 쓰므로 날씨에는 쓸 수 없습니다. '雨が降りそうですから'가 자연스럽습니다.\n2. 明日は朝から天気がいいつもりです。(내일은 아침부터 날씨가 좋을 작정입니다.)\n   날씨는 사람의 의지로 정할 수 없으므로 'つもり'를 쓸 수 없습니다. '天気がいいでしょう'가 자연스럽습니다.\n3. このかばんは軽いつもりですから、とても便利です。(이 가방은 가벼울 작정이라서 매우 편리합니다.)\n   'つもり'는 사물의 성질에는 쓸 수 없습니다. '軽いですから'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0629",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0629",
+    "prompt": "다음 한자 「郊外」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "こうがい",
+    "explanation": "郊外은(는) こうがい로 읽습니다. 뜻은 '교외'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0630",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0630",
+    "prompt": "ここで写真を撮っては__です。",
+    "options": [
+      "だめ",
+      "上手",
+      "好き",
+      "元気"
+    ],
+    "correct_answer": "だめ",
+    "explanation": "~てはだめです는 '~하면 안 됩니다'라는 금지 표현입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0631",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0631",
+    "prompt": "「おくじょう」의 올바른 표기를 고르세요. (뜻: 옥상)",
+    "options": [
+      "屋上",
+      "向上",
+      "床屋",
+      "屋根"
+    ],
+    "correct_answer": "屋上",
+    "explanation": "「おくじょう」는 屋上로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0632",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0632",
+    "prompt": "다음 한자 「失礼」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "しつれい",
+    "explanation": "失礼은(는) しつれい로 읽습니다. 뜻은 '실례'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0633",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0633",
+    "prompt": "「ごみ」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "ごみは決まった日に、決まった場所に出してください。",
+      "白いシャツに、しょうゆのごみがついてしまいました。",
+      "昨日の晩ごはんのごみを、今日のお昼に温めて食べました。",
+      "日曜日の駅はごみが多くて、なかなか前へ進めませんでした。"
+    ],
+    "correct_answer": "ごみは決まった日に、決まった場所に出してください。",
+    "explanation": "정답: ごみは決まった日に、決まった場所に出してください。(쓰레기는 정해진 날에 정해진 장소에 내놓으세요.)\n'ごみ'는 필요 없어서 버리는 물건을 뜻합니다.\n\n오답:\n1. 白いシャツに、しょうゆのごみがついてしまいました。(흰 셔츠에 간장 쓰레기가 묻어 버렸습니다.)\n   옷에 묻은 얼룩은 'しみ'나 '汚れ(더러움)'라고 합니다. 'ごみ'는 필요 없어서 버리는 물건입니다.\n2. 昨日の晩ごはんのごみを、今日のお昼に温めて食べました。(어제 저녁밥 쓰레기를 오늘 점심에 데워 먹었습니다.)\n   먹고 남은 음식은 '残り(남은 것)'라고 합니다. 버리는 'ごみ'는 먹지 않습니다.\n3. 日曜日の駅はごみが多くて、なかなか前へ進めませんでした。(일요일 역은 쓰레기가 많아서 좀처럼 앞으로 나아갈 수 없었습니다.)\n   사람이 많아 붐비는 것은 '人ごみ(인파)'입니다. 'ごみ'만 쓰면 쓰레기라는 뜻이 됩니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0634",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0634",
+    "prompt": "ライオンやゾウがたくさん住んでいる__へ、いつか行ってみたいです。",
+    "options": [
+      "ヨーロッパ",
+      "アフリカ",
+      "北海道",
+      "韓国"
+    ],
+    "correct_answer": "アフリカ",
+    "explanation": "사자와 코끼리가 많이 사는 곳은 아프리카이므로 アフリカ가 알맞습니다. ヨーロッパ(유럽)·北海道(홋카이도)·韓国(한국)에는 사자나 코끼리가 많이 살지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0635",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0635",
+    "prompt": "「てん」의 올바른 표기를 고르세요. (뜻: 점/점수)",
+    "options": [
+      "点",
+      "点く",
+      "交差点",
+      "色"
+    ],
+    "correct_answer": "点",
+    "explanation": "「てん」는 点로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0636",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0636",
+    "prompt": "다음 한자 「一生懸命」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "いっしょうけんめい",
+    "explanation": "一生懸命은(는) いっしょうけんめい로 읽습니다. 뜻은 '열심히'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0637",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0637",
+    "prompt": "「こんど」의 올바른 표기를 고르세요. (뜻: 이번/다음번)",
+    "options": [
+      "今度",
+      "温度",
+      "態度",
+      "一度"
+    ],
+    "correct_answer": "今度",
+    "explanation": "「こんど」는 今度로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0638",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0638",
+    "prompt": "다음 한자 「建てる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "たてる",
+    "explanation": "建てる은(는) たてる로 읽습니다. 뜻은 '짓다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0639",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0639",
+    "prompt": "「かれ」의 올바른 표기를 고르세요. (뜻: 그/남자친구)",
+    "options": [
+      "彼",
+      "彼ら",
+      "彼女",
+      "庭"
+    ],
+    "correct_answer": "彼",
+    "explanation": "「かれ」는 彼로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0640",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0640",
+    "prompt": "「いらっしゃる」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "私は明日、先生の家にいらっしゃいます。",
+      "先生は今、研究室にいらっしゃいます。",
+      "妹はもう学校にいらっしゃいました。",
+      "私も来週、パーティーにいらっしゃいたいです。"
+    ],
+    "correct_answer": "先生は今、研究室にいらっしゃいます。",
+    "explanation": "정답: 先生は今、研究室にいらっしゃいます。(선생님은 지금 연구실에 계십니다.)\n'いらっしゃる'는 いる·行く·来る의 존경어로, 상대나 윗사람의 행동에 사용합니다.\n\n오답:\n1. 私は明日、先生の家にいらっしゃいます。(저는 내일 선생님 댁에 오십니다.)\n   존경어는 자신의 행동에 쓸 수 없습니다. 자신에게는 '伺います'를 씁니다.\n2. 妹はもう学校にいらっしゃいました。(여동생은 벌써 학교에 가셨습니다.)\n   가족(손아랫사람)을 남에게 말할 때는 존경어를 쓰지 않습니다. '行きました'가 자연스럽습니다.\n3. 私も来週、パーティーにいらっしゃいたいです。(저도 다음 주 파티에 오시고 싶습니다.)\n   자신의 희망에 존경어를 쓸 수 없습니다. '行きたいです'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0641",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0641",
+    "prompt": "다음 한자 「大事」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "だいじ",
+    "explanation": "大事은(는) だいじ로 읽습니다. 뜻은 '소중함'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0642",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0642",
+    "prompt": "「どろぼう」의 올바른 표기를 고르세요. (뜻: 도둑)",
+    "options": [
+      "泥棒",
+      "小鳥",
+      "駅員",
+      "随分"
+    ],
+    "correct_answer": "泥棒",
+    "explanation": "「どろぼう」는 泥棒로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0643",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0643",
+    "prompt": "다음 한자 「過ぎる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "すぎる",
+    "explanation": "過ぎる은(는) すぎる로 읽습니다. 뜻은 '지나다/넘다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0644",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0644",
+    "prompt": "来週までに、歴史について__を書いて、先生に出さなければなりません。",
+    "options": [
+      "テキスト",
+      "ニュース",
+      "レポート",
+      "授業"
+    ],
+    "correct_answer": "レポート",
+    "explanation": "レポート는 과제로 써서 제출하는 보고서이므로 '써서 선생님께 내야 한다'는 문장에 알맞습니다. テキスト(교재)는 수업에서 읽는 책, ニュース(뉴스)는 방송·신문의 소식, 授業(수업)는 듣는 것이라 학생이 써서 내는 것이 아닙니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0645",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0645",
+    "prompt": "「は」의 올바른 표기를 고르세요. (뜻: 잎)",
+    "options": [
+      "葉",
+      "絹",
+      "色",
+      "倍"
+    ],
+    "correct_answer": "葉",
+    "explanation": "「は」는 葉로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0646",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0646",
+    "prompt": "다음 한자 「必要」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ひつよう",
+    "explanation": "必要은(는) ひつよう로 읽습니다. 뜻은 '필요함'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0647",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0647",
+    "prompt": "「かちょう」의 올바른 표기를 고르세요. (뜻: 과장)",
+    "options": [
+      "課長",
+      "店長",
+      "社長",
+      "部長"
+    ],
+    "correct_answer": "課長",
+    "explanation": "「かちょう」는 課長로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0648",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0648",
+    "prompt": "「すると」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "雨が降っています。すると、傘を持って行ってください。",
+      "A「明日、行きませんか。」B「すると、行きましょう。」",
+      "窓を開けました。すると、冷たい風が部屋に入ってきました。",
+      "友達に電話をしました。すると、あした会いたいです。"
+    ],
+    "correct_answer": "窓を開けました。すると、冷たい風が部屋に入ってきました。",
+    "explanation": "정답: 窓を開けました。すると、冷たい風が部屋に入ってきました。(창문을 열었습니다. 그러자 차가운 바람이 방에 들어왔습니다.)\n'すると'는 앞의 일이 계기가 되어 이어서 일어난 일을 나타낼 때 사용합니다.\n\n오답:\n1. 雨が降っています。すると、傘を持って行ってください。(비가 오고 있습니다. 그러자 우산을 가지고 가세요.)\n   'すると'는 이어서 일어난 사실에 쓰며 의뢰나 명령 문장은 이어질 수 없습니다. 'ですから'나 'それなら'가 자연스럽습니다.\n2. A「明日、行きませんか。」B「すると、行きましょう。」(A「내일 가지 않을래요?」 B「그러자 갑시다.」)\n   'すると'는 상대의 제안에 대한 대답으로 쓸 수 없습니다. 이 경우 'じゃあ'나 'それでは'를 씁니다.\n3. 友達に電話をしました。すると、あした会いたいです。(친구에게 전화했습니다. 그러자 내일 만나고 싶습니다.)\n   'すると'는 객관적으로 일어난 일을 이어서 말하며, 말하는 사람의 희망에는 쓸 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0649",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0649",
+    "prompt": "「やめる」의 올바른 표기를 고르세요. (뜻: 그만두다)",
+    "options": [
+      "止める",
+      "禁止",
+      "停止",
+      "止む"
+    ],
+    "correct_answer": "止める",
+    "explanation": "「やめる」는 止める로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0650",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0650",
+    "prompt": "子どもがボールを投げて、窓の__が割れてしまいました。",
+    "options": [
+      "カーテン",
+      "紙",
+      "布",
+      "ガラス"
+    ],
+    "correct_answer": "ガラス",
+    "explanation": "ガラス는 깨지기 쉬운 재료로, '割れる(깨지다)'와 함께 써서 창문 유리가 깨졌다는 문장에 알맞습니다. カーテン(커튼)·紙(종이)·布(천)는 찢어질(破れる) 수는 있어도 '割れる'를 쓰지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0651",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0651",
+    "prompt": "「きびしい」의 올바른 표기를 고르세요. (뜻: 엄하다)",
+    "options": [
+      "厳しい",
+      "比べる",
+      "集まる",
+      "折れる"
+    ],
+    "correct_answer": "厳しい",
+    "explanation": "「きびしい」는 厳しい로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0652",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0652",
+    "prompt": "「エスカレーター」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "エスカレーターに乗って、隣の町まで行きました。",
+      "エスカレーターのボタンを押して、ドアが開くのを待ちました。",
+      "エスカレーターの中は狭くて、五人しか乗れません。",
+      "荷物が重いので、階段ではなくエスカレーターで上がりました。"
+    ],
+    "correct_answer": "荷物が重いので、階段ではなくエスカレーターで上がりました。",
+    "explanation": "정답: 荷物が重いので、階段ではなくエスカレーターで上がりました。(짐이 무거워서 계단이 아니라 에스컬레이터로 올라갔습니다.)\n'エスカレーター'는 건물 안에서 사람을 위아래 층으로 옮기는, 움직이는 계단 모양의 기계입니다.\n\n오답:\n1. エスカレーターに乗って、隣の町まで行きました。(에스컬레이터를 타고 이웃 마을까지 갔습니다.)\n   'エスカレーター'는 건물 안에서 층을 오르내리는 기계입니다. 다른 마을에 갈 때는 '電車'나 'バス'를 탑니다.\n2. エスカレーターのボタンを押して、ドアが開くのを待ちました。(에스컬레이터 버튼을 누르고 문이 열리기를 기다렸습니다.)\n   버튼을 누르고 문이 열리기를 기다리는 것은 'エレベーター(엘리베이터)'입니다. 'エスカレーター'에는 문이 없습니다.\n3. エスカレーターの中は狭くて、五人しか乗れません。(에스컬레이터 안은 좁아서 다섯 명밖에 탈 수 없습니다.)\n   안이 좁아 탈 수 있는 사람 수가 정해진 상자 모양의 기계는 'エレベーター'입니다. 'エスカレーター'는 계단 모양이라 '中'이 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0653",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0653",
+    "prompt": "다음 한자 「絹」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "きぬ",
+    "explanation": "絹은(는) きぬ로 읽습니다. 뜻은 '비단'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0654",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0654",
+    "prompt": "この映画は__おもしろくありませんでした。",
+    "options": [
+      "ちっとも",
+      "必ず",
+      "もうすぐ",
+      "すぐ"
+    ],
+    "correct_answer": "ちっとも",
+    "explanation": "ちっとも는 뒤에 부정 표현이 와서 '조금도 ~않다'라는 뜻을 나타냅니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0655",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0655",
+    "prompt": "「ふかい」의 올바른 표기를 고르세요. (뜻: 깊다)",
+    "options": [
+      "深い",
+      "協力",
+      "正確",
+      "道路"
+    ],
+    "correct_answer": "深い",
+    "explanation": "「ふかい」는 深い로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0656",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0656",
+    "prompt": "「できるだけ」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "宿題は、できるだけ早く出してください。",
+      "私は昨日、できるだけ朝七時に起きました。",
+      "このケーキは、できるだけおいしいです。",
+      "駅まで、できるだけ歩いて十分です。"
+    ],
+    "correct_answer": "宿題は、できるだけ早く出してください。",
+    "explanation": "정답: 宿題は、できるだけ早く出してください。(숙제는 가능한 한 빨리 내 주세요.)\n'できるだけ'는 '가능한 한'이라는 뜻으로, '早く(빨리)'·'たくさん(많이)'처럼 정도를 나타내는 말과 함께 가능한 범위에서 최대한 하려는 노력을 나타냅니다.\n\n오답:\n1. 私は昨日、できるだけ朝七時に起きました。(저는 어제 가능한 한 아침 7시에 일어났습니다.)\n   'できるだけ'는 '7시'처럼 정해진 시각을 꾸밀 수 없습니다. 'できるだけ早く起きました'라면 자연스럽습니다.\n2. このケーキは、できるだけおいしいです。(이 케이크는 가능한 한 맛있습니다.)\n   사물의 상태가 어느 정도인지 말할 때는 'できるだけ'가 아니라 'とても'를 씁니다.\n3. 駅まで、できるだけ歩いて十分です。(역까지 가능한 한 걸어서 10분입니다.)\n   대강의 시간이나 양을 말할 때는 'だいたい(대략)'를 씁니다. 'できるだけ'는 노력을 나타내는 말입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0657",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0657",
+    "prompt": "다음 한자 「悲しい」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かなしい",
+    "explanation": "悲しい은(는) かなしい로 읽습니다. 뜻은 '슬프다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0658",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0658",
+    "prompt": "「ちゅうがっこう」의 올바른 표기를 고르세요. (뜻: 중학교)",
+    "options": [
+      "中学校",
+      "真ん中",
+      "高校生",
+      "小学校"
+    ],
+    "correct_answer": "中学校",
+    "explanation": "「ちゅうがっこう」는 中学校로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0659",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0659",
+    "prompt": "料理が終わったら、__の火を消してください。",
+    "options": [
+      "電気",
+      "ガス",
+      "水道",
+      "エアコン"
+    ],
+    "correct_answer": "ガス",
+    "explanation": "ガス는 요리할 때 불을 켜는 가스이므로 '가스 불을 끄다'라는 문장에 알맞습니다. 電気(전기)·水道(수도)·エアコン(에어컨)에는 '火(불)'가 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0660",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0660",
+    "prompt": "「アルバイト」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "お金はもらいませんが、週末は病院でアルバイトをしています。",
+      "大学生のとき、コンビニでアルバイトをしていました。",
+      "毎月、アルバイトの店に給料を払っています。",
+      "先生、明日のアルバイトは何ページから何ページまでですか。"
+    ],
+    "correct_answer": "大学生のとき、コンビニでアルバイトをしていました。",
+    "explanation": "정답: 大学生のとき、コンビニでアルバイトをしていました。(대학생 때 편의점에서 아르바이트를 했습니다.)\n'アルバイト'는 본업과 별개로 시간제로 일하고 급여를 받는 일입니다.\n\n오답:\n1. お金はもらいませんが、週末は病院でアルバイトをしています。(돈은 받지 않지만 주말에는 병원에서 아르바이트를 하고 있습니다.)\n   'アルバイト'는 급여를 받는 일입니다. 돈을 받지 않고 남을 돕는 일은 'ボランティア(자원봉사)'라고 합니다.\n2. 毎月、アルバイトの店に給料を払っています。(매달 아르바이트하는 가게에 급여를 내고 있습니다.)\n   급여는 가게가 아르바이트하는 사람에게 주는 것입니다. 일하는 사람은 '給料をもらう'를 씁니다.\n3. 先生、明日のアルバイトは何ページから何ページまでですか。(선생님, 내일 아르바이트는 몇 페이지부터 몇 페이지까지입니까?)\n   선생님이 내 주는 과제는 '宿題(숙제)'입니다. 'アルバイト'는 돈을 받고 하는 일입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0661",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0661",
+    "prompt": "다음 한자 「起こす」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おこす",
+    "explanation": "起こす은(는) おこす로 읽습니다. 뜻은 '깨우다/일으키다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0662",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0662",
+    "prompt": "「かむ」의 올바른 표기를 고르세요. (뜻: 씹다/물다)",
+    "options": [
+      "噛む",
+      "頼る",
+      "怪我",
+      "試験"
+    ],
+    "correct_answer": "噛む",
+    "explanation": "「かむ」는 噛む로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0663",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0663",
+    "prompt": "다음 한자 「浅い」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "あさい",
+    "explanation": "浅い은(는) あさい로 읽습니다. 뜻은 '얕다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0664",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0664",
+    "prompt": "「うそ」의 올바른 표기를 고르세요. (뜻: 거짓말)",
+    "options": [
+      "嘘",
+      "光",
+      "塀",
+      "絹"
+    ],
+    "correct_answer": "嘘",
+    "explanation": "「うそ」는 嘘로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0665",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0665",
+    "prompt": "다음 한자 「親」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おや",
+    "explanation": "親은(는) おや로 읽습니다. 뜻은 '부모'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0666",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0666",
+    "prompt": "「せいよう」의 올바른 표기를 고르세요. (뜻: 서양)",
+    "options": [
+      "西洋",
+      "洋服",
+      "届く",
+      "地震"
+    ],
+    "correct_answer": "西洋",
+    "explanation": "「せいよう」는 西洋로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0667",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0667",
+    "prompt": "母は近くのスーパーで__として働いています。",
+    "options": [
+      "給料",
+      "客",
+      "パート",
+      "品物"
+    ],
+    "correct_answer": "パート",
+    "explanation": "パート는 시간제로 일하는 사람이나 그 일자리를 뜻하므로 '~로서 일하다'와 어울립니다. 給料(급여)·客(손님)·品物(물건)는 가게에서 일하는 사람의 신분이 될 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0668",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0668",
+    "prompt": "다음 한자 「時代」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "じだい",
+    "explanation": "時代은(는) じだい로 읽습니다. 뜻은 '시대'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0669",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0669",
+    "prompt": "「もうしあげる」의 올바른 표기를 고르세요. (뜻: 말씀드리다)",
+    "options": [
+      "申し上げる",
+      "召し上がる",
+      "差し上げる",
+      "上司"
+    ],
+    "correct_answer": "申し上げる",
+    "explanation": "「もうしあげる」는 申し上げる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0670",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0670",
+    "prompt": "다음 한자 「出席する」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "しゅっせきする",
+    "explanation": "出席する은(는) しゅっせきする로 읽습니다. 뜻은 '출석하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0671",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0671",
+    "prompt": "「どうぶつえん」의 올바른 표기를 고르세요. (뜻: 동물원)",
+    "options": [
+      "動物園",
+      "贈り物",
+      "忘れ物",
+      "乗り物"
+    ],
+    "correct_answer": "動物園",
+    "explanation": "「どうぶつえん」는 動物園로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0672",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0672",
+    "prompt": "다음 한자 「捕まえる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "つかまえる",
+    "explanation": "捕まえる은(는) つかまえる로 읽습니다. 뜻은 '붙잡다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0673",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0673",
+    "prompt": "「よる」의 올바른 표기를 고르세요. (뜻: 들르다)",
+    "options": [
+      "寄る",
+      "残業",
+      "興味",
+      "交通"
+    ],
+    "correct_answer": "寄る",
+    "explanation": "「よる」는 寄る로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0674",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0674",
+    "prompt": "「ひらく」의 올바른 표기를 고르세요. (뜻: 열다/열리다)",
+    "options": [
+      "開く",
+      "開放",
+      "経験",
+      "予定"
+    ],
+    "correct_answer": "開く",
+    "explanation": "「ひらく」는 開く로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0675",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0675",
+    "prompt": "「にげる」의 올바른 표기를 고르세요. (뜻: 도망치다)",
+    "options": [
+      "逃げる",
+      "逃げ出す",
+      "増える",
+      "迎える"
+    ],
+    "correct_answer": "逃げる",
+    "explanation": "「にげる」는 逃げる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0676",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0676",
+    "prompt": "「だから」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "顔を洗いました。だから、朝ごはんを食べました。",
+      "A「この店は高いですね。」B「だから、私も高いと思います。」",
+      "今日は雨が降っています。だから、家で映画を見ます。",
+      "運動が好きではありません。だから、毎日走っています。"
+    ],
+    "correct_answer": "今日は雨が降っています。だから、家で映画を見ます。",
+    "explanation": "정답: 今日は雨が降っています。だから、家で映画を見ます。(오늘은 비가 오고 있습니다. 그래서 집에서 영화를 봅니다.)\n'だから'는 앞 문장이 원인이 되어 뒤 문장의 결과가 이어질 때 사용합니다.\n\n오답:\n1. 顔を洗いました。だから、朝ごはんを食べました。(세수를 했습니다. 그래서 아침밥을 먹었습니다.)\n   세수와 아침 식사 사이에는 원인과 결과의 관계가 없고 순서만 있습니다. 순서를 나타낼 때는 'それから'를 씁니다.\n2. A「この店は高いですね。」B「だから、私も高いと思います。」(A「이 가게는 비싸네요.」 B「그래서 저도 비싸다고 생각합니다.」)\n   상대의 말에 동의할 때는 'だから'가 아니라 'そうですね'를 씁니다.\n3. 運動が好きではありません。だから、毎日走っています。(운동을 좋아하지 않습니다. 그래서 매일 달리고 있습니다.)\n   앞 문장이 원인이 되지 못하고 뒤 문장과 모순됩니다. 이 경우 'でも'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0677",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0677",
+    "prompt": "다음 한자 「地理」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ちり",
+    "explanation": "地理은(는) ちり로 읽습니다. 뜻은 '지리'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0678",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0678",
+    "prompt": "__まで雨が降っていましたが、今はやみました。",
+    "options": [
+      "これから",
+      "来週",
+      "あした",
+      "さっき"
+    ],
+    "correct_answer": "さっき",
+    "explanation": "さっき는 조금 전의 시간을 뜻하므로 '아까까지 비가 왔다'는 과거의 문장에 알맞습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0679",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0679",
+    "prompt": "「こわい」의 올바른 표기를 고르세요. (뜻: 무섭다)",
+    "options": [
+      "怖い",
+      "目標",
+      "人形",
+      "零す"
+    ],
+    "correct_answer": "怖い",
+    "explanation": "「こわい」는 怖い로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0680",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0680",
+    "prompt": "다음 한자 「包む」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "つつむ",
+    "explanation": "包む은(는) つつむ로 읽습니다. 뜻은 '싸다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0681",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0681",
+    "prompt": "「なるべく」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "明日はなるべく雨が降るでしょう。",
+      "先週の試験に、なるべく合格しました。",
+      "その映画はなるべくおもしろかったです。",
+      "体のために、なるべく野菜を食べるようにしています。"
+    ],
+    "correct_answer": "体のために、なるべく野菜を食べるようにしています。",
+    "explanation": "정답: 体のために、なるべく野菜を食べるようにしています。(건강을 위해 되도록 채소를 먹으려고 하고 있습니다.)\n'なるべく'는 '되도록'이라는 뜻으로, 가능한 한 그렇게 하려는 말하는 사람의 노력이나 바람을 나타냅니다.\n\n오답:\n1. 明日はなるべく雨が降るでしょう。(내일은 되도록 비가 내리겠지요.)\n   날씨처럼 사람의 노력과 관계없는 일을 추측할 때는 'なるべく'를 쓸 수 없습니다. 'たぶん'이나 'きっと'가 자연스럽습니다.\n2. 先週の試験に、なるべく合格しました。(지난주 시험에 되도록 합격했습니다.)\n   어렵게 결과를 이루었다는 뜻은 'やっと'로 나타냅니다. 'なるべく'는 앞으로 하려는 노력에 쓰며 이미 이루어진 결과에는 쓰지 않습니다.\n3. その映画はなるべくおもしろかったです。(그 영화는 되도록 재미있었습니다.)\n   'なるべく'는 동작에 쓰므로, 사물의 상태를 설명하는 문장에는 쓸 수 없습니다. 'とても'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0682",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0682",
+    "prompt": "パンの間にハムと野菜を入れて、__を作りました。",
+    "options": [
+      "サンドイッチ",
+      "ステーキ",
+      "ジャム",
+      "スープ"
+    ],
+    "correct_answer": "サンドイッチ",
+    "explanation": "サンドイッチ는 빵 사이에 햄이나 채소를 넣은 음식이므로 문장에 알맞습니다. ステーキ(스테이크)는 구운 고기, ジャム(잼)은 과일을 졸인 것, スープ(수프)는 국물 요리라 빵 사이에 넣어 만들지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0683",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0683",
+    "prompt": "「かいぎしつ」의 올바른 표기를 고르세요. (뜻: 회의실)",
+    "options": [
+      "会議室",
+      "展覧会",
+      "会社員",
+      "説明会"
+    ],
+    "correct_answer": "会議室",
+    "explanation": "「かいぎしつ」는 会議室로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0684",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0684",
+    "prompt": "다음 한자 「品物」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "しなもの",
+    "explanation": "品物은(는) しなもの로 읽습니다. 뜻은 '물건/상품'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0685",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0685",
+    "prompt": "「にんぎょう」의 올바른 표기를 고르세요. (뜻: 인형)",
+    "options": [
+      "人形",
+      "人口",
+      "形",
+      "理想"
+    ],
+    "correct_answer": "人形",
+    "explanation": "「にんぎょう」는 人形로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0686",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0686",
+    "prompt": "다음 한자 「飾る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かざる",
+    "explanation": "飾る은(는) かざる로 읽습니다. 뜻은 '장식하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0687",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0687",
+    "prompt": "「とめる」의 올바른 표기를 고르세요. (뜻: 세우다/멈추다)",
+    "options": [
+      "止める",
+      "禁止",
+      "止む",
+      "停止"
+    ],
+    "correct_answer": "止める",
+    "explanation": "「とめる」는 止める로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0688",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0688",
+    "prompt": "다음 한자 「恥ずかしい」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "はずかしい",
+    "explanation": "恥ずかしい은(는) はずかしい로 읽습니다. 뜻은 '부끄럽다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0689",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0689",
+    "prompt": "「けんかする」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "兄と弟は、おもちゃのことでよくけんかします。",
+      "祖母は一年間、病気とけんかして、元気になりました。",
+      "私たちのチームは、隣の町のチームとサッカーでけんかして、三対一で勝ちました。",
+      "昨日は一人で部屋の中でけんかして、疲れました。"
+    ],
+    "correct_answer": "兄と弟は、おもちゃのことでよくけんかします。",
+    "explanation": "정답: 兄と弟は、おもちゃのことでよくけんかします。(형과 동생은 장난감 때문에 자주 싸웁니다.)\n'けんかする'는 사람끼리 말이나 행동으로 다툰다는 뜻입니다.\n\n오답:\n1. 祖母は一年間、病気とけんかして、元気になりました。(할머니는 1년 동안 병과 싸워서 건강해졌습니다.)\n   병이나 어려움에 맞서는 것은 '戦う(싸우다)'를 써서 '病気と戦う'라고 합니다. 'けんか'는 사람끼리의 다툼입니다.\n2. 私たちのチームは、隣の町のチームとサッカーでけんかして、三対一で勝ちました。(우리 팀은 이웃 마을 팀과 축구로 싸워서 3대 1로 이겼습니다.)\n   규칙에 따라 승부를 겨루는 것은 '試合をする(시합을 하다)'입니다. 'けんか'는 경기가 아니라 다툼입니다.\n3. 昨日は一人で部屋の中でけんかして、疲れました。(어제는 혼자 방 안에서 싸워서 피곤했습니다.)\n   'けんかする'는 상대가 있어야 성립하므로 혼자서는 할 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0690",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0690",
+    "prompt": "「なげる」의 올바른 표기를 고르세요. (뜻: 던지다)",
+    "options": [
+      "投げる",
+      "投票",
+      "信じる",
+      "進める"
+    ],
+    "correct_answer": "投げる",
+    "explanation": "「なげる」는 投げる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0691",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0691",
+    "prompt": "다음 한자 「力」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ちから",
+    "explanation": "力은(는) ちから로 읽습니다. 뜻은 '힘'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0692",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0692",
+    "prompt": "「きぶん」의 올바른 표기를 고르세요. (뜻: 기분)",
+    "options": [
+      "気分",
+      "部分",
+      "気圧",
+      "半分"
+    ],
+    "correct_answer": "気分",
+    "explanation": "「きぶん」는 気分로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0693",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0693",
+    "prompt": "A「昨日、駅で山田さんに会いましたよ。」B「えっ、山田さんは今アメリカにいますよ。__はずはありません。」",
+    "options": [
+      "どんな",
+      "そんな",
+      "どの",
+      "大きな"
+    ],
+    "correct_answer": "そんな",
+    "explanation": "そんな는 상대가 말한 내용을 가리켜 '그런'이라는 뜻을 나타내며, 'そんなはずはありません(그럴 리가 없습니다)'으로 자주 씁니다. どんな·どの는 의문을 나타내므로 평서문에 쓸 수 없고, 大きな는 상대의 말을 가리킬 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0694",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0694",
+    "prompt": "「やっと」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "やっと、私は毎朝六時に起きます。",
+      "三時間待って、やっとバスが来ました。",
+      "このカレーはやっと辛いです。",
+      "急いでいたので、やっと駅に着けませんでした。"
+    ],
+    "correct_answer": "三時間待って、やっとバスが来ました。",
+    "explanation": "정답: 三時間待って、やっとバスが来ました。(세 시간 기다려서 겨우 버스가 왔습니다.)\n'やっと'는 오랜 시간이나 노력 끝에 어떤 일이 이루어졌음을 나타낼 때 사용합니다.\n\n오답:\n1. やっと、私は毎朝六時に起きます。(겨우 저는 매일 아침 6시에 일어납니다.)\n   'やっと'는 한 번의 결과에 쓰므로 습관을 말하는 문장에는 쓸 수 없습니다.\n2. このカレーはやっと辛いです。(이 카레는 겨우 맵습니다.)\n   'やっと'는 결과에 이르렀음을 나타내므로, 사물의 성질을 설명하는 문장에는 쓸 수 없습니다. 'とても'가 자연스럽습니다.\n3. 急いでいたので、やっと駅に着けませんでした。(서둘렀기 때문에 겨우 역에 도착하지 못했습니다.)\n   'やっと'는 마침내 이루어진 일에 쓰며 못 했다는 부정문에는 어울리지 않습니다. 'なかなか'나 '結局'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0695",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0695",
+    "prompt": "다음 한자 「行う」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おこなう",
+    "explanation": "行う은(는) おこなう로 읽습니다. 뜻은 '실시하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0696",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0696",
+    "prompt": "__は、小さくて丸い実がたくさん集まった果物で、ワインの材料にもなります。",
+    "options": [
+      "りんご",
+      "バナナ",
+      "ぶどう",
+      "すいか"
+    ],
+    "correct_answer": "ぶどう",
+    "explanation": "ぶどう는 작고 둥근 알이 송이로 모여 달리는 과일이고 와인의 재료이므로 알맞습니다. りんご(사과)는 크고 둥근 과일, バナナ(바나나)는 길쭉한 과일, すいか(수박)는 아주 큰 과일입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0697",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0697",
+    "prompt": "「なくなる」의 올바른 표기를 고르세요. (뜻: 없어지다)",
+    "options": [
+      "無くなる",
+      "無駄",
+      "無理",
+      "売り切れ"
+    ],
+    "correct_answer": "無くなる",
+    "explanation": "「なくなる」는 無くなる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0698",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0698",
+    "prompt": "다음 한자 「再来月」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "さらいげつ",
+    "explanation": "再来月은(는) さらいげつ로 읽습니다. 뜻은 '다다음 달'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0699",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0699",
+    "prompt": "「はやし」의 올바른 표기를 고르세요. (뜻: 수풀)",
+    "options": [
+      "林",
+      "森林",
+      "隅",
+      "油"
+    ],
+    "correct_answer": "林",
+    "explanation": "「はやし」는 林로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0700",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0700",
+    "prompt": "다음 한자 「倍」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ばい",
+    "explanation": "倍은(는) ばい로 읽습니다. 뜻은 '배'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0701",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0701",
+    "prompt": "「やせる」의 올바른 표기를 고르세요. (뜻: 마르다)",
+    "options": [
+      "痩せる",
+      "運転手",
+      "説明会",
+      "折れる"
+    ],
+    "correct_answer": "痩せる",
+    "explanation": "「やせる」는 痩せる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0702",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0702",
+    "prompt": "다음 한자 「線」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "せん",
+    "explanation": "線은(는) せん로 읽습니다. 뜻은 '선'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0703",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0703",
+    "prompt": "「ねぼう」의 올바른 표기를 고르세요. (뜻: 늦잠)",
+    "options": [
+      "寝坊",
+      "赤ん坊",
+      "大抵",
+      "景色"
+    ],
+    "correct_answer": "寝坊",
+    "explanation": "「ねぼう」는 寝坊로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0704",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0704",
+    "prompt": "「パパ」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "会社の部長に、「昨日、パパと旅行に行きました」と話しました。",
+      "パパの妹は私のおじさんです。",
+      "うちでは、子どもたちがお父さんをパパと呼びます。",
+      "パパは私を産んでくれた人で、とても優しいです。"
+    ],
+    "correct_answer": "うちでは、子どもたちがお父さんをパパと呼びます。",
+    "explanation": "정답: うちでは、子どもたちがお父さんをパパと呼びます。(우리 집에서는 아이들이 아버지를 아빠라고 부릅니다.)\n'パパ'는 가족끼리 아버지를 부르는 친근한 말입니다.\n\n오답:\n1. 会社の部長に、「昨日、パパと旅行に行きました」と話しました。(회사 부장님께 \"어제 아빠와 여행을 갔습니다\"라고 말했습니다.)\n   'パパ'는 가족끼리 쓰는 친근한 말이므로, 회사처럼 격식 있는 자리에서 자기 아버지를 말할 때는 '父'를 씁니다.\n2. パパの妹は私のおじさんです。(아빠의 여동생은 저의 삼촌입니다.)\n   아버지의 여동생은 'おばさん'입니다. 'おじさん'은 남자 어른을 가리킵니다.\n3. パパは私を産んでくれた人で、とても優しいです。(아빠는 저를 낳아 준 사람으로 매우 다정합니다.)\n   아이를 낳는 사람은 'ママ'입니다. 'パパ'는 아버지를 가리킵니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0705",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0705",
+    "prompt": "다음 한자 「光る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ひかる",
+    "explanation": "光る은(는) ひかる로 읽습니다. 뜻은 '빛나다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0706",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0706",
+    "prompt": "「おっと」의 올바른 표기를 고르세요. (뜻: 남편)",
+    "options": [
+      "夫",
+      "工夫",
+      "庭",
+      "子"
+    ],
+    "correct_answer": "夫",
+    "explanation": "「おっと」는 夫로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0707",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0707",
+    "prompt": "다음 한자 「雲」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "くも",
+    "explanation": "雲은(는) くも로 읽습니다. 뜻은 '구름'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0708",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0708",
+    "prompt": "「さか」의 올바른 표기를 고르세요. (뜻: 비탈길)",
+    "options": [
+      "坂",
+      "角",
+      "市",
+      "米"
+    ],
+    "correct_answer": "坂",
+    "explanation": "「さか」는 坂로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0709",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0709",
+    "prompt": "다음 한자 「飛行場」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ひこうじょう",
+    "explanation": "飛行場은(는) ひこうじょう로 읽습니다. 뜻은 '비행장'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0710",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0710",
+    "prompt": "「じゅうどう」의 올바른 표기를 고르세요. (뜻: 유도)",
+    "options": [
+      "柔道",
+      "道路",
+      "道具",
+      "水道"
+    ],
+    "correct_answer": "柔道",
+    "explanation": "「じゅうどう」는 柔道로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0711",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0711",
+    "prompt": "다음 한자 「決して」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "けっして",
+    "explanation": "決して은(는) けっして로 읽습니다. 뜻은 '결코'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0712",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0712",
+    "prompt": "「しょうがっこう」의 올바른 표기를 고르세요. (뜻: 초등학교)",
+    "options": [
+      "小学校",
+      "中学校",
+      "小遣い",
+      "大学生"
+    ],
+    "correct_answer": "小学校",
+    "explanation": "「しょうがっこう」는 小学校로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0713",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0713",
+    "prompt": "다음 한자 「昔」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "むかし",
+    "explanation": "昔은(는) むかし로 읽습니다. 뜻은 '옛날'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0714",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0714",
+    "prompt": "「うつくしい」의 올바른 표기를 고르세요. (뜻: 아름답다)",
+    "options": [
+      "美しい",
+      "美容院",
+      "美術",
+      "厳しい"
+    ],
+    "correct_answer": "美しい",
+    "explanation": "「うつくしい」는 美しい로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0715",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0715",
+    "prompt": "다음 한자 「捨てる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "すてる",
+    "explanation": "捨てる은(는) すてる로 읽습니다. 뜻은 '버리다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0716",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0716",
+    "prompt": "先生は毎朝、散歩を__と聞きました。",
+    "options": [
+      "いたす",
+      "召し上がる",
+      "いらっしゃる",
+      "なさる"
+    ],
+    "correct_answer": "なさる",
+    "explanation": "なさる는 する의 존경어이므로 선생님의 행동인 '산책을 하시다'에 알맞습니다. いたす는 する의 겸양어라 선생님의 행동에 쓸 수 없고, 召し上がる는 食べる·飲む, いらっしゃる는 いる·行く·来る의 존경어라 '散歩を'와 이어지지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0717",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0717",
+    "prompt": "「こと」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "机の上にある大きなことを取ってください。",
+      "私は昨日、駅で友達のことに会いました。",
+      "窓から、鳥が空を飛んでいることを見ました。",
+      "私の趣味は、写真を撮ることです。"
+    ],
+    "correct_answer": "私の趣味は、写真を撮ることです。",
+    "explanation": "정답: 私の趣味は、写真を撮ることです。(제 취미는 사진을 찍는 것입니다.)\n'こと'는 동사 뒤에 붙어 동작이나 일을 명사처럼 나타낼 때 사용합니다.\n\n오답:\n1. 机の上にある大きなことを取ってください。(책상 위에 있는 큰 것을 집어 주세요.)\n   'こと'는 눈에 보이는 물건을 가리킬 수 없습니다. 물건에는 'もの'를 씁니다.\n2. 私は昨日、駅で友達のことに会いました。(저는 어제 역에서 친구의 일에 만났습니다.)\n   '会う'는 만나는 사람 뒤에 바로 'に'를 붙여 '友達に会いました'라고 합니다. '友達のこと'는 '친구에 관한 일'이라는 뜻이라 만날 수 없습니다.\n3. 窓から、鳥が空を飛んでいることを見ました。(창문으로 새가 하늘을 날고 있는 것을 보았습니다.)\n   '見る'·'聞く'처럼 눈이나 귀로 직접 느끼는 동사 앞에서는 'こと'가 아니라 'の'를 써서 '飛んでいるのを見ました'라고 합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0718",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0718",
+    "prompt": "雨が強くなって、川の水が__増えています。",
+    "options": [
+      "どんどん",
+      "そろそろ",
+      "ちょうど",
+      "なるべく"
+    ],
+    "correct_answer": "どんどん",
+    "explanation": "どんどん은 변화가 계속 빠르게 진행되는 모양을 나타내므로 '물이 자꾸 불어나다'와 어울립니다. そろそろ(슬슬)는 어떤 때가 가까워짐, ちょうど(딱)는 정확히 맞음, なるべく(되도록)는 말하는 사람의 노력을 나타내어 문장에 맞지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0719",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0719",
+    "prompt": "「てきとう」의 올바른 표기를 고르세요. (뜻: 적당함)",
+    "options": [
+      "適当",
+      "番号",
+      "急に",
+      "高校"
+    ],
+    "correct_answer": "適当",
+    "explanation": "「てきとう」는 適当로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0720",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0720",
+    "prompt": "다음 한자 「素晴らしい」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "すばらしい",
+    "explanation": "素晴らしい은(는) すばらしい로 읽습니다. 뜻은 '훌륭하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0721",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0721",
+    "prompt": "「おわり」의 올바른 표기를 고르세요. (뜻: 끝)",
+    "options": [
+      "終わり",
+      "変える",
+      "真ん中",
+      "お互い"
+    ],
+    "correct_answer": "終わり",
+    "explanation": "「おわり」는 終わり로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0722",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0722",
+    "prompt": "다음 한자 「一度」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "いちど",
+    "explanation": "一度은(는) いちど로 읽습니다. 뜻은 '한 번'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0723",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0723",
+    "prompt": "「おれい」의 올바른 표기를 고르세요. (뜻: 사례/감사 인사)",
+    "options": [
+      "お礼",
+      "失礼",
+      "回る",
+      "開く"
+    ],
+    "correct_answer": "お礼",
+    "explanation": "「おれい」는 お礼로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0724",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0724",
+    "prompt": "다음 한자 「歯医者」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "はいしゃ",
+    "explanation": "歯医者은(는) はいしゃ로 읽습니다. 뜻은 '치과 의사'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0725",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0725",
+    "prompt": "「なおる」의 올바른 표기를 고르세요. (뜻: 낫다)",
+    "options": [
+      "治る",
+      "政治",
+      "治療",
+      "出発"
+    ],
+    "correct_answer": "治る",
+    "explanation": "「なおる」는 治る로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0726",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0726",
+    "prompt": "다음 한자 「お祭り」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おまつり",
+    "explanation": "お祭り은(는) おまつり로 읽습니다. 뜻은 '축제'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0727",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0727",
+    "prompt": "「すいどう」의 올바른 표기를 고르세요. (뜻: 수도)",
+    "options": [
+      "水道",
+      "道路",
+      "洪水",
+      "水泳"
+    ],
+    "correct_answer": "水道",
+    "explanation": "「すいどう」는 水道로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0728",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0728",
+    "prompt": "「ベル」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "ドアの前でベルを押すと、中から人が出てきました。",
+      "テレビをつけるときは、このベルを押してください。",
+      "部屋が暗いので、ベルをつけて本を読みました。",
+      "ベルを見たら、もう三時だったので、急いで家を出ました。"
+    ],
+    "correct_answer": "ドアの前でベルを押すと、中から人が出てきました。",
+    "explanation": "정답: ドアの前でベルを押すと、中から人が出てきました。(문 앞에서 벨을 누르자 안에서 사람이 나왔습니다.)\n'ベル'은 누르거나 흔들어 소리를 내서 사람을 부르거나 무언가를 알리는 도구입니다.\n\n오답:\n1. テレビをつけるときは、このベルを押してください。(텔레비전을 켤 때는 이 벨을 눌러 주세요.)\n   기계를 켜기 위해 누르는 것은 'ボタン'이나 'スイッチ'입니다. 'ベル'은 소리를 내는 도구입니다.\n2. 部屋が暗いので、ベルをつけて本を読みました。(방이 어두워서 벨을 켜고 책을 읽었습니다.)\n   방을 밝게 하려고 켜는 것은 '電気(전등)'입니다.\n3. ベルを見たら、もう三時だったので、急いで家を出ました。(벨을 보니 벌써 3시여서 서둘러 집을 나왔습니다.)\n   시간을 확인하는 것은 '時計(시계)'입니다. 'ベル'은 시간을 보여 주지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0729",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0729",
+    "prompt": "다음 한자 「赤ん坊」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "あかんぼう",
+    "explanation": "赤ん坊은(는) あかんぼう로 읽습니다. 뜻은 '아기'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0730",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0730",
+    "prompt": "このコーヒーは、味が少し__ので、飲まないほうがいいです。",
+    "options": [
+      "広い",
+      "おかしい",
+      "若い",
+      "近い"
+    ],
+    "correct_answer": "おかしい",
+    "explanation": "おかしい는 평소와 달리 이상하다는 뜻이므로 '맛이 이상하다'에 알맞습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0731",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0731",
+    "prompt": "「じこ」의 올바른 표기를 고르세요. (뜻: 사고)",
+    "options": [
+      "事故",
+      "仕事",
+      "用事",
+      "返事"
+    ],
+    "correct_answer": "事故",
+    "explanation": "「じこ」는 事故로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0732",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0732",
+    "prompt": "다음 한자 「変」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "へん",
+    "explanation": "変은(는) へん로 읽습니다. 뜻은 '이상함'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0733",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0733",
+    "prompt": "「じてん」의 올바른 표기를 고르세요. (뜻: 사전)",
+    "options": [
+      "辞典",
+      "開く",
+      "残る",
+      "交流"
+    ],
+    "correct_answer": "辞典",
+    "explanation": "「じてん」는 辞典로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0734",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0734",
+    "prompt": "다음 한자 「残る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "のこる",
+    "explanation": "残る은(는) のこる로 읽습니다. 뜻은 '남다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0735",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0735",
+    "prompt": "「たてる」의 올바른 표기를 고르세요. (뜻: 세우다)",
+    "options": [
+      "立てる",
+      "目立つ",
+      "役に立つ",
+      "決める"
+    ],
+    "correct_answer": "立てる",
+    "explanation": "「たてる」는 立てる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0736",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0736",
+    "prompt": "「くれる」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "私は友達に傘を貸してくれました。",
+      "友達が私に傘を貸してくれました。",
+      "姉に宿題を手伝ってくれて、助かりました。",
+      "先生、宿題を見てくれて、ありがとうございました。"
+    ],
+    "correct_answer": "友達が私に傘を貸してくれました。",
+    "explanation": "정답: 友達が私に傘を貸してくれました。(친구가 나에게 우산을 빌려주었습니다.)\n'くれる'는 다른 사람이 나(또는 우리 쪽)에게 무언가를 해 주거나 줄 때 사용합니다.\n\n오답:\n1. 私は友達に傘を貸してくれました。(저는 친구에게 우산을 빌려 주었습니다.)\n   내가 남에게 해 줄 때는 'くれる'가 아니라 'あげる'를 씁니다. '貸してあげました'가 맞습니다.\n2. 姉に宿題を手伝ってくれて、助かりました。(언니에게 숙제를 도와주어서 도움이 되었습니다.)\n   'くれる'는 주는 사람을 'が'로 나타내어 '姉が手伝ってくれて'라고 합니다. 'に'를 쓰려면 '姉に手伝ってもらって'처럼 'もらう'를 씁니다.\n3. 先生、宿題を見てくれて、ありがとうございました。(선생님, 숙제를 봐 줘서 고맙습니다.)\n   윗사람이 해 준 일에는 'くれる'가 아니라 존경어 'くださる'를 써서 '見てくださって'라고 합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0737",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0737",
+    "prompt": "先生から本を__ことになりました。",
+    "options": [
+      "あげる",
+      "差し上げる",
+      "いただく",
+      "やる"
+    ],
+    "correct_answer": "いただく",
+    "explanation": "いただく는 もらう의 겸양어로, 윗사람에게서 받을 때 씁니다. '先生から(선생님에게서)'와 어울리는 것은 받는 동작뿐이며, あげる·差し上げる·やる는 모두 주는 동작입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0738",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0738",
+    "prompt": "다음 한자 「漬ける」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "つける",
+    "explanation": "漬ける은(는) つける로 읽습니다. 뜻은 '담그다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0739",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0739",
+    "prompt": "「スクリーン」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "映画館の入口でスクリーンを買って、中に入りました。",
+      "映画館では、前から三番目のスクリーンに座りました。",
+      "映画館の大きなスクリーンで、新しい映画を見ました。",
+      "この映画のスクリーンを書いたのは、有名な作家です。"
+    ],
+    "correct_answer": "映画館の大きなスクリーンで、新しい映画を見ました。",
+    "explanation": "정답: 映画館の大きなスクリーンで、新しい映画を見ました。(영화관의 큰 스크린으로 새 영화를 보았습니다.)\n'スクリーン'은 영화나 영상을 비추는 큰 화면입니다.\n\n오답:\n1. 映画館の入口でスクリーンを買って、中に入りました。(영화관 입구에서 스크린을 사서 안으로 들어갔습니다.)\n   영화관에 들어가기 위해 사는 것은 'チケット'나 '切符(표)'입니다.\n2. 映画館では、前から三番目のスクリーンに座りました。(영화관에서는 앞에서 세 번째 스크린에 앉았습니다.)\n   앉는 곳은 '席(자리)'입니다. 'スクリーン'은 앉는 곳이 아니라 앞쪽에 있는 화면입니다.\n3. この映画のスクリーンを書いたのは、有名な作家です。(이 영화의 스크린을 쓴 사람은 유명한 작가입니다.)\n   영화의 이야기를 글로 쓴 것은 '話(이야기)'나 '脚本(각본)'이라고 합니다. 'スクリーン'은 화면이므로 쓸 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0740",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0740",
+    "prompt": "「こころ」의 올바른 표기를 고르세요. (뜻: 마음)",
+    "options": [
+      "心",
+      "安心する",
+      "心配する",
+      "安心"
+    ],
+    "correct_answer": "心",
+    "explanation": "「こころ」는 心로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0741",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0741",
+    "prompt": "다음 한자 「確か」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "たしか",
+    "explanation": "確か은(는) たしか로 읽습니다. 뜻은 '확실함'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0742",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0742",
+    "prompt": "レストランで、牛肉を厚く切って焼いた__を食べました。",
+    "options": [
+      "ハンバーグ",
+      "サンドイッチ",
+      "スープ",
+      "ステーキ"
+    ],
+    "correct_answer": "ステーキ",
+    "explanation": "ステーキ는 고기를 두껍게 잘라 구운 요리이므로 문장에 알맞습니다. ハンバーグ(햄버그스테이크)는 다진 고기를 뭉쳐 구운 요리, サンドイッチ(샌드위치)는 빵 사이에 재료를 넣은 음식, スープ(수프)는 국물 요리입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0743",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0743",
+    "prompt": "「しょくりょうひん」의 올바른 표기를 고르세요. (뜻: 식료품)",
+    "options": [
+      "食料品",
+      "料金",
+      "作品",
+      "食料"
+    ],
+    "correct_answer": "食料品",
+    "explanation": "「しょくりょうひん」는 食料品로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0744",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0744",
+    "prompt": "다음 한자 「森」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "もり",
+    "explanation": "森은(는) もり로 읽습니다. 뜻은 '숲'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0745",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0745",
+    "prompt": "「オーバー」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "暑い夏の日には、オーバーを着て出かけます。",
+      "オーバーを履いて、駅まで歩きました。",
+      "寒いので、首にオーバーを巻いて出かけました。",
+      "寒いので、オーバーを着て出かけました。"
+    ],
+    "correct_answer": "寒いので、オーバーを着て出かけました。",
+    "explanation": "정답: 寒いので、オーバーを着て出かけました。(추워서 외투를 입고 나갔습니다.)\n'オーバー'는 추울 때 옷 위에 입는 두꺼운 외투를 뜻합니다.\n\n오답:\n1. 暑い夏の日には、オーバーを着て出かけます。(더운 여름날에는 외투를 입고 나갑니다.)\n   'オーバー'는 추운 겨울에 입는 두꺼운 외투이므로 더운 여름에는 입지 않습니다.\n2. オーバーを履いて、駅まで歩きました。(외투를 신고 역까지 걸었습니다.)\n   'オーバー'는 입는 옷이므로 '履く'를 쓸 수 없습니다. 입을 때는 '着る'를 씁니다.\n3. 寒いので、首にオーバーを巻いて出かけました。(추워서 목에 외투를 두르고 나갔습니다.)\n   목에 감는 것은 'マフラー(머플러)'입니다. 'オーバー'는 몸에 입는 외투입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0746",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0746",
+    "prompt": "「いし」의 올바른 표기를 고르세요. (뜻: 돌)",
+    "options": [
+      "石",
+      "畳",
+      "湖",
+      "彼"
+    ],
+    "correct_answer": "石",
+    "explanation": "「いし」는 石로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0747",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0747",
+    "prompt": "다음 한자 「思い出す」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おもいだす",
+    "explanation": "思い出す은(는) おもいだす로 읽습니다. 뜻은 '떠올리다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0748",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0748",
+    "prompt": "「こまかい」의 올바른 표기를 고르세요. (뜻: 자잘하다/세세하다)",
+    "options": [
+      "細かい",
+      "小遣い",
+      "捕まる",
+      "建てる"
+    ],
+    "correct_answer": "細かい",
+    "explanation": "「こまかい」는 細かい로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0749",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0749",
+    "prompt": "다음 한자 「塗る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ぬる",
+    "explanation": "塗る은(는) ぬる로 읽습니다. 뜻은 '바르다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0750",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0750",
+    "prompt": "「めずらしい」의 올바른 표기를 고르세요. (뜻: 드물다/신기하다)",
+    "options": [
+      "珍しい",
+      "足りる",
+      "揺れる",
+      "増やす"
+    ],
+    "correct_answer": "珍しい",
+    "explanation": "「めずらしい」는 珍しい로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0751",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0751",
+    "prompt": "다음 한자 「用」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "よう",
+    "explanation": "用은(는) よう로 읽습니다. 뜻은 '볼일'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0752",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0752",
+    "prompt": "「こうむいん」의 올바른 표기를 고르세요. (뜻: 공무원)",
+    "options": [
+      "公務員",
+      "会社員",
+      "銀行員",
+      "駅員"
+    ],
+    "correct_answer": "公務員",
+    "explanation": "「こうむいん」는 公務員로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0753",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0753",
+    "prompt": "다음 한자 「お嬢さん」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おじょうさん",
+    "explanation": "お嬢さん은(는) おじょうさん로 읽습니다. 뜻은 '따님/아가씨'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0754",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0754",
+    "prompt": "「ようい」의 올바른 표기를 고르세요. (뜻: 준비)",
+    "options": [
+      "用意",
+      "注意",
+      "意識",
+      "用事"
+    ],
+    "correct_answer": "用意",
+    "explanation": "「ようい」는 用意로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0755",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0755",
+    "prompt": "다음 한자 「探す」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "さがす",
+    "explanation": "探す은(는) さがす로 읽습니다. 뜻은 '찾다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0756",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0756",
+    "prompt": "雨がやんで、空が__明るくなりました。",
+    "options": [
+      "すっかり",
+      "ちっとも",
+      "なるべく",
+      "きっと"
+    ],
+    "correct_answer": "すっかり",
+    "explanation": "すっかり는 '완전히'라는 뜻으로 상태가 완전히 바뀌었음을 나타내므로 '하늘이 완전히 밝아졌다'에 알맞습니다. ちっとも(조금도)는 부정문에 쓰고, なるべく(되도록)는 노력, きっと(틀림없이)는 추측을 나타내어 맞지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0757",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0757",
+    "prompt": "「アナウンサー」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "テレビのニュースで、アナウンサーが天気を知らせています。",
+      "新聞のアナウンサーが、昨日の事故について記事を書きました。",
+      "バスのアナウンサーが、安全に運転してくれました。",
+      "デパートの売り場で、アナウンサーに服のサイズを聞きました。"
+    ],
+    "correct_answer": "テレビのニュースで、アナウンサーが天気を知らせています。",
+    "explanation": "정답: テレビのニュースで、アナウンサーが天気を知らせています。(텔레비전 뉴스에서 아나운서가 날씨를 알려 주고 있습니다.)\n'アナウンサー'는 텔레비전이나 라디오 방송에서 뉴스나 안내를 말로 전하는 사람입니다.\n\n오답:\n1. 新聞のアナウンサーが、昨日の事故について記事を書きました。(신문 아나운서가 어제 사고에 대해 기사를 썼습니다.)\n   신문 기사를 쓰는 사람은 '記者(기자)'입니다. 'アナウンサー'는 방송에서 말로 전하는 사람입니다.\n2. バスのアナウンサーが、安全に運転してくれました。(버스 아나운서가 안전하게 운전해 주었습니다.)\n   버스를 운전하는 사람은 '運転手(운전기사)'입니다. 버스 안에 안내 방송이 나와도 운전하는 사람을 'アナウンサー'라고 하지 않습니다.\n3. デパートの売り場で、アナウンサーに服のサイズを聞きました。(백화점 매장에서 아나운서에게 옷 사이즈를 물었습니다.)\n   매장에서 손님을 돕는 사람은 '店員(점원)'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0758",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0758",
+    "prompt": "「みそ」의 올바른 표기를 고르세요. (뜻: 된장)",
+    "options": [
+      "味噌",
+      "味方",
+      "意味",
+      "興味"
+    ],
+    "correct_answer": "味噌",
+    "explanation": "「みそ」는 味噌로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0759",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0759",
+    "prompt": "다음 한자 「通う」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かよう",
+    "explanation": "通う은(는) かよう로 읽습니다. 뜻은 '다니다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0760",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0760",
+    "prompt": "「のりもの」의 올바른 표기를 고르세요. (뜻: 탈것)",
+    "options": [
+      "乗り物",
+      "動物園",
+      "忘れ物",
+      "乗り場"
+    ],
+    "correct_answer": "乗り物",
+    "explanation": "「のりもの」는 乗り物로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0761",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0761",
+    "prompt": "다음 한자 「小鳥」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ことり",
+    "explanation": "小鳥은(는) ことり로 읽습니다. 뜻은 '작은 새'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0762",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0762",
+    "prompt": "「げしゅく」의 올바른 표기를 고르세요. (뜻: 하숙)",
+    "options": [
+      "下宿",
+      "靴下",
+      "以下",
+      "民宿"
+    ],
+    "correct_answer": "下宿",
+    "explanation": "「げしゅく」는 下宿로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0763",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0763",
+    "prompt": "朝ごはんに、パンにいちごの__をつけて食べます。",
+    "options": [
+      "ケーキ",
+      "ジャム",
+      "ジュース",
+      "サンドイッチ"
+    ],
+    "correct_answer": "ジャム",
+    "explanation": "ジャム은 과일을 설탕과 졸여 만든 것으로 빵에 발라 먹으므로 문장에 알맞습니다. ケーキ(케이크)·ジュース(주스)·サンドイッチ(샌드위치)는 빵에 발라(つけて) 먹는 것이 아닙니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0764",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0764",
+    "prompt": "「はず」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "日曜日はひまなので、私は一日中家でゲームをするはずです。",
+      "田中さんは九時に出たから、もう会社に着いているはずです。",
+      "のどがかわいたので、私は水が飲みたいはずです。",
+      "山田さんは三十分前に家を出たから、まだ家にいるはずです。"
+    ],
+    "correct_answer": "田中さんは九時に出たから、もう会社に着いているはずです。",
+    "explanation": "정답: 田中さんは九時に出たから、もう会社に着いているはずです。(다나카 씨는 9시에 나갔으니 벌써 회사에 도착했을 것입니다.)\n'はず'는 근거가 있어 '당연히 ~일 것이다'라고 판단할 때 사용합니다.\n\n오답:\n1. 日曜日はひまなので、私は一日中家でゲームをするはずです。(일요일은 한가해서 저는 하루 종일 집에서 게임을 할 것입니다.)\n   자신이 마음대로 정하는 행동의 계획에는 'はず'가 아니라 'つもり'를 씁니다.\n2. のどがかわいたので、私は水が飲みたいはずです。(목이 말라서 저는 물을 마시고 싶을 것입니다.)\n   자신의 기분이나 바람은 스스로 알고 있으므로 추측을 나타내는 'はず'를 쓸 수 없습니다. '飲みたいです'가 맞습니다.\n3. 山田さんは三十分前に家を出たから、まだ家にいるはずです。(야마다 씨는 30분 전에 집을 나갔으니 아직 집에 있을 것입니다.)\n   'はず'는 앞의 근거에서 당연히 이끌어지는 판단을 나타냅니다. 집을 나갔다는 근거와 '아직 집에 있다'는 판단이 모순됩니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0765",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0765",
+    "prompt": "다음 한자 「楽しむ」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "たのしむ",
+    "explanation": "楽しむ은(는) たのしむ로 읽습니다. 뜻은 '즐기다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0766",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0766",
+    "prompt": "「ぼうえき」의 올바른 표기를 고르세요. (뜻: 무역)",
+    "options": [
+      "貿易",
+      "制限",
+      "登山",
+      "鳴る"
+    ],
+    "correct_answer": "貿易",
+    "explanation": "「ぼうえき」는 貿易로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0767",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0767",
+    "prompt": "다음 한자 「反対」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "はんたい",
+    "explanation": "反対은(는) はんたい로 읽습니다. 뜻은 '반대'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0768",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0768",
+    "prompt": "「もうす」의 올바른 표기를 고르세요. (뜻: 말하다 (겸양))",
+    "options": [
+      "申す",
+      "申し込む",
+      "申し上げる",
+      "伝統"
+    ],
+    "correct_answer": "申す",
+    "explanation": "「もうす」는 申す로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0769",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0769",
+    "prompt": "다음 한자 「真面目」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "まじめ",
+    "explanation": "真面目은(는) まじめ로 읽습니다. 뜻은 '성실함'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0770",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0770",
+    "prompt": "「ごらんになる」의 올바른 표기를 고르세요. (뜻: 보시다)",
+    "options": [
+      "ご覧になる",
+      "展覧会",
+      "素晴らしい",
+      "召し上がる"
+    ],
+    "correct_answer": "ご覧になる",
+    "explanation": "「ごらんになる」는 ご覧になる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0771",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0771",
+    "prompt": "다음 한자 「泊まる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "とまる",
+    "explanation": "泊まる은(는) とまる로 읽습니다. 뜻은 '묵다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0772",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0772",
+    "prompt": "こちらのお席で__でしょうか。",
+    "options": [
+      "長い",
+      "重い",
+      "よろしい",
+      "暗い"
+    ],
+    "correct_answer": "よろしい",
+    "explanation": "よろしい는 いい의 정중한 말로, 손님에게 '괜찮으십니까'라고 물을 때 씁니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0773",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0773",
+    "prompt": "「こんや」의 올바른 표기를 고르세요. (뜻: 오늘 밤)",
+    "options": [
+      "今夜",
+      "今度",
+      "暖房",
+      "部分"
+    ],
+    "correct_answer": "今夜",
+    "explanation": "「こんや」는 今夜로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0774",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0774",
+    "prompt": "「チェックする」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "道を渡るときは、車によくチェックしてください。",
+      "赤と白のチェックしたシャツを着て、出かけました。",
+      "出かける前に、かぎをかけたか、もう一度チェックしました。",
+      "日本語の作文を、先生にチェックしました。"
+    ],
+    "correct_answer": "出かける前に、かぎをかけたか、もう一度チェックしました。",
+    "explanation": "정답: 出かける前に、かぎをかけたか、もう一度チェックしました。(나가기 전에 열쇠를 잠갔는지 한 번 더 확인했습니다.)\n'チェックする'는 틀린 곳이 없는지, 상태가 어떤지 하나하나 확인한다는 뜻입니다.\n\n오답:\n1. 道を渡るときは、車によくチェックしてください。(길을 건널 때는 차에 잘 체크해 주세요.)\n   위험한 것에 신경을 쓰는 것은 '気をつける'나 '注意する'입니다. '車に気をつけてください'가 맞습니다.\n2. 赤と白のチェックしたシャツを着て、出かけました。(빨강과 하양의 체크한 셔츠를 입고 나갔습니다.)\n   격자무늬는 명사 'チェック'를 써서 'チェックのシャツ'라고 합니다. 'チェックした'는 '확인한'이라는 뜻이 됩니다.\n3. 日本語の作文を、先生にチェックしました。(일본어 작문을 선생님에게 체크했습니다.)\n   확인하는 사람은 선생님이므로 '先生にチェックしてもらいました'라고 해야 합니다. 'チェックしました'만 쓰면 내가 확인했다는 뜻이 됩니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0775",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0775",
+    "prompt": "다음 한자 「空気」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "くうき",
+    "explanation": "空気은(는) くうき로 읽습니다. 뜻은 '공기'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0776",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0776",
+    "prompt": "「きゅうこう」의 올바른 표기를 고르세요. (뜻: 급행)",
+    "options": [
+      "急行",
+      "急ぐ",
+      "急に",
+      "行う"
+    ],
+    "correct_answer": "急行",
+    "explanation": "「きゅうこう」는 急行로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0777",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0777",
+    "prompt": "다음 한자 「皆」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "みな",
+    "explanation": "皆은(는) みな로 읽습니다. 뜻은 '모두'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0778",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0778",
+    "prompt": "「あじ」의 올바른 표기를 고르세요. (뜻: 맛)",
+    "options": [
+      "味",
+      "興味",
+      "味噌",
+      "趣味"
+    ],
+    "correct_answer": "味",
+    "explanation": "「あじ」는 味로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0779",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0779",
+    "prompt": "다음 한자 「校長」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "こうちょう",
+    "explanation": "校長은(는) こうちょう로 읽습니다. 뜻은 '교장'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0780",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0780",
+    "prompt": "友だちの誕生日会で、おいしい__をたくさん食べました。",
+    "options": [
+      "食堂",
+      "台所",
+      "冷蔵庫",
+      "ごちそう"
+    ],
+    "correct_answer": "ごちそう",
+    "explanation": "ごちそう는 정성껏 차린 맛있는 음식을 뜻하므로 '맛있는 ~을 많이 먹었다'에 알맞습니다. 食堂(식당)·台所(부엌)·冷蔵庫(냉장고)는 음식과 관련된 장소나 물건이지만 먹을 수 있는 것이 아닙니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0781",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0781",
+    "prompt": "「おどり」의 올바른 표기를 고르세요. (뜻: 춤)",
+    "options": [
+      "踊り",
+      "踊る",
+      "製品",
+      "医者"
+    ],
+    "correct_answer": "踊り",
+    "explanation": "「おどり」는 踊り로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0782",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0782",
+    "prompt": "다음 한자 「引っ越す」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ひっこす",
+    "explanation": "引っ越す은(는) ひっこす로 읽습니다. 뜻은 '이사하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0783",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0783",
+    "prompt": "「れいぼう」의 올바른 표기를 고르세요. (뜻: 냉방)",
+    "options": [
+      "冷房",
+      "暖房",
+      "冷やす",
+      "冷える"
+    ],
+    "correct_answer": "冷房",
+    "explanation": "「れいぼう」는 冷房로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0784",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0784",
+    "prompt": "다음 한자 「亡くなる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "なくなる",
+    "explanation": "亡くなる은(는) なくなる로 읽습니다. 뜻은 '돌아가시다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0785",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0785",
+    "prompt": "「はっきり」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "かぜがはっきり治って、元気になりました。",
+      "朝ごはんをはっきり食べて、学校へ行きました。",
+      "明日は、はっきり雨が降るでしょう。",
+      "今日は天気がいいので、遠くの山がはっきり見えます。"
+    ],
+    "correct_answer": "今日は天気がいいので、遠くの山がはっきり見えます。",
+    "explanation": "정답: 今日は天気がいいので、遠くの山がはっきり見えます。(오늘은 날씨가 좋아서 먼 산이 또렷하게 보입니다.)\n'はっきり'는 모양이나 소리, 의견 등이 또렷하고 분명한 모양을 나타냅니다.\n\n오답:\n1. かぜがはっきり治って、元気になりました。(감기가 분명히 나아서 건강해졌습니다.)\n   상태가 완전히 바뀌었음을 나타낼 때는 'すっかり'를 써서 'すっかり治って'라고 합니다.\n2. 朝ごはんをはっきり食べて、学校へ行きました。(아침밥을 분명히 먹고 학교에 갔습니다.)\n   충분히, 제대로 한다는 뜻은 'しっかり'를 써서 'しっかり食べて'라고 합니다.\n3. 明日は、はっきり雨が降るでしょう。(내일은 분명히 비가 오겠지요.)\n   확신하는 추측에는 'きっと'를 씁니다. 'はっきり'는 보이거나 들리는 것이 또렷한 모양이라 추측에는 쓰지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0786",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0786",
+    "prompt": "「さしあげる」의 올바른 표기를 고르세요. (뜻: 드리다)",
+    "options": [
+      "差し上げる",
+      "申し上げる",
+      "召し上がる",
+      "屋上"
+    ],
+    "correct_answer": "差し上げる",
+    "explanation": "「さしあげる」는 差し上げる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0787",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0787",
+    "prompt": "다음 한자 「港」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "みなと",
+    "explanation": "港은(는) みなと로 읽습니다. 뜻은 '항구'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0788",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0788",
+    "prompt": "彼はピアノが上手で、本当に__人です。",
+    "options": [
+      "すごい",
+      "少ない",
+      "安い",
+      "長い"
+    ],
+    "correct_answer": "すごい",
+    "explanation": "すごい는 정도가 대단하다는 뜻으로 사람의 실력을 칭찬할 때 씁니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0789",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0789",
+    "prompt": "「パソコン」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "レポートを書くために、パソコンを使います。",
+      "電気屋で、新しいパソコンを二枚買いました。",
+      "部屋が暑いので、パソコンをつけて涼しくしました。",
+      "パソコンをかけて、好きな音楽を聞きました。"
+    ],
+    "correct_answer": "レポートを書くために、パソコンを使います。",
+    "explanation": "정답: レポートを書くために、パソコンを使います。(리포트를 쓰기 위해 컴퓨터를 사용합니다.)\n'パソコン'은 개인이 쓰는 컴퓨터입니다.\n\n오답:\n1. 電気屋で、新しいパソコンを二枚買いました。(전자제품 가게에서 새 컴퓨터를 두 장 샀습니다.)\n   기계는 '枚'가 아니라 '台'로 셉니다. '二台'가 맞습니다.\n2. 部屋が暑いので、パソコンをつけて涼しくしました。(방이 더워서 컴퓨터를 켜서 시원하게 했습니다.)\n   방을 시원하게 하는 것은 'エアコン(에어컨)'입니다. 'パソコン'을 켜도 방은 시원해지지 않습니다.\n3. パソコンをかけて、好きな音楽を聞きました。(컴퓨터를 틀어서 좋아하는 음악을 들었습니다.)\n   'かける'는 '音楽をかける'·'CDをかける'처럼 음악에 씁니다. 'パソコンで音楽をかけて'라고 해야 합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0790",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0790",
+    "prompt": "「きょうかい」의 올바른 표기를 고르세요. (뜻: 교회)",
+    "options": [
+      "教会",
+      "会議",
+      "機会",
+      "教育"
+    ],
+    "correct_answer": "教会",
+    "explanation": "「きょうかい」는 教会로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0791",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0791",
+    "prompt": "다음 한자 「彼ら」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かれら",
+    "explanation": "彼ら은(는) かれら로 읽습니다. 뜻은 '그들'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0792",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0792",
+    "prompt": "「いっぱい」의 올바른 표기를 고르세요. (뜻: 가득함)",
+    "options": [
+      "一杯",
+      "一度",
+      "一方",
+      "一生懸命"
+    ],
+    "correct_answer": "一杯",
+    "explanation": "「いっぱい」는 一杯로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0793",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0793",
+    "prompt": "私の友達はニューヨークがある__から来ました。",
+    "options": [
+      "韓国",
+      "アメリカ",
+      "日本",
+      "中国"
+    ],
+    "correct_answer": "アメリカ",
+    "explanation": "뉴욕이 있는 나라는 미국이므로 アメリカ가 알맞습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0794",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0794",
+    "prompt": "다음 한자 「男性」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "だんせい",
+    "explanation": "男性은(는) だんせい로 읽습니다. 뜻은 '남성'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0795",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0795",
+    "prompt": "「せいさんする」의 올바른 표기를 고르세요. (뜻: 생산하다)",
+    "options": [
+      "生産する",
+      "一生懸命",
+      "大学生",
+      "生活費"
+    ],
+    "correct_answer": "生産する",
+    "explanation": "「せいさんする」는 生産する로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0796",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0796",
+    "prompt": "다음 한자 「着物」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "きもの",
+    "explanation": "着物은(는) きもの로 읽습니다. 뜻은 '기모노'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0797",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0797",
+    "prompt": "「おもちゃ」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "工場では、大きなおもちゃを使って車を作っています。",
+      "子どもは新しいおもちゃで、うれしそうに遊んでいます。",
+      "子どもたちは、公園でおもちゃをして遊んでいます。",
+      "うちのおもちゃは小さい犬で、毎日いっしょに散歩します。"
+    ],
+    "correct_answer": "子どもは新しいおもちゃで、うれしそうに遊んでいます。",
+    "explanation": "정답: 子どもは新しいおもちゃで、うれしそうに遊んでいます。(아이는 새 장난감으로 즐겁게 놀고 있습니다.)\n'おもちゃ'는 아이가 가지고 노는 물건입니다.\n\n오답:\n1. 工場では、大きなおもちゃを使って車を作っています。(공장에서는 큰 장난감을 사용해서 자동차를 만들고 있습니다.)\n   물건을 만들 때 쓰는 것은 '機械(기계)'나 '道具(도구)'입니다. 'おもちゃ'는 놀이에 쓰는 물건입니다.\n2. 子どもたちは、公園でおもちゃをして遊んでいます。(아이들은 공원에서 장난감을 하며 놀고 있습니다.)\n   'おもちゃ'는 'する'와 함께 쓰지 않습니다. 'おもちゃで遊んでいます'라고 해야 합니다.\n3. うちのおもちゃは小さい犬で、毎日いっしょに散歩します。(우리 집 장난감은 작은 개라서 매일 함께 산책합니다.)\n   집에서 기르는 동물은 'ペット(애완동물)'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0798",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0798",
+    "prompt": "「くれる」의 올바른 표기를 고르세요. (뜻: 저물다)",
+    "options": [
+      "暮れる",
+      "暮らし",
+      "増やす",
+      "洗面所"
+    ],
+    "correct_answer": "暮れる",
+    "explanation": "「くれる」는 暮れる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0799",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0799",
+    "prompt": "다음 한자 「釣る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "つる",
+    "explanation": "釣る은(는) つる로 읽습니다. 뜻은 '낚다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0800",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0800",
+    "prompt": "「うつ」의 올바른 표기를 고르세요. (뜻: 치다)",
+    "options": [
+      "打つ",
+      "構成",
+      "家内",
+      "製造"
+    ],
+    "correct_answer": "打つ",
+    "explanation": "「うつ」는 打つ로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0801",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0801",
+    "prompt": "遠くに見える__大きなビルで働きたいです。",
+    "options": [
+      "この",
+      "どの",
+      "あんな",
+      "小さな"
+    ],
+    "correct_answer": "あんな",
+    "explanation": "あんな는 멀리 있는 것을 가리켜 '저런'이라는 뜻을 나타냅니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0802",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0802",
+    "prompt": "다음 한자 「昼間」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ひるま",
+    "explanation": "昼間은(는) ひるま로 읽습니다. 뜻은 '낮'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0803",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0803",
+    "prompt": "「きょういく」의 올바른 표기를 고르세요. (뜻: 교육)",
+    "options": [
+      "教育",
+      "教科",
+      "教室",
+      "教会"
+    ],
+    "correct_answer": "教育",
+    "explanation": "「きょういく」는 教育로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0804",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0804",
+    "prompt": "다음 한자 「女性」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "じょせい",
+    "explanation": "女性은(는) じょせい로 읽습니다. 뜻은 '여성'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0805",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0805",
+    "prompt": "「こめ」의 올바른 표기를 고르세요. (뜻: 쌀)",
+    "options": [
+      "米",
+      "変",
+      "子",
+      "味"
+    ],
+    "correct_answer": "米",
+    "explanation": "「こめ」는 米로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0806",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0806",
+    "prompt": "다음 한자 「邪魔」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "じゃま",
+    "explanation": "邪魔은(는) じゃま로 읽습니다. 뜻은 '방해'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0807",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0807",
+    "prompt": "「さらいしゅう」의 올바른 표기를 고르세요. (뜻: 다다음 주)",
+    "options": [
+      "再来週",
+      "再来月",
+      "将来",
+      "未来"
+    ],
+    "correct_answer": "再来週",
+    "explanation": "「さらいしゅう」는 再来週로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0808",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0808",
+    "prompt": "다음 한자 「喉」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "のど",
+    "explanation": "喉은(는) のど로 읽습니다. 뜻은 '목'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0809",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0809",
+    "prompt": "「ち」의 올바른 표기를 고르세요. (뜻: 피)",
+    "options": [
+      "血",
+      "湯",
+      "隅",
+      "声"
+    ],
+    "correct_answer": "血",
+    "explanation": "「ち」는 血로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0810",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0810",
+    "prompt": "다음 한자 「毛」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "け",
+    "explanation": "毛은(는) け로 읽습니다. 뜻은 '털'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0811",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0811",
+    "prompt": "「ひどい」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "このケーキはひどくおいしいので、また買いたいです。",
+      "先生がほめてくれて、ひどい気持ちになりました。",
+      "ひどい雨で、道が川のようになりました。",
+      "田中さんは、困っている人をいつも助けてくれるひどい人です。"
+    ],
+    "correct_answer": "ひどい雨で、道が川のようになりました。",
+    "explanation": "정답: ひどい雨で、道が川のようになりました。(심한 비로 길이 강처럼 되었습니다.)\n'ひどい'는 정도가 심하거나 나쁘다는 뜻으로 나쁜 상태를 나타낼 때 사용합니다.\n\n오답:\n1. このケーキはひどくおいしいので、また買いたいです。(이 케이크는 지독하게 맛있어서 또 사고 싶습니다.)\n   좋은 것의 정도가 크다고 할 때는 'ひどく'가 아니라 'とても'나 'すごく'를 씁니다. 'ひどく'는 나쁜 상태에 씁니다.\n2. 先生がほめてくれて、ひどい気持ちになりました。(선생님이 칭찬해 줘서 심한 기분이 되었습니다.)\n   칭찬받은 기분은 좋은 감정입니다. 'ひどい'는 나쁜 기분에 쓰므로 'うれしい'가 자연스럽습니다.\n3. 田中さんは、困っている人をいつも助けてくれるひどい人です。(다나카 씨는 곤란한 사람을 늘 도와주는 심한 사람입니다.)\n   남을 돕는 좋은 사람에게는 'ひどい'를 쓰지 않습니다. '優しい'나 '親切な'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0812",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0812",
+    "prompt": "朝から待っていますが、バスが__来ません。",
+    "options": [
+      "たくさん",
+      "いちばん",
+      "もっと",
+      "なかなか"
+    ],
+    "correct_answer": "なかなか",
+    "explanation": "なかなか는 뒤에 부정 표현이 와서 '좀처럼 ~않는다'는 뜻을 나타냅니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0813",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0813",
+    "prompt": "「ずいぶん」의 올바른 표기를 고르세요. (뜻: 꽤)",
+    "options": [
+      "随分",
+      "部分",
+      "水分",
+      "気分"
+    ],
+    "correct_answer": "随分",
+    "explanation": "「ずいぶん」는 随分로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0814",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0814",
+    "prompt": "다음 한자 「電灯」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "でんとう",
+    "explanation": "電灯은(는) でんとう로 읽습니다. 뜻은 '전등'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0815",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0815",
+    "prompt": "「しかる」의 올바른 표기를 고르세요. (뜻: 꾸짖다)",
+    "options": [
+      "叱る",
+      "怪我",
+      "社員",
+      "習慣"
+    ],
+    "correct_answer": "叱る",
+    "explanation": "「しかる」는 叱る로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0816",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0816",
+    "prompt": "「サンダル」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "寒いので、サンダルをはいてから、その上に靴をはきました。",
+      "サンダルを着て、海へ遊びに行きました。",
+      "サンダルは、冬に雪の中を歩くときにはく、長くて暖かい靴です。",
+      "暑い日は、サンダルをはいて出かけます。"
+    ],
+    "correct_answer": "暑い日は、サンダルをはいて出かけます。",
+    "explanation": "정답: 暑い日は、サンダルをはいて出かけます。(더운 날에는 샌들을 신고 나갑니다.)\n'サンダル'은 발등이나 발가락이 드러나는 여름용 신발입니다.\n\n오답:\n1. 寒いので、サンダルをはいてから、その上に靴をはきました。(추워서 샌들을 신고 그 위에 구두를 신었습니다.)\n   신발 안에 먼저 신는 것은 '靴下(양말)'입니다. 'サンダル'은 그 자체가 신발입니다.\n2. サンダルを着て、海へ遊びに行きました。(샌들을 입고 바다에 놀러 갔습니다.)\n   신발에는 '着る'가 아니라 'はく'를 씁니다. 'サンダルをはいて'가 맞습니다.\n3. サンダルは、冬に雪の中を歩くときにはく、長くて暖かい靴です。(샌들은 겨울에 눈 속을 걸을 때 신는 길고 따뜻한 신발입니다.)\n   설명한 것은 'ブーツ(부츠)'입니다. 'サンダル'은 발이 드러나는 시원한 신발이라 겨울용이 아닙니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0817",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0817",
+    "prompt": "大きな地震があると、だれでも__でしょう。",
+    "options": [
+      "びっくりする",
+      "喜ぶ",
+      "安心する",
+      "楽しむ"
+    ],
+    "correct_answer": "びっくりする",
+    "explanation": "びっくりする는 갑작스러운 일에 깜짝 놀란다는 뜻이므로 큰 지진이 났을 때의 반응에 알맞습니다. 喜ぶ(기뻐하다)·安心する(안심하다)·楽しむ(즐기다)는 지진이라는 상황과 맞지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0818",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0818",
+    "prompt": "「うまい」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "彼はサッカーがうまいです。",
+      "このかばんは、軽くてうまいので、旅行に便利です。",
+      "今日は天気がうまいので、散歩に行きましょう。",
+      "熱があって、今日は気分がうまくありません。"
+    ],
+    "correct_answer": "彼はサッカーがうまいです。",
+    "explanation": "정답: 彼はサッカーがうまいです。(그는 축구를 잘합니다.)\n'うまい'는 기술이나 실력이 뛰어나다(잘하다)는 뜻이나, 음식이 맛있다는 뜻으로 사용합니다.\n\n오답:\n1. このかばんは、軽くてうまいので、旅行に便利です。(이 가방은 가볍고 잘해서 여행에 편리합니다.)\n   물건의 성질이 좋다고 할 때는 'いい'를 씁니다. 'うまい'는 사람의 솜씨나 음식 맛에 씁니다.\n2. 今日は天気がうまいので、散歩に行きましょう。(오늘은 날씨가 잘해서 산책하러 갑시다.)\n   날씨가 좋다고 할 때는 'いい'를 써서 '天気がいい'라고 합니다.\n3. 熱があって、今日は気分がうまくありません。(열이 있어서 오늘은 기분이 잘하지 않습니다.)\n   몸이나 기분의 상태가 좋지 않을 때는 'よくありません'을 씁니다. 'うまい'는 기분 상태에 쓰지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0819",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0819",
+    "prompt": "다음 한자 「講堂」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "こうどう",
+    "explanation": "講堂은(는) こうどう로 읽습니다. 뜻은 '강당'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0820",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0820",
+    "prompt": "「こ」의 올바른 표기를 고르세요. (뜻: 아이)",
+    "options": [
+      "子",
+      "双子",
+      "帽子",
+      "電子レンジ"
+    ],
+    "correct_answer": "子",
+    "explanation": "「こ」는 子로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0821",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0821",
+    "prompt": "スーパーで買い物をして、__でお金を払いました。",
+    "options": [
+      "エスカレーター",
+      "レジ",
+      "エレベーター",
+      "トイレ"
+    ],
+    "correct_answer": "レジ",
+    "explanation": "レジ는 가게에서 계산하는 곳이므로 '돈을 냈다'와 어울립니다. エスカレーター·エレベーター·トイレ도 가게 안에 있지만 돈을 내는 곳이 아닙니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0822",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0822",
+    "prompt": "「しばらく」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "名前を呼ばれたので、しばらく「はい」と答えました。",
+      "しばらく待ってください。もうすぐ来ます。",
+      "スープに塩をしばらく入れてください。",
+      "生まれてから今まで、しばらくこの町に住んでいます。"
+    ],
+    "correct_answer": "しばらく待ってください。もうすぐ来ます。",
+    "explanation": "정답: しばらく待ってください。もうすぐ来ます。(잠시 기다려 주세요. 곧 올 겁니다.)\n'しばらく'는 '잠시, 한동안'이라는 뜻으로, 어느 정도 이어지는 시간을 나타낼 때 사용합니다.\n\n오답:\n1. 名前を呼ばれたので、しばらく「はい」と答えました。(이름이 불려서 잠시 \"네\"라고 대답했습니다.)\n   시간을 두지 않고 바로 한다는 뜻은 'すぐ'를 씁니다. 'すぐ「はい」と答えました'가 맞습니다.\n2. スープに塩をしばらく入れてください。(수프에 소금을 잠시 넣어 주세요.)\n   'しばらく'는 시간에만 쓰고 양에는 쓰지 않습니다. 양이 적다는 뜻은 '少し'를 씁니다.\n3. 生まれてから今まで、しばらくこの町に住んでいます。(태어나서 지금까지 한동안 이 마을에 살고 있습니다.)\n   태어나서 지금까지 계속 이어진 일에는 'ずっと'를 씁니다. 'しばらく'는 어느 정도의 동안만 이어지는 시간입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0823",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0823",
+    "prompt": "「あく」의 올바른 표기를 고르세요. (뜻: 비다)",
+    "options": [
+      "空く",
+      "空気",
+      "経験",
+      "予定"
+    ],
+    "correct_answer": "空く",
+    "explanation": "「あく」는 空く로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0824",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0824",
+    "prompt": "「とおり」의 올바른 표기를 고르세요. (뜻: 거리)",
+    "options": [
+      "通り",
+      "交通",
+      "通う",
+      "通訳"
+    ],
+    "correct_answer": "通り",
+    "explanation": "「とおり」는 通り로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0825",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0825",
+    "prompt": "다음 한자 「下着」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "したぎ",
+    "explanation": "下着은(는) したぎ로 읽습니다. 뜻은 '속옷'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0826",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0826",
+    "prompt": "先生、この字は__書けばいいですか。",
+    "options": [
+      "たいてい",
+      "ほとんど",
+      "こう",
+      "さっき"
+    ],
+    "correct_answer": "こう",
+    "explanation": "こう는 '이렇게'라는 뜻으로 방법을 나타내므로 書けばいいですか와 어울립니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0827",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0827",
+    "prompt": "「ため」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "黒板の字がよく見えるために、前の席に座りました。",
+      "雨のため、洗濯物がよく乾きました。",
+      "病気のため、今日は学校を休みます。",
+      "仕事のため、昨日は朝からとても暇でした。"
+    ],
+    "correct_answer": "病気のため、今日は学校を休みます。",
+    "explanation": "정답: 病気のため、今日は学校を休みます。(병 때문에 오늘은 학교를 쉽니다.)\n'ため'는 '~때문에'라는 이유나 '~하기 위해'라는 목적을 나타냅니다. 정답 문장에서는 병이 원인이 되어 학교를 쉰다는 이유를 나타냅니다.\n\n오답:\n1. 黒板の字がよく見えるために、前の席に座りました。(칠판 글씨가 잘 보이기 위해 앞자리에 앉았습니다.)\n   '見える'처럼 사람의 의지로 할 수 없는 말 뒤에서 목적을 나타낼 때는 'ために'가 아니라 'ように'를 씁니다. '見えるように'가 맞습니다.\n2. 雨のため、洗濯物がよく乾きました。(비 때문에 빨래가 잘 말랐습니다.)\n   비는 빨래를 마르게 하는 원인이 되지 못하므로 'ため'를 쓸 수 없습니다.\n3. 仕事のため、昨日は朝からとても暇でした。(일 때문에 어제는 아침부터 매우 한가했습니다.)\n   일이 있는 것과 한가한 것은 모순되므로 'ため'로 이어질 수 없습니다. '忙しかった'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0828",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0828",
+    "prompt": "田中先生は明日の会議に__予定です。",
+    "options": [
+      "参る",
+      "伺う",
+      "いたす",
+      "おいでになる"
+    ],
+    "correct_answer": "おいでになる",
+    "explanation": "おいでになる는 いる·来る·行く의 존경어이므로 선생님이 회의에 오신다는 문장에 알맞습니다. 参る·伺う는 자신을 낮추는 겸양어라 선생님의 행동에 쓸 수 없고, いたす는 する의 겸양어입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0829",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0829",
+    "prompt": "「すむ」의 올바른 표기를 고르세요. (뜻: 끝나다)",
+    "options": [
+      "済む",
+      "経済",
+      "理由",
+      "気分"
+    ],
+    "correct_answer": "済む",
+    "explanation": "「すむ」는 済む로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0830",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0830",
+    "prompt": "「ハンバーグ」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "ハンバーグは、牛肉を大きく厚く切って焼いた料理です。",
+      "朝ごはんに、パンにハンバーグをぬって食べました。",
+      "駅の前の店で、紙に包んだハンバーグを買って、歩きながら食べました。",
+      "晩ごはんに、母がおいしいハンバーグを作ってくれました。"
+    ],
+    "correct_answer": "晩ごはんに、母がおいしいハンバーグを作ってくれました。",
+    "explanation": "정답: 晩ごはんに、母がおいしいハンバーグを作ってくれました。(저녁밥으로 어머니가 맛있는 햄버그스테이크를 만들어 주었습니다.)\n'ハンバーグ'는 다진 고기를 둥글넓적하게 뭉쳐 구운 요리입니다.\n\n오답:\n1. ハンバーグは、牛肉を大きく厚く切って焼いた料理です。(햄버그스테이크는 소고기를 크고 두껍게 잘라 구운 요리입니다.)\n   고기를 두껍게 잘라 구운 요리는 'ステーキ(스테이크)'입니다. 'ハンバーグ'는 다진 고기로 만듭니다.\n2. 朝ごはんに、パンにハンバーグをぬって食べました。(아침으로 빵에 햄버그스테이크를 발라 먹었습니다.)\n   빵에 바르는 것은 'バター'나 'ジャム'입니다. 'ハンバーグ'는 바를 수 없는 고기 요리입니다.\n3. 駅の前の店で、紙に包んだハンバーグを買って、歩きながら食べました。(역 앞 가게에서 종이에 싼 햄버그스테이크를 사서 걸으면서 먹었습니다.)\n   빵 사이에 고기를 끼워 종이에 싸서 파는 것은 'ハンバーガー(햄버거)'입니다. 'ハンバーグ'는 접시에 담아 먹는 요리입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0831",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0831",
+    "prompt": "다음 한자 「市」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "し",
+    "explanation": "市은(는) し로 읽습니다. 뜻은 '시 (행정구역)'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0832",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0832",
+    "prompt": "「あそび」의 올바른 표기를 고르세요. (뜻: 놀이)",
+    "options": [
+      "遊び",
+      "平和",
+      "課長",
+      "参る"
+    ],
+    "correct_answer": "遊び",
+    "explanation": "「あそび」는 遊び로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0833",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0833",
+    "prompt": "다음 한자 「支度する」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "したくする",
+    "explanation": "支度する은(는) したくする로 읽습니다. 뜻은 '준비하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0834",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0834",
+    "prompt": "「みえる」의 올바른 표기를 고르세요. (뜻: 보이다)",
+    "options": [
+      "見える",
+      "見送り",
+      "拝見する",
+      "意見"
+    ],
+    "correct_answer": "見える",
+    "explanation": "「みえる」는 見える로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0835",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0835",
+    "prompt": "다음 한자 「十分」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "じゅうぶん",
+    "explanation": "十分은(는) じゅうぶん로 읽습니다. 뜻은 '충분함'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0836",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0836",
+    "prompt": "彼は約束を守る人ですから、__来るでしょう。",
+    "options": [
+      "きっと",
+      "ぜひ",
+      "なるべく",
+      "さっき"
+    ],
+    "correct_answer": "きっと",
+    "explanation": "きっと는 '틀림없이'라는 뜻으로 '~でしょう'와 함께 확신하는 추측을 나타냅니다. ぜひ(꼭)는 희망·부탁, なるべく(되도록)는 노력에 쓰고, さっき(아까)는 지난 시간이라 '来るでしょう'와 맞지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0837",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0837",
+    "prompt": "「まず」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "料理をするときは、まず手を洗ってください。",
+      "最後に、まず私は先生にあいさつしました。",
+      "宿題が全部終わってから、まず勉強を始めました。",
+      "これで終わりです。まず、ありがとうございました。"
+    ],
+    "correct_answer": "料理をするときは、まず手を洗ってください。",
+    "explanation": "정답: 料理をするときは、まず手を洗ってください。(요리를 할 때는 우선 손을 씻으세요.)\n'まず'는 여러 일 중에서 가장 먼저 해야 할 일을 말할 때 사용합니다.\n\n오답:\n1. 最後に、まず私は先生にあいさつしました。(마지막에 우선 저는 선생님께 인사했습니다.)\n   'まず'는 처음을 나타내므로 '最後に'와 모순됩니다.\n2. 宿題が全部終わってから、まず勉強を始めました。(숙제가 모두 끝난 뒤에 우선 공부를 시작했습니다.)\n   이미 끝난 뒤에는 처음 하는 일이 아니므로 'まず'를 쓸 수 없습니다.\n3. これで終わりです。まず、ありがとうございました。(이것으로 끝입니다. 우선 감사합니다.)\n   끝에 하는 인사에는 'まず'가 아니라 '最後に'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0838",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0838",
+    "prompt": "「とおく」의 올바른 표기를 고르세요. (뜻: 먼 곳)",
+    "options": [
+      "遠く",
+      "遠慮",
+      "金額",
+      "注文"
+    ],
+    "correct_answer": "遠く",
+    "explanation": "「とおく」는 遠く로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0839",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0839",
+    "prompt": "다음 한자 「大体」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "だいたい",
+    "explanation": "大体은(는) だいたい로 읽습니다. 뜻은 '대체로'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0840",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0840",
+    "prompt": "「ただしい」의 올바른 표기를 고르세요. (뜻: 올바르다)",
+    "options": [
+      "正しい",
+      "正月",
+      "正確",
+      "正解"
+    ],
+    "correct_answer": "正しい",
+    "explanation": "「ただしい」는 正しい로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0841",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0841",
+    "prompt": "다음 한자 「都」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "と",
+    "explanation": "都은(는) と로 읽습니다. 뜻은 '도 (행정구역)'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0842",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0842",
+    "prompt": "「おかねもち」의 올바른 표기를 고르세요. (뜻: 부자)",
+    "options": [
+      "お金持ち",
+      "貯金",
+      "現金",
+      "気持ち"
+    ],
+    "correct_answer": "お金持ち",
+    "explanation": "「おかねもち」는 お金持ち로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0843",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0843",
+    "prompt": "다음 한자 「島」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "しま",
+    "explanation": "島은(는) しま로 읽습니다. 뜻은 '섬'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0844",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0844",
+    "prompt": "「すべる」의 올바른 표기를 고르세요. (뜻: 미끄러지다)",
+    "options": [
+      "滑る",
+      "水分",
+      "約束",
+      "節約"
+    ],
+    "correct_answer": "滑る",
+    "explanation": "「すべる」는 滑る로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0845",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0845",
+    "prompt": "テストは__難しくありませんでした。",
+    "options": [
+      "もうすぐ",
+      "それほど",
+      "さっき",
+      "たくさん"
+    ],
+    "correct_answer": "それほど",
+    "explanation": "それほど는 뒤에 부정 표현이 와서 '그다지 ~않다'는 뜻을 나타냅니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0846",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0846",
+    "prompt": "「プレゼント」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "先生に、手紙でプレゼントを言いました。",
+      "母の日に、花のプレゼントを買いました。",
+      "スーパーで買い物をして、レジでプレゼントを払いました。",
+      "入院している友達のプレゼントに、病院へ行きました。"
+    ],
+    "correct_answer": "母の日に、花のプレゼントを買いました。",
+    "explanation": "정답: 母の日に、花のプレゼントを買いました。(어버이날에 꽃 선물을 샀습니다.)\n'プレゼント'는 생일·기념일이나 감사의 마음으로 남에게 주는 선물입니다.\n\n오답:\n1. 先生に、手紙でプレゼントを言いました。(선생님께 편지로 선물을 말했습니다.)\n   감사의 마음을 말이나 편지로 전하는 것은 'お礼を言う'입니다. 'プレゼント'는 주는 물건이라 '言う'와 함께 쓰지 않습니다.\n2. スーパーで買い物をして、レジでプレゼントを払いました。(슈퍼에서 장을 보고 계산대에서 선물을 냈습니다.)\n   물건값으로 내는 것은 'お金'입니다. 'プレゼント'는 값을 받지 않고 주는 것입니다.\n3. 入院している友達のプレゼントに、病院へ行きました。(입원한 친구의 선물에 병원에 갔습니다.)\n   아픈 사람을 찾아가는 것은 'お見舞い(병문안)'라고 하며 '友達のお見舞いに行きました'라고 합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0847",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0847",
+    "prompt": "다음 한자 「妻」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "つま",
+    "explanation": "妻은(는) つま로 읽습니다. 뜻은 '아내'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0848",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0848",
+    "prompt": "「かえり」의 올바른 표기를 고르세요. (뜻: 귀가)",
+    "options": [
+      "帰り",
+      "光る",
+      "地面",
+      "災害"
+    ],
+    "correct_answer": "帰り",
+    "explanation": "「かえり」는 帰り로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0849",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0849",
+    "prompt": "다음 한자 「具合」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ぐあい",
+    "explanation": "具合은(는) ぐあい로 읽습니다. 뜻은 '상태'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0850",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0850",
+    "prompt": "「かたい」의 올바른 표기를 고르세요. (뜻: 딱딱하다)",
+    "options": [
+      "固い",
+      "参加",
+      "体温",
+      "選手"
+    ],
+    "correct_answer": "固い",
+    "explanation": "「かたい」는 固い로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0851",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0851",
+    "prompt": "大切な会議があるので、黒い__を着て会社へ行きました。",
+    "options": [
+      "くつ",
+      "帽子",
+      "スーツ",
+      "ネクタイ"
+    ],
+    "correct_answer": "スーツ",
+    "explanation": "スーツ는 위아래를 갖춰 입는 정장이므로 '着る(입다)'와 어울립니다. くつ(구두)는 'はく', 帽子(모자)는 'かぶる', ネクタイ(넥타이)는 'する·しめる'를 씁니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0852",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0852",
+    "prompt": "다음 한자 「髪」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かみ",
+    "explanation": "髪은(는) かみ로 읽습니다. 뜻은 '머리카락'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0853",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0853",
+    "prompt": "「てんきよほう」의 올바른 표기를 고르세요. (뜻: 일기예보)",
+    "options": [
+      "天気予報",
+      "予定する",
+      "気に入る",
+      "予約する"
+    ],
+    "correct_answer": "天気予報",
+    "explanation": "「てんきよほう」는 天気予報로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0854",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0854",
+    "prompt": "다음 한자 「彼女」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かのじょ",
+    "explanation": "彼女은(는) かのじょ로 읽습니다. 뜻은 '그녀/여자친구'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0855",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0855",
+    "prompt": "「あいだ」의 올바른 표기를 고르세요. (뜻: 사이/동안)",
+    "options": [
+      "間",
+      "間に合う",
+      "間違える",
+      "この間"
+    ],
+    "correct_answer": "間",
+    "explanation": "「あいだ」는 間로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0856",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0856",
+    "prompt": "다음 한자 「枝」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "えだ",
+    "explanation": "枝은(는) えだ로 읽습니다. 뜻은 '가지'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0857",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0857",
+    "prompt": "「そろそろ」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "そろそろ三年前に、この町に引っ越しました。",
+      "もう少し時間がかかるので、ここでそろそろ待ってください。",
+      "もう十時ですから、そろそろ帰りましょう。",
+      "私はそろそろ、毎朝七時に起きています。"
+    ],
+    "correct_answer": "もう十時ですから、そろそろ帰りましょう。",
+    "explanation": "정답: もう十時ですから、そろそろ帰りましょう。(벌써 10시이니 슬슬 돌아갑시다.)\n'そろそろ'는 어떤 일을 할 때가 가까워졌음을 나타낼 때 사용합니다.\n\n오답:\n1. そろそろ三年前に、この町に引っ越しました。(슬슬 3년 전에 이 마을로 이사했습니다.)\n   'そろそろ'는 앞으로 할 일에 쓰며 과거의 일에는 쓸 수 없습니다.\n2. もう少し時間がかかるので、ここでそろそろ待ってください。(시간이 조금 더 걸리니 여기서 슬슬 기다려 주세요.)\n   어느 정도의 시간 동안 기다린다는 뜻은 'しばらく'를 써서 'しばらく待ってください'라고 합니다.\n3. 私はそろそろ、毎朝七時に起きています。(저는 슬슬 매일 아침 7시에 일어나고 있습니다.)\n   매일 반복되는 습관에는 'そろそろ'를 쓰지 않습니다. 'いつも'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0858",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0858",
+    "prompt": "「しみん」의 올바른 표기를 고르세요. (뜻: 시민)",
+    "options": [
+      "市民",
+      "民宿",
+      "市",
+      "市役所"
+    ],
+    "correct_answer": "市民",
+    "explanation": "「しみん」는 市民로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0859",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0859",
+    "prompt": "メールが使えないので、地図を__で送りました。",
+    "options": [
+      "テレビ",
+      "ラジオ",
+      "ステレオ",
+      "ファックス"
+    ],
+    "correct_answer": "ファックス",
+    "explanation": "ファックス는 문서나 그림을 전화선으로 보내는 기기이므로 지도를 보냈다는 문장에 알맞습니다. テレビ·ラジオ·ステレオ는 방송이나 소리를 받아 보고 듣는 기기라 지도를 보낼 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0860",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0860",
+    "prompt": "다음 한자 「負ける」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "まける",
+    "explanation": "負ける은(는) まける로 읽습니다. 뜻은 '지다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0861",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0861",
+    "prompt": "「いなか」의 올바른 표기를 고르세요. (뜻: 시골)",
+    "options": [
+      "田舎",
+      "階段",
+      "放る",
+      "卒業"
+    ],
+    "correct_answer": "田舎",
+    "explanation": "「いなか」는 田舎로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0862",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0862",
+    "prompt": "다음 한자 「高校生」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "こうこうせい",
+    "explanation": "高校生은(는) こうこうせい로 읽습니다. 뜻은 '고등학생'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0863",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0863",
+    "prompt": "「そんなに」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "A「このカメラ、高いですか。」B「いいえ、そんなに高いです。」",
+      "A「明日は雨が降りますか。」B「ええ、私もそんなに思います。」",
+      "このレストランは安いです。そんなに、とてもおいしいです。",
+      "そんなに急がなくても、まだ時間はあります。"
+    ],
+    "correct_answer": "そんなに急がなくても、まだ時間はあります。",
+    "explanation": "정답: そんなに急がなくても、まだ時間はあります。(그렇게 서두르지 않아도 아직 시간이 있습니다.)\n'そんなに'는 '그렇게(까지)'라는 뜻으로 상대의 말이나 행동의 정도를 가리키며, 주로 부정 표현과 함께 씁니다.\n\n오답:\n1. A「このカメラ、高いですか。」B「いいえ、そんなに高いです。」(A「이 카메라 비싼가요?」 B「아니요, 그렇게 비쌉니다.」)\n   'いいえ'로 부정하면서 뒤에 긍정문이 이어져 모순됩니다. 'そんなに高くないです'가 맞습니다.\n2. A「明日は雨が降りますか。」B「ええ、私もそんなに思います。」(A「내일은 비가 올까요?」 B「네, 저도 그렇게나 생각합니다.」)\n   상대의 말에 동의하여 '그렇게 생각한다'고 할 때는 'そう'를 써서 'そう思います'라고 합니다.\n3. このレストランは安いです。そんなに、とてもおいしいです。(이 레스토랑은 쌉니다. 그렇게, 아주 맛있습니다.)\n   앞의 좋은 점에 다른 좋은 점을 더할 때는 'それに(게다가)'를 씁니다. 'そんなに'는 정도를 나타내는 말입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0864",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0864",
+    "prompt": "「ひるやすみ」의 올바른 표기를 고르세요. (뜻: 점심시간)",
+    "options": [
+      "昼休み",
+      "冬休み",
+      "春休み",
+      "休憩"
+    ],
+    "correct_answer": "昼休み",
+    "explanation": "「ひるやすみ」는 昼休み로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0865",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0865",
+    "prompt": "다음 한자 「忘れ物」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "わすれもの",
+    "explanation": "忘れ物은(는) わすれもの로 읽습니다. 뜻은 '잊은 물건'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0866",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0866",
+    "prompt": "「うで」의 올바른 표기를 고르세요. (뜻: 팔)",
+    "options": [
+      "腕",
+      "声",
+      "林",
+      "親"
+    ],
+    "correct_answer": "腕",
+    "explanation": "「うで」는 腕로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0867",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0867",
+    "prompt": "彼が会社をやめた__を聞いたら、病気だったそうです。",
+    "options": [
+      "わけ",
+      "予定",
+      "場合",
+      "意見"
+    ],
+    "correct_answer": "わけ",
+    "explanation": "わけ는 '이유, 사정'이라는 뜻으로 '회사를 그만둔 이유를 물었더니 병 때문이었다'는 문장에 알맞습니다. 予定(예정)·場合(경우)·意見(의견)는 이미 그만둔 일의 원인을 나타낼 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0868",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0868",
+    "prompt": "다음 한자 「承知する」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "しょうちする",
+    "explanation": "承知する은(는) しょうちする로 읽습니다. 뜻은 '알겠다/승낙하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0869",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0869",
+    "prompt": "「にっき」의 올바른 표기를 고르세요. (뜻: 일기)",
+    "options": [
+      "日記",
+      "記憶",
+      "記事",
+      "誕生日"
+    ],
+    "correct_answer": "日記",
+    "explanation": "「にっき」는 日記로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0870",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0870",
+    "prompt": "다음 한자 「高校」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "こうこう",
+    "explanation": "高校은(는) こうこう로 읽습니다. 뜻은 '고등학교'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0871",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0871",
+    "prompt": "「だんぼう」의 올바른 표기를 고르세요. (뜻: 난방)",
+    "options": [
+      "暖房",
+      "冷房",
+      "課題",
+      "火事"
+    ],
+    "correct_answer": "暖房",
+    "explanation": "「だんぼう」는 暖房로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0872",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0872",
+    "prompt": "다음 한자 「留守」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "るす",
+    "explanation": "留守은(는) るす로 읽습니다. 뜻은 '부재'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0873",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0873",
+    "prompt": "「わりあい」의 올바른 표기를 고르세요. (뜻: 비율)",
+    "options": [
+      "割合",
+      "試合",
+      "割引",
+      "都合"
+    ],
+    "correct_answer": "割合",
+    "explanation": "「わりあい」는 割合로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0874",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0874",
+    "prompt": "다음 한자 「寺」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "てら",
+    "explanation": "寺은(는) てら로 읽습니다. 뜻은 '절'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0875",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0875",
+    "prompt": "「ふつう」의 올바른 표기를 고르세요. (뜻: 보통)",
+    "options": [
+      "普通",
+      "交通",
+      "通訳",
+      "通り"
+    ],
+    "correct_answer": "普通",
+    "explanation": "「ふつう」는 普通로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0876",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0876",
+    "prompt": "「なるほど」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "A「この道をまっすぐ行くと、駅に早く着きますよ。」B「なるほど、そうですか。」",
+      "A「今日は本当に暑いですね。」B「なるほど、暑いですね。」",
+      "A「明日、いっしょに映画を見に行きませんか。」B「なるほど、行きましょう。」",
+      "A「宿題を手伝ってくれて、ありがとう。」B「なるほど、また手伝いますよ。」"
+    ],
+    "correct_answer": "A「この道をまっすぐ行くと、駅に早く着きますよ。」B「なるほど、そうですか。」",
+    "explanation": "정답: A「この道をまっすぐ行くと、駅に早く着きますよ。」B「なるほど、そうですか。」(A「이 길로 곧장 가면 역에 빨리 도착해요.」 B「과연, 그렇군요.」)\n'なるほど'는 상대의 설명을 듣고 새로 알게 되어 납득했을 때 맞장구로 사용합니다.\n\n오답:\n1. A「今日は本当に暑いですね。」B「なるほど、暑いですね。」(A「오늘 정말 덥네요.」 B「과연, 덥네요.」)\n   둘 다 이미 느끼고 있는 사실에 동의할 때는 'そうですね'를 씁니다. 'なるほど'는 새로운 정보를 듣고 납득할 때 씁니다.\n2. A「明日、いっしょに映画を見に行きませんか。」B「なるほど、行きましょう。」(A「내일 같이 영화 보러 가지 않을래요?」 B「과연, 갑시다.」)\n   권유에 찬성할 때는 'いいですね'를 씁니다. 'なるほど'는 제안에 대한 대답으로 쓰지 않습니다.\n3. A「宿題を手伝ってくれて、ありがとう。」B「なるほど、また手伝いますよ。」(A「숙제를 도와줘서 고마워.」 B「과연, 또 도와줄게요.」)\n   감사 인사에 대한 대답은 'どういたしまして'나 'いいえ'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0877",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0877",
+    "prompt": "先生が私に辞書を__ので、毎日使っています。",
+    "options": [
+      "いただいた",
+      "くださった",
+      "さしあげた",
+      "あげた"
+    ],
+    "correct_answer": "くださった",
+    "explanation": "くださる는 くれる의 존경어로, 윗사람이 나에게 줄 때 씁니다. いただく는 받는 내가 주어일 때(私が先生にいただく), さしあげる·あげる는 내가 남에게 줄 때 쓰므로 '先生が私に'와 맞지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0878",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0878",
+    "prompt": "다음 한자 「お子さん」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おこさん",
+    "explanation": "お子さん은(는) おこさん로 읽습니다. 뜻은 '자제분'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0879",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0879",
+    "prompt": "「はこぶ」의 올바른 표기를 고르세요. (뜻: 옮기다)",
+    "options": [
+      "運ぶ",
+      "運賃",
+      "運転",
+      "運転手"
+    ],
+    "correct_answer": "運ぶ",
+    "explanation": "「はこぶ」는 運ぶ로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0880",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0880",
+    "prompt": "다음 한자 「文学」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ぶんがく",
+    "explanation": "文学은(는) ぶんがく로 읽습니다. 뜻은 '문학'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0881",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0881",
+    "prompt": "「ひかり」의 올바른 표기를 고르세요. (뜻: 빛)",
+    "options": [
+      "光",
+      "光る",
+      "観光",
+      "味"
+    ],
+    "correct_answer": "光",
+    "explanation": "「ひかり」는 光로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0882",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0882",
+    "prompt": "다음 한자 「お見舞い」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "おみまい",
+    "explanation": "お見舞い은(는) おみまい로 읽습니다. 뜻은 '병문안'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0883",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0883",
+    "prompt": "「せき」의 올바른 표기를 고르세요. (뜻: 자리)",
+    "options": [
+      "席",
+      "出席する",
+      "欠席",
+      "変"
+    ],
+    "correct_answer": "席",
+    "explanation": "「せき」는 席로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0884",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0884",
+    "prompt": "다음 한자 「ご存じ」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ごぞんじ",
+    "explanation": "ご存じ은(는) ごぞんじ로 읽습니다. 뜻은 '아심'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0885",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0885",
+    "prompt": "「さがる」의 올바른 표기를 고르세요. (뜻: 내려가다/물러나다)",
+    "options": [
+      "下がる",
+      "下げる",
+      "廊下",
+      "部下"
+    ],
+    "correct_answer": "下がる",
+    "explanation": "「さがる」는 下がる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0886",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0886",
+    "prompt": "다음 한자 「字」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "じ",
+    "explanation": "字은(는) じ로 읽습니다. 뜻은 '글자'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0887",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0887",
+    "prompt": "「アジア」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "私は、アジア語と英語が話せます。",
+      "日本や韓国や中国は、アジアにある国です。",
+      "私はアジア人ではありません。日本人です。",
+      "東京からアジアまで、電車で二時間かかります。"
+    ],
+    "correct_answer": "日本や韓国や中国は、アジアにある国です。",
+    "explanation": "정답: 日本や韓国や中国は、アジアにある国です。(일본, 한국, 중국은 아시아에 있는 나라입니다.)\n'アジア'는 일본, 한국, 중국 등 여러 나라가 있는 넓은 지역(대륙)입니다.\n\n오답:\n1. 私は、アジア語と英語が話せます。(저는 아시아어와 영어를 할 수 있습니다.)\n   'アジア'는 여러 나라가 있는 지역이라 'アジア語'라는 하나의 언어는 없습니다. '中国語'나 '韓国語'처럼 나라의 말을 씁니다.\n2. 私はアジア人ではありません。日本人です。(저는 아시아인이 아닙니다. 일본인입니다.)\n   일본은 아시아에 있는 나라이므로 일본인도 'アジア人'입니다. 앞뒤 문장이 모순됩니다.\n3. 東京からアジアまで、電車で二時間かかります。(도쿄에서 아시아까지 전철로 두 시간 걸립니다.)\n   도쿄는 이미 아시아 안에 있으므로 'アジア'를 도착지로 쓸 수 없습니다. 'アジア'는 한 장소가 아니라 넓은 지역입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0888",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0888",
+    "prompt": "「すく」의 올바른 표기를 고르세요. (뜻: 한산해지다)",
+    "options": [
+      "空く",
+      "空気",
+      "笑う",
+      "体温"
+    ],
+    "correct_answer": "空く",
+    "explanation": "「すく」는 空く로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0889",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0889",
+    "prompt": "다음 한자 「最も」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "もっとも",
+    "explanation": "最も은(는) もっとも로 읽습니다. 뜻은 '가장'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0890",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0890",
+    "prompt": "「あう」의 올바른 표기를 고르세요. (뜻: 맞다)",
+    "options": [
+      "合う",
+      "試合",
+      "具合",
+      "場合"
+    ],
+    "correct_answer": "合う",
+    "explanation": "「あう」는 合う로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0891",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0891",
+    "prompt": "다음 한자 「久しぶり」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ひさしぶり",
+    "explanation": "久しぶり은(는) ひさしぶり로 읽습니다. 뜻은 '오랜만'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0892",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0892",
+    "prompt": "朝になったので、__を開けて部屋を明るくしました。",
+    "options": [
+      "冷蔵庫",
+      "引き出し",
+      "カーテン",
+      "箱"
+    ],
+    "correct_answer": "カーテン",
+    "explanation": "カーテン은 창가에 다는 천이라 열면 햇빛이 들어와 방이 밝아집니다. 冷蔵庫(냉장고)·引き出し(서랍)·箱(상자)도 '開ける'와 함께 쓰지만 열어도 방이 밝아지지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0893",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0893",
+    "prompt": "「きしゃ」의 올바른 표기를 고르세요. (뜻: 기차)",
+    "options": [
+      "汽車",
+      "車内",
+      "駐車場",
+      "建物"
+    ],
+    "correct_answer": "汽車",
+    "explanation": "「きしゃ」는 汽車로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0894",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0894",
+    "prompt": "다음 한자 「召し上がる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "めしあがる",
+    "explanation": "召し上がる은(는) めしあがる로 읽습니다. 뜻은 '드시다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0895",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0895",
+    "prompt": "「ふとる」의 올바른 표기를 고르세요. (뜻: 살찌다)",
+    "options": [
+      "太る",
+      "煮る",
+      "配達",
+      "車内"
+    ],
+    "correct_answer": "太る",
+    "explanation": "「ふとる」는 太る로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0896",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0896",
+    "prompt": "「よう」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "遅れないように、遅く起きました。",
+      "明日は早く起きたいので、今晩は早く寝るようです。",
+      "忘れないように、メモをしておきます。",
+      "彼は日本人ような日本語を話します。"
+    ],
+    "correct_answer": "忘れないように、メモをしておきます。",
+    "explanation": "정답: 忘れないように、メモをしておきます。(잊지 않도록 메모를 해 두겠습니다.)\n'ように'는 '~하도록'이라는 목적이나 바람을 나타내며, 뒤에는 그 목적에 맞는 행동이 옵니다. 'よう'는 이 밖에 '~인 것 같다(ようだ)', '~처럼(のように)'의 뜻으로도 씁니다.\n\n오답:\n1. 遅れないように、遅く起きました。(늦지 않도록 늦게 일어났습니다.)\n   늦지 않으려면 일찍 일어나야 하므로 목적과 행동이 모순됩니다.\n2. 明日は早く起きたいので、今晩は早く寝るようです。(내일은 일찍 일어나고 싶어서 오늘 밤은 일찍 자는 것 같습니다.)\n   'ようだ'는 보거나 들은 것을 근거로 추측할 때 씁니다. 자신이 정한 행동에는 '寝るつもりです'나 '寝ます'를 씁니다.\n3. 彼は日本人ような日本語を話します。(그는 일본인 같은 일본어를 말합니다.)\n   명사 뒤에 'よう'를 붙일 때는 'の'가 필요하므로 '日本人のような'라고 해야 합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0897",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0897",
+    "prompt": "다음 한자 「直る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "なおる",
+    "explanation": "直る은(는) なおる로 읽습니다. 뜻은 '고쳐지다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0898",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0898",
+    "prompt": "「あつめる」의 올바른 표기를 고르세요. (뜻: 모으다)",
+    "options": [
+      "集める",
+      "集まる",
+      "集まり",
+      "説明書"
+    ],
+    "correct_answer": "集める",
+    "explanation": "「あつめる」는 集める로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0899",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0899",
+    "prompt": "다음 한자 「直す」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "なおす",
+    "explanation": "直す은(는) なおす로 읽습니다. 뜻은 '고치다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0900",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0900",
+    "prompt": "「せんぱい」의 올바른 표기를 고르세요. (뜻: 선배)",
+    "options": [
+      "先輩",
+      "先に",
+      "場所",
+      "光る"
+    ],
+    "correct_answer": "先輩",
+    "explanation": "「せんぱい」는 先輩로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0901",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0901",
+    "prompt": "다음 한자 「世話する」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "せわする",
+    "explanation": "世話する은(는) せわする로 읽습니다. 뜻은 '돌보다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0902",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0902",
+    "prompt": "「おく」의 올바른 표기를 고르세요. (뜻: 억)",
+    "options": [
+      "億",
+      "光",
+      "絹",
+      "点"
+    ],
+    "correct_answer": "億",
+    "explanation": "「おく」는 億로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0903",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0903",
+    "prompt": "다음 한자 「数学」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "すうがく",
+    "explanation": "数学은(는) すうがく로 읽습니다. 뜻은 '수학'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0904",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0904",
+    "prompt": "「はらう」의 올바른 표기를 고르세요. (뜻: 지불하다)",
+    "options": [
+      "払う",
+      "支払い",
+      "競争",
+      "反対"
+    ],
+    "correct_answer": "払う",
+    "explanation": "「はらう」는 払う로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0905",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0905",
+    "prompt": "다음 한자 「君」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "きみ",
+    "explanation": "君은(는) きみ로 읽습니다. 뜻은 '너/자네'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0906",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0906",
+    "prompt": "「ひえる」의 올바른 표기를 고르세요. (뜻: 식다/차가워지다)",
+    "options": [
+      "冷える",
+      "冷やす",
+      "冷房",
+      "見える"
+    ],
+    "correct_answer": "冷える",
+    "explanation": "「ひえる」는 冷える로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0907",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0907",
+    "prompt": "다음 한자 「点く」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "つく",
+    "explanation": "点く은(는) つく로 읽습니다. 뜻은 '켜지다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0908",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0908",
+    "prompt": "「このあいだ」의 올바른 표기를 고르세요. (뜻: 요전)",
+    "options": [
+      "この間",
+      "間違い",
+      "間",
+      "間違える"
+    ],
+    "correct_answer": "この間",
+    "explanation": "「このあいだ」는 この間로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0909",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0909",
+    "prompt": "다음 한자 「格好」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かっこう",
+    "explanation": "格好은(는) かっこう로 읽습니다. 뜻은 '모양/차림새'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0910",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0910",
+    "prompt": "「はいけんする」의 올바른 표기를 고르세요. (뜻: 보다 (겸양))",
+    "options": [
+      "拝見する",
+      "見つける",
+      "お見舞い",
+      "発見する"
+    ],
+    "correct_answer": "拝見する",
+    "explanation": "「はいけんする」는 拝見する로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0911",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0911",
+    "prompt": "다음 한자 「割れる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "われる",
+    "explanation": "割れる은(는) われる로 읽습니다. 뜻은 '깨지다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0912",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0912",
+    "prompt": "「しんぶんしゃ」의 올바른 표기를 고르세요. (뜻: 신문사)",
+    "options": [
+      "新聞社",
+      "会社員",
+      "社員",
+      "新聞"
+    ],
+    "correct_answer": "新聞社",
+    "explanation": "「しんぶんしゃ」는 新聞社로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0913",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0913",
+    "prompt": "다음 한자 「回る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "まわる",
+    "explanation": "回る은(는) まわる로 읽습니다. 뜻은 '돌다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0914",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0914",
+    "prompt": "「まわす」의 올바른 표기를 고르세요. (뜻: 돌리다)",
+    "options": [
+      "回す",
+      "回る",
+      "気分",
+      "習慣"
+    ],
+    "correct_answer": "回す",
+    "explanation": "「まわす」는 回す로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0915",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0915",
+    "prompt": "さっき山田先生が、明日の授業は休みだと__。",
+    "options": [
+      "申しました",
+      "いらっしゃいました",
+      "召し上がりました",
+      "おっしゃいました"
+    ],
+    "correct_answer": "おっしゃいました",
+    "explanation": "おっしゃる는 言う의 존경어이므로 선생님이 말씀하셨다는 문장에 알맞습니다. 申す는 言う의 겸양어라 선생님의 행동에 쓸 수 없고, いらっしゃる(계시다·오시다)·召し上がる(드시다)는 '~と(~라고)'와 이어지지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0916",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0916",
+    "prompt": "다음 한자 「眠い」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ねむい",
+    "explanation": "眠い은(는) ねむい로 읽습니다. 뜻은 '졸리다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0917",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0917",
+    "prompt": "「アクセサリー」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "寒いので、アクセサリーを着て出かけました。",
+      "弟は、車や人形などのアクセサリーで遊ぶのが好きです。",
+      "新聞の小さい字を読むときは、アクセサリーをかけます。",
+      "彼女はネックレスなどのアクセサリーを集めるのが好きです。"
+    ],
+    "correct_answer": "彼女はネックレスなどのアクセサリーを集めるのが好きです。",
+    "explanation": "정답: 彼女はネックレスなどのアクセサリーを集めるのが好きです。(그녀는 목걸이 등의 액세서리를 모으는 것을 좋아합니다.)\n'アクセサリー'는 목걸이나 반지처럼 몸을 꾸미기 위해 다는 장신구입니다.\n\n오답:\n1. 寒いので、アクセサリーを着て出かけました。(추워서 액세서리를 입고 나갔습니다.)\n   추울 때 입는 것은 'コート'나 'セーター'입니다. 'アクセサリー'는 'つける'와 함께 쓰는 장신구입니다.\n2. 弟は、車や人形などのアクセサリーで遊ぶのが好きです。(남동생은 자동차나 인형 같은 액세서리로 노는 것을 좋아합니다.)\n   아이가 가지고 노는 물건은 'おもちゃ(장난감)'입니다.\n3. 新聞の小さい字を読むときは、アクセサリーをかけます。(신문의 작은 글씨를 읽을 때는 액세서리를 씁니다.)\n   글씨를 잘 보기 위해 쓰는 것은 'めがね(안경)'입니다. 'アクセサリー'는 꾸미기 위한 것입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0918",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0918",
+    "prompt": "「しかた」의 올바른 표기를 고르세요. (뜻: 방법)",
+    "options": [
+      "仕方",
+      "方法",
+      "両方",
+      "一方"
+    ],
+    "correct_answer": "仕方",
+    "explanation": "「しかた」는 仕方로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0919",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0919",
+    "prompt": "今日は昨日__寒くありません。",
+    "options": [
+      "ほど",
+      "ため",
+      "つもり",
+      "はず"
+    ],
+    "correct_answer": "ほど",
+    "explanation": "~ほど~ない는 '~만큼 ~하지 않다'는 비교 표현입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0920",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0920",
+    "prompt": "다음 한자 「代わり」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かわり",
+    "explanation": "代わり은(는) かわり로 읽습니다. 뜻은 '대신'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0921",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0921",
+    "prompt": "「こうぎょう」의 올바른 표기를 고르세요. (뜻: 공업)",
+    "options": [
+      "工業",
+      "工夫",
+      "残業",
+      "工事"
+    ],
+    "correct_answer": "工業",
+    "explanation": "「こうぎょう」는 工業로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0922",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0922",
+    "prompt": "「スーツケース」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "旅行に行くので、スーツケースに服を入れました。",
+      "スーツケースを着て、会社へ行きました。",
+      "毎朝、スーツケースに教科書を入れて、学校へ行きます。",
+      "めがねをスーツケースに入れて、ポケットにしまいました。"
+    ],
+    "correct_answer": "旅行に行くので、スーツケースに服を入れました。",
+    "explanation": "정답: 旅行に行くので、スーツケースに服を入れました。(여행을 가므로 여행 가방에 옷을 넣었습니다.)\n'スーツケース'는 여행할 때 짐을 넣는 큰 가방입니다.\n\n오답:\n1. スーツケースを着て、会社へ行きました。(여행 가방을 입고 회사에 갔습니다.)\n   'スーツケース'는 입는 옷이 아닙니다. 입는 것은 'スーツ'입니다.\n2. 毎朝、スーツケースに教科書を入れて、学校へ行きます。(매일 아침 여행 가방에 교과서를 넣고 학교에 갑니다.)\n   'スーツケース'는 여행할 때 짐을 넣는 큰 가방입니다. 학교에 갈 때는 'かばん'을 씁니다.\n3. めがねをスーツケースに入れて、ポケットにしまいました。(안경을 여행 가방에 넣어 주머니에 넣었습니다.)\n   안경을 넣는 작은 통은 'めがねケース(안경집)'입니다. 큰 'スーツケース'는 주머니에 들어가지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0923",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0923",
+    "prompt": "父は毎朝、顔を洗って、__をそります。",
+    "options": [
+      "歯",
+      "ひげ",
+      "つめ",
+      "目"
+    ],
+    "correct_answer": "ひげ",
+    "explanation": "ひげ는 얼굴에 난 수염이므로 'そる(깎다)'와 어울립니다. 歯(이)는 'みがく', つめ(손톱)는 '切る'를 쓰고, 目(눈)는 깎는 대상이 아닙니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0924",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0924",
+    "prompt": "다음 한자 「紹介」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "しょうかい",
+    "explanation": "紹介은(는) しょうかい로 읽습니다. 뜻은 '소개'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0925",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0925",
+    "prompt": "「けれども」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "今日は天気がいいけれども、散歩に行きました。",
+      "このカメラは高いけれども、とても使いやすいです。",
+      "昨日は日曜日でしたけれども、会社は休みでした。",
+      "田中さんは優しいけれども、みんなに好かれています。"
+    ],
+    "correct_answer": "このカメラは高いけれども、とても使いやすいです。",
+    "explanation": "정답: このカメラは高いけれども、とても使いやすいです。(이 카메라는 비싸지만 매우 쓰기 쉽습니다.)\n'けれども'는 앞 내용과 대비되거나 반대되는 내용을 이을 때 사용합니다.\n\n오답:\n1. 今日は天気がいいけれども、散歩に行きました。(오늘은 날씨가 좋지만 산책을 갔습니다.)\n   날씨가 좋으면 산책을 가는 것이 자연스러우므로 대비가 아닙니다. 'ので'나 'から'가 자연스럽습니다.\n2. 昨日は日曜日でしたけれども、会社は休みでした。(어제는 일요일이었지만 회사는 쉬는 날이었습니다.)\n   일요일에 회사가 쉬는 것은 당연하므로 'けれども'로 이을 수 없습니다. 'ので'가 자연스럽습니다.\n3. 田中さんは優しいけれども、みんなに好かれています。(다나카 씨는 다정하지만 모두에게 사랑받습니다.)\n   다정한 사람이 사랑받는 것은 대비가 아니므로 'けれども'가 부자연스럽습니다. 'ので'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0926",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0926",
+    "prompt": "「うごく」의 올바른 표기를 고르세요. (뜻: 움직이다)",
+    "options": [
+      "動く",
+      "移動",
+      "感動",
+      "動物園"
+    ],
+    "correct_answer": "動く",
+    "explanation": "「うごく」는 動く로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0927",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0927",
+    "prompt": "好きな歌手の__のチケットが買えたので、来月聞きに行きます。",
+    "options": [
+      "試合",
+      "映画",
+      "コンサート",
+      "パーティー"
+    ],
+    "correct_answer": "コンサート",
+    "explanation": "コンサート는 음악을 들려주는 공연이므로 '들으러 간다(聞きに行く)'와 어울립니다. 試合(시합)·映画(영화)·パーティー(파티)는 '聞きに行く'가 아니라 '見に行く'나 '行く'를 씁니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0928",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0928",
+    "prompt": "다음 한자 「虫」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "むし",
+    "explanation": "虫은(는) むし로 읽습니다. 뜻은 '벌레'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0929",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0929",
+    "prompt": "「コンピューター」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "コンピューターは、人の形をしていて、歩いたり話したりする機械です。",
+      "ご飯を温めたいので、コンピューターに入れてボタンを押しました。",
+      "このコンピューターは速くて、仕事に便利です。",
+      "会社で、新しいコンピューターを五本買いました。"
+    ],
+    "correct_answer": "このコンピューターは速くて、仕事に便利です。",
+    "explanation": "정답: このコンピューターは速くて、仕事に便利です。(이 컴퓨터는 빨라서 일에 편리합니다.)\n'コンピューター'는 계산이나 문서 작성에 쓰는 기계입니다.\n\n오답:\n1. コンピューターは、人の形をしていて、歩いたり話したりする機械です。(컴퓨터는 사람 모양을 하고 걷거나 말하거나 하는 기계입니다.)\n   사람 모양으로 걷고 말하는 기계는 'ロボット(로봇)'입니다. 'コンピューター'는 계산하거나 문서를 만드는 기계입니다.\n2. ご飯を温めたいので、コンピューターに入れてボタンを押しました。(밥을 데우고 싶어서 컴퓨터에 넣고 버튼을 눌렀습니다.)\n   음식을 데우는 기계는 '電子レンジ(전자레인지)'입니다.\n3. 会社で、新しいコンピューターを五本買いました。(회사에서 새 컴퓨터를 다섯 자루 샀습니다.)\n   기계는 '本'이 아니라 '台'로 셉니다. '五台'가 맞습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0930",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0930",
+    "prompt": "「うえる」의 올바른 표기를 고르세요. (뜻: 심다)",
+    "options": [
+      "植える",
+      "植物",
+      "調べる",
+      "決める"
+    ],
+    "correct_answer": "植える",
+    "explanation": "「うえる」는 植える로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0931",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0931",
+    "prompt": "다음 한자 「勝つ」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かつ",
+    "explanation": "勝つ은(는) かつ로 읽습니다. 뜻은 '이기다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0932",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0932",
+    "prompt": "「すな」의 올바른 표기를 고르세요. (뜻: 모래)",
+    "options": [
+      "砂",
+      "音",
+      "腕",
+      "形"
+    ],
+    "correct_answer": "砂",
+    "explanation": "「すな」는 砂로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0933",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0933",
+    "prompt": "다음 한자 「参る」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "まいる",
+    "explanation": "参る은(는) まいる로 읽습니다. 뜻은 '가다/오다 (겸양)'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0934",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0934",
+    "prompt": "「やくにたつ」의 올바른 표기를 고르세요. (뜻: 도움이 되다)",
+    "options": [
+      "役に立つ",
+      "立てる",
+      "目立つ",
+      "市役所"
+    ],
+    "correct_answer": "役に立つ",
+    "explanation": "「やくにたつ」는 役に立つ로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0935",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0935",
+    "prompt": "電車が__着くので、荷物を持ってください。",
+    "options": [
+      "さっき",
+      "たまに",
+      "ときどき",
+      "もうすぐ"
+    ],
+    "correct_answer": "もうすぐ",
+    "explanation": "もうすぐ는 '이제 곧'이라는 뜻으로 가까운 미래를 나타냅니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0936",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0936",
+    "prompt": "다음 한자 「草」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "くさ",
+    "explanation": "草은(는) くさ로 읽습니다. 뜻은 '풀'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0937",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0937",
+    "prompt": "「このごろ」의 올바른 표기를 고르세요. (뜻: 요즘)",
+    "options": [
+      "この頃",
+      "ごみ箱",
+      "過ごす",
+      "勘違い"
+    ],
+    "correct_answer": "この頃",
+    "explanation": "「このごろ」는 この頃로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0938",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0938",
+    "prompt": "다음 한자 「訪ねる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "たずねる",
+    "explanation": "訪ねる은(는) たずねる로 읽습니다. 뜻은 '방문하다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0939",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0939",
+    "prompt": "「さげる」의 올바른 표기를 고르세요. (뜻: 내리다)",
+    "options": [
+      "下げる",
+      "下がる",
+      "以下",
+      "靴下"
+    ],
+    "correct_answer": "下げる",
+    "explanation": "「さげる」는 下げる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0940",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0940",
+    "prompt": "다음 한자 「花見」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "はなみ",
+    "explanation": "花見은(는) はなみ로 읽습니다. 뜻은 '꽃구경'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0941",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0941",
+    "prompt": "「わかれる」의 올바른 표기를 고르세요. (뜻: 헤어지다)",
+    "options": [
+      "別れる",
+      "特別",
+      "差別",
+      "別"
+    ],
+    "correct_answer": "別れる",
+    "explanation": "「わかれる」는 別れる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0942",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0942",
+    "prompt": "「ガソリンスタンド」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "旅行の間、車をガソリンスタンドに一週間止めておきました。",
+      "次のガソリンスタンドで電車を降りて、バスに乗りかえます。",
+      "毎週、ガソリンスタンドで車の運転を習っています。",
+      "車のガソリンがなくなりそうなので、ガソリンスタンドに寄りました。"
+    ],
+    "correct_answer": "車のガソリンがなくなりそうなので、ガソリンスタンドに寄りました。",
+    "explanation": "정답: 車のガソリンがなくなりそうなので、ガソリンスタンドに寄りました。(차의 휘발유가 떨어질 것 같아서 주유소에 들렀습니다.)\n'ガソリンスタンド'는 자동차에 휘발유를 넣는 곳입니다.\n\n오답:\n1. 旅行の間、車をガソリンスタンドに一週間止めておきました。(여행하는 동안 차를 주유소에 일주일 세워 두었습니다.)\n   차를 오래 세워 두는 곳은 '駐車場(주차장)'입니다. 'ガソリンスタンド'는 기름을 넣는 곳입니다.\n2. 次のガソリンスタンドで電車を降りて、バスに乗りかえます。(다음 주유소에서 전철을 내려 버스로 갈아탑니다.)\n   전철을 타고 내리는 곳은 '駅(역)'입니다. 영어 'gas station'의 'station'과 혼동하기 쉽지만 'ガソリンスタンド'는 주유소입니다.\n3. 毎週、ガソリンスタンドで車の運転を習っています。(매주 주유소에서 자동차 운전을 배우고 있습니다.)\n   운전을 배우는 곳은 '自動車学校(운전학원)'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0943",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0943",
+    "prompt": "ラケットを買ったので、日曜日に友達と__をします。",
+    "options": [
+      "テニス",
+      "サッカー",
+      "水泳",
+      "スキー"
+    ],
+    "correct_answer": "テニス",
+    "explanation": "テニス는 라켓으로 공을 치는 운동이므로 '라켓을 샀다'는 문장과 어울립니다. サッカー(축구)·水泳(수영)·スキー(스키)에는 라켓을 쓰지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0944",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0944",
+    "prompt": "다음 한자 「上がる」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "あがる",
+    "explanation": "上がる은(는) あがる로 읽습니다. 뜻은 '오르다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0945",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0945",
+    "prompt": "「しょくじする」의 올바른 표기를 고르세요. (뜻: 식사하다)",
+    "options": [
+      "食事する",
+      "食料",
+      "工事",
+      "仕事"
+    ],
+    "correct_answer": "食事する",
+    "explanation": "「しょくじする」는 食事する로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0946",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0946",
+    "prompt": "다음 한자 「湯」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "ゆ",
+    "explanation": "湯은(는) ゆ로 읽습니다. 뜻은 '뜨거운 물'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0947",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0947",
+    "prompt": "「きょうそう」의 올바른 표기를 고르세요. (뜻: 경쟁)",
+    "options": [
+      "競争",
+      "争う",
+      "戦争",
+      "趣味"
+    ],
+    "correct_answer": "競争",
+    "explanation": "「きょうそう」는 競争로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0948",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0948",
+    "prompt": "다음 한자 「湖」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "みずうみ",
+    "explanation": "湖은(는) みずうみ로 읽습니다. 뜻은 '호수'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0949",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0949",
+    "prompt": "「あつまる」의 올바른 표기를 고르세요. (뜻: 모이다)",
+    "options": [
+      "集まる",
+      "集める",
+      "集まり",
+      "受ける"
+    ],
+    "correct_answer": "集まる",
+    "explanation": "「あつまる」는 集まる로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0950",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0950",
+    "prompt": "다음 한자 「糸」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "いと",
+    "explanation": "糸은(는) いと로 읽습니다. 뜻은 '실'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0951",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0951",
+    "prompt": "「ピアノ」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "姉は毎日、ピアノを練習しています。",
+      "私はピアノを三枚、買いました。",
+      "ピアノを吹いて、みんなを楽しませました。",
+      "ピアノを肩にかけて、歌いながら弾きました。"
+    ],
+    "correct_answer": "姉は毎日、ピアノを練習しています。",
+    "explanation": "정답: 姉は毎日、ピアノを練習しています。(언니는 매일 피아노를 연습하고 있습니다.)\n'ピアノ'는 '弾く'와 함께 쓰며 '台'로 세는 크고 무거운 건반 악기입니다.\n\n오답:\n1. 私はピアノを三枚、買いました。(저는 피아노를 세 장 샀습니다.)\n   피아노는 '枚'가 아니라 '台'로 셉니다. '三台'가 맞습니다.\n2. ピアノを吹いて、みんなを楽しませました。(피아노를 불어서 모두를 즐겁게 했습니다.)\n   피아노는 '吹く'가 아니라 '弾く'를 씁니다. '吹く'는 플루트 등에 씁니다.\n3. ピアノを肩にかけて、歌いながら弾きました。(피아노를 어깨에 메고 노래하면서 쳤습니다.)\n   어깨에 메고 치는 악기는 'ギター(기타)'입니다. 'ピアノ'는 크고 무거워서 어깨에 멜 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0952",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0952",
+    "prompt": "「もめん」의 올바른 표기를 고르세요. (뜻: 무명/면)",
+    "options": [
+      "木綿",
+      "以外",
+      "通り",
+      "才能"
+    ],
+    "correct_answer": "木綿",
+    "explanation": "「もめん」는 木綿로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0953",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0953",
+    "prompt": "私は、背が高くて優しい__の人が好きです。",
+    "options": [
+      "サイズ",
+      "タイプ",
+      "形",
+      "色"
+    ],
+    "correct_answer": "タイプ",
+    "explanation": "タイプ는 '유형'이라는 뜻으로 '키가 크고 다정한 타입의 사람'처럼 좋아하는 사람의 유형을 말할 때 씁니다. サイズ(크기)·形(모양)·色(색)는 사람의 성격이나 유형을 나타낼 수 없습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0954",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0954",
+    "prompt": "「すり」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "夜、すりが窓を割って家に入り、テレビを盗んでいきました。",
+      "電車の中ですりにお財布を盗まれました。",
+      "すりが、財布を盗んだ男をつかまえてくれました。",
+      "私は、すりにお金をもらって、買い物をしました。"
+    ],
+    "correct_answer": "電車の中ですりにお財布を盗まれました。",
+    "explanation": "정답: 電車の中ですりにお財布を盗まれました。(전철 안에서 소매치기에게 지갑을 도둑맞았습니다.)\n'すり'는 사람이 많은 곳에서 남의 주머니나 가방에서 몰래 돈이나 물건을 훔치는 사람입니다.\n\n오답:\n1. 夜、すりが窓を割って家に入り、テレビを盗んでいきました。(밤에 소매치기가 창문을 깨고 집에 들어와 텔레비전을 훔쳐 갔습니다.)\n   집에 몰래 들어와 물건을 훔치는 사람은 'どろぼう(도둑)'입니다. 'すり'는 사람이 많은 곳에서 몸에 지닌 물건을 훔칩니다.\n2. すりが、財布を盗んだ男をつかまえてくれました。(소매치기가 지갑을 훔친 남자를 붙잡아 주었습니다.)\n   도둑을 붙잡는 사람은 '警官(경찰관)'입니다. 'すり'는 훔치는 쪽입니다.\n3. 私は、すりにお金をもらって、買い物をしました。(저는 소매치기에게 돈을 받아 쇼핑을 했습니다.)\n   소매치기는 돈을 훔치는 사람이며 주는 사람이 아닙니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0955",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0955",
+    "prompt": "다음 한자 「嬉しい」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "うれしい",
+    "explanation": "嬉しい은(는) うれしい로 읽습니다. 뜻은 '기쁘다'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0956",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0956",
+    "prompt": "車を運転する人は、__を飲んではいけません。",
+    "options": [
+      "ジュース",
+      "牛乳",
+      "アルコール",
+      "コーヒー"
+    ],
+    "correct_answer": "アルコール",
+    "explanation": "アルコール은 술에 들어 있는 성분으로, 운전하는 사람이 마시면 안 되는 것이므로 알맞습니다. ジュース(주스)·牛乳(우유)·コーヒー(커피)는 운전하는 사람이 마셔도 됩니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0957",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0957",
+    "prompt": "「ソフト」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "疲れたので、ソフトに座って休みました。",
+      "ハンバーグにソフトをかけて食べました。",
+      "このゲームのソフトは、パソコンで使えます。",
+      "この石はとてもソフトで、ぶつかると痛いです。"
+    ],
+    "correct_answer": "このゲームのソフトは、パソコンで使えます。",
+    "explanation": "정답: このゲームのソフトは、パソコンで使えます。(이 게임 소프트웨어는 컴퓨터에서 쓸 수 있습니다.)\n'ソフト'는 컴퓨터에서 쓰는 프로그램(소프트웨어)이나 부드러운 것을 뜻합니다.\n\n오답:\n1. 疲れたので、ソフトに座って休みました。(피곤해서 소프트에 앉아 쉬었습니다.)\n   앉아서 쉬는 푹신한 의자는 'ソファー(소파)'입니다. 'ソフト'와 모양이 비슷하지만 다른 말입니다.\n2. ハンバーグにソフトをかけて食べました。(햄버그스테이크에 소프트를 뿌려 먹었습니다.)\n   음식에 뿌려 맛을 내는 것은 'ソース(소스)'입니다.\n3. この石はとてもソフトで、ぶつかると痛いです。(이 돌은 매우 부드러워서 부딪히면 아픕니다.)\n   'ソフト'는 부드럽다는 뜻이므로 부딪히면 아프다는 내용과 모순됩니다. '硬い'가 자연스럽습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0958",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0958",
+    "prompt": "「じんじゃ」의 올바른 표기를 고르세요. (뜻: 신사)",
+    "options": [
+      "神社",
+      "社員",
+      "社会",
+      "社長"
+    ],
+    "correct_answer": "神社",
+    "explanation": "「じんじゃ」는 神社로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0959",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0959",
+    "prompt": "薬を飲んだら、熱が__下がりました。",
+    "options": [
+      "なるべく",
+      "きっと",
+      "ぜひ",
+      "だいぶ"
+    ],
+    "correct_answer": "だいぶ",
+    "explanation": "だいぶ는 '꽤, 상당히'라는 뜻으로 변화의 정도가 큼을 나타내므로 '열이 꽤 내렸다'에 알맞습니다. なるべく(되도록)·ぜひ(꼭)는 바람이나 노력에 쓰고, きっと(틀림없이)는 추측을 나타내므로 이미 일어난 일인 '下がりました'와 맞지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0960",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0960",
+    "prompt": "다음 한자 「楽しみ」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "たのしみ",
+    "explanation": "楽しみ은(는) たのしみ로 읽습니다. 뜻은 '기대/즐거움'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0961",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0961",
+    "prompt": "「でんぽう」의 올바른 표기를 고르세요. (뜻: 전보)",
+    "options": [
+      "電報",
+      "情報",
+      "電灯",
+      "電池"
+    ],
+    "correct_answer": "電報",
+    "explanation": "「でんぽう」는 電報로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_kanji_reading_0962",
+    "item_type": "vocab_kanji_reading",
+    "type": "fill_blank",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0962",
+    "prompt": "다음 한자 「家内」의 가나 읽기를 쓰세요.",
+    "options": [],
+    "correct_answer": "かない",
+    "explanation": "家内은(는) かない로 읽습니다. 뜻은 '아내 (자기 아내)'입니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_orthography_0963",
+    "item_type": "vocab_orthography",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0963",
+    "prompt": "「ゆび」의 올바른 표기를 고르세요. (뜻: 손가락)",
+    "options": [
+      "指",
+      "指輪",
+      "字",
+      "枝"
+    ],
+    "correct_answer": "指",
+    "explanation": "「ゆび」는 指로 표기합니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_usage_0964",
+    "item_type": "vocab_usage",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0964",
+    "prompt": "「これから」가 올바르게 사용된 일본어 문장을 고르세요.",
+    "options": [
+      "駅で切符を買いました。これから、電車に乗りました。",
+      "私は、これからずっと、この町に住んできました。",
+      "これから、昨日の宿題をしました。",
+      "これから、友達と夕ごはんを食べに行きます。"
+    ],
+    "correct_answer": "これから、友達と夕ごはんを食べに行きます。",
+    "explanation": "정답: これから、友達と夕ごはんを食べに行きます。(지금부터 친구와 저녁을 먹으러 갑니다.)\n'これから'는 지금부터 앞으로의 시간을 나타낼 때 사용합니다.\n\n오답:\n1. 駅で切符を買いました。これから、電車に乗りました。(역에서 표를 샀습니다. 지금부터 전철을 탔습니다.)\n   지난 일의 순서를 이어 말할 때는 'それから(그러고 나서)'를 씁니다. 'これから'는 지금부터 앞으로의 일에 씁니다.\n2. 私は、これからずっと、この町に住んできました。(저는 지금부터 쭉 이 마을에 살아왔습니다.)\n   과거부터 지금까지를 말할 때는 'これまで(지금까지)'를 씁니다. '住んできました'는 지금까지의 일이므로 'これから'와 맞지 않습니다.\n3. これから、昨日の宿題をしました。(지금부터 어제 숙제를 했습니다.)\n   'これから'는 앞으로를 나타내므로 과거형 '~ました'와 어울리지 않습니다.",
+    "difficulty": 1
+  },
+  {
+    "source_id": "n4_seed_vocab_context_0965",
+    "item_type": "vocab_context",
+    "type": "multiple_choice",
+    "category": "vocabulary",
+    "material_key": "ja:vocab:n4_word_0965",
+    "prompt": "いつもは家で食べますが、__外で食べます。",
+    "options": [
+      "たまに",
+      "さっき",
+      "なるべく",
+      "ちょうど"
+    ],
+    "correct_answer": "たまに",
+    "explanation": "たまに는 '가끔'이라는 뜻으로, '평소에는 집에서 먹지만 가끔 밖에서 먹는다'는 문장에 알맞습니다. さっき(아까)는 지난 일, ちょうど(딱)는 정확히 맞음을 나타내고, なるべく(되도록)는 '평소에는 집에서 먹는다'는 앞 문장과 모순됩니다.",
+    "difficulty": 1
+  },
+  {
     "source_id": "n4_seed_grammar_form_0001",
     "item_type": "grammar_form",
     "type": "multiple_choice",

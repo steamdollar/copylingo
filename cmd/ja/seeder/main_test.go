@@ -41,13 +41,21 @@ func TestKanaScriptLabel(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
 
-			if got := kanaScriptLabel(tt.kana); got != tt.want {
-				t.Fatalf("kanaScriptLabel(%q) = %q, want %q", tt.kana, got, tt.want)
-			}
-		})
+				if got := kanaScriptLabel(tt.kana); got != tt.want {
+					t.Fatalf(
+						"kanaScriptLabel(%q) = %q, want %q",
+						tt.kana,
+						got,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
@@ -64,36 +72,83 @@ func TestBuildQuestionType2PromptIncludesScriptLabel(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
 
-			q := buildQuestion("a", tt.answer, []string{"い", "う", "え", "お"}, false)
-			if !strings.Contains(q.Prompt, tt.want) {
-				t.Fatalf("prompt %q does not contain %q", q.Prompt, tt.want)
-			}
-			if !strings.Contains(q.Explanation, tt.want) {
-				t.Fatalf("explanation %q does not contain %q", q.Explanation, tt.want)
-			}
-		})
+				q := buildQuestion(
+					"a",
+					tt.answer,
+					[]string{"い", "う", "え", "お"},
+					false,
+				)
+				if !strings.Contains(
+					q.Prompt,
+					tt.want,
+				) {
+					t.Fatalf(
+						"prompt %q does not contain %q",
+						q.Prompt,
+						tt.want,
+					)
+				}
+				if !strings.Contains(
+					q.Explanation,
+					tt.want,
+				) {
+					t.Fatalf(
+						"explanation %q does not contain %q",
+						q.Explanation,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
 func TestBuildQuestionSetsSkill(t *testing.T) {
 	t.Parallel()
 
-	toRomaji := buildQuestion("あ", "a", []string{"i", "u", "e", "o"}, true)
+	toRomaji := buildQuestion(
+		"あ",
+		"a",
+		[]string{"i", "u", "e", "o"},
+		true,
+	)
 	if toRomaji.Skill == nil || *toRomaji.Skill != model.SkillKanaReading {
-		t.Fatalf("toRomaji skill = %v, want %q", toRomaji.Skill, model.SkillKanaReading)
+		t.Fatalf(
+			"toRomaji skill = %v, want %q",
+			toRomaji.Skill,
+			model.SkillKanaReading,
+		)
 	}
 
-	toKana := buildQuestion("a", "あ", []string{"い", "う", "え", "お"}, false)
+	toKana := buildQuestion(
+		"a",
+		"あ",
+		[]string{"い", "う", "え", "お"},
+		false,
+	)
 	if toKana.Skill == nil || *toKana.Skill != model.SkillKanaRecall {
-		t.Fatalf("toKana skill = %v, want %q", toKana.Skill, model.SkillKanaRecall)
+		t.Fatalf(
+			"toKana skill = %v, want %q",
+			toKana.Skill,
+			model.SkillKanaRecall,
+		)
 	}
 
-	handwriting := buildHandwritingQuestion("a", "あ")
+	handwriting := buildHandwritingQuestion(
+		"a",
+		"あ",
+	)
 	if handwriting.Skill == nil || *handwriting.Skill != model.SkillKanaHandwriting {
-		t.Fatalf("handwriting skill = %v, want %q", handwriting.Skill, model.SkillKanaHandwriting)
+		t.Fatalf(
+			"handwriting skill = %v, want %q",
+			handwriting.Skill,
+			model.SkillKanaHandwriting,
+		)
 	}
 }
 
@@ -117,13 +172,21 @@ func TestKanaDisambiguationHint(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
 
-			if got := kanaDisambiguationHint(tt.kana); got != tt.want {
-				t.Fatalf("kanaDisambiguationHint(%q) = %q, want %q", tt.kana, got, tt.want)
-			}
-		})
+				if got := kanaDisambiguationHint(tt.kana); got != tt.want {
+					t.Fatalf(
+						"kanaDisambiguationHint(%q) = %q, want %q",
+						tt.kana,
+						got,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
@@ -146,34 +209,79 @@ func TestAmbiguousReverseKanaQuestionsIncludeHint(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
 
-			romaji := ja.KanaMap[tt.kana]
-			type2 := buildQuestion(romaji, tt.kana, []string{"あ", "い", "う", "え", "お"}, false)
-			if !strings.Contains(type2.Prompt, tt.want) {
-				t.Fatalf("Type 2 prompt %q does not contain %q", type2.Prompt, tt.want)
-			}
+				romaji := ja.KanaMap[tt.kana]
+				type2 := buildQuestion(
+					romaji,
+					tt.kana,
+					[]string{"あ", "い", "う", "え", "お"},
+					false,
+				)
+				if !strings.Contains(
+					type2.Prompt,
+					tt.want,
+				) {
+					t.Fatalf(
+						"Type 2 prompt %q does not contain %q",
+						type2.Prompt,
+						tt.want,
+					)
+				}
 
-			handwriting := buildHandwritingQuestion(romaji, tt.kana)
-			if !strings.Contains(handwriting.Prompt, tt.want) {
-				t.Fatalf("handwriting prompt %q does not contain %q", handwriting.Prompt, tt.want)
-			}
-		})
+				handwriting := buildHandwritingQuestion(
+					romaji,
+					tt.kana,
+				)
+				if !strings.Contains(
+					handwriting.Prompt,
+					tt.want,
+				) {
+					t.Fatalf(
+						"handwriting prompt %q does not contain %q",
+						handwriting.Prompt,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
 func TestUnambiguousReverseKanaQuestionsDoNotIncludeHint(t *testing.T) {
 	t.Parallel()
 
-	type2 := buildQuestion("ga", "が", []string{"あ", "い", "う", "え", "お"}, false)
-	if strings.Contains(type2.Prompt, "힌트:") {
-		t.Fatalf("Type 2 prompt unexpectedly contains hint: %q", type2.Prompt)
+	type2 := buildQuestion(
+		"ga",
+		"が",
+		[]string{"あ", "い", "う", "え", "お"},
+		false,
+	)
+	if strings.Contains(
+		type2.Prompt,
+		"힌트:",
+	) {
+		t.Fatalf(
+			"Type 2 prompt unexpectedly contains hint: %q",
+			type2.Prompt,
+		)
 	}
 
-	handwriting := buildHandwritingQuestion("ga", "が")
-	if strings.Contains(handwriting.Prompt, "힌트:") {
-		t.Fatalf("handwriting prompt unexpectedly contains hint: %q", handwriting.Prompt)
+	handwriting := buildHandwritingQuestion(
+		"ga",
+		"が",
+	)
+	if strings.Contains(
+		handwriting.Prompt,
+		"힌트:",
+	) {
+		t.Fatalf(
+			"handwriting prompt unexpectedly contains hint: %q",
+			handwriting.Prompt,
+		)
 	}
 }
 
@@ -193,40 +301,66 @@ func TestShouldSeedHandwritingQuestion(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
 
-			if got := shouldSeedHandwritingQuestion(tt.kana); got != tt.want {
-				t.Fatalf("shouldSeedHandwritingQuestion(%q) = %t, want %t", tt.kana, got, tt.want)
-			}
-		})
+				if got := shouldSeedHandwritingQuestion(tt.kana); got != tt.want {
+					t.Fatalf(
+						"shouldSeedHandwritingQuestion(%q) = %t, want %t",
+						tt.kana,
+						got,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
 func TestBuildKanaQuestionsSetsStableQuestionKeys(t *testing.T) {
 	t.Parallel()
 
-	materialIDsByKana := make(map[string]int, len(ja.KanaMap))
+	materialIDsByKana := make(
+		map[string]int,
+		len(ja.KanaMap),
+	)
 	for kana := range ja.KanaMap {
 		materialIDsByKana[kana] = len(materialIDsByKana) + 1
 	}
 
 	questions := buildKanaQuestions(materialIDsByKana)
 	if len(questions) != 622 {
-		t.Fatalf("len(questions) = %d, want 622", len(questions))
+		t.Fatalf(
+			"len(questions) = %d, want 622",
+			len(questions),
+		)
 	}
 
-	seen := make(map[string]bool, len(questions))
+	seen := make(
+		map[string]bool,
+		len(questions),
+	)
 	for _, question := range questions {
 		if question.QuestionKey == nil || *question.QuestionKey == "" {
-			t.Fatalf("missing question_key for question: %+v", question)
+			t.Fatalf(
+				"missing question_key for question: %+v",
+				question,
+			)
 		}
 		if seen[*question.QuestionKey] {
-			t.Fatalf("duplicate question_key %q", *question.QuestionKey)
+			t.Fatalf(
+				"duplicate question_key %q",
+				*question.QuestionKey,
+			)
 		}
 		seen[*question.QuestionKey] = true
 		if question.MaterialID == nil {
-			t.Fatalf("missing material_id for question_key %q", *question.QuestionKey)
+			t.Fatalf(
+				"missing material_id for question_key %q",
+				*question.QuestionKey,
+			)
 		}
 	}
 
@@ -238,7 +372,10 @@ func TestBuildKanaQuestionsSetsStableQuestionKeys(t *testing.T) {
 		"ja:kana:u30e6:recall",
 	} {
 		if !seen[key] {
-			t.Fatalf("question_key %q not found", key)
+			t.Fatalf(
+				"question_key %q not found",
+				key,
+			)
 		}
 	}
 	if seen["ja:kana:u30e6:handwriting"] {
@@ -256,27 +393,47 @@ func TestLoadKanaMaterialIDs(t *testing.T) {
 		},
 	}
 
-	got, err := loadKanaMaterialIDs(context.Background(), store, map[string]string{
-		"あ":  "a",
-		"きゃ": "kya",
-	})
+	got, err := loadKanaMaterialIDs(
+		context.Background(),
+		store,
+		map[string]string{
+			"あ":  "a",
+			"きゃ": "kya",
+		},
+	)
 	if err != nil {
-		t.Fatalf("loadKanaMaterialIDs: %v", err)
+		t.Fatalf(
+			"loadKanaMaterialIDs: %v",
+			err,
+		)
 	}
 	if got["あ"] != 1 || got["きゃ"] != 2 {
-		t.Fatalf("material ids = %#v, want あ=1 and きゃ=2", got)
+		t.Fatalf(
+			"material ids = %#v, want あ=1 and きゃ=2",
+			got,
+		)
 	}
 }
 
 func TestLoadKanaMaterialIDsMissing(t *testing.T) {
 	t.Parallel()
 
-	_, err := loadKanaMaterialIDs(context.Background(), fakeKanaMaterialStore{}, map[string]string{"あ": "a"})
+	_, err := loadKanaMaterialIDs(
+		context.Background(),
+		fakeKanaMaterialStore{},
+		map[string]string{"あ": "a"},
+	)
 	if err == nil {
 		t.Fatal("loadKanaMaterialIDs error = nil, want missing material error")
 	}
-	if !strings.Contains(err.Error(), "ja:kana:u3042") {
-		t.Fatalf("error = %q, want missing material key", err)
+	if !strings.Contains(
+		err.Error(),
+		"ja:kana:u3042",
+	) {
+		t.Fatalf(
+			"error = %q, want missing material key",
+			err,
+		)
 	}
 }
 
@@ -299,40 +456,82 @@ func TestBuildKanaToMeaningQuestion(t *testing.T) {
 	t.Parallel()
 
 	word := vocabWord{ID: "n5_word_test", Kana: "みず", Kanji: "水", MeaningKo: "물", PartOfSpeech: "noun"}
-	q := buildKanaToMeaningQuestion(rand.New(rand.NewSource(1)), word, defaultTestCatalog.Words)
+	q := buildKanaToMeaningQuestion(
+		rand.New(rand.NewSource(1)),
+		word,
+		defaultTestCatalog.Words,
+	)
 
 	if q.Type != model.QuestionMultipleChoice {
-		t.Fatalf("type = %q, want %q", q.Type, model.QuestionMultipleChoice)
+		t.Fatalf(
+			"type = %q, want %q",
+			q.Type,
+			model.QuestionMultipleChoice,
+		)
 	}
 	if q.Skill == nil || *q.Skill != model.SkillVocabMeaning {
-		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillVocabMeaning)
+		t.Fatalf(
+			"skill = %v, want %q",
+			q.Skill,
+			model.SkillVocabMeaning,
+		)
 	}
 	if q.Category != model.CategoryVocabulary {
-		t.Fatalf("category = %q, want %q", q.Category, model.CategoryVocabulary)
+		t.Fatalf(
+			"category = %q, want %q",
+			q.Category,
+			model.CategoryVocabulary,
+		)
 	}
 	if q.Language != vocabLanguage {
-		t.Fatalf("language = %q, want %q", q.Language, vocabLanguage)
+		t.Fatalf(
+			"language = %q, want %q",
+			q.Language,
+			vocabLanguage,
+		)
 	}
 	if q.ProficiencyLevel != defaultTestCatalog.Level {
-		t.Fatalf("level = %q, want %q", q.ProficiencyLevel, defaultTestCatalog.Level)
+		t.Fatalf(
+			"level = %q, want %q",
+			q.ProficiencyLevel,
+			defaultTestCatalog.Level,
+		)
 	}
 	if q.Difficulty != vocabDifficulty {
-		t.Fatalf("difficulty = %d, want %d", q.Difficulty, vocabDifficulty)
+		t.Fatalf(
+			"difficulty = %d, want %d",
+			q.Difficulty,
+			vocabDifficulty,
+		)
 	}
 
 	options, err := q.GetOptions()
 	if err != nil {
-		t.Fatalf("GetOptions: %v", err)
+		t.Fatalf(
+			"GetOptions: %v",
+			err,
+		)
 	}
 	if len(options) != 4 {
-		t.Fatalf("len(options) = %d, want 4: %v", len(options), options)
+		t.Fatalf(
+			"len(options) = %d, want 4: %v",
+			len(options),
+			options,
+		)
 	}
 
-	seen := make(map[string]bool, len(options))
+	seen := make(
+		map[string]bool,
+		len(options),
+	)
 	hasAnswer := false
 	for _, opt := range options {
 		if seen[opt] {
-			t.Fatalf("duplicate option %q in %v", opt, options)
+			t.Fatalf(
+				"duplicate option %q in %v",
+				opt,
+				options,
+			)
 		}
 		seen[opt] = true
 		if opt == word.MeaningKo {
@@ -340,9 +539,19 @@ func TestBuildKanaToMeaningQuestion(t *testing.T) {
 		}
 	}
 	if !hasAnswer {
-		t.Fatalf("options %v do not contain answer %q", options, word.MeaningKo)
+		t.Fatalf(
+			"options %v do not contain answer %q",
+			options,
+			word.MeaningKo,
+		)
 	}
-	assertContainsAll(t, q.Explanation, word.Kana, word.Kanji, word.MeaningKo)
+	assertContainsAll(
+		t,
+		q.Explanation,
+		word.Kana,
+		word.Kanji,
+		word.MeaningKo,
+	)
 }
 
 func TestBuildMeaningToKanaQuestion(t *testing.T) {
@@ -352,23 +561,49 @@ func TestBuildMeaningToKanaQuestion(t *testing.T) {
 	q := buildMeaningToKanaQuestion(word)
 
 	if q.Type != model.QuestionFillBlank {
-		t.Fatalf("type = %q, want %q", q.Type, model.QuestionFillBlank)
+		t.Fatalf(
+			"type = %q, want %q",
+			q.Type,
+			model.QuestionFillBlank,
+		)
 	}
 	if q.Skill == nil || *q.Skill != model.SkillVocabRecall {
-		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillVocabRecall)
+		t.Fatalf(
+			"skill = %v, want %q",
+			q.Skill,
+			model.SkillVocabRecall,
+		)
 	}
 	if q.CorrectAnswer != word.Kana {
-		t.Fatalf("correct answer = %q, want %q", q.CorrectAnswer, word.Kana)
+		t.Fatalf(
+			"correct answer = %q, want %q",
+			q.CorrectAnswer,
+			word.Kana,
+		)
 	}
 	options, err := q.GetOptions()
 	if err != nil {
-		t.Fatalf("GetOptions: %v", err)
+		t.Fatalf(
+			"GetOptions: %v",
+			err,
+		)
 	}
 	if len(options) != 0 {
-		t.Fatalf("len(options) = %d, want 0: %v", len(options), options)
+		t.Fatalf(
+			"len(options) = %d, want 0: %v",
+			len(options),
+			options,
+		)
 	}
-	if !strings.Contains(q.Prompt, word.MeaningKo) {
-		t.Fatalf("prompt %q does not contain meaning %q", q.Prompt, word.MeaningKo)
+	if !strings.Contains(
+		q.Prompt,
+		word.MeaningKo,
+	) {
+		t.Fatalf(
+			"prompt %q does not contain meaning %q",
+			q.Prompt,
+			word.MeaningKo,
+		)
 	}
 }
 
@@ -378,12 +613,30 @@ func TestBuildMeaningToKanaQuestionCounterUsesKanjiReadingPrompt(t *testing.T) {
 	word := vocabWord{ID: "n5_word_test", Kana: "にほん", Kanji: "二本", MeaningKo: "두 개 (길고 가는 것)", PartOfSpeech: "counter"}
 	q := buildMeaningToKanaQuestion(word)
 
-	assertContainsAll(t, q.Prompt, "二本", "두 개 (길고 가는 것)", "히라가나 읽기")
-	if strings.Contains(q.Prompt, "にほん") {
-		t.Fatalf("counter prompt %q should not reveal answer kana", q.Prompt)
+	assertContainsAll(
+		t,
+		q.Prompt,
+		"二本",
+		"두 개 (길고 가는 것)",
+		"히라가나 읽기",
+	)
+	if strings.Contains(
+		q.Prompt,
+		"にほん",
+	) {
+		t.Fatalf(
+			"counter prompt %q should not reveal answer kana",
+			q.Prompt,
+		)
 	}
-	if strings.Contains(q.Prompt, "뜻 <b>'두 개") {
-		t.Fatalf("counter prompt %q should not ask by meaning only", q.Prompt)
+	if strings.Contains(
+		q.Prompt,
+		"뜻 <b>'두 개",
+	) {
+		t.Fatalf(
+			"counter prompt %q should not ask by meaning only",
+			q.Prompt,
+		)
 	}
 }
 
@@ -394,21 +647,50 @@ func TestBuildMeaningToKanaHandwritingQuestion(t *testing.T) {
 	q := buildMeaningToKanaHandwritingQuestion(word)
 
 	if q.Type != model.QuestionKanaHandwriting {
-		t.Fatalf("type = %q, want %q", q.Type, model.QuestionKanaHandwriting)
+		t.Fatalf(
+			"type = %q, want %q",
+			q.Type,
+			model.QuestionKanaHandwriting,
+		)
 	}
 	if q.Skill == nil || *q.Skill != model.SkillVocabHandwriting {
-		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillVocabHandwriting)
+		t.Fatalf(
+			"skill = %v, want %q",
+			q.Skill,
+			model.SkillVocabHandwriting,
+		)
 	}
 	if q.Category != model.CategoryVocabulary {
-		t.Fatalf("category = %q, want %q", q.Category, model.CategoryVocabulary)
+		t.Fatalf(
+			"category = %q, want %q",
+			q.Category,
+			model.CategoryVocabulary,
+		)
 	}
 	if q.CorrectAnswer != word.Kana {
-		t.Fatalf("correct answer = %q, want %q", q.CorrectAnswer, word.Kana)
+		t.Fatalf(
+			"correct answer = %q, want %q",
+			q.CorrectAnswer,
+			word.Kana,
+		)
 	}
-	if !strings.Contains(q.Prompt, word.MeaningKo) {
-		t.Fatalf("prompt %q does not contain meaning %q", q.Prompt, word.MeaningKo)
+	if !strings.Contains(
+		q.Prompt,
+		word.MeaningKo,
+	) {
+		t.Fatalf(
+			"prompt %q does not contain meaning %q",
+			q.Prompt,
+			word.MeaningKo,
+		)
 	}
-	assertContainsAll(t, q.Explanation, word.Kana, word.Kanji, word.MeaningKo)
+	assertContainsAll(
+		t,
+		q.Explanation,
+		word.Kana,
+		word.Kanji,
+		word.MeaningKo,
+	)
 }
 
 func TestBuildMeaningToKanaHandwritingQuestionCounterUsesKanjiReadingPrompt(t *testing.T) {
@@ -423,12 +705,31 @@ func TestBuildMeaningToKanaHandwritingQuestionCounterUsesKanjiReadingPrompt(t *t
 	}
 	q := buildMeaningToKanaHandwritingQuestion(word)
 
-	assertContainsAll(t, q.Prompt, "三枚", "세 장 (얇고 평평한 것)", "히라가나 읽기", "손글씨")
-	if strings.Contains(q.Prompt, "さんまい") {
-		t.Fatalf("counter prompt %q should not reveal answer kana", q.Prompt)
+	assertContainsAll(
+		t,
+		q.Prompt,
+		"三枚",
+		"세 장 (얇고 평평한 것)",
+		"히라가나 읽기",
+		"손글씨",
+	)
+	if strings.Contains(
+		q.Prompt,
+		"さんまい",
+	) {
+		t.Fatalf(
+			"counter prompt %q should not reveal answer kana",
+			q.Prompt,
+		)
 	}
-	if strings.Contains(q.Prompt, "뜻 <b>'세 장") {
-		t.Fatalf("counter prompt %q should not ask by meaning only", q.Prompt)
+	if strings.Contains(
+		q.Prompt,
+		"뜻 <b>'세 장",
+	) {
+		t.Fatalf(
+			"counter prompt %q should not ask by meaning only",
+			q.Prompt,
+		)
 	}
 }
 
@@ -436,39 +737,90 @@ func TestBuildGrammarMeaningQuestion(t *testing.T) {
 	t.Parallel()
 
 	point := defaultTestCatalog.GrammarPoints[0]
-	q := buildGrammarMeaningQuestion(rand.New(rand.NewSource(1)), point, defaultTestCatalog.GrammarPoints)
+	q := buildGrammarMeaningQuestion(
+		rand.New(rand.NewSource(1)),
+		point,
+		defaultTestCatalog.GrammarPoints,
+	)
 
 	if q.Type != model.QuestionMultipleChoice {
-		t.Fatalf("type = %q, want %q", q.Type, model.QuestionMultipleChoice)
+		t.Fatalf(
+			"type = %q, want %q",
+			q.Type,
+			model.QuestionMultipleChoice,
+		)
 	}
 	if q.Skill == nil || *q.Skill != model.SkillGrammarForm {
-		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillGrammarForm)
+		t.Fatalf(
+			"skill = %v, want %q",
+			q.Skill,
+			model.SkillGrammarForm,
+		)
 	}
 	if q.Category != model.CategoryGrammar {
-		t.Fatalf("category = %q, want %q", q.Category, model.CategoryGrammar)
+		t.Fatalf(
+			"category = %q, want %q",
+			q.Category,
+			model.CategoryGrammar,
+		)
 	}
 	if q.Language != vocabLanguage {
-		t.Fatalf("language = %q, want %q", q.Language, vocabLanguage)
+		t.Fatalf(
+			"language = %q, want %q",
+			q.Language,
+			vocabLanguage,
+		)
 	}
 	if q.ProficiencyLevel != defaultTestCatalog.Level {
-		t.Fatalf("level = %q, want %q", q.ProficiencyLevel, defaultTestCatalog.Level)
+		t.Fatalf(
+			"level = %q, want %q",
+			q.ProficiencyLevel,
+			defaultTestCatalog.Level,
+		)
 	}
 	if q.Difficulty != ja.GrammarDifficulty {
-		t.Fatalf("difficulty = %d, want %d", q.Difficulty, ja.GrammarDifficulty)
+		t.Fatalf(
+			"difficulty = %d, want %d",
+			q.Difficulty,
+			ja.GrammarDifficulty,
+		)
 	}
 	if q.CorrectAnswer != point.MeaningKo {
-		t.Fatalf("correct answer = %q, want %q", q.CorrectAnswer, point.MeaningKo)
+		t.Fatalf(
+			"correct answer = %q, want %q",
+			q.CorrectAnswer,
+			point.MeaningKo,
+		)
 	}
 
 	options, err := q.GetOptions()
 	if err != nil {
-		t.Fatalf("GetOptions: %v", err)
+		t.Fatalf(
+			"GetOptions: %v",
+			err,
+		)
 	}
 	if len(options) != 4 {
-		t.Fatalf("len(options) = %d, want 4: %v", len(options), options)
+		t.Fatalf(
+			"len(options) = %d, want 4: %v",
+			len(options),
+			options,
+		)
 	}
-	assertContainsAll(t, q.Prompt, point.Pattern, point.Example)
-	assertContainsAll(t, q.Explanation, point.Pattern, point.MeaningKo, point.Example, point.TranslationKo)
+	assertContainsAll(
+		t,
+		q.Prompt,
+		point.Pattern,
+		point.Example,
+	)
+	assertContainsAll(
+		t,
+		q.Explanation,
+		point.Pattern,
+		point.MeaningKo,
+		point.Example,
+		point.TranslationKo,
+	)
 }
 
 func TestBuildGrammarFormQuestion(t *testing.T) {
@@ -478,52 +830,107 @@ func TestBuildGrammarFormQuestion(t *testing.T) {
 	q := buildGrammarFormQuestion(point)
 
 	if q.Type != model.QuestionMultipleChoice {
-		t.Fatalf("type = %q, want %q", q.Type, model.QuestionMultipleChoice)
+		t.Fatalf(
+			"type = %q, want %q",
+			q.Type,
+			model.QuestionMultipleChoice,
+		)
 	}
 	if q.Skill == nil || *q.Skill != model.SkillGrammarForm {
-		t.Fatalf("skill = %v, want %q", q.Skill, model.SkillGrammarForm)
+		t.Fatalf(
+			"skill = %v, want %q",
+			q.Skill,
+			model.SkillGrammarForm,
+		)
 	}
 	if q.Category != model.CategoryGrammar {
-		t.Fatalf("category = %q, want %q", q.Category, model.CategoryGrammar)
+		t.Fatalf(
+			"category = %q, want %q",
+			q.Category,
+			model.CategoryGrammar,
+		)
 	}
 	if q.CorrectAnswer != point.CorrectAnswer {
-		t.Fatalf("correct answer = %q, want %q", q.CorrectAnswer, point.CorrectAnswer)
+		t.Fatalf(
+			"correct answer = %q, want %q",
+			q.CorrectAnswer,
+			point.CorrectAnswer,
+		)
 	}
 	options, err := q.GetOptions()
 	if err != nil {
-		t.Fatalf("GetOptions: %v", err)
+		t.Fatalf(
+			"GetOptions: %v",
+			err,
+		)
 	}
 	if len(options) != 4 {
-		t.Fatalf("len(options) = %d, want 4: %v", len(options), options)
+		t.Fatalf(
+			"len(options) = %d, want 4: %v",
+			len(options),
+			options,
+		)
 	}
-	assertContainsAll(t, q.Prompt, point.ClozePrompt)
-	assertContainsAll(t, q.Explanation, point.Pattern, point.MeaningKo, point.Example, point.TranslationKo)
+	assertContainsAll(
+		t,
+		q.Prompt,
+		point.ClozePrompt,
+	)
+	assertContainsAll(
+		t,
+		q.Explanation,
+		point.Pattern,
+		point.MeaningKo,
+		point.Example,
+		point.TranslationKo,
+	)
 }
 
 func TestSeederN5WordsIntegrity(t *testing.T) {
 	t.Parallel()
 
-	if len(defaultTestCatalog.Words) != 540 {
-		t.Fatalf("len(default words) = %d, want 540", len(defaultTestCatalog.Words))
+	if len(defaultTestCatalog.Words) != 789 {
+		t.Fatalf(
+			"len(default words) = %d, want 789",
+			len(defaultTestCatalog.Words),
+		)
 	}
 
-	ids := make(map[string]bool, len(defaultTestCatalog.Words))
+	ids := make(
+		map[string]bool,
+		len(defaultTestCatalog.Words),
+	)
 	for _, word := range defaultTestCatalog.Words {
 		if word.ID == "" {
-			t.Fatalf("empty ID for word %+v", word)
+			t.Fatalf(
+				"empty ID for word %+v",
+				word,
+			)
 		}
 		if ids[word.ID] {
-			t.Fatalf("duplicate ID %q", word.ID)
+			t.Fatalf(
+				"duplicate ID %q",
+				word.ID,
+			)
 		}
 		ids[word.ID] = true
 		if word.Kana == "" {
-			t.Fatalf("empty Kana for word %+v", word)
+			t.Fatalf(
+				"empty Kana for word %+v",
+				word,
+			)
 		}
 		if word.Kanji == "" {
-			t.Fatalf("empty Kanji for word %+v", word)
+			t.Fatalf(
+				"empty Kanji for word %+v",
+				word,
+			)
 		}
 		if word.MeaningKo == "" {
-			t.Fatalf("empty MeaningKo for word %+v", word)
+			t.Fatalf(
+				"empty MeaningKo for word %+v",
+				word,
+			)
 		}
 	}
 }
@@ -532,20 +939,35 @@ func TestSeederN5GrammarPointsIntegrity(t *testing.T) {
 	t.Parallel()
 
 	if len(defaultTestCatalog.GrammarPoints) != 80 {
-		t.Fatalf("len(default grammar points) = %d, want 80", len(defaultTestCatalog.GrammarPoints))
+		t.Fatalf(
+			"len(default grammar points) = %d, want 80",
+			len(defaultTestCatalog.GrammarPoints),
+		)
 	}
 
-	ids := make(map[string]bool, len(defaultTestCatalog.GrammarPoints))
+	ids := make(
+		map[string]bool,
+		len(defaultTestCatalog.GrammarPoints),
+	)
 	for _, point := range defaultTestCatalog.GrammarPoints {
 		if point.ID == "" {
-			t.Fatalf("empty ID for grammar point %+v", point)
+			t.Fatalf(
+				"empty ID for grammar point %+v",
+				point,
+			)
 		}
 		if ids[point.ID] {
-			t.Fatalf("duplicate ID %q", point.ID)
+			t.Fatalf(
+				"duplicate ID %q",
+				point.ID,
+			)
 		}
 		ids[point.ID] = true
 		if point.Pattern == "" || point.MeaningKo == "" || point.CorrectAnswer == "" {
-			t.Fatalf("incomplete grammar point: %+v", point)
+			t.Fatalf(
+				"incomplete grammar point: %+v",
+				point,
+			)
 		}
 	}
 }
@@ -553,19 +975,32 @@ func TestSeederN5GrammarPointsIntegrity(t *testing.T) {
 func TestBuildVocabularyQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDsByWordID := make(map[string]int, len(defaultTestCatalog.Words))
+	materialIDsByWordID := make(
+		map[string]int,
+		len(defaultTestCatalog.Words),
+	)
 	for idx, word := range defaultTestCatalog.Words {
 		materialIDsByWordID[word.ID] = idx + 1
 	}
 
-	questions := buildVocabularyQuestions(rand.New(rand.NewSource(1)), defaultTestCatalog.Words, materialIDsByWordID)
-	if len(questions) != 2051 {
-		t.Fatalf("len(questions) = %d, want 2051", len(questions))
+	questions := buildVocabularyQuestions(
+		rand.New(rand.NewSource(1)),
+		defaultTestCatalog.Words,
+		materialIDsByWordID,
+	)
+	if len(questions) != 2966 {
+		t.Fatalf(
+			"len(questions) = %d, want 2966",
+			len(questions),
+		)
 	}
 
 	countByType := map[model.QuestionType]int{}
 	countBySkill := map[model.Skill]int{}
-	seenKeys := make(map[string]bool, len(questions))
+	seenKeys := make(
+		map[string]bool,
+		len(questions),
+	)
 	for _, q := range questions {
 		countByType[q.Type]++
 		if q.Skill != nil {
@@ -573,31 +1008,55 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 		}
 		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
-			t.Fatalf("unexpected question metadata: %+v", q)
+			t.Fatalf(
+				"unexpected question metadata: %+v",
+				q,
+			)
 		}
 		if q.MaterialID == nil {
-			t.Fatalf("material_id is nil for question: %+v", q)
+			t.Fatalf(
+				"material_id is nil for question: %+v",
+				q,
+			)
 		}
 		if q.QuestionKey == nil || *q.QuestionKey == "" {
-			t.Fatalf("question_key is nil for question: %+v", q)
+			t.Fatalf(
+				"question_key is nil for question: %+v",
+				q,
+			)
 		}
 		if seenKeys[*q.QuestionKey] {
-			t.Fatalf("duplicate question_key %q", *q.QuestionKey)
+			t.Fatalf(
+				"duplicate question_key %q",
+				*q.QuestionKey,
+			)
 		}
 		seenKeys[*q.QuestionKey] = true
 	}
 
-	if countByType[model.QuestionMultipleChoice] != 540 {
-		t.Fatalf("multiple_choice count = %d, want 540", countByType[model.QuestionMultipleChoice])
+	if countByType[model.QuestionMultipleChoice] != 789 {
+		t.Fatalf(
+			"multiple_choice count = %d, want 789",
+			countByType[model.QuestionMultipleChoice],
+		)
 	}
-	if countByType[model.QuestionFillBlank] != 971 {
-		t.Fatalf("fill_blank count = %d, want 971", countByType[model.QuestionFillBlank])
+	if countByType[model.QuestionFillBlank] != 1388 {
+		t.Fatalf(
+			"fill_blank count = %d, want 1388",
+			countByType[model.QuestionFillBlank],
+		)
 	}
-	if countByType[model.QuestionKanaHandwriting] != 540 {
-		t.Fatalf("kana_handwriting count = %d, want 540", countByType[model.QuestionKanaHandwriting])
+	if countByType[model.QuestionKanaHandwriting] != 789 {
+		t.Fatalf(
+			"kana_handwriting count = %d, want 789",
+			countByType[model.QuestionKanaHandwriting],
+		)
 	}
-	if countBySkill[model.SkillVocabKanjiRecall] != 431 {
-		t.Fatalf("vocab_kanji_recall count = %d, want 431", countBySkill[model.SkillVocabKanjiRecall])
+	if countBySkill[model.SkillVocabKanjiRecall] != 599 {
+		t.Fatalf(
+			"vocab_kanji_recall count = %d, want 599",
+			countBySkill[model.SkillVocabKanjiRecall],
+		)
 	}
 	for _, key := range []string{
 		"ja:vocab:n5_word_001:meaning",
@@ -606,7 +1065,10 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 		"ja:vocab:n5_word_001:kanji_recall",
 	} {
 		if !seenKeys[key] {
-			t.Fatalf("question_key %q not found", key)
+			t.Fatalf(
+				"question_key %q not found",
+				key,
+			)
 		}
 	}
 }
@@ -624,14 +1086,28 @@ func TestBuildKanjiRecallQuestion(t *testing.T) {
 
 	if question.Type != model.QuestionFillBlank || question.Skill == nil ||
 		*question.Skill != model.SkillVocabKanjiRecall || question.Category != model.CategoryVocabulary {
-		t.Fatalf("unexpected question metadata: %+v", question)
+		t.Fatalf(
+			"unexpected question metadata: %+v",
+			question,
+		)
 	}
 	if question.CorrectAnswer != word.Kanji {
-		t.Fatalf("correct_answer = %q, want %q", question.CorrectAnswer, word.Kanji)
+		t.Fatalf(
+			"correct_answer = %q, want %q",
+			question.CorrectAnswer,
+			word.Kanji,
+		)
 	}
 	for _, want := range []string{word.MeaningKo, word.Kana, "한자"} {
-		if !strings.Contains(question.Prompt, want) {
-			t.Fatalf("prompt %q does not contain %q", question.Prompt, want)
+		if !strings.Contains(
+			question.Prompt,
+			want,
+		) {
+			t.Fatalf(
+				"prompt %q does not contain %q",
+				question.Prompt,
+				want,
+			)
 		}
 	}
 }
@@ -652,19 +1128,30 @@ func TestShouldBuildKanjiRecallQuestion(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := shouldBuildKanjiRecallQuestion(tt.word); got != tt.want {
-				t.Fatalf("shouldBuildKanjiRecallQuestion(%+v) = %t, want %t", tt.word, got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
+				if got := shouldBuildKanjiRecallQuestion(tt.word); got != tt.want {
+					t.Fatalf(
+						"shouldBuildKanjiRecallQuestion(%+v) = %t, want %t",
+						tt.word,
+						got,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
 func TestBuildGrammarQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDsByGrammarID := make(map[string]int, len(defaultTestCatalog.GrammarPoints))
+	materialIDsByGrammarID := make(
+		map[string]int,
+		len(defaultTestCatalog.GrammarPoints),
+	)
 	for idx, point := range defaultTestCatalog.GrammarPoints {
 		materialIDsByGrammarID[point.ID] = idx + 1
 	}
@@ -675,31 +1162,52 @@ func TestBuildGrammarQuestions(t *testing.T) {
 		materialIDsByGrammarID,
 	)
 	if len(questions) != 160 {
-		t.Fatalf("len(questions) = %d, want 160", len(questions))
+		t.Fatalf(
+			"len(questions) = %d, want 160",
+			len(questions),
+		)
 	}
 
 	countByType := map[model.QuestionType]int{}
-	seenKeys := make(map[string]bool, len(questions))
+	seenKeys := make(
+		map[string]bool,
+		len(questions),
+	)
 	for _, q := range questions {
 		countByType[q.Type]++
 		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryGrammar || q.Difficulty != ja.GrammarDifficulty {
-			t.Fatalf("unexpected question metadata: %+v", q)
+			t.Fatalf(
+				"unexpected question metadata: %+v",
+				q,
+			)
 		}
 		if q.MaterialID == nil {
-			t.Fatalf("material_id is nil for question: %+v", q)
+			t.Fatalf(
+				"material_id is nil for question: %+v",
+				q,
+			)
 		}
 		if q.QuestionKey == nil || *q.QuestionKey == "" {
-			t.Fatalf("question_key is nil for question: %+v", q)
+			t.Fatalf(
+				"question_key is nil for question: %+v",
+				q,
+			)
 		}
 		if seenKeys[*q.QuestionKey] {
-			t.Fatalf("duplicate question_key %q", *q.QuestionKey)
+			t.Fatalf(
+				"duplicate question_key %q",
+				*q.QuestionKey,
+			)
 		}
 		seenKeys[*q.QuestionKey] = true
 	}
 
 	if countByType[model.QuestionMultipleChoice] != 160 {
-		t.Fatalf("multiple_choice count = %d, want 160", countByType[model.QuestionMultipleChoice])
+		t.Fatalf(
+			"multiple_choice count = %d, want 160",
+			countByType[model.QuestionMultipleChoice],
+		)
 	}
 	for _, key := range []string{
 		"ja:grammar:n5_grammar_001:meaning",
@@ -708,7 +1216,10 @@ func TestBuildGrammarQuestions(t *testing.T) {
 		"ja:grammar:n5_grammar_060:form",
 	} {
 		if !seenKeys[key] {
-			t.Fatalf("question_key %q not found", key)
+			t.Fatalf(
+				"question_key %q not found",
+				key,
+			)
 		}
 	}
 }
@@ -716,7 +1227,10 @@ func TestBuildGrammarQuestions(t *testing.T) {
 func TestBuildVocabContextQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDsByWordID := make(map[string]int, len(defaultTestCatalog.Words))
+	materialIDsByWordID := make(
+		map[string]int,
+		len(defaultTestCatalog.Words),
+	)
 	for idx, word := range defaultTestCatalog.Words {
 		materialIDsByWordID[word.ID] = idx + 1
 	}
@@ -728,38 +1242,71 @@ func TestBuildVocabContextQuestions(t *testing.T) {
 		materialIDsByWordID,
 	)
 	if len(questions) != 45 {
-		t.Fatalf("len(questions) = %d, want 45", len(questions))
+		t.Fatalf(
+			"len(questions) = %d, want 45",
+			len(questions),
+		)
 	}
 
-	seenKeys := make(map[string]bool, len(questions))
+	seenKeys := make(
+		map[string]bool,
+		len(questions),
+	)
 	for _, q := range questions {
 		if q.Type != model.QuestionMultipleChoice {
-			t.Fatalf("type = %q, want multiple_choice: %+v", q.Type, q)
+			t.Fatalf(
+				"type = %q, want multiple_choice: %+v",
+				q.Type,
+				q,
+			)
 		}
 		if q.Skill == nil || *q.Skill != model.SkillVocabContext {
-			t.Fatalf("skill = %v, want vocab_context: %+v", q.Skill, q)
+			t.Fatalf(
+				"skill = %v, want vocab_context: %+v",
+				q.Skill,
+				q,
+			)
 		}
 		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
-			t.Fatalf("unexpected question metadata: %+v", q)
+			t.Fatalf(
+				"unexpected question metadata: %+v",
+				q,
+			)
 		}
 		if q.MaterialID == nil {
-			t.Fatalf("material_id is nil for question: %+v", q)
+			t.Fatalf(
+				"material_id is nil for question: %+v",
+				q,
+			)
 		}
 		if q.QuestionKey == nil || *q.QuestionKey == "" {
-			t.Fatalf("question_key is nil for question: %+v", q)
+			t.Fatalf(
+				"question_key is nil for question: %+v",
+				q,
+			)
 		}
 		if seenKeys[*q.QuestionKey] {
-			t.Fatalf("duplicate question_key %q", *q.QuestionKey)
+			t.Fatalf(
+				"duplicate question_key %q",
+				*q.QuestionKey,
+			)
 		}
 		seenKeys[*q.QuestionKey] = true
 
 		options, err := q.GetOptions()
 		if err != nil {
-			t.Fatalf("GetOptions: %v", err)
+			t.Fatalf(
+				"GetOptions: %v",
+				err,
+			)
 		}
 		if len(options) != 4 {
-			t.Fatalf("len(options) = %d, want 4: %+v", len(options), q)
+			t.Fatalf(
+				"len(options) = %d, want 4: %+v",
+				len(options),
+				q,
+			)
 		}
 		found := false
 		for _, option := range options {
@@ -768,7 +1315,11 @@ func TestBuildVocabContextQuestions(t *testing.T) {
 			}
 		}
 		if !found {
-			t.Fatalf("options %v do not contain correct answer %q", options, q.CorrectAnswer)
+			t.Fatalf(
+				"options %v do not contain correct answer %q",
+				options,
+				q.CorrectAnswer,
+			)
 		}
 	}
 
@@ -778,7 +1329,10 @@ func TestBuildVocabContextQuestions(t *testing.T) {
 		"ja:vocab:n5_word_092:context:1",
 	} {
 		if !seenKeys[key] {
-			t.Fatalf("question_key %q not found", key)
+			t.Fatalf(
+				"question_key %q not found",
+				key,
+			)
 		}
 	}
 }
@@ -788,46 +1342,94 @@ func TestBuildListeningQuestions(t *testing.T) {
 
 	questions := buildListeningQuestions(defaultTestCatalog.ListeningQuestions)
 	if len(questions) != 50 {
-		t.Fatalf("len(questions) = %d, want 50", len(questions))
+		t.Fatalf(
+			"len(questions) = %d, want 50",
+			len(questions),
+		)
 	}
 
-	seenKeys := make(map[string]bool, len(questions))
+	seenKeys := make(
+		map[string]bool,
+		len(questions),
+	)
 	for i, question := range questions {
 		item := defaultTestCatalog.ListeningQuestions[i]
 		if question.Type != model.QuestionListening || question.Category != model.CategoryListening ||
 			question.Language != vocabLanguage || question.ProficiencyLevel != defaultTestCatalog.Level {
-			t.Fatalf("question %d has unexpected metadata: %+v", i, question)
+			t.Fatalf(
+				"question %d has unexpected metadata: %+v",
+				i,
+				question,
+			)
 		}
 		if question.Skill == nil || *question.Skill != item.Skill {
-			t.Fatalf("question %d skill = %v, want %q", i, question.Skill, item.Skill)
+			t.Fatalf(
+				"question %d skill = %v, want %q",
+				i,
+				question.Skill,
+				item.Skill,
+			)
 		}
 		if question.AudioScript == nil || *question.AudioScript != item.Script {
-			t.Fatalf("question %d audio_script = %v, want %q", i, question.AudioScript, item.Script)
+			t.Fatalf(
+				"question %d audio_script = %v, want %q",
+				i,
+				question.AudioScript,
+				item.Script,
+			)
 		}
 		if question.AudioPath != nil || question.AudioFileID != nil || question.MaterialID != nil {
-			t.Fatalf("question %d has unexpected generated/cache/material fields: %+v", i, question)
+			t.Fatalf(
+				"question %d has unexpected generated/cache/material fields: %+v",
+				i,
+				question,
+			)
 		}
 		if question.CorrectAnswer != item.CorrectAnswer || question.Difficulty != item.Difficulty {
-			t.Fatalf("question %d content mapping mismatch: %+v", i, question)
+			t.Fatalf(
+				"question %d content mapping mismatch: %+v",
+				i,
+				question,
+			)
 		}
 		if question.QuestionKey == nil {
-			t.Fatalf("question %d question_key is nil", i)
+			t.Fatalf(
+				"question %d question_key is nil",
+				i,
+			)
 		}
 		wantKey := "ja:listening:" + item.ID
 		if *question.QuestionKey != wantKey {
-			t.Fatalf("question %d question_key = %q, want %q", i, *question.QuestionKey, wantKey)
+			t.Fatalf(
+				"question %d question_key = %q, want %q",
+				i,
+				*question.QuestionKey,
+				wantKey,
+			)
 		}
 		if seenKeys[*question.QuestionKey] {
-			t.Fatalf("duplicate question_key %q", *question.QuestionKey)
+			t.Fatalf(
+				"duplicate question_key %q",
+				*question.QuestionKey,
+			)
 		}
 		seenKeys[*question.QuestionKey] = true
 
 		options, err := question.GetOptions()
 		if err != nil {
-			t.Fatalf("question %d options: %v", i, err)
+			t.Fatalf(
+				"question %d options: %v",
+				i,
+				err,
+			)
 		}
 		if len(options) != len(item.Options) {
-			t.Fatalf("question %d options len = %d, want %d", i, len(options), len(item.Options))
+			t.Fatalf(
+				"question %d options len = %d, want %d",
+				i,
+				len(options),
+				len(item.Options),
+			)
 		}
 	}
 }
@@ -837,7 +1439,11 @@ func TestVocabularyMaterialKey(t *testing.T) {
 
 	word := vocabWord{ID: "n5_word_024"}
 	if got, want := vocabularyMaterialKey(word), "ja:vocab:n5_word_024"; got != want {
-		t.Fatalf("vocabularyMaterialKey = %q, want %q", got, want)
+		t.Fatalf(
+			"vocabularyMaterialKey = %q, want %q",
+			got,
+			want,
+		)
 	}
 }
 
@@ -846,7 +1452,11 @@ func TestGrammarMaterialKey(t *testing.T) {
 
 	point := grammarPoint{ID: "n5_grammar_009"}
 	if got, want := grammarMaterialKey(point), "ja:grammar:n5_grammar_009"; got != want {
-		t.Fatalf("grammarMaterialKey = %q, want %q", got, want)
+		t.Fatalf(
+			"grammarMaterialKey = %q, want %q",
+			got,
+			want,
+		)
 	}
 }
 
@@ -864,13 +1474,23 @@ func TestLoadVocabularyMaterialIDs(t *testing.T) {
 		},
 	}
 
-	got, err := loadVocabularyMaterialIDs(context.Background(), store, words)
+	got, err := loadVocabularyMaterialIDs(
+		context.Background(),
+		store,
+		words,
+	)
 	if err != nil {
-		t.Fatalf("loadVocabularyMaterialIDs: %v", err)
+		t.Fatalf(
+			"loadVocabularyMaterialIDs: %v",
+			err,
+		)
 	}
 
 	if got["n5_word_001"] != 10 || got["n5_word_024"] != 24 {
-		t.Fatalf("material ids = %#v, want word_001=10 and word_024=24", got)
+		t.Fatalf(
+			"material ids = %#v, want word_001=10 and word_024=24",
+			got,
+		)
 	}
 }
 
@@ -885,8 +1505,14 @@ func TestLoadVocabularyMaterialIDsMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("loadVocabularyMaterialIDs error = nil, want missing material error")
 	}
-	if !strings.Contains(err.Error(), "ja:vocab:n5_word_024") {
-		t.Fatalf("error = %q, want missing material key", err)
+	if !strings.Contains(
+		err.Error(),
+		"ja:vocab:n5_word_024",
+	) {
+		t.Fatalf(
+			"error = %q, want missing material key",
+			err,
+		)
 	}
 }
 
@@ -904,13 +1530,23 @@ func TestLoadGrammarMaterialIDs(t *testing.T) {
 		},
 	}
 
-	got, err := loadGrammarMaterialIDs(context.Background(), store, points)
+	got, err := loadGrammarMaterialIDs(
+		context.Background(),
+		store,
+		points,
+	)
 	if err != nil {
-		t.Fatalf("loadGrammarMaterialIDs: %v", err)
+		t.Fatalf(
+			"loadGrammarMaterialIDs: %v",
+			err,
+		)
 	}
 
 	if got["n5_grammar_001"] != 10 || got["n5_grammar_009"] != 90 {
-		t.Fatalf("material ids = %#v, want grammar_001=10 and grammar_009=90", got)
+		t.Fatalf(
+			"material ids = %#v, want grammar_001=10 and grammar_009=90",
+			got,
+		)
 	}
 }
 
@@ -925,8 +1561,14 @@ func TestLoadGrammarMaterialIDsMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("loadGrammarMaterialIDs error = nil, want missing material error")
 	}
-	if !strings.Contains(err.Error(), "ja:grammar:n5_grammar_009") {
-		t.Fatalf("error = %q, want missing material key", err)
+	if !strings.Contains(
+		err.Error(),
+		"ja:grammar:n5_grammar_009",
+	) {
+		t.Fatalf(
+			"error = %q, want missing material key",
+			err,
+		)
 	}
 }
 
@@ -979,9 +1621,15 @@ func TestBuildReadingQuestions(t *testing.T) {
 	}
 	materialIDs := map[string]int{"n5_reading_0001": 77}
 
-	questions := buildReadingQuestions(passages, materialIDs)
+	questions := buildReadingQuestions(
+		passages,
+		materialIDs,
+	)
 	if len(questions) != 1 {
-		t.Fatalf("len(questions) = %d, want 1", len(questions))
+		t.Fatalf(
+			"len(questions) = %d, want 1",
+			len(questions),
+		)
 	}
 
 	question := questions[0]
@@ -991,52 +1639,107 @@ func TestBuildReadingQuestions(t *testing.T) {
 		question.Language != vocabLanguage ||
 		question.ProficiencyLevel != defaultTestCatalog.Level ||
 		question.Difficulty != 2 {
-		t.Fatalf("unexpected reading question metadata: %+v", question)
+		t.Fatalf(
+			"unexpected reading question metadata: %+v",
+			question,
+		)
 	}
 	if question.QuestionKey == nil || *question.QuestionKey != "ja:reading:n5_reading_0001:question:1" {
-		t.Fatalf("question key = %v, want ja:reading:n5_reading_0001:question:1", question.QuestionKey)
+		t.Fatalf(
+			"question key = %v, want ja:reading:n5_reading_0001:question:1",
+			question.QuestionKey,
+		)
 	}
 	if question.MaterialID == nil || *question.MaterialID != 77 {
-		t.Fatalf("material id = %v, want 77", question.MaterialID)
+		t.Fatalf(
+			"material id = %v, want 77",
+			question.MaterialID,
+		)
 	}
-	assertContainsAll(t, question.Prompt, "図書館は毎週月曜日が休みです。", "図書館はいつ休みですか。")
+	assertContainsAll(
+		t,
+		question.Prompt,
+		"図書館は毎週月曜日が休みです。",
+		"図書館はいつ休みですか。",
+	)
 	// The full-hiragana reading aid is study-card-only; it must not leak into the quiz prompt.
-	if strings.Contains(question.Prompt, "としょかん") {
-		t.Fatalf("prompt leaks the reading aid: %q", question.Prompt)
+	if strings.Contains(
+		question.Prompt,
+		"としょかん",
+	) {
+		t.Fatalf(
+			"prompt leaks the reading aid: %q",
+			question.Prompt,
+		)
 	}
 	if question.CorrectAnswer != "毎週月曜日" {
-		t.Fatalf("correct answer = %q, want 毎週月曜日", question.CorrectAnswer)
+		t.Fatalf(
+			"correct answer = %q, want 毎週月曜日",
+			question.CorrectAnswer,
+		)
 	}
-	assertContainsAll(t, string(question.Options), "毎週月曜日", "毎日")
+	assertContainsAll(
+		t,
+		string(question.Options),
+		"毎週月曜日",
+		"毎日",
+	)
 }
 
 func TestN5WordOrderIntegrity(t *testing.T) {
 	t.Parallel()
 
 	if len(defaultTestCatalog.WordOrderQuestions) != 30 {
-		t.Fatalf("expected 30 word-order questions, got %d", len(defaultTestCatalog.WordOrderQuestions))
+		t.Fatalf(
+			"expected 30 word-order questions, got %d",
+			len(defaultTestCatalog.WordOrderQuestions),
+		)
 	}
-	grammarIDs := make(map[string]struct{}, len(defaultTestCatalog.GrammarPoints))
+	grammarIDs := make(
+		map[string]struct{},
+		len(defaultTestCatalog.GrammarPoints),
+	)
 	for _, point := range defaultTestCatalog.GrammarPoints {
 		grammarIDs[point.ID] = struct{}{}
 	}
-	seen := make(map[string]struct{}, len(defaultTestCatalog.WordOrderQuestions))
+	seen := make(
+		map[string]struct{},
+		len(defaultTestCatalog.WordOrderQuestions),
+	)
 	for _, item := range defaultTestCatalog.WordOrderQuestions {
 		if item.ID == "" {
 			t.Fatal("word-order item has empty id")
 		}
 		if _, ok := seen[item.ID]; ok {
-			t.Fatalf("duplicate word-order id %q", item.ID)
+			t.Fatalf(
+				"duplicate word-order id %q",
+				item.ID,
+			)
 		}
 		seen[item.ID] = struct{}{}
 		if _, ok := grammarIDs[item.GrammarID]; !ok {
-			t.Fatalf("word-order item %q references unknown grammar %q", item.ID, item.GrammarID)
+			t.Fatalf(
+				"word-order item %q references unknown grammar %q",
+				item.ID,
+				item.GrammarID,
+			)
 		}
 		if len(item.Chunks) < 2 {
-			t.Fatalf("word-order item %q has too few chunks", item.ID)
+			t.Fatalf(
+				"word-order item %q has too few chunks",
+				item.ID,
+			)
 		}
-		if got := strings.Join(item.Chunks, ""); got != item.CorrectAnswer {
-			t.Fatalf("word-order item %q joins to %q, want %q", item.ID, got, item.CorrectAnswer)
+		if got := strings.Join(
+			item.Chunks,
+			"",
+		); got != item.CorrectAnswer {
+			t.Fatalf(
+				"word-order item %q joins to %q, want %q",
+				item.ID,
+				got,
+				item.CorrectAnswer,
+			)
 		}
 	}
 }
@@ -1044,38 +1747,74 @@ func TestN5WordOrderIntegrity(t *testing.T) {
 func TestBuildWordOrderQuestions(t *testing.T) {
 	t.Parallel()
 
-	materialIDs := make(map[string]int, len(defaultTestCatalog.GrammarPoints))
+	materialIDs := make(
+		map[string]int,
+		len(defaultTestCatalog.GrammarPoints),
+	)
 	for i, point := range defaultTestCatalog.GrammarPoints {
 		materialIDs[point.ID] = i + 1
 	}
-	questions := buildWordOrderQuestions(defaultTestCatalog.WordOrderQuestions, materialIDs)
+	questions := buildWordOrderQuestions(
+		defaultTestCatalog.WordOrderQuestions,
+		materialIDs,
+	)
 	if len(questions) != len(defaultTestCatalog.WordOrderQuestions) {
-		t.Fatalf("len(word-order questions) = %d, want %d", len(questions), len(defaultTestCatalog.WordOrderQuestions))
+		t.Fatalf(
+			"len(word-order questions) = %d, want %d",
+			len(questions),
+			len(defaultTestCatalog.WordOrderQuestions),
+		)
 	}
-	seen := make(map[string]struct{}, len(questions))
+	seen := make(
+		map[string]struct{},
+		len(questions),
+	)
 	for _, question := range questions {
 		if question.Type != model.QuestionWordOrder {
-			t.Fatalf("type = %q, want %q", question.Type, model.QuestionWordOrder)
+			t.Fatalf(
+				"type = %q, want %q",
+				question.Type,
+				model.QuestionWordOrder,
+			)
 		}
 		if question.Skill == nil || *question.Skill != model.SkillSentenceComposition {
-			t.Fatalf("skill = %v, want %q", question.Skill, model.SkillSentenceComposition)
+			t.Fatalf(
+				"skill = %v, want %q",
+				question.Skill,
+				model.SkillSentenceComposition,
+			)
 		}
 		if question.QuestionKey == nil {
 			t.Fatal("word-order question missing question key")
 		}
 		if question.MaterialID == nil {
-			t.Fatalf("question %q missing material link", *question.QuestionKey)
+			t.Fatalf(
+				"question %q missing material link",
+				*question.QuestionKey,
+			)
 		}
 		if _, ok := seen[*question.QuestionKey]; ok {
-			t.Fatalf("duplicate question key %q", *question.QuestionKey)
+			t.Fatalf(
+				"duplicate question key %q",
+				*question.QuestionKey,
+			)
 		}
 		seen[*question.QuestionKey] = struct{}{}
 		options, err := question.GetOptions()
 		if err != nil {
-			t.Fatalf("GetOptions: %v", err)
+			t.Fatalf(
+				"GetOptions: %v",
+				err,
+			)
 		}
-		if strings.Join(options, "") != question.CorrectAnswer {
-			t.Fatalf("question %q options do not join to answer", *question.QuestionKey)
+		if strings.Join(
+			options,
+			"",
+		) != question.CorrectAnswer {
+			t.Fatalf(
+				"question %q options do not join to answer",
+				*question.QuestionKey,
+			)
 		}
 	}
 }
@@ -1094,12 +1833,22 @@ func TestLoadReadingMaterialIDs(t *testing.T) {
 		},
 	}
 
-	got, err := loadReadingMaterialIDs(context.Background(), store, passages)
+	got, err := loadReadingMaterialIDs(
+		context.Background(),
+		store,
+		passages,
+	)
 	if err != nil {
-		t.Fatalf("loadReadingMaterialIDs: %v", err)
+		t.Fatalf(
+			"loadReadingMaterialIDs: %v",
+			err,
+		)
 	}
 	if got["n5_reading_0001"] != 11 || got["n5_reading_0002"] != 22 {
-		t.Fatalf("material ids = %#v, want reading_0001=11 and reading_0002=22", got)
+		t.Fatalf(
+			"material ids = %#v, want reading_0001=11 and reading_0002=22",
+			got,
+		)
 	}
 }
 
@@ -1114,8 +1863,14 @@ func TestLoadReadingMaterialIDsMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("loadReadingMaterialIDs error = nil, want missing material error")
 	}
-	if !strings.Contains(err.Error(), "ja:reading:n5_reading_0003") {
-		t.Fatalf("error = %q, want missing material key", err)
+	if !strings.Contains(
+		err.Error(),
+		"ja:reading:n5_reading_0003",
+	) {
+		t.Fatalf(
+			"error = %q, want missing material key",
+			err,
+		)
 	}
 }
 
@@ -1140,31 +1895,57 @@ func TestBuildN4QuestionsIntegrityAndTaxonomy(t *testing.T) {
 		model.SkillListeningVerbal:        true,
 		model.SkillListeningQuickResponse: true,
 	}
-	gotTypes := make(map[model.Skill]bool, len(questions))
-	seenKeys := make(map[string]bool, len(questions))
+	gotTypes := make(
+		map[model.Skill]bool,
+		len(questions),
+	)
+	seenKeys := make(
+		map[string]bool,
+		len(questions),
+	)
 	for _, question := range questions {
 		if question.ProficiencyLevel != additionalTestCatalog.Level {
-			t.Fatalf("question level = %q, want %q", question.ProficiencyLevel, additionalTestCatalog.Level)
+			t.Fatalf(
+				"question level = %q, want %q",
+				question.ProficiencyLevel,
+				additionalTestCatalog.Level,
+			)
 		}
 		if question.Skill == nil {
 			t.Fatal("N4 question has nil item_type")
 		}
 		gotTypes[*question.Skill] = true
-		if question.QuestionKey == nil || !strings.Contains(*question.QuestionKey, "n4") {
-			t.Fatalf("N4 question key = %v, want level-aware key", question.QuestionKey)
+		if question.QuestionKey == nil || !strings.Contains(
+			*question.QuestionKey,
+			"n4",
+		) {
+			t.Fatalf(
+				"N4 question key = %v, want level-aware key",
+				question.QuestionKey,
+			)
 		}
 		if seenKeys[*question.QuestionKey] {
-			t.Fatalf("duplicate N4 question key %q", *question.QuestionKey)
+			t.Fatalf(
+				"duplicate N4 question key %q",
+				*question.QuestionKey,
+			)
 		}
 		seenKeys[*question.QuestionKey] = true
 
 		options, err := question.GetOptions()
 		if err != nil {
-			t.Fatalf("GetOptions(%q): %v", *question.QuestionKey, err)
+			t.Fatalf(
+				"GetOptions(%q): %v",
+				*question.QuestionKey,
+				err,
+			)
 		}
 		switch question.Type {
 		case model.QuestionMultipleChoice, model.QuestionReadingComp:
-			if len(options) == 0 || !containsString(options, question.CorrectAnswer) {
+			if len(options) == 0 || !containsString(
+				options,
+				question.CorrectAnswer,
+			) {
 				t.Fatalf(
 					"question %q has invalid options/answer: %v / %q",
 					*question.QuestionKey,
@@ -1173,24 +1954,44 @@ func TestBuildN4QuestionsIntegrityAndTaxonomy(t *testing.T) {
 				)
 			}
 		case model.QuestionWordOrder:
-			if strings.Join(options, "") != question.CorrectAnswer {
-				t.Fatalf("question %q chunks do not join to answer", *question.QuestionKey)
+			if strings.Join(
+				options,
+				"",
+			) != question.CorrectAnswer {
+				t.Fatalf(
+					"question %q chunks do not join to answer",
+					*question.QuestionKey,
+				)
 			}
 		}
 		if question.Category == model.CategoryListening {
 			if question.MaterialID != nil || question.AudioScript == nil || *question.AudioScript == "" {
-				t.Fatalf("listening question %q must be material-less with audio script", *question.QuestionKey)
+				t.Fatalf(
+					"listening question %q must be material-less with audio script",
+					*question.QuestionKey,
+				)
 			}
 		} else if question.MaterialID == nil {
-			t.Fatalf("non-listening question %q has no material reference", *question.QuestionKey)
+			t.Fatalf(
+				"non-listening question %q has no material reference",
+				*question.QuestionKey,
+			)
 		}
 	}
 	if len(gotTypes) != len(wantTypes) {
-		t.Fatalf("N4 item_type count = %d, want %d (%v)", len(gotTypes), len(wantTypes), gotTypes)
+		t.Fatalf(
+			"N4 item_type count = %d, want %d (%v)",
+			len(gotTypes),
+			len(wantTypes),
+			gotTypes,
+		)
 	}
 	for itemType := range wantTypes {
 		if !gotTypes[itemType] {
-			t.Fatalf("missing N4 item_type %q", itemType)
+			t.Fatalf(
+				"missing N4 item_type %q",
+				itemType,
+			)
 		}
 	}
 }
@@ -1200,21 +2001,33 @@ func TestBuildAdditionalLevelQuestionsDeterministic(t *testing.T) {
 
 	first := buildAdditionalLevelQuestionsForTest()
 	second := buildAdditionalLevelQuestionsForTest()
-	if !reflect.DeepEqual(first, second) {
+	if !reflect.DeepEqual(
+		first,
+		second,
+	) {
 		t.Fatal("combined N4 question seed output is not deterministic")
 	}
 }
 
 func buildAdditionalLevelQuestionsForTest() []*model.Question {
-	wordIDs := make(map[string]int, len(additionalTestCatalog.Words))
+	wordIDs := make(
+		map[string]int,
+		len(additionalTestCatalog.Words),
+	)
 	for i, word := range additionalTestCatalog.Words {
 		wordIDs[word.ID] = i + 1
 	}
-	grammarIDs := make(map[string]int, len(additionalTestCatalog.GrammarPoints))
+	grammarIDs := make(
+		map[string]int,
+		len(additionalTestCatalog.GrammarPoints),
+	)
 	for i, point := range additionalTestCatalog.GrammarPoints {
 		grammarIDs[point.ID] = len(wordIDs) + i + 1
 	}
-	readingIDs := make(map[string]int, len(additionalTestCatalog.ReadingPassages))
+	readingIDs := make(
+		map[string]int,
+		len(additionalTestCatalog.ReadingPassages),
+	)
 	for i, passage := range additionalTestCatalog.ReadingPassages {
 		readingIDs[passage.ID] = len(wordIDs) + len(grammarIDs) + i + 1
 	}
@@ -1226,24 +2039,40 @@ func buildAdditionalLevelQuestionsForTest() []*model.Question {
 		grammarIDs,
 		readingIDs,
 	)
-	questions := make([]*model.Question, 0)
+	questions := make(
+		[]*model.Question,
+		0,
+	)
 	questions = append(
 		questions,
-		buildListeningQuestionsForLevel(additionalTestCatalog.Level, additionalTestCatalog.ListeningQuestions)...)
+		buildListeningQuestionsForLevel(
+			additionalTestCatalog.Level,
+			additionalTestCatalog.ListeningQuestions,
+		)...,
+	)
 	questions = append(
 		questions,
 		buildReadingQuestionsForLevel(
 			additionalTestCatalog.Level,
 			additionalTestCatalog.ReadingPassages,
 			readingIDs,
-		)...)
+		)...,
+	)
 	questions = append(
 		questions,
-		buildQuestionSeeds(additionalTestCatalog.Level, additionalTestCatalog.QuestionSeeds, materialIDsByKey)...)
+		buildQuestionSeeds(
+			additionalTestCatalog.Level,
+			additionalTestCatalog.QuestionSeeds,
+			materialIDsByKey,
+		)...,
+	)
 	return questions
 }
 
-func containsString(values []string, want string) bool {
+func containsString(
+	values []string,
+	want string,
+) bool {
 	for _, value := range values {
 		if value == want {
 			return true
@@ -1267,11 +2096,22 @@ func (s fakeReadingMaterialStore) GetByMaterialKeys(
 	return s.materials, nil
 }
 
-func assertContainsAll(t *testing.T, s string, wants ...string) {
+func assertContainsAll(
+	t *testing.T,
+	s string,
+	wants ...string,
+) {
 	t.Helper()
 	for _, want := range wants {
-		if !strings.Contains(s, want) {
-			t.Fatalf("%q does not contain %q", s, want)
+		if !strings.Contains(
+			s,
+			want,
+		) {
+			t.Fatalf(
+				"%q does not contain %q",
+				s,
+				want,
+			)
 		}
 	}
 }

@@ -328,3 +328,51 @@ func TestDueReviewsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) {
 		}
 	}
 }
+
+func TestQuestionUpsertBatchesStayUnderBindParamLimit(t *testing.T) {
+	rowsPerStatement := postgresMaxBindParams / questionBatchColumnCount
+	questions := make(
+		[]*model.Question,
+		2*rowsPerStatement+1,
+	)
+	for i := range questions {
+		questions[i] = &model.Question{Options: []byte("[]")}
+	}
+
+	batches := questionUpsertBatches(questions)
+	if len(batches) != 3 {
+		t.Fatalf(
+			"len(batches) = %d, want 3",
+			len(batches),
+		)
+	}
+	// Batches must cover every question once, in order, with each statement under the limit.
+	next := 0
+	for i, batch := range batches {
+		if _, args := buildQuestionBatchUpsertQuery(batch); len(args) > postgresMaxBindParams {
+			t.Fatalf(
+				"batch %d binds %d params, limit %d",
+				i,
+				len(args),
+				postgresMaxBindParams,
+			)
+		}
+		for _, question := range batch {
+			if question != questions[next] {
+				t.Fatalf(
+					"batch %d breaks question order at index %d",
+					i,
+					next,
+				)
+			}
+			next++
+		}
+	}
+	if next != len(questions) {
+		t.Fatalf(
+			"batched %d questions, want %d",
+			next,
+			len(questions),
+		)
+	}
+}

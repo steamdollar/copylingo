@@ -42,20 +42,57 @@ func (r *QuestionRepository) UpsertSeedBatch(
 		}
 	}
 
-	query, args := buildQuestionBatchUpsertQuery(questions)
-	if _, err := r.db.ExecContext(
+	// Each statement stays under PostgreSQL's bind-parameter limit; one
+	// transaction keeps the seed catalog all-or-nothing across statements.
+	return WithinTx(
 		ctx,
-		query,
-		args...,
-	); err != nil {
-		return fmt.Errorf(
-			"QuestionRepository.UpsertSeedBatch count=%d: %w",
-			len(questions),
-			err,
+		r.db,
+		func(tx *sqlx.Tx) error {
+			for _, batch := range questionUpsertBatches(questions) {
+				query, args := buildQuestionBatchUpsertQuery(batch)
+				if _, err := tx.ExecContext(
+					ctx,
+					query,
+					args...,
+				); err != nil {
+					return fmt.Errorf(
+						"QuestionRepository.UpsertSeedBatch count=%d batch_size=%d: %w",
+						len(questions),
+						len(batch),
+						err,
+					)
+				}
+			}
+			return nil
+		},
+	)
+}
+
+// postgresMaxBindParams is PostgreSQL's per-statement bind parameter limit.
+const postgresMaxBindParams = 65535
+
+// questionBatchColumnCount is the number of bind parameters per question row.
+const questionBatchColumnCount = 15
+
+// questionUpsertBatches splits questions so each multi-row upsert binds at
+// most postgresMaxBindParams parameters.
+func questionUpsertBatches(questions []*model.Question) [][]*model.Question {
+	const rowsPerStatement = postgresMaxBindParams / questionBatchColumnCount
+	batches := make(
+		[][]*model.Question,
+		0,
+		(len(questions)+rowsPerStatement-1)/rowsPerStatement,
+	)
+	for start := 0; start < len(questions); start += rowsPerStatement {
+		batches = append(
+			batches,
+			questions[start:min(
+				start+rowsPerStatement,
+				len(questions),
+			)],
 		)
 	}
-
-	return nil
+	return batches
 }
 
 // GetNewQuestions returns catalog questions without progress for the user.
@@ -381,7 +418,7 @@ func buildQuestionBatchUpsertQuery(questions []*model.Question) (string, []any) 
 }
 
 func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
-	const columnCount = 15
+	const columnCount = questionBatchColumnCount
 
 	var query strings.Builder
 	query.WriteString(`
