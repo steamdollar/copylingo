@@ -38,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-10-08 | Study 플랜 신규 어휘 중심 재조정(ADR-064): 하루 신규 단어 12→24, 재학습·독해 재독 축소, `/study n`이 아침 플랜 비율을 따름 | [workthrough](docs/workthrough/2610/2610081045_study_plan_new_vocab_focus.md) |
 | 2026-10-07 | JLPT N5/N4 어휘 보충: Waller(구 출제기준 재구성) 리스트 기준으로 N5 249개, N4 365개(+seed 365개, 작성 문항 opus 검수) 추가, question seed upsert 파라미터 한도 버그 수정 | [workthrough](docs/workthrough/2610/2610072307_jlpt_vocab_supplement.md) |
 | 2026-10-05 | 죽은 코드 삭제: 호출자 없는 repository 메서드 10개·읽지 않는 Redis 키·미사용/중복 interface·grader 테스트 전용 메서드, scheduler 콘텐츠 수집 연결 제거(pipeline 코드는 보존, ADR-057 보강) | [2610051735_dead_code_cleanup.md](docs/workthrough/2610/2610051735_dead_code_cleanup.md) |
 | 2026-10-05 | Quiz 답안 제출(선택지·어순·주관식)에 세션 소유자 검사 추가, callback 정수 파싱 실패를 0번 선택지로 처리하던 문제 수정 | [2610051431_quiz_answer_owner_check.md](docs/workthrough/2610/2610051431_quiz_answer_owner_check.md) |

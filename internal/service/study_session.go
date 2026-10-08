@@ -24,62 +24,69 @@ const (
 	StudyProfileEvening StudySessionProfile = "evening"
 )
 
+// Study plans favor new vocabulary: quiz answers already review learned items,
+// so passive re-study and passage re-reading get few slots (ADR-064).
 var morningStudySessionPlan = model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
-	{Category: model.MaterialCategoryVocabulary, NewCount: 8, ReviewCount: 7},
+	{Category: model.MaterialCategoryVocabulary, NewCount: 14, ReviewCount: 2},
 	{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
 	{Category: model.MaterialCategoryReading, NewCount: 1, ReviewCount: 0},
 }}
 
 var eveningStudySessionPlan = model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
-	{Category: model.MaterialCategoryVocabulary, NewCount: 4, ReviewCount: 14},
+	{Category: model.MaterialCategoryVocabulary, NewCount: 10, ReviewCount: 4},
 	{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
-	{Category: model.MaterialCategoryReading, NewCount: 0, ReviewCount: 2},
+	{Category: model.MaterialCategoryReading, NewCount: 0, ReviewCount: 0},
 }}
 
-// scaleMorningStudySessionPlan scales the morning category weights (15:4:1)
-// to a requested limit. Reading is capped at two slots; any excess is
-// redistributed between vocabulary and grammar using their 15:4 weights.
+// scaleMorningStudySessionPlan scales the morning plan's category totals
+// (vocabulary:grammar:reading) and per-category new ratios to a requested
+// limit, so tuning morningStudySessionPlan also tunes /study n. Reading is
+// capped at two slots; any excess is redistributed between vocabulary and
+// grammar using their plan weights.
 func scaleMorningStudySessionPlan(limit int) model.StudySessionPlan {
+	base := morningStudySessionPlan.Quotas
+	weights := make(
+		[]int,
+		len(base),
+	)
+	for i, quota := range base {
+		weights[i] = quota.NewCount + quota.ReviewCount
+	}
+
 	// Above 40 materials, keep reading at two and distribute the rest by the
 	// vocabulary-to-grammar ratio.
 	var categoryTotals [3]int
 	if limit <= 40 {
 		allocation := largestRemainderStudyAllocation(
-			[]int{15, 4, 1},
+			weights,
 			limit,
 		)
 		categoryTotals = [3]int{allocation[0], allocation[1], allocation[2]}
 	} else {
 		allocation := largestRemainderStudyAllocation(
-			[]int{15, 4},
+			weights[:2],
 			limit-2,
 		)
 		categoryTotals = [3]int{allocation[0], allocation[1], 2}
 	}
-	vocabularyNew := scaleStudyNewCount(
-		categoryTotals[0],
-		8,
-		15,
+
+	quotas := make(
+		[]model.StudyMaterialQuota,
+		len(base),
 	)
-	grammarNew := scaleStudyNewCount(
-		categoryTotals[1],
-		1,
-		4,
-	)
-	readingNew := scaleStudyNewCount(
-		categoryTotals[2],
-		1,
-		1,
-	)
-	return model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
-		{
-			Category:    model.MaterialCategoryVocabulary,
-			NewCount:    vocabularyNew,
-			ReviewCount: categoryTotals[0] - vocabularyNew,
-		},
-		{Category: model.MaterialCategoryGrammar, NewCount: grammarNew, ReviewCount: categoryTotals[1] - grammarNew},
-		{Category: model.MaterialCategoryReading, NewCount: readingNew, ReviewCount: categoryTotals[2] - readingNew},
-	}}
+	for i, quota := range base {
+		newCount := scaleStudyNewCount(
+			categoryTotals[i],
+			quota.NewCount,
+			weights[i],
+		)
+		quotas[i] = model.StudyMaterialQuota{
+			Category:    quota.Category,
+			NewCount:    newCount,
+			ReviewCount: categoryTotals[i] - newCount,
+		}
+	}
+	return model.StudySessionPlan{Quotas: quotas}
 }
 
 // largestRemainderStudyAllocation uses integer arithmetic so ties are stable

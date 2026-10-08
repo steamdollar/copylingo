@@ -335,13 +335,14 @@ func TestBuildStudySessionUsesRequestedLimit(t *testing.T) {
 		sessionStore,
 		studyTestDB,
 	)
+	// A limit equal to the morning total scales back to the morning plan itself.
 	session, err := svc.BuildStudySession(
 		ctx,
 		userID,
 		"ja",
 		"N5",
 		StudyProfileMorning,
-		20,
+		morningStudySessionPlan.TotalMaterialCount(),
 	)
 	if err != nil {
 		t.Fatalf(
@@ -399,28 +400,28 @@ func TestBuildStudySessionUsesFixedPlan(t *testing.T) {
 		want    model.StudySessionPlan
 	}{
 		{profile: StudyProfileMorning, want: studyPlan(
-			8,
-			7,
+			14,
+			2,
 			1,
 			3,
 			1,
 			0,
 		)},
 		{profile: StudyProfileEvening, want: studyPlan(
+			10,
 			4,
-			14,
 			1,
 			3,
 			0,
-			2,
+			0,
 		)},
 		{profile: StudyProfileEvening, limit: 10, want: studyPlan(
+			10,
 			4,
-			14,
 			1,
 			3,
 			0,
-			2,
+			0,
 		)},
 	}
 
@@ -505,32 +506,40 @@ func TestBuildStudySessionScalesMorningPlan(t *testing.T) {
 			0,
 		)},
 		{limit: 2, want: studyPlan(
-			1,
-			1,
+			2,
+			0,
 			0,
 			0,
 			0,
 			0,
 		)},
 		{limit: 15, want: studyPlan(
-			6,
-			5,
+			10,
+			1,
 			1,
 			2,
 			1,
 			0,
 		)},
 		{limit: 20, want: studyPlan(
-			8,
-			7,
+			13,
+			2,
+			1,
+			3,
+			1,
+			0,
+		)},
+		{limit: 21, want: studyPlan(
+			14,
+			2,
 			1,
 			3,
 			1,
 			0,
 		)},
 		{limit: 50, want: studyPlan(
-			20,
-			18,
+			33,
+			5,
 			3,
 			7,
 			2,
