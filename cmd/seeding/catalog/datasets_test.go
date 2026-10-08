@@ -1,7 +1,9 @@
 package catalog
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -492,108 +494,154 @@ func TestN5Reading_Integrity(t *testing.T) {
 	}
 }
 
-func TestN4CatalogFixturesCoverOfficialItemTypes(t *testing.T) {
+func contains(
+	values []string,
+	want string,
+) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+// TestRecordCatalogIntegrity checks every level authored in the unified
+// record format (ADR-066). Keys are the upsert identity, so they must be
+// unique across levels; every non-listening question must point at a
+// material that the registry actually seeds.
+func TestRecordCatalogIntegrity(t *testing.T) {
 	t.Parallel()
 
-	catalog := levelCatalogForTest(
-		t,
-		"N4",
-	)
-	if len(catalog.Words) == 0 || len(catalog.GrammarPoints) == 0 || len(catalog.ReadingPassages) == 0 ||
-		len(catalog.ListeningQuestions) == 0 ||
-		len(catalog.QuestionSeeds) == 0 {
+	materialKeys := make(map[string]bool)
+	questionKeys := make(map[string]bool)
+	recordLevels := 0
+	for _, catalog := range LevelCatalogsFor(Japanese) {
+		if len(catalog.Materials) == 0 && len(catalog.Questions) == 0 {
+			continue
+		}
+		recordLevels++
+		if len(catalog.Materials) == 0 || len(catalog.Questions) == 0 {
+			t.Fatalf(
+				"%s record catalog must have materials and questions: materials=%d questions=%d",
+				catalog.Level,
+				len(catalog.Materials),
+				len(catalog.Questions),
+			)
+		}
+		for _, record := range catalog.Materials {
+			var payload map[string]any
+			if !strings.HasPrefix(
+				record.MaterialKey,
+				catalog.Language+":",
+			) || record.Category == "" || record.Title == "" || record.Difficulty < 1 ||
+				json.Unmarshal(
+					record.Payload,
+					&payload,
+				) != nil ||
+				len(payload) == 0 {
+				t.Fatalf(
+					"invalid %s material record: %+v",
+					catalog.Level,
+					record,
+				)
+			}
+			if materialKeys[record.MaterialKey] {
+				t.Fatalf(
+					"duplicate material key %q",
+					record.MaterialKey,
+				)
+			}
+			materialKeys[record.MaterialKey] = true
+		}
+	}
+	for _, catalog := range LevelCatalogsFor(Japanese) {
+		for _, record := range catalog.Questions {
+			assertQuestionRecord(
+				t,
+				catalog,
+				record,
+				materialKeys,
+			)
+			if questionKeys[record.QuestionKey] {
+				t.Fatalf(
+					"duplicate question key %q",
+					record.QuestionKey,
+				)
+			}
+			questionKeys[record.QuestionKey] = true
+		}
+	}
+	if recordLevels == 0 {
+		t.Fatal("no level is authored in the unified record format")
+	}
+}
+
+func assertQuestionRecord(
+	t *testing.T,
+	catalog LevelCatalog,
+	record QuestionRecord,
+	materialKeys map[string]bool,
+) {
+	t.Helper()
+	if !strings.HasPrefix(
+		record.QuestionKey,
+		catalog.Language+":",
+	) || record.ItemType == "" || record.Type == "" || record.Category == "" || record.Prompt == "" ||
+		record.CorrectAnswer == "" ||
+		record.Difficulty < 1 {
 		t.Fatalf(
-			"N4 catalog datasets must be non-empty: vocab=%d grammar=%d reading=%d listening=%d seeds=%d",
-			len(catalog.Words),
-			len(catalog.GrammarPoints),
-			len(catalog.ReadingPassages),
-			len(catalog.ListeningQuestions),
-			len(catalog.QuestionSeeds),
+			"invalid %s question record: %+v",
+			catalog.Level,
+			record,
 		)
 	}
-	seenWordIDs := make(
-		map[string]bool,
-		len(catalog.Words),
-	)
-	for _, word := range catalog.Words {
-		if word.Level != catalog.Level || word.ID == "" || word.Kana == "" || word.Kanji == "" || word.MeaningKo == "" {
-			t.Fatalf(
-				"invalid N4 vocabulary row: %+v",
-				word,
-			)
-		}
-		if seenWordIDs[word.ID] {
-			t.Fatalf(
-				"duplicate N4 vocabulary ID %q",
-				word.ID,
-			)
-		}
-		seenWordIDs[word.ID] = true
-	}
-	seenGrammarIDs := make(
-		map[string]bool,
-		len(catalog.GrammarPoints),
-	)
-	for _, point := range catalog.GrammarPoints {
-		if point.Level != catalog.Level || point.ID == "" || point.Pattern == "" || point.CorrectAnswer == "" {
-			t.Fatalf(
-				"invalid N4 grammar row: %+v",
-				point,
-			)
-		}
-		if seenGrammarIDs[point.ID] {
-			t.Fatalf(
-				"duplicate N4 grammar ID %q",
-				point.ID,
-			)
-		}
-		seenGrammarIDs[point.ID] = true
-		if len(point.FormOptions) == 0 || !contains(
-			point.FormOptions,
-			point.CorrectAnswer,
+	switch record.Type {
+	case model.QuestionMultipleChoice, model.QuestionReadingComp, model.QuestionListening:
+		if !contains(
+			record.Options,
+			record.CorrectAnswer,
 		) {
 			t.Fatalf(
-				"N4 grammar %q has invalid form options",
-				point.ID,
+				"question %q answer %q is not in options %v",
+				record.QuestionKey,
+				record.CorrectAnswer,
+				record.Options,
+			)
+		}
+	case model.QuestionWordOrder:
+		if len(record.Options) == 0 || strings.Join(
+			record.Options,
+			"",
+		) != record.CorrectAnswer {
+			t.Fatalf(
+				"word-order question %q chunks do not join to the answer",
+				record.QuestionKey,
 			)
 		}
 	}
-	seenReadingIDs := make(
-		map[string]bool,
-		len(catalog.ReadingPassages),
-	)
-	readingSkills := make(
-		[]model.Skill,
-		0,
-		len(catalog.ReadingPassages),
-	)
-	for _, passage := range catalog.ReadingPassages {
-		if passage.Level != catalog.Level || passage.ID == "" || passage.Skill == "" || passage.Title == "" ||
-			passage.Passage == "" ||
-			passage.Reading == "" ||
-			passage.Prompt == "" ||
-			len(passage.Options) == 0 ||
-			!contains(
-				passage.Options,
-				passage.CorrectAnswer,
-			) {
+	if record.Category == model.CategoryListening {
+		if record.MaterialKey != "" || record.AudioScript == "" {
 			t.Fatalf(
-				"invalid N4 reading row: %+v",
-				passage,
+				"listening question %q must be material-less with an audio script",
+				record.QuestionKey,
 			)
 		}
-		if seenReadingIDs[passage.ID] {
-			t.Fatalf(
-				"duplicate N4 reading ID %q",
-				passage.ID,
-			)
-		}
-		seenReadingIDs[passage.ID] = true
-		readingSkills = append(
-			readingSkills,
-			passage.Skill,
+		return
+	}
+	if !materialKeys[record.MaterialKey] {
+		t.Fatalf(
+			"question %q references unseeded material %q",
+			record.QuestionKey,
+			record.MaterialKey,
 		)
 	}
+}
+
+// TestN4RecordsCoverOfficialItemTypes pins N4 to the JLPT item types the
+// app models, so a dropped file under data/ja/n4/questions/ is caught.
+func TestN4RecordsCoverOfficialItemTypes(t *testing.T) {
+	t.Parallel()
 
 	want := map[model.Skill]bool{
 		model.SkillVocabKanjiReading:      true,
@@ -612,119 +660,21 @@ func TestN4CatalogFixturesCoverOfficialItemTypes(t *testing.T) {
 		model.SkillListeningVerbal:        true,
 		model.SkillListeningQuickResponse: true,
 	}
-	got := make(
-		map[model.Skill]bool,
-		len(catalog.QuestionSeeds)+len(catalog.ListeningQuestions)+len(readingSkills),
-	)
-	for _, skill := range readingSkills {
-		got[skill] = true
+	got := make(map[model.Skill]bool)
+	for _, record := range levelCatalogForTest(
+		t,
+		"N4",
+	).Questions {
+		got[record.ItemType] = true
 	}
-	seenSeedIDs := make(
-		map[string]bool,
-		len(catalog.QuestionSeeds),
-	)
-	for _, seed := range catalog.QuestionSeeds {
-		seedID := seed.SourceID
-		if seedID == "" {
-			seedID = seed.ID
-		}
-		if seedID == "" || seed.ItemType == "" || seed.Type == "" || seed.Category == "" || seed.Prompt == "" ||
-			seed.CorrectAnswer == "" {
-			t.Fatalf(
-				"invalid N4 question seed %q: %+v",
-				seedID,
-				seed,
-			)
-		}
-		if seenSeedIDs[seedID] {
-			t.Fatalf(
-				"duplicate N4 question seed ID %q",
-				seedID,
-			)
-		}
-		seenSeedIDs[seedID] = true
-		if seed.Category == model.CategoryListening && seed.MaterialKey != "" {
-			t.Fatalf(
-				"N4 listening seed %q must be material-less",
-				seedID,
-			)
-		}
-		if seed.Type == model.QuestionMultipleChoice || seed.Type == model.QuestionReadingComp {
-			if len(seed.Options) == 0 || !contains(
-				seed.Options,
-				seed.CorrectAnswer,
-			) {
-				t.Fatalf(
-					"N4 seed %q answer %q is not in options %v",
-					seedID,
-					seed.CorrectAnswer,
-					seed.Options,
-				)
-			}
-		}
-		if seed.Type == model.QuestionWordOrder &&
-			(len(seed.Options) == 0 || strings.Join(
-				seed.Options,
-				"",
-			) != seed.CorrectAnswer) {
-			t.Fatalf(
-				"N4 word-order seed %q does not join to answer",
-				seedID,
-			)
-		}
-		got[seed.ItemType] = true
-	}
-	seenListeningIDs := make(
-		map[string]bool,
-		len(catalog.ListeningQuestions),
-	)
-	for _, question := range catalog.ListeningQuestions {
-		if question.Level != catalog.Level || question.ID == "" || question.Script == "" || question.Prompt == "" ||
-			len(question.Options) == 0 ||
-			!contains(
-				question.Options,
-				question.CorrectAnswer,
-			) {
-			t.Fatalf(
-				"invalid N4 listening row: %+v",
-				question,
-			)
-		}
-		if seenListeningIDs[question.ID] {
-			t.Fatalf(
-				"duplicate N4 listening ID %q",
-				question.ID,
-			)
-		}
-		seenListeningIDs[question.ID] = true
-		got[question.Skill] = true
-	}
-	if len(got) != len(want) {
+	if !reflect.DeepEqual(
+		got,
+		want,
+	) {
 		t.Fatalf(
-			"N4 item type count = %d, want %d (%v)",
-			len(got),
-			len(want),
+			"N4 item types = %v, want %v",
 			got,
+			want,
 		)
 	}
-	for itemType := range want {
-		if !got[itemType] {
-			t.Fatalf(
-				"N4 item type %q is not represented",
-				itemType,
-			)
-		}
-	}
-}
-
-func contains(
-	values []string,
-	want string,
-) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
 }

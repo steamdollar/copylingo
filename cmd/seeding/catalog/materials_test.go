@@ -596,6 +596,14 @@ func TestBuildAdditionalLevelMaterialsAreLevelAwareAndDoNotCollide(t *testing.T)
 			continue
 		}
 		additionalCount++
+		if material.Language != additionalCatalog.Language {
+			t.Fatalf(
+				"N4 material %q language = %q, want %q",
+				material.MaterialKey,
+				material.Language,
+				additionalCatalog.Language,
+			)
+		}
 		if defaultKeys[material.MaterialKey] {
 			t.Fatalf(
 				"additional material key collides with default: %q",
@@ -612,13 +620,7 @@ func TestBuildAdditionalLevelMaterialsAreLevelAwareAndDoNotCollide(t *testing.T)
 			)
 		}
 	}
-	wantAdditional := len(
-		additionalCatalog.Words,
-	) + len(
-		additionalCatalog.GrammarPoints,
-	) + len(
-		additionalCatalog.ReadingPassages,
-	)
+	wantAdditional := len(additionalCatalog.Materials)
 	if additionalCount != wantAdditional {
 		t.Fatalf(
 			"additional material count = %d, want %d",

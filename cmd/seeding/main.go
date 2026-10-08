@@ -29,7 +29,6 @@ type vocabContext = catalog.VocabContext
 type listeningQuestion = catalog.ListeningQuestion
 type readingPassage = catalog.ReadingPassage
 type wordOrderQuestion = catalog.WordOrderQuestion
-type questionSeed = catalog.QuestionSeed
 type levelCatalog = catalog.LevelCatalog
 
 // defaultProficiencyLevel is the Japanese registry default. The question
@@ -225,16 +224,20 @@ func main() {
 		)
 	}
 
+	recordMaterialIDs, err := loadRecordMaterialIDs(
+		ctx,
+		repos.Material,
+		levelCatalogs,
+	)
+	if err != nil {
+		log.Fatalf(
+			"Failed to load record materials: %v",
+			err,
+		)
+	}
+
 	rng := rand.New(rand.NewSource(1))
 
-	materialIDsByKey := materialIDsForCatalogKeys(
-		allWords,
-		allGrammarPoints,
-		allReadingPassages,
-		materialIDsByWordID,
-		materialIDsByGrammarID,
-		materialIDsByReadingID,
-	)
 	questions := buildKanaQuestions(materialIDsByKana)
 	for _, entry := range levelCatalogs {
 		if entry.GenerateVocabularyQuestions {
@@ -292,13 +295,23 @@ func main() {
 				materialIDsByGrammarID,
 			)...,
 		)
+		recordQuestions, err := buildRecordQuestions(
+			entry.Language,
+			entry.Level,
+			entry.Questions,
+			recordMaterialIDs,
+		)
+		if err != nil {
+			log.Fatalf(
+				"Failed to build %s %s record questions: %v",
+				entry.Language,
+				entry.Level,
+				err,
+			)
+		}
 		questions = append(
 			questions,
-			buildQuestionSeeds(
-				entry.Level,
-				entry.QuestionSeeds,
-				materialIDsByKey,
-			)...,
+			recordQuestions...,
 		)
 	}
 
@@ -322,7 +335,8 @@ func main() {
 	)
 }
 
-type readingMaterialStore interface {
+// materialKeyStore resolves upserted materials by their stable key.
+type materialKeyStore interface {
 	GetByMaterialKeys(
 		ctx context.Context,
 		keys []string,
@@ -331,7 +345,7 @@ type readingMaterialStore interface {
 
 func loadReadingMaterialIDs(
 	ctx context.Context,
-	store readingMaterialStore,
+	store materialKeyStore,
 	passages []readingPassage,
 ) (map[string]int, error) {
 	keys := make(
@@ -649,137 +663,124 @@ func listeningQuestionKey(
 	)
 }
 
-func materialIDsForCatalogKeys(
-	words []vocabWord,
-	points []grammarPoint,
-	passages []readingPassage,
-	wordIDs map[string]int,
-	grammarIDs map[string]int,
-	readingIDs map[string]int,
-) map[string]int {
+// loadRecordMaterialIDs resolves every material_key referenced by unified
+// question records to its upserted row ID in one query. Unresolved keys are
+// reported per question by buildRecordQuestions.
+func loadRecordMaterialIDs(
+	ctx context.Context,
+	store materialKeyStore,
+	catalogs []levelCatalog,
+) (map[string]int, error) {
+	keys := make(
+		[]string,
+		0,
+	)
+	seenKeys := make(map[string]struct{})
+	for _, entry := range catalogs {
+		for _, record := range entry.Questions {
+			if record.MaterialKey == "" {
+				continue
+			}
+			if _, seen := seenKeys[record.MaterialKey]; seen {
+				continue
+			}
+			seenKeys[record.MaterialKey] = struct{}{}
+			keys = append(
+				keys,
+				record.MaterialKey,
+			)
+		}
+	}
 	idsByKey := make(
 		map[string]int,
-		len(wordIDs)+len(grammarIDs)+len(readingIDs),
+		len(keys),
 	)
-	for _, word := range words {
-		if id, ok := wordIDs[word.ID]; ok {
-			idsByKey[catalog.MaterialKeyForVocab(word)] = id
-		}
+	if len(keys) == 0 {
+		return idsByKey, nil
 	}
-	for _, point := range points {
-		if id, ok := grammarIDs[point.ID]; ok {
-			idsByKey[catalog.MaterialKeyForGrammar(point)] = id
-		}
-	}
-	for _, passage := range passages {
-		if id, ok := readingIDs[passage.ID]; ok {
-			idsByKey[catalog.MaterialKeyForReading(passage)] = id
-		}
-	}
-	return idsByKey
-}
-
-func questionSeedSourceID(seed questionSeed) string {
-	if seed.SourceID != "" {
-		return seed.SourceID
-	}
-	return seed.ID
-}
-
-func questionSeedKey(
-	level string,
-	seed questionSeed,
-) string {
-	return fmt.Sprintf(
-		"%s:question:%s:%s",
-		catalog.Japanese,
-		strings.ToLower(normalizeProficiencyLevel(level)),
-		questionSeedSourceID(seed),
+	materials, err := store.GetByMaterialKeys(
+		ctx,
+		keys,
 	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"get record materials by key: %w",
+			err,
+		)
+	}
+	for _, material := range materials {
+		idsByKey[material.MaterialKey] = material.ID
+	}
+	return idsByKey, nil
 }
 
-func buildQuestionSeeds(
+// buildRecordQuestions maps unified question records to rows. Every item
+// type takes this one path. The checks guard what the database and the bot
+// rely on: a unique upsert key, the fields every renderer reads, and the
+// listening/material split (listening plays audio instead of a material).
+func buildRecordQuestions(
+	language,
 	level string,
-	seeds []questionSeed,
+	records []catalog.QuestionRecord,
 	materialIDsByKey map[string]int,
-) []*model.Question {
-	level = normalizeProficiencyLevel(level)
+) ([]*model.Question, error) {
 	questions := make(
 		[]*model.Question,
 		0,
-		len(seeds),
+		len(records),
 	)
 	seenKeys := make(
 		map[string]struct{},
-		len(seeds),
+		len(records),
 	)
-	for _, seed := range seeds {
-		sourceID := questionSeedSourceID(seed)
-		if sourceID == "" || seed.ItemType == "" || seed.Prompt == "" || seed.CorrectAnswer == "" {
-			log.Fatalf(
-				"question_seed: incomplete seed %q",
-				sourceID,
+	for _, record := range records {
+		if record.QuestionKey == "" || record.ItemType == "" || record.Type == "" || record.Category == "" ||
+			record.Prompt == "" ||
+			record.CorrectAnswer == "" ||
+			record.Difficulty < 1 {
+			return nil, fmt.Errorf(
+				"question record %q: missing required field",
+				record.QuestionKey,
 			)
 		}
-		key := questionSeedKey(
-			level,
-			seed,
-		)
-		if _, exists := seenKeys[key]; exists {
-			log.Fatalf(
-				"question_seed: duplicate question key %q",
-				key,
+		if _, exists := seenKeys[record.QuestionKey]; exists {
+			return nil, fmt.Errorf(
+				"question record %q: duplicate question key",
+				record.QuestionKey,
 			)
 		}
-		seenKeys[key] = struct{}{}
-
-		questionType := seed.Type
-		if questionType == "" {
-			questionType = model.QuestionMultipleChoice
-		}
-		category := seed.Category
-		if category == "" {
-			category = categoryForItemType(seed.ItemType)
-		}
-		difficulty := seed.Difficulty
-		if difficulty < 1 {
-			difficulty = 1
-		}
+		seenKeys[record.QuestionKey] = struct{}{}
 		question := &model.Question{
-			Type:             questionType,
-			Skill:            model.SkillPtr(seed.ItemType),
-			Language:         catalog.Japanese,
+			Type:             record.Type,
+			Skill:            model.SkillPtr(record.ItemType),
+			Language:         language,
 			ProficiencyLevel: level,
-			Category:         category,
-			Prompt:           seed.Prompt,
-			Options:          mustJSON(seed.Options),
-			CorrectAnswer:    seed.CorrectAnswer,
-			Explanation:      seed.Explanation,
-			Difficulty:       difficulty,
+			Category:         record.Category,
+			Prompt:           record.Prompt,
+			Options:          mustJSON(record.Options),
+			CorrectAnswer:    record.CorrectAnswer,
+			Explanation:      record.Explanation,
+			Difficulty:       record.Difficulty,
 		}
-		if seed.AudioScript != "" {
-			audioScript := seed.AudioScript
+		if record.AudioScript != "" {
+			audioScript := record.AudioScript
 			question.AudioScript = &audioScript
 		}
-		if seed.AudioPath != "" {
-			audioPath := seed.AudioPath
-			question.AudioPath = &audioPath
-		}
-		if category == model.CategoryListening {
-			if seed.MaterialKey != "" {
-				log.Fatalf(
-					"question_seed: listening seed %q cannot reference material %q",
-					sourceID,
-					seed.MaterialKey,
+		if record.Category == model.CategoryListening {
+			if record.MaterialKey != "" {
+				return nil, fmt.Errorf(
+					"listening question record %q cannot reference material %q",
+					record.QuestionKey,
+					record.MaterialKey,
 				)
 			}
-		} else if seed.MaterialKey != "" {
-			materialID, ok := materialIDsByKey[seed.MaterialKey]
+		} else if record.MaterialKey != "" {
+			materialID, ok := materialIDsByKey[record.MaterialKey]
 			if !ok {
-				log.Fatalf(
-					"question_seed: missing material %q for %q",
-					seed.MaterialKey,
-					sourceID,
+				return nil, fmt.Errorf(
+					"question record %q: material %q not found",
+					record.QuestionKey,
+					record.MaterialKey,
 				)
 			}
 			setQuestionMaterial(
@@ -789,30 +790,14 @@ func buildQuestionSeeds(
 		}
 		setQuestionKey(
 			question,
-			key,
+			record.QuestionKey,
 		)
 		questions = append(
 			questions,
 			question,
 		)
 	}
-	return questions
-}
-
-func categoryForItemType(itemType model.Skill) model.QuestionCategory {
-	switch itemType {
-	case model.SkillReadingShort, model.SkillReadingMedium, model.SkillReadingInformation:
-		return model.CategoryReading
-	case model.SkillListeningTask,
-		model.SkillListeningKeyPoint,
-		model.SkillListeningVerbal,
-		model.SkillListeningQuickResponse:
-		return model.CategoryListening
-	case model.SkillGrammarForm, model.SkillSentenceComposition, model.SkillGrammarText:
-		return model.CategoryGrammar
-	default:
-		return model.CategoryVocabulary
-	}
+	return questions, nil
 }
 
 func normalizeProficiencyLevel(level string) string {
@@ -931,16 +916,9 @@ func buildKanaQuestions(materialIDsByKana map[string]int) []*model.Question {
 	return questions
 }
 
-type kanaMaterialStore interface {
-	GetByMaterialKeys(
-		ctx context.Context,
-		keys []string,
-	) ([]model.Material, error)
-}
-
 func loadKanaMaterialIDs(
 	ctx context.Context,
-	store kanaMaterialStore,
+	store materialKeyStore,
 	kanaMap map[string]string,
 ) (map[string]int, error) {
 	keys := make(
@@ -1023,16 +1001,9 @@ func kanaQuestionKey(
 	)
 }
 
-type vocabularyMaterialStore interface {
-	GetByMaterialKeys(
-		ctx context.Context,
-		keys []string,
-	) ([]model.Material, error)
-}
-
 func loadVocabularyMaterialIDs(
 	ctx context.Context,
-	store vocabularyMaterialStore,
+	store materialKeyStore,
 	words []vocabWord,
 ) (map[string]int, error) {
 	keys := make(
@@ -1543,16 +1514,9 @@ func formatExplanation(word vocabWord) string {
 	)
 }
 
-type grammarMaterialStore interface {
-	GetByMaterialKeys(
-		ctx context.Context,
-		keys []string,
-	) ([]model.Material, error)
-}
-
 func loadGrammarMaterialIDs(
 	ctx context.Context,
-	store grammarMaterialStore,
+	store materialKeyStore,
 	points []grammarPoint,
 ) (map[string]int, error) {
 	keys := make(

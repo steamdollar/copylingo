@@ -62,6 +62,10 @@ func BuildAllMaterialsForLevels(levels ...string) []*model.Material {
 		[]*model.Material,
 		0,
 	)
+	recordMaterials := make(
+		[]*model.Material,
+		0,
+	)
 	seenLevels := make(
 		map[string]struct{},
 		len(levels),
@@ -100,12 +104,20 @@ func BuildAllMaterialsForLevels(levels ...string) []*model.Material {
 				catalog.ReadingPassages,
 			)...,
 		)
+		recordMaterials = append(
+			recordMaterials,
+			BuildRecordMaterials(
+				catalog.Language,
+				level,
+				catalog.Materials,
+			)...,
+		)
 	}
 
 	materials := make(
 		[]*model.Material,
 		0,
-		len(kanaMaterials)+len(vocabMaterials)+len(grammarMaterials)+len(readingMaterials),
+		len(kanaMaterials)+len(vocabMaterials)+len(grammarMaterials)+len(readingMaterials)+len(recordMaterials),
 	)
 	materials = append(
 		materials,
@@ -123,6 +135,40 @@ func BuildAllMaterialsForLevels(levels ...string) []*model.Material {
 		materials,
 		readingMaterials...,
 	)
+	materials = append(
+		materials,
+		recordMaterials...,
+	)
+	return materials
+}
+
+// BuildRecordMaterials maps unified material records to rows. Every
+// category takes this one path: the record already carries its key, title,
+// and payload, so only language and level are stamped from the registry.
+func BuildRecordMaterials(
+	language,
+	level string,
+	records []MaterialRecord,
+) []*model.Material {
+	materials := make(
+		[]*model.Material,
+		0,
+		len(records),
+	)
+	for _, record := range records {
+		materials = append(
+			materials,
+			&model.Material{
+				MaterialKey:      record.MaterialKey,
+				Category:         record.Category,
+				Language:         language,
+				ProficiencyLevel: level,
+				Title:            record.Title,
+				Payload:          record.Payload,
+				Difficulty:       record.Difficulty,
+			},
+		)
+	}
 	return materials
 }
 

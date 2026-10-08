@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"math/rand"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -11,10 +10,7 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-var (
-	defaultTestCatalog    = catalogForTest(defaultProficiencyLevel())
-	additionalTestCatalog = catalogForTest("N4")
-)
+var defaultTestCatalog = catalogForTest(defaultProficiencyLevel())
 
 func catalogForTest(level string) levelCatalog {
 	entry, ok := catalog.LevelCatalogFor(
@@ -1876,201 +1872,6 @@ func TestLoadReadingMaterialIDsMissing(t *testing.T) {
 	}
 }
 
-func TestBuildN4QuestionsIntegrityAndTaxonomy(t *testing.T) {
-	t.Parallel()
-
-	questions := buildAdditionalLevelQuestionsForTest()
-	wantTypes := map[model.Skill]bool{
-		model.SkillVocabKanjiReading:      true,
-		model.SkillVocabOrthography:       true,
-		model.SkillVocabContext:           true,
-		model.SkillVocabParaphrase:        true,
-		model.SkillVocabUsage:             true,
-		model.SkillGrammarForm:            true,
-		model.SkillSentenceComposition:    true,
-		model.SkillGrammarText:            true,
-		model.SkillReadingShort:           true,
-		model.SkillReadingMedium:          true,
-		model.SkillReadingInformation:     true,
-		model.SkillListeningTask:          true,
-		model.SkillListeningKeyPoint:      true,
-		model.SkillListeningVerbal:        true,
-		model.SkillListeningQuickResponse: true,
-	}
-	gotTypes := make(
-		map[model.Skill]bool,
-		len(questions),
-	)
-	seenKeys := make(
-		map[string]bool,
-		len(questions),
-	)
-	for _, question := range questions {
-		if question.ProficiencyLevel != additionalTestCatalog.Level {
-			t.Fatalf(
-				"question level = %q, want %q",
-				question.ProficiencyLevel,
-				additionalTestCatalog.Level,
-			)
-		}
-		if question.Skill == nil {
-			t.Fatal("N4 question has nil item_type")
-		}
-		gotTypes[*question.Skill] = true
-		if question.QuestionKey == nil || !strings.Contains(
-			*question.QuestionKey,
-			"n4",
-		) {
-			t.Fatalf(
-				"N4 question key = %v, want level-aware key",
-				question.QuestionKey,
-			)
-		}
-		if seenKeys[*question.QuestionKey] {
-			t.Fatalf(
-				"duplicate N4 question key %q",
-				*question.QuestionKey,
-			)
-		}
-		seenKeys[*question.QuestionKey] = true
-
-		options, err := question.GetOptions()
-		if err != nil {
-			t.Fatalf(
-				"GetOptions(%q): %v",
-				*question.QuestionKey,
-				err,
-			)
-		}
-		switch question.Type {
-		case model.QuestionMultipleChoice, model.QuestionReadingComp:
-			if len(options) == 0 || !containsString(
-				options,
-				question.CorrectAnswer,
-			) {
-				t.Fatalf(
-					"question %q has invalid options/answer: %v / %q",
-					*question.QuestionKey,
-					options,
-					question.CorrectAnswer,
-				)
-			}
-		case model.QuestionWordOrder:
-			if strings.Join(
-				options,
-				"",
-			) != question.CorrectAnswer {
-				t.Fatalf(
-					"question %q chunks do not join to answer",
-					*question.QuestionKey,
-				)
-			}
-		}
-		if question.Category == model.CategoryListening {
-			if question.MaterialID != nil || question.AudioScript == nil || *question.AudioScript == "" {
-				t.Fatalf(
-					"listening question %q must be material-less with audio script",
-					*question.QuestionKey,
-				)
-			}
-		} else if question.MaterialID == nil {
-			t.Fatalf(
-				"non-listening question %q has no material reference",
-				*question.QuestionKey,
-			)
-		}
-	}
-	if len(gotTypes) != len(wantTypes) {
-		t.Fatalf(
-			"N4 item_type count = %d, want %d (%v)",
-			len(gotTypes),
-			len(wantTypes),
-			gotTypes,
-		)
-	}
-	for itemType := range wantTypes {
-		if !gotTypes[itemType] {
-			t.Fatalf(
-				"missing N4 item_type %q",
-				itemType,
-			)
-		}
-	}
-}
-
-func TestBuildAdditionalLevelQuestionsDeterministic(t *testing.T) {
-	t.Parallel()
-
-	first := buildAdditionalLevelQuestionsForTest()
-	second := buildAdditionalLevelQuestionsForTest()
-	if !reflect.DeepEqual(
-		first,
-		second,
-	) {
-		t.Fatal("combined N4 question seed output is not deterministic")
-	}
-}
-
-func buildAdditionalLevelQuestionsForTest() []*model.Question {
-	wordIDs := make(
-		map[string]int,
-		len(additionalTestCatalog.Words),
-	)
-	for i, word := range additionalTestCatalog.Words {
-		wordIDs[word.ID] = i + 1
-	}
-	grammarIDs := make(
-		map[string]int,
-		len(additionalTestCatalog.GrammarPoints),
-	)
-	for i, point := range additionalTestCatalog.GrammarPoints {
-		grammarIDs[point.ID] = len(wordIDs) + i + 1
-	}
-	readingIDs := make(
-		map[string]int,
-		len(additionalTestCatalog.ReadingPassages),
-	)
-	for i, passage := range additionalTestCatalog.ReadingPassages {
-		readingIDs[passage.ID] = len(wordIDs) + len(grammarIDs) + i + 1
-	}
-	materialIDsByKey := materialIDsForCatalogKeys(
-		additionalTestCatalog.Words,
-		additionalTestCatalog.GrammarPoints,
-		additionalTestCatalog.ReadingPassages,
-		wordIDs,
-		grammarIDs,
-		readingIDs,
-	)
-	questions := make(
-		[]*model.Question,
-		0,
-	)
-	questions = append(
-		questions,
-		buildListeningQuestionsForLevel(
-			additionalTestCatalog.Level,
-			additionalTestCatalog.ListeningQuestions,
-		)...,
-	)
-	questions = append(
-		questions,
-		buildReadingQuestionsForLevel(
-			additionalTestCatalog.Level,
-			additionalTestCatalog.ReadingPassages,
-			readingIDs,
-		)...,
-	)
-	questions = append(
-		questions,
-		buildQuestionSeeds(
-			additionalTestCatalog.Level,
-			additionalTestCatalog.QuestionSeeds,
-			materialIDsByKey,
-		)...,
-	)
-	return questions
-}
-
 func containsString(
 	values []string,
 	want string,
@@ -2116,4 +1917,209 @@ func assertContainsAll(
 			)
 		}
 	}
+}
+
+func TestBuildRecordQuestionsMapsRecords(t *testing.T) {
+	t.Parallel()
+
+	records := []catalog.QuestionRecord{
+		{
+			QuestionKey:   "ja:question:n4:sample_vocab",
+			MaterialKey:   "ja:vocab:n4_word_0001",
+			ItemType:      model.SkillVocabKanjiReading,
+			Type:          model.QuestionFillBlank,
+			Category:      model.CategoryVocabulary,
+			Prompt:        "「経験」의 읽기를 쓰세요.",
+			Options:       []string{},
+			CorrectAnswer: "けいけん",
+			Explanation:   "経験은 けいけん으로 읽습니다.",
+			Difficulty:    2,
+		},
+		{
+			QuestionKey:   "ja:listening:n4:sample_listening",
+			ItemType:      model.SkillListeningTask,
+			Type:          model.QuestionListening,
+			Category:      model.CategoryListening,
+			Prompt:        "몇 시에 갑니까?",
+			Options:       []string{"9시", "10시"},
+			CorrectAnswer: "9시",
+			AudioScript:   "九時に行きます。",
+			Difficulty:    1,
+		},
+	}
+	questions, err := buildRecordQuestions(
+		catalog.Japanese,
+		"N4",
+		records,
+		map[string]int{"ja:vocab:n4_word_0001": 42},
+	)
+	if err != nil {
+		t.Fatalf(
+			"buildRecordQuestions: %v",
+			err,
+		)
+	}
+	if len(questions) != len(records) {
+		t.Fatalf(
+			"question count = %d, want %d",
+			len(questions),
+			len(records),
+		)
+	}
+	vocab := questions[0]
+	if vocab.QuestionKey == nil || *vocab.QuestionKey != records[0].QuestionKey ||
+		vocab.Language != catalog.Japanese ||
+		vocab.ProficiencyLevel != "N4" ||
+		vocab.MaterialID == nil ||
+		*vocab.MaterialID != 42 ||
+		vocab.Skill == nil ||
+		*vocab.Skill != model.SkillVocabKanjiReading ||
+		string(vocab.Options) != "[]" ||
+		vocab.AudioScript != nil {
+		t.Fatalf(
+			"vocab question mapped incorrectly: %+v",
+			vocab,
+		)
+	}
+	listening := questions[1]
+	if listening.MaterialID != nil || listening.AudioScript == nil || *listening.AudioScript != records[1].AudioScript {
+		t.Fatalf(
+			"listening question mapped incorrectly: %+v",
+			listening,
+		)
+	}
+}
+
+func TestBuildRecordQuestionsRejectsInvalidRecords(t *testing.T) {
+	t.Parallel()
+
+	valid := catalog.QuestionRecord{
+		QuestionKey:   "ja:question:n4:valid",
+		MaterialKey:   "ja:grammar:n4_grammar_0001",
+		ItemType:      model.SkillGrammarForm,
+		Type:          model.QuestionMultipleChoice,
+		Category:      model.CategoryGrammar,
+		Prompt:        "빈칸에 들어갈 표현을 고르세요.",
+		Options:       []string{"そうです", "ようです"},
+		CorrectAnswer: "そうです",
+		Difficulty:    2,
+	}
+	tests := []struct {
+		name    string
+		records func() []catalog.QuestionRecord
+	}{
+		{
+			name: "missing prompt",
+			records: func() []catalog.QuestionRecord {
+				record := valid
+				record.Prompt = ""
+				return []catalog.QuestionRecord{record}
+			},
+		},
+		{
+			name: "zero difficulty",
+			records: func() []catalog.QuestionRecord {
+				record := valid
+				record.Difficulty = 0
+				return []catalog.QuestionRecord{record}
+			},
+		},
+		{
+			name: "duplicate key",
+			records: func() []catalog.QuestionRecord {
+				return []catalog.QuestionRecord{valid, valid}
+			},
+		},
+		{
+			name: "listening with material",
+			records: func() []catalog.QuestionRecord {
+				record := valid
+				record.Category = model.CategoryListening
+				return []catalog.QuestionRecord{record}
+			},
+		},
+		{
+			name: "unresolved material",
+			records: func() []catalog.QuestionRecord {
+				record := valid
+				record.MaterialKey = "ja:grammar:missing"
+				return []catalog.QuestionRecord{record}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				t.Parallel()
+
+				if _, err := buildRecordQuestions(
+					catalog.Japanese,
+					"N4",
+					tt.records(),
+					map[string]int{valid.MaterialKey: 1},
+				); err == nil {
+					t.Fatal("buildRecordQuestions accepted an invalid record")
+				}
+			},
+		)
+	}
+}
+
+func TestLoadRecordMaterialIDsRequestsEachKeyOnce(t *testing.T) {
+	t.Parallel()
+
+	store := &recordingMaterialStore{
+		materials: []model.Material{
+			{ID: 7, MaterialKey: "ja:vocab:n4_word_0001"},
+		},
+	}
+	catalogs := []levelCatalog{
+		{
+			Questions: []catalog.QuestionRecord{
+				{MaterialKey: "ja:vocab:n4_word_0001"},
+				{MaterialKey: "ja:vocab:n4_word_0001"},
+				{Category: model.CategoryListening},
+			},
+		},
+	}
+	ids, err := loadRecordMaterialIDs(
+		context.Background(),
+		store,
+		catalogs,
+	)
+	if err != nil {
+		t.Fatalf(
+			"loadRecordMaterialIDs: %v",
+			err,
+		)
+	}
+	if len(store.requestedKeys) != 1 || store.requestedKeys[0] != "ja:vocab:n4_word_0001" {
+		t.Fatalf(
+			"requested keys = %v, want the one referenced key",
+			store.requestedKeys,
+		)
+	}
+	if ids["ja:vocab:n4_word_0001"] != 7 {
+		t.Fatalf(
+			"resolved ids = %v",
+			ids,
+		)
+	}
+}
+
+type recordingMaterialStore struct {
+	materials     []model.Material
+	requestedKeys []string
+}
+
+func (s *recordingMaterialStore) GetByMaterialKeys(
+	ctx context.Context,
+	keys []string,
+) ([]model.Material, error) {
+	s.requestedKeys = append(
+		s.requestedKeys,
+		keys...,
+	)
+	return s.materials, nil
 }

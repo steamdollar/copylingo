@@ -3,6 +3,7 @@ package catalog
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"strings"
 
 	"github.com/lsj/copylingo/cmd/seeding/data"
@@ -114,30 +115,44 @@ type WordOrderQuestion struct {
 	Explanation   string   `json:"explanation"`
 }
 
-// QuestionSeed is an authored question that does not need a specialized
-// generator. SourceID (or ID for legacy fixtures) is used to derive a stable
-// level-aware question key. MaterialKey may link vocabulary, grammar, or
-// reading questions to their study material. Listening seeds intentionally do
-// not carry a material link; AudioScript and AudioPath feed the audio pipeline.
-type QuestionSeed struct {
-	ID            string                 `json:"id,omitempty"`
-	SourceID      string                 `json:"source_id,omitempty"`
+// MaterialRecord is one materials-table row as authored data (ADR-066).
+// Language and level come from the record's data/<language>/<level>/
+// directory. Payload is opaque to the seeder; its shape is the contract
+// between the category and the bot's study-card renderer.
+type MaterialRecord struct {
+	MaterialKey string                 `json:"material_key"`
+	Category    model.MaterialCategory `json:"category"`
+	Title       string                 `json:"title"`
+	Difficulty  int                    `json:"difficulty"`
+	Payload     json.RawMessage        `json:"payload"`
+}
+
+// QuestionRecord is one questions-table row as authored data (ADR-066).
+// QuestionKey is the upsert identity and is written verbatim, so converted
+// questions keep the key (and therefore the row and learner progress) they
+// had under their former type-specific builders. MaterialKey links the
+// question to a study material; listening questions carry AudioScript instead.
+type QuestionRecord struct {
+	QuestionKey   string                 `json:"question_key"`
+	MaterialKey   string                 `json:"material_key,omitempty"`
 	ItemType      model.Skill            `json:"item_type"`
 	Type          model.QuestionType     `json:"type"`
 	Category      model.QuestionCategory `json:"category"`
-	MaterialKey   string                 `json:"material_key,omitempty"`
 	Prompt        string                 `json:"prompt"`
 	Options       []string               `json:"options"`
 	CorrectAnswer string                 `json:"correct_answer"`
 	Explanation   string                 `json:"explanation"`
 	AudioScript   string                 `json:"audio_script,omitempty"`
-	AudioPath     string                 `json:"audio_path,omitempty"`
 	Difficulty    int                    `json:"difficulty"`
 }
 
 // LevelCatalog groups every authored dataset by language and proficiency
 // level. Adding a level extends the registry instead of adding level-named Go
 // variables and branching throughout material or question assembly.
+//
+// Materials/Questions hold levels converted to the unified record format;
+// the typed fields above them are the legacy N5 datasets that still go
+// through type-specific builders until they are converted.
 type LevelCatalog struct {
 	Language                    string
 	Level                       string
@@ -147,13 +162,15 @@ type LevelCatalog struct {
 	ListeningQuestions          []ListeningQuestion
 	ReadingPassages             []ReadingPassage
 	WordOrderQuestions          []WordOrderQuestion
-	QuestionSeeds               []QuestionSeed
+	Materials                   []MaterialRecord
+	Questions                   []QuestionRecord
 	GenerateVocabularyQuestions bool
 	GenerateGrammarQuestions    bool
 }
 
-// levelCatalogFiles names one level's datasets; file names resolve under
-// data/<language>/.
+// levelCatalogFiles names one level's datasets. Legacy file names resolve
+// under data/<language>/; recordDir names data/<language>/<recordDir>/,
+// whose materials/ and questions/ subdirectories hold unified records.
 type levelCatalogFiles struct {
 	language                    string
 	level                       string
@@ -163,7 +180,7 @@ type levelCatalogFiles struct {
 	listening                   string
 	reading                     string
 	wordOrder                   string
-	questionSeeds               string
+	recordDir                   string
 	generateVocabularyQuestions bool
 	generateGrammarQuestions    bool
 }
@@ -175,11 +192,7 @@ var catalogFiles = []levelCatalogFiles{
 		reading: "n5_reading.json", wordOrder: "n5_word_order.json",
 		generateVocabularyQuestions: true, generateGrammarQuestions: true,
 	},
-	{
-		language: Japanese, level: "N4", vocab: "n4_vocab.json", grammar: "n4_grammar.json",
-		listening: "n4_listening.json", reading: "n4_reading.json",
-		questionSeeds: "n4_question_seeds.json",
-	},
+	{language: Japanese, level: "N4", recordDir: "n4"},
 }
 
 // KanaMap maps each kana to its romaji. Script-label and hint logic lives in Go.
@@ -279,9 +292,15 @@ func loadLevelCatalogs(files []levelCatalogFiles) []LevelCatalog {
 					language,
 					file.wordOrder,
 				),
-				QuestionSeeds: loadOptionalJSONFile[[]QuestionSeed](
+				Materials: loadRecordDir[MaterialRecord](
 					language,
-					file.questionSeeds,
+					file.recordDir,
+					"materials",
+				),
+				Questions: loadRecordDir[QuestionRecord](
+					language,
+					file.recordDir,
+					"questions",
 				),
 				GenerateVocabularyQuestions: file.generateVocabularyQuestions,
 				GenerateGrammarQuestions:    file.generateGrammarQuestions,
@@ -303,6 +322,50 @@ func loadOptionalJSONFile[T any](
 		language,
 		name,
 	)
+}
+
+// loadRecordDir concatenates every JSON array under
+// data/<language>/<dir>/<kind>/ in file-name order. Records share one
+// schema, so how they are split across files is an authoring choice.
+func loadRecordDir[T any](
+	language,
+	dir,
+	kind string,
+) []T {
+	if dir == "" {
+		return nil
+	}
+	pattern := language + "/" + dir + "/" + kind + "/*.json"
+	names, err := fs.Glob(
+		data.FS,
+		pattern,
+	)
+	if err != nil {
+		panic(fmt.Errorf(
+			"catalog: glob %s datasets: %w",
+			pattern,
+			err,
+		))
+	}
+	var records []T
+	for _, name := range names {
+		content, err := data.FS.ReadFile(name)
+		if err != nil {
+			panic(fmt.Errorf(
+				"catalog: read %s dataset: %w",
+				name,
+				err,
+			))
+		}
+		records = append(
+			records,
+			mustLoadJSON[[]T](
+				name,
+				content,
+			)...,
+		)
+	}
+	return records
 }
 
 func mustLoadJSONFile[T any](

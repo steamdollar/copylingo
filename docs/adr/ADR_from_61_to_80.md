@@ -65,10 +65,33 @@
     - registry 항목과 `LevelCatalog`에 `Language`를 둔다. 조회는 `LevelCatalogsFor(language)`, `LevelCatalogFor(language, level)`, `DefaultProficiencyLevel(language)`로 바꾼다.
     - 언어 코드는 `catalog.Japanese` 상수 하나로 모은다. material/question key 접두어와 `Language` 필드는 이 상수에서 만든다. 값은 그대로라서 DB의 `material_key`·`question_key`는 바뀌지 않는다.
     - seeder에 `-language` 플래그(기본 `ja`)를 둔다. 이름은 기존 `generate_listening_audio`의 `-language`에 맞췄다. 등록되지 않은 언어면 바로 종료한다.
-  - B2 (다음 단계, 미착수): 일본어 전용 builder(kana, vocab kana/kanji 문항, `ScriptLabel`, 탁점 hint)를 `cmd/seeding/ja`로 분리한다.
+  - B2 (다음 단계, 미착수): 일본어 전용 builder(kana, vocab kana/kanji 문항, `ScriptLabel`, 탁점 hint)를 `cmd/seeding/ja`로 분리한다. → ADR-066에서 데이터를 공통 record로 옮기는 방향으로 대체됐다.
   - 하지 않기로 한 것: vocab schema를 `word/reading` 등으로 일반화하거나 언어 plugin interface를 두는 일은 두 번째 언어가 실제로 들어올 때 한다. 구현체가 하나뿐인 interface는 설계가 맞는지 검증할 수 없다. 또 payload 키를 바꾸면 DB 데이터 migration과 bot 렌더러 수정까지 번진다.
 - 결과:
   - 새 언어를 추가할 때 데이터 위치(`data/<code>/`)와 registry 항목은 정해졌다. 다만 그 언어용 schema·builder와 서버 쪽 레벨 규칙·Skill 분류는 여전히 따로 만들어야 한다.
   - 변경 전후 seed 출력(material 2,242개, question 5,318개)이 바이트 단위로 같음을 확인했다. 기존 DB 재seed가 필요 없다.
   - 실행 명령이 `go run ./cmd/ja/seeder` → `go run ./cmd/seeding`으로 바뀐다.
+
+## ADR-066: Seed 데이터를 DB row 모양의 공통 record로 통일한다 (N4 먼저)
+
+- 날짜: 2026-10-08
+- 상태: 승인됨. N4 적용 완료, N5는 미착수. ADR-065의 B2(일본어 builder 분리) 방향을 대체한다
+- 배경:
+  - 같은 문항 유형이 level마다 다른 JSON 형식이었다. N4는 거의 모든 문항이 `QuestionSeed` 형식이었고, 청해·독해만 별도 형식이었다. N5는 어휘 문맥(`word_id, form_options, clozes[]`), 어순(`grammar_id, chunks`), 문법 형태(문법 자료 안의 `cloze_prompt`)가 전부 제각각이었다.
+  - 그래서 seeder에 문항 유형마다 builder와 key 규칙이 따로 있었다.
+  - N5 문항 5,318개 중 3,668개(kana, 어휘 뜻·회상·손글씨·한자, 문법 뜻)는 JSON에 없고, seeder가 실행될 때 Go로 생성한다.
+- 결정:
+  - 데이터 형식을 DB 테이블 row 모양 두 가지로 통일한다. seeder는 문항 유형을 몰라도 된다.
+    - `data/<language>/<level>/materials/*.json`: `{material_key, category, title, difficulty, payload}`. payload는 seeder가 해석하지 않고, category와 bot Study 화면 렌더러 사이의 계약이다.
+    - `data/<language>/<level>/questions/*.json`: `{question_key, material_key?, item_type, type, category, prompt, options, correct_answer, explanation, audio_script?, difficulty}`.
+    - language와 level은 디렉토리에서 정한다. 같은 schema라 파일을 어떻게 나누든 상관없다. 지금은 category별로 나눴다.
+  - `question_key`와 `material_key`는 모든 record에 명시한다(K1). DB upsert는 `ON CONFLICT (question_key)`로 기존 row를 찾고, 학습 진도는 `question_id`에 붙어 있다. 그래서 전환된 문항은 예전 builder가 만들던 key를 그대로 가진다(예: `ja:listening:n4:…`, `ja:reading:…:question:1`, `ja:question:n4:…`). key 형식이 여러 가지로 남지만 데이터의 차이일 뿐 코드에 분기는 없다.
+    - 대안 K2(DB key를 한 번에 새 규칙으로 UPDATE)는 기각했다. 운영 DB를 직접 바꿔야 하고, 순서가 틀리면 중복 row가 생긴다.
+  - 변환은 현재 builder의 출력을 그대로 저장하는 방식으로 한다. 그러면 변환 전후 seed 결과가 같다는 걸 key별로 비교해 증명할 수 있다.
+  - N4를 먼저 전환한다. N5는 자동 생성 문항을 어떻게 할지(데이터로 저장 / 생성 도구로 보존) 결정한 뒤에 전환하고, 그때까지 기존 builder를 유지한다.
+- 결과:
+  - N4 legacy 파일 5개를 material 1,125개, question 1,405개짜리 record 파일로 바꿨다. `QuestionSeed` 타입, seed key 규칙(`source_id`에서 key 생성), `categoryForItemType`, 중복이던 material store interface 4개를 제거했다.
+  - `n4_grammar.json`의 cloze 필드(`cloze_prompt`, `correct_answer`, `form_options`) 100건은 N4 문법 문항 생성이 꺼져 있어서 쓰이지 않았다. payload에 없으므로 버렸다(git 이력에 남음). N4 파일에만 있던 `level` 필드도 버렸다.
+  - 전환 기간에는 seeder 경로가 두 개다(N5 legacy builder, record 경로). N5까지 전환하면 legacy 경로 전체를 지운다.
+  - 새 문항을 추가할 때 `question_key`를 직접 정해야 한다. catalog 테스트가 key의 유일성, 언어 접두어, material 참조를 검사한다.
 
