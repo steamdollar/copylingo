@@ -13,7 +13,6 @@ import (
 
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
-	"github.com/lsj/copylingo/internal/pipeline"
 )
 
 func TestRunJobInjectsCorrelationAndTimeout(t *testing.T) {
@@ -120,8 +119,7 @@ func TestRunJobLogsFailure(t *testing.T) {
 func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
 	cronScheduler := cron.New()
 	scheduler := New(Deps{
-		Orchestrator: pipeline.NewOrchestrator(),
-		Cron:         cronScheduler,
+		Cron: cronScheduler,
 	})
 
 	scheduler.Start()

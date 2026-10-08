@@ -306,7 +306,7 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 	opts, _ := json.Marshal([]string{"apple", "banana"})
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
@@ -360,7 +360,7 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 	sessionID := 21
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1}, // unanswered
@@ -443,7 +443,7 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 	opts, _ := json.Marshal([]string{"A", "B", "C", "D"})
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1},
@@ -518,7 +518,7 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 	sessionID := 31
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{SessionQuestion: model.SessionQuestion{QuestionID: 1}, Question: model.Question{ID: 1}},
 		},
@@ -563,7 +563,7 @@ func TestShowQuestion_SubjectivePrompt(t *testing.T) {
 	sessionID := 32
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1},
@@ -614,7 +614,7 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 	sessionID, questionID := 40, 1
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
@@ -639,7 +639,7 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 		sf,
 		stateStores,
 		123,
-		nil,
+		&tgbotapi.User{ID: 1},
 		sessionID,
 		0,
 		"banana",
@@ -694,7 +694,7 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 	sessionID, questionID := 41, 1
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
@@ -719,7 +719,7 @@ func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
 		sf,
 		stateStores,
 		123,
-		nil,
+		&tgbotapi.User{ID: 1},
 		sessionID,
 		0,
 		"answer",

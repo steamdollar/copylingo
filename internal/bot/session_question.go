@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
@@ -113,14 +112,6 @@ func (sf *SessionFlow) showQuestion(
 					),
 				),
 			),
-		)
-	}
-
-	if sf.timing != nil {
-		_ = sf.timing.RecordQuestionStart(
-			ctx,
-			sessionID,
-			time.Now(),
 		)
 	}
 

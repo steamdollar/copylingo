@@ -35,6 +35,8 @@ type QuizAnswerResult struct {
 
 // QuizTextAnswer is a typed answer to the question at QuestionIndex.
 type QuizTextAnswer struct {
+	// UserID is the owner of the session; mismatches are rejected.
+	UserID        int64
 	SessionID     int
 	QuestionIndex int
 	Text          string
@@ -44,14 +46,17 @@ type QuizTextAnswer struct {
 }
 
 // SubmitQuizOption grades the chosen option of the current question.
+// userID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
 func (s *SessionService) SubmitQuizOption(
 	ctx context.Context,
+	userID int64,
 	sessionID,
 	questionID,
 	optionIdx int,
 ) (*QuizAnswerResult, error) {
 	state, err := s.loadQuizForAnswer(
 		ctx,
+		userID,
 		sessionID,
 	)
 	if err != nil {
@@ -87,14 +92,17 @@ func (s *SessionService) SubmitQuizOption(
 
 // SubmitQuizWordOrder grades a word-order answer given as option indices in
 // the chosen order. The selection must use every option exactly once.
+// userID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
 func (s *SessionService) SubmitQuizWordOrder(
 	ctx context.Context,
+	userID int64,
 	sessionID,
 	questionID int,
 	selection []int,
 ) (*QuizAnswerResult, error) {
 	state, err := s.loadQuizForAnswer(
 		ctx,
+		userID,
 		sessionID,
 	)
 	if err != nil {
@@ -137,12 +145,14 @@ func (s *SessionService) SubmitQuizWordOrder(
 
 // SubmitQuizText grades a typed answer to the question at answer.QuestionIndex.
 // An out-of-range index reports ErrQuizActiveSessionQuestionNotFound.
+// answer.UserID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
 func (s *SessionService) SubmitQuizText(
 	ctx context.Context,
 	answer QuizTextAnswer,
 ) (*QuizAnswerResult, error) {
 	state, err := s.loadQuizForAnswer(
 		ctx,
+		answer.UserID,
 		answer.SessionID,
 	)
 	if err != nil {
@@ -176,6 +186,7 @@ func (s *SessionService) SubmitQuizText(
 
 func (s *SessionService) loadQuizForAnswer(
 	ctx context.Context,
+	userID int64,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
 	state, err := s.quizProgress.Get(
@@ -188,6 +199,15 @@ func (s *SessionService) loadQuizForAnswer(
 			ErrQuizStateUnavailable,
 			sessionID,
 			err,
+		)
+	}
+	// Callback data is forgeable, so the caller must own the session.
+	if state.Session.UserID != userID {
+		return nil, fmt.Errorf(
+			"%w session_id=%d user_id=%d",
+			ErrQuizActiveSessionUserMismatch,
+			sessionID,
+			userID,
 		)
 	}
 	return state, nil

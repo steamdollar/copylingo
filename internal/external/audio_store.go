@@ -18,29 +18,6 @@ import (
 // AudioContentType is the MIME type stored for OGG/Opus voice clips.
 const AudioContentType = "audio/ogg"
 
-// AudioStore is the object-store contract for TTS audio (ADR-032). The single
-// implementation targets any S3-compatible backend (local MinIO, prod AWS S3)
-// via an endpoint swap.
-type AudioStore interface {
-	// Exists reports whether an object already exists at key (dedup check).
-	Exists(
-		ctx context.Context,
-		key string,
-	) (bool, error)
-	// Put stores body at key with the given content type.
-	Put(
-		ctx context.Context,
-		key string,
-		body []byte,
-		contentType string,
-	) error
-	// Get fetches the object bytes at key.
-	Get(
-		ctx context.Context,
-		key string,
-	) ([]byte, error)
-}
-
 // AudioKey builds the content-addressed object key for a synthesized clip:
 // tts/{lang}/{voice}/{sha256(script)}.ogg (ADR-032). Identical scripts collapse
 // to one object regardless of which question referenced them.
@@ -66,7 +43,9 @@ func keySegment(s string) string {
 	return s
 }
 
-// S3AudioStore is the aws-sdk-go-v2 implementation of AudioStore.
+// S3AudioStore is the object store for TTS audio (ADR-032), targeting any
+// S3-compatible backend (local MinIO, prod AWS S3) via an endpoint swap.
+// Built on aws-sdk-go-v2.
 type S3AudioStore struct {
 	client *s3.Client
 	bucket string

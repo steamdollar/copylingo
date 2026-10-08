@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
@@ -53,7 +52,6 @@ type testInteractionStores struct {
 	drafts       map[draftKey][]int
 	messages     map[handwritingMessageKey]model.TelegramMessageRef
 	fingerprints map[int]string
-	starts       map[int]time.Time
 }
 
 type draftKey struct{ sessionID, questionID int }
@@ -75,7 +73,6 @@ func newTestInteractionStores() *testInteractionStores {
 		drafts:       map[draftKey][]int{},
 		messages:     map[handwritingMessageKey]model.TelegramMessageRef{},
 		fingerprints: map[int]string{},
-		starts:       map[int]time.Time{},
 	}
 }
 
@@ -177,9 +174,6 @@ func newTestSessionFlow(
 		}
 		if deps.Recovery == nil {
 			deps.Recovery = stores
-		}
-		if deps.Timing == nil {
-			deps.Timing = stores
 		}
 	}
 	return NewSessionFlow(deps)
@@ -528,15 +522,6 @@ func (s *testInteractionStores) SetMiniAppFingerprint(
 	fingerprint string,
 ) error {
 	s.fingerprints[sessionID] = fingerprint
-	return nil
-}
-
-func (s *testInteractionStores) RecordQuestionStart(
-	_ context.Context,
-	sessionID int,
-	startedAt time.Time,
-) error {
-	s.starts[sessionID] = startedAt
 	return nil
 }
 

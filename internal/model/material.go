@@ -29,17 +29,3 @@ type Material struct {
 	Difficulty       int              `db:"difficulty"        json:"difficulty"`
 	CreatedAt        time.Time        `db:"created_at"        json:"created_at"`
 }
-
-// UserMaterialProgress stores user-specific spaced repetition state for a material.
-type UserMaterialProgress struct {
-	UserID        int64      `db:"user_id"         json:"user_id"`
-	MaterialID    int        `db:"material_id"     json:"material_id"`
-	EaseFactor    float64    `db:"ease_factor"     json:"ease_factor"`
-	IntervalDays  int        `db:"interval_days"   json:"interval_days"`
-	Repetitions   int        `db:"repetitions"     json:"repetitions"`
-	NextReviewAt  *time.Time `db:"next_review_at"  json:"next_review_at"`
-	LastStudiedAt *time.Time `db:"last_studied_at" json:"last_studied_at"`
-	TimesStudied  int        `db:"times_studied"   json:"times_studied"`
-	CreatedAt     time.Time  `db:"created_at"      json:"created_at"`
-	UpdatedAt     time.Time  `db:"updated_at"      json:"updated_at"`
-}

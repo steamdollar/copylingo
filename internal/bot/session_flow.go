@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
@@ -32,6 +31,7 @@ type quizSession interface {
 	) (*model.QuizActiveSessionState, error)
 	SubmitQuizOption(
 		ctx context.Context,
+		userID int64,
 		sessionID,
 		questionID,
 		optionIdx int,
@@ -42,6 +42,7 @@ type quizSession interface {
 	) (*service.QuizAnswerResult, error)
 	SubmitQuizWordOrder(
 		ctx context.Context,
+		userID int64,
 		sessionID,
 		questionID int,
 		selection []int,
@@ -125,7 +126,6 @@ type SessionFlowDeps struct {
 	Drafts             WordOrderDraftStore
 	Messages           HandwritingMessageStore
 	Recovery           MiniAppRecoveryStore
-	Timing             QuestionTimingStore
 	// Study resumes an in-progress Study session from the main menu.
 	Study         *StudyFlow
 	PublicBaseURL string
@@ -142,7 +142,6 @@ type SessionFlow struct {
 	drafts             WordOrderDraftStore
 	messages           HandwritingMessageStore
 	recovery           MiniAppRecoveryStore
-	timing             QuestionTimingStore
 	study              *StudyFlow
 	publicBaseURL      string
 }
@@ -158,7 +157,6 @@ func NewSessionFlow(deps SessionFlowDeps) *SessionFlow {
 		drafts:             deps.Drafts,
 		messages:           deps.Messages,
 		recovery:           deps.Recovery,
-		timing:             deps.Timing,
 		study:              deps.Study,
 		publicBaseURL:      deps.PublicBaseURL,
 	}
@@ -507,12 +505,10 @@ func (sf *SessionFlow) HandleAnswerCallback(
 		if cb.Message == nil {
 			return
 		}
-		currentIdx := 0
-		fmt.Sscanf(
-			parts[3],
-			"%d",
-			&currentIdx,
-		)
+		currentIdx, err := strconv.Atoi(parts[3])
+		if err != nil {
+			return
+		}
 		if !sf.isQuestionAnswered(
 			ctx,
 			sessionID,
@@ -584,12 +580,10 @@ func (sf *SessionFlow) HandleAnswerCallback(
 	if err != nil {
 		return
 	}
-	optionIdx := 0
-	fmt.Sscanf(
-		parts[3],
-		"%d",
-		&optionIdx,
-	)
+	optionIdx, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return
+	}
 
 	sf.processAnswer(
 		ctx,
@@ -715,14 +709,6 @@ func (sf *SessionFlow) startSession(
 			)
 		}
 		return
-	}
-
-	if sf.timing != nil {
-		_ = sf.timing.RecordQuestionStart(
-			ctx,
-			sessionID,
-			time.Now(),
-		)
 	}
 
 	editMessageID := cb.Message.MessageID

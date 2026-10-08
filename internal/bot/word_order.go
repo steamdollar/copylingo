@@ -400,6 +400,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 		editMessageID := cb.Message.MessageID
 		result, err := sf.session.SubmitQuizWordOrder(
 			ctx,
+			cb.From.ID,
 			sessionID,
 			questionID,
 			selection,

@@ -97,29 +97,6 @@ func (m *mockSRSRepo) GetDueReviewCount(
 	return 5, nil // Return 5 for main menu display test
 }
 
-type mockStatsRepo struct {
-	getTodayStatsFn func(
-		ctx context.Context,
-		userID int64,
-	) (*model.UserStats, error)
-}
-
-func (m *mockStatsRepo) GetTodayStats(
-	ctx context.Context,
-	userID int64,
-) (*model.UserStats, error) {
-	return m.getTodayStatsFn(
-		ctx,
-		userID,
-	)
-}
-func (m *mockStatsRepo) SaveDailyStats(
-	ctx context.Context,
-	stats *model.UserStats,
-) error {
-	return nil
-}
-
 type commandStudyMaterialStore struct {
 	materials []model.Material
 	err       error

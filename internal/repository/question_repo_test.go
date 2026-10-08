@@ -7,7 +7,7 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-func TestBuildQuestionBatchInsertQuery(t *testing.T) {
+func TestBuildQuestionBatchBaseQuery(t *testing.T) {
 	materialID := 24
 	questionKey := "ja:kana:u3042:recall"
 	questions := []*model.Question{
@@ -38,46 +38,109 @@ func TestBuildQuestionBatchInsertQuery(t *testing.T) {
 		},
 	}
 
-	query, args := buildQuestionBatchInsertQuery(questions)
+	query, args := buildQuestionBatchBaseQuery(questions)
 
-	if !strings.Contains(query, "INSERT INTO questions") {
-		t.Fatalf("query = %q, want insert statement", query)
+	if !strings.Contains(
+		query,
+		"INSERT INTO questions",
+	) {
+		t.Fatalf(
+			"query = %q, want insert statement",
+			query,
+		)
 	}
-	if !strings.Contains(query, "question_key") {
-		t.Fatalf("query = %q, want question_key column", query)
+	if !strings.Contains(
+		query,
+		"question_key",
+	) {
+		t.Fatalf(
+			"query = %q, want question_key column",
+			query,
+		)
 	}
-	if !strings.Contains(query, "item_type") {
-		t.Fatalf("query = %q, want item_type column", query)
+	if !strings.Contains(
+		query,
+		"item_type",
+	) {
+		t.Fatalf(
+			"query = %q, want item_type column",
+			query,
+		)
 	}
-	if !strings.Contains(query, "material_id") {
-		t.Fatalf("query = %q, want material_id column", query)
+	if !strings.Contains(
+		query,
+		"material_id",
+	) {
+		t.Fatalf(
+			"query = %q, want material_id column",
+			query,
+		)
 	}
-	if !strings.Contains(query, "audio_script") {
-		t.Fatalf("query = %q, want audio_script column", query)
+	if !strings.Contains(
+		query,
+		"audio_script",
+	) {
+		t.Fatalf(
+			"query = %q, want audio_script column",
+			query,
+		)
 	}
-	if !strings.Contains(query, "($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)") {
-		t.Fatalf("query = %q, want first placeholder group", query)
+	if !strings.Contains(
+		query,
+		"($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+	) {
+		t.Fatalf(
+			"query = %q, want first placeholder group",
+			query,
+		)
 	}
-	if !strings.Contains(query, "($16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)") {
-		t.Fatalf("query = %q, want second placeholder group", query)
+	if !strings.Contains(
+		query,
+		"($16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)",
+	) {
+		t.Fatalf(
+			"query = %q, want second placeholder group",
+			query,
+		)
 	}
-	if strings.Contains(query, "RETURNING id") {
-		t.Fatalf("query = %q, did not expect returning id clause", query)
+	if strings.Contains(
+		query,
+		"RETURNING id",
+	) {
+		t.Fatalf(
+			"query = %q, did not expect returning id clause",
+			query,
+		)
 	}
 	if len(args) != 30 {
-		t.Fatalf("len(args) = %d, want 30", len(args))
+		t.Fatalf(
+			"len(args) = %d, want 30",
+			len(args),
+		)
 	}
 	gotQuestionKey, ok := args[0].(*string)
 	if !ok || gotQuestionKey == nil || *gotQuestionKey != questionKey {
-		t.Fatalf("args[0] = %#v, want question_key %q", args[0], questionKey)
+		t.Fatalf(
+			"args[0] = %#v, want question_key %q",
+			args[0],
+			questionKey,
+		)
 	}
 	gotMaterialID, ok := args[2].(*int)
 	if !ok || gotMaterialID == nil || *gotMaterialID != materialID {
-		t.Fatalf("args[2] = %#v, want material_id %d", args[2], materialID)
+		t.Fatalf(
+			"args[2] = %#v, want material_id %d",
+			args[2],
+			materialID,
+		)
 	}
 	gotSkill, ok := args[4].(*model.Skill)
 	if !ok || gotSkill == nil || *gotSkill != model.SkillKanaRecall {
-		t.Fatalf("args[4] = %#v, want %q", args[4], model.SkillKanaRecall)
+		t.Fatalf(
+			"args[4] = %#v, want %q",
+			args[4],
+			model.SkillKanaRecall,
+		)
 	}
 }
 
@@ -101,8 +164,14 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 
 	query, args := buildQuestionBatchUpsertQuery(questions)
 
-	if !strings.Contains(query, "ON CONFLICT (question_key) DO UPDATE SET") {
-		t.Fatalf("query = %q, want question_key upsert", query)
+	if !strings.Contains(
+		query,
+		"ON CONFLICT (question_key) DO UPDATE SET",
+	) {
+		t.Fatalf(
+			"query = %q, want question_key upsert",
+			query,
+		)
 	}
 	for _, column := range []string{
 		"content_id",
@@ -120,19 +189,44 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 		"difficulty",
 	} {
 		want := column + " = EXCLUDED." + column
-		if !strings.Contains(query, want) {
-			t.Fatalf("query = %q, want update %q", query, want)
+		if !strings.Contains(
+			query,
+			want,
+		) {
+			t.Fatalf(
+				"query = %q, want update %q",
+				query,
+				want,
+			)
 		}
 	}
-	if !strings.Contains(query, "WHEN questions.audio_script IS NOT DISTINCT FROM EXCLUDED.audio_script") {
-		t.Fatalf("query = %q, want audio script-aware path preservation", query)
+	if !strings.Contains(
+		query,
+		"WHEN questions.audio_script IS NOT DISTINCT FROM EXCLUDED.audio_script",
+	) {
+		t.Fatalf(
+			"query = %q, want audio script-aware path preservation",
+			query,
+		)
 	}
-	if !strings.Contains(query, "THEN COALESCE(EXCLUDED.audio_path, questions.audio_path)") {
-		t.Fatalf("query = %q, want existing audio path preserved for unchanged script", query)
+	if !strings.Contains(
+		query,
+		"THEN COALESCE(EXCLUDED.audio_path, questions.audio_path)",
+	) {
+		t.Fatalf(
+			"query = %q, want existing audio path preserved for unchanged script",
+			query,
+		)
 	}
 	// audio_file_id is set post-hoc (SetAudioFileID), never via the seed upsert.
-	if strings.Contains(query, "audio_file_id = EXCLUDED.audio_file_id") {
-		t.Fatalf("query = %q, did not expect audio_file_id in upsert", query)
+	if strings.Contains(
+		query,
+		"audio_file_id = EXCLUDED.audio_file_id",
+	) {
+		t.Fatalf(
+			"query = %q, did not expect audio_file_id in upsert",
+			query,
+		)
 	}
 	for _, runtimeColumn := range []string{
 		"times_served",
@@ -143,12 +237,22 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 		"next_review_at",
 		"last_reviewed_at",
 	} {
-		if strings.Contains(query, runtimeColumn+" = EXCLUDED."+runtimeColumn) {
-			t.Fatalf("query = %q, did not expect runtime column update %q", query, runtimeColumn)
+		if strings.Contains(
+			query,
+			runtimeColumn+" = EXCLUDED."+runtimeColumn,
+		) {
+			t.Fatalf(
+				"query = %q, did not expect runtime column update %q",
+				query,
+				runtimeColumn,
+			)
 		}
 	}
 	if len(args) != 15 {
-		t.Fatalf("len(args) = %d, want 15", len(args))
+		t.Fatalf(
+			"len(args) = %d, want 15",
+			len(args),
+		)
 	}
 }
 
@@ -169,8 +273,15 @@ func TestNewQuestionsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) 
 		"candidate.kanji_recall_rank <= $7",
 		"LIMIT $6",
 	} {
-		if !strings.Contains(newQuestionsForStudiedMaterialsQuery, want) {
-			t.Fatalf("query = %q, want %q", newQuestionsForStudiedMaterialsQuery, want)
+		if !strings.Contains(
+			newQuestionsForStudiedMaterialsQuery,
+			want,
+		) {
+			t.Fatalf(
+				"query = %q, want %q",
+				newQuestionsForStudiedMaterialsQuery,
+				want,
+			)
 		}
 	}
 }
@@ -182,7 +293,10 @@ func TestNewQuestionsQueryGatesReadingOnStudiedMaterial(t *testing.T) {
 		newQuestionsForStudiedMaterialsQuery,
 		"q.category <> 'reading' OR ump.material_id IS NOT NULL",
 	) {
-		t.Fatalf("query = %q, want reading studied-material admission gate", newQuestionsForStudiedMaterialsQuery)
+		t.Fatalf(
+			"query = %q, want reading studied-material admission gate",
+			newQuestionsForStudiedMaterialsQuery,
+		)
 	}
 }
 
@@ -202,8 +316,15 @@ func TestDueReviewsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) {
 		"candidate.kanji_recall_rank <= $5",
 		"LIMIT $4",
 	} {
-		if !strings.Contains(dueReviewsForStudiedMaterialsQuery, want) {
-			t.Fatalf("query = %q, want %q", dueReviewsForStudiedMaterialsQuery, want)
+		if !strings.Contains(
+			dueReviewsForStudiedMaterialsQuery,
+			want,
+		) {
+			t.Fatalf(
+				"query = %q, want %q",
+				dueReviewsForStudiedMaterialsQuery,
+				want,
+			)
 		}
 	}
 }

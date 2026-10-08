@@ -52,25 +52,18 @@ type sessionStore interface {
 	) error
 }
 
-type sessionQuestionStore interface {
-	CreateSessionQuestions(
-		ctx context.Context,
-		sqs []model.SessionQuestion,
-	) error
-}
-
 // sessionBuilderService creates learning sessions with appropriate question mix.
 type sessionBuilderService struct {
 	questionRepo        questionFetcher
 	sessionRepo         sessionStore
-	sessionQuestionRepo sessionQuestionStore
+	sessionQuestionRepo SessionQuestionRepo
 	srs                 srsScheduler
 }
 
 func newSessionBuilderService(
 	questionRepo questionFetcher,
 	sessionRepo sessionStore,
-	sessionQuestionRepo sessionQuestionStore,
+	sessionQuestionRepo SessionQuestionRepo,
 	srs srsScheduler,
 ) *sessionBuilderService {
 	return &sessionBuilderService{

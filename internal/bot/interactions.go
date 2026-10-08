@@ -2,7 +2,6 @@ package bot
 
 import (
 	"context"
-	"time"
 
 	"github.com/lsj/copylingo/internal/model"
 )
@@ -49,13 +48,5 @@ type MiniAppRecoveryStore interface {
 		ctx context.Context,
 		sessionID int,
 		fingerprint string,
-	) error
-}
-
-type QuestionTimingStore interface {
-	RecordQuestionStart(
-		ctx context.Context,
-		sessionID int,
-		startedAt time.Time,
 	) error
 }

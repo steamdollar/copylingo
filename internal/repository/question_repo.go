@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -26,49 +25,37 @@ func NewQuestionRepository(db *sqlx.DB) *QuestionRepository {
 	return &QuestionRepository{db: db}
 }
 
-// CreateBatch inserts multiple questions in a single transaction and round-trip.
-func (r *QuestionRepository) CreateBatch(ctx context.Context, questions []*model.Question) error {
-	if len(questions) == 0 {
-		return nil
-	}
-
-	query, args := buildQuestionBatchInsertQuery(questions)
-	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
-		log.Println("QuestionBatch insert failed:", err)
-		return err
-	}
-
-	return nil
-}
-
 // UpsertSeedBatch inserts or refreshes seed-owned questions identified by stable question_key.
-func (r *QuestionRepository) UpsertSeedBatch(ctx context.Context, questions []*model.Question) error {
+func (r *QuestionRepository) UpsertSeedBatch(
+	ctx context.Context,
+	questions []*model.Question,
+) error {
 	if len(questions) == 0 {
 		return nil
 	}
 	for idx, question := range questions {
 		if question.QuestionKey == nil || *question.QuestionKey == "" {
-			return fmt.Errorf("QuestionRepository.UpsertSeedBatch question_index=%d: missing question_key", idx)
+			return fmt.Errorf(
+				"QuestionRepository.UpsertSeedBatch question_index=%d: missing question_key",
+				idx,
+			)
 		}
 	}
 
 	query, args := buildQuestionBatchUpsertQuery(questions)
-	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("QuestionRepository.UpsertSeedBatch count=%d: %w", len(questions), err)
+	if _, err := r.db.ExecContext(
+		ctx,
+		query,
+		args...,
+	); err != nil {
+		return fmt.Errorf(
+			"QuestionRepository.UpsertSeedBatch count=%d: %w",
+			len(questions),
+			err,
+		)
 	}
 
 	return nil
-}
-
-func (r *QuestionRepository) GetByID(ctx context.Context, id int) (*model.Question, error) {
-	q := &model.Question{}
-	err := r.db.GetContext(
-		ctx,
-		q,
-		fmt.Sprintf(`SELECT %s FROM questions q WHERE q.id = $1`, questionCatalogColumns),
-		id,
-	)
-	return q, err
 }
 
 // GetNewQuestions returns catalog questions without progress for the user.
@@ -79,7 +66,8 @@ func (r *QuestionRepository) GetNewQuestions(
 	levels []string,
 	category string,
 	excludeIDs []int,
-	limit, kanjiRecallLimit int,
+	limit,
+	kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
 	err := r.db.SelectContext(
@@ -97,7 +85,8 @@ func (r *QuestionRepository) GetNewQuestions(
 	return questions, err
 }
 
-var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
+var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(
+	`
 		WITH %s, selected_material_counts AS (
 			SELECT material_id, COUNT(*) AS question_count
 			FROM questions
@@ -171,7 +160,11 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 			candidate.difficulty ASC,
 			candidate.random_order
 		LIMIT $6
-	`, maintenanceQuizCandidatesCTE("$3"), quizMaterialPreferenceGate, questionCatalogColumns)
+	`,
+	maintenanceQuizCandidatesCTE("$3"),
+	quizMaterialPreferenceGate,
+	questionCatalogColumns,
+)
 
 // GetListeningNeedingAudio returns listening questions that have a script but no
 // generated audio yet, oldest first, so the pre-generation pipeline can fill them
@@ -179,11 +172,16 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(`
 // gate is audio_path (the object-store SSOT pointer).
 func (r *QuestionRepository) GetListeningNeedingAudio(
 	ctx context.Context,
-	language, level string,
+	language,
+	level string,
 	limit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
-	err := r.db.SelectContext(ctx, &questions, fmt.Sprintf(`
+	err := r.db.SelectContext(
+		ctx,
+		&questions,
+		fmt.Sprintf(
+			`
 		SELECT %s FROM questions q
 		WHERE category = 'listening'
 		  AND language = $1 AND proficiency_level = $2
@@ -191,22 +189,44 @@ func (r *QuestionRepository) GetListeningNeedingAudio(
 		  AND audio_path IS NULL
 		ORDER BY created_at ASC
 		LIMIT $3
-	`, questionCatalogColumns), language, level, limit)
+	`,
+			questionCatalogColumns,
+		),
+		language,
+		level,
+		limit,
+	)
 	return questions, err
 }
 
 // SetAudioPath stores the object-store key produced for a question's audio.
-func (r *QuestionRepository) SetAudioPath(ctx context.Context, id int, audioPath string) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE questions SET audio_path = $2 WHERE id = $1`, id, audioPath)
+func (r *QuestionRepository) SetAudioPath(
+	ctx context.Context,
+	id int,
+	audioPath string,
+) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE questions SET audio_path = $2 WHERE id = $1`,
+		id,
+		audioPath,
+	)
 	return err
 }
 
 // SetAudioFileID caches the Telegram file_id returned after the first upload so
 // later sends can reuse it (ADR-032). The object store remains the SSOT.
-func (r *QuestionRepository) SetAudioFileID(ctx context.Context, id int, fileID string) error {
-	_, err := r.db.ExecContext(ctx,
-		`UPDATE questions SET audio_file_id = $2 WHERE id = $1`, id, fileID)
+func (r *QuestionRepository) SetAudioFileID(
+	ctx context.Context,
+	id int,
+	fileID string,
+) error {
+	_, err := r.db.ExecContext(
+		ctx,
+		`UPDATE questions SET audio_file_id = $2 WHERE id = $1`,
+		id,
+		fileID,
+	)
 	return err
 }
 
@@ -214,9 +234,11 @@ func (r *QuestionRepository) SetAudioFileID(ctx context.Context, id int, fileID 
 func (r *QuestionRepository) GetDueReviews(
 	ctx context.Context,
 	userID int64,
-	language, currentLevel string,
+	language,
+	currentLevel string,
 	levels []string,
-	limit, kanjiRecallLimit int,
+	limit,
+	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	var questions []model.Question
@@ -235,7 +257,8 @@ func (r *QuestionRepository) GetDueReviews(
 	return questions, err
 }
 
-var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
+var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(
+	`
 		WITH %s, candidates AS (
 			SELECT
 				q.id,
@@ -287,7 +310,11 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(`
 			candidate.material_priority,
 			candidate.next_review_at ASC
 		LIMIT $4
-	`, maintenanceQuizCandidatesCTE("$3"), quizMaterialPreferenceGate, questionCatalogColumns)
+	`,
+	maintenanceQuizCandidatesCTE("$3"),
+	quizMaterialPreferenceGate,
+	questionCatalogColumns,
+)
 
 // GetDueReviewCount returns the number of questions due for review.
 func (r *QuestionRepository) GetDueReviewCount(
@@ -297,7 +324,14 @@ func (r *QuestionRepository) GetDueReviewCount(
 	levels []string,
 ) (int, error) {
 	var count int
-	err := r.db.GetContext(ctx, &count, dueReviewCountQuery, userID, language, pq.Array(levels))
+	err := r.db.GetContext(
+		ctx,
+		&count,
+		dueReviewCountQuery,
+		userID,
+		language,
+		pq.Array(levels),
+	)
 	return count, err
 }
 
@@ -316,11 +350,6 @@ var dueReviewCountQuery = `
 		AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
 		AND (q.category <> 'reading' OR ump.material_id IS NOT NULL)
 	` + quizMaterialPreferenceGate
-
-func buildQuestionBatchInsertQuery(questions []*model.Question) (string, []any) {
-	query, args := buildQuestionBatchBaseQuery(questions)
-	return query, args
-}
 
 func buildQuestionBatchUpsertQuery(questions []*model.Question) (string, []any) {
 	query, args := buildQuestionBatchBaseQuery(questions)
@@ -363,7 +392,11 @@ func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
 		VALUES
 	`)
 
-	args := make([]any, 0, len(questions)*columnCount)
+	args := make(
+		[]any,
+		0,
+		len(questions)*columnCount,
+	)
 	for i, q := range questions {
 		if i > 0 {
 			query.WriteString(",")
@@ -372,11 +405,25 @@ func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
 		base := i * columnCount
 		query.WriteString(fmt.Sprintf(
 			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
-			base+9, base+10, base+11, base+12, base+13, base+14, base+15,
+			base+1,
+			base+2,
+			base+3,
+			base+4,
+			base+5,
+			base+6,
+			base+7,
+			base+8,
+			base+9,
+			base+10,
+			base+11,
+			base+12,
+			base+13,
+			base+14,
+			base+15,
 		))
 
-		args = append(args,
+		args = append(
+			args,
 			q.QuestionKey,
 			q.ContentID,
 			q.MaterialID,

@@ -10,10 +10,6 @@ import (
 )
 
 type mockGraderQuizActiveSession struct {
-	getFn func(
-		ctx context.Context,
-		sessionID int,
-	) (*model.QuizActiveSessionState, error)
 	recordAnswerFn func(
 		ctx context.Context,
 		sessionID,
@@ -21,16 +17,6 @@ type mockGraderQuizActiveSession struct {
 		userAnswer string,
 		isCorrect bool,
 	) error
-}
-
-func (m *mockGraderQuizActiveSession) Get(
-	ctx context.Context,
-	sessionID int,
-) (*model.QuizActiveSessionState, error) {
-	return m.getFn(
-		ctx,
-		sessionID,
-	)
 }
 
 func (m *mockGraderQuizActiveSession) RecordAnswer(
@@ -63,14 +49,9 @@ type mockSRS struct {
 		limit,
 		kanjiRecallLimit int,
 	) ([]model.Question, error)
-	getDueCountFn   func(ctx context.Context) (int, error)
-	processAnswerFn func(
-		ctx context.Context,
-		q *model.Question,
-		isCorrect bool,
-	) error
-	gotLanguage string
-	gotLevel    string
+	getDueCountFn func(ctx context.Context) (int, error)
+	gotLanguage   string
+	gotLevel      string
 }
 
 func (m *mockSRS) GetDueReviews(
@@ -166,21 +147,13 @@ func TestGradeAnswer_Correct(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
+	question := &model.Question{
+		ID:            questionID,
+		CorrectAnswer: "apple",
+		Type:          model.QuestionMultipleChoice,
+	}
+
 	active := &mockGraderQuizActiveSession{
-		getFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(
-				sessionID,
-				model.Question{
-					ID:            questionID,
-					CorrectAnswer: "apple",
-					Type:          model.QuestionMultipleChoice,
-				},
-				false,
-			), nil
-		},
 		recordAnswerFn: func(
 			ctx context.Context,
 			sid,
@@ -205,10 +178,11 @@ func TestGradeAnswer_Correct(t *testing.T) {
 		active,
 		nil,
 	)
-	isCorrect, feedback, err := grader.GradeAnswer(
+	isCorrect, feedback, err := grader.GradeAnswerWithQuestion(
 		ctx,
 		sessionID,
 		questionID,
+		question,
 		"apple",
 	)
 	if err != nil {
@@ -233,21 +207,13 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
+	question := &model.Question{
+		ID:            questionID,
+		CorrectAnswer: "apple",
+		Type:          model.QuestionMultipleChoice,
+	}
+
 	active := &mockGraderQuizActiveSession{
-		getFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(
-				sessionID,
-				model.Question{
-					ID:            questionID,
-					CorrectAnswer: "apple",
-					Type:          model.QuestionMultipleChoice,
-				},
-				false,
-			), nil
-		},
 		recordAnswerFn: func(
 			ctx context.Context,
 			sid,
@@ -266,10 +232,11 @@ func TestGradeAnswer_Wrong(t *testing.T) {
 		active,
 		nil,
 	)
-	isCorrect, _, err := grader.GradeAnswer(
+	isCorrect, _, err := grader.GradeAnswerWithQuestion(
 		ctx,
 		sessionID,
 		questionID,
+		question,
 		"banana",
 	)
 	if err != nil {
@@ -288,22 +255,14 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
+	question := &model.Question{
+		ID:            questionID,
+		CorrectAnswer: "I'm a student",
+		Type:          model.QuestionSubjective,
+		Prompt:        "Translate: 私は学生です",
+	}
+
 	active := &mockGraderQuizActiveSession{
-		getFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(
-				sessionID,
-				model.Question{
-					ID:            questionID,
-					CorrectAnswer: "I'm a student",
-					Type:          model.QuestionSubjective,
-					Prompt:        "Translate: 私は学生です",
-				},
-				false,
-			), nil
-		},
 		recordAnswerFn: func(
 			ctx context.Context,
 			sid,
@@ -332,10 +291,11 @@ func TestGradeAnswer_Subjective_Correct(t *testing.T) {
 		active,
 		llm,
 	)
-	isCorrect, feedback, err := grader.GradeAnswer(
+	isCorrect, feedback, err := grader.GradeAnswerWithQuestion(
 		ctx,
 		sessionID,
 		questionID,
+		question,
 		"I am a student",
 	)
 	if err != nil {
@@ -360,23 +320,14 @@ func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderQuizActiveSession{
-		getFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(
-				sessionID,
-				model.Question{
-					ID:            questionID,
-					CorrectAnswer: "I'm a student",
-					Type:          model.QuestionSubjective,
-					Prompt:        "Translate: 私は学生です",
-				},
-				false,
-			), nil
-		},
+	question := &model.Question{
+		ID:            questionID,
+		CorrectAnswer: "I'm a student",
+		Type:          model.QuestionSubjective,
+		Prompt:        "Translate: 私は学生です",
 	}
+
+	active := &mockGraderQuizActiveSession{}
 	llm := &mockLLM{
 		gradeAnswerFn: func(
 			ctx context.Context,
@@ -392,10 +343,11 @@ func TestGradeAnswer_Subjective_AIUnavailable(t *testing.T) {
 		active,
 		llm,
 	)
-	_, _, err := grader.GradeAnswer(
+	_, _, err := grader.GradeAnswerWithQuestion(
 		ctx,
 		sessionID,
 		questionID,
+		question,
 		"I am a student",
 	)
 	if !errors.Is(
@@ -423,23 +375,14 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	active := &mockGraderQuizActiveSession{
-		getFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(
-				sessionID,
-				model.Question{
-					ID:            questionID,
-					CorrectAnswer: "あ",
-					Type:          model.QuestionKanaHandwriting,
-					Prompt:        "Write あ",
-				},
-				false,
-			), nil
-		},
+	question := &model.Question{
+		ID:            questionID,
+		CorrectAnswer: "あ",
+		Type:          model.QuestionKanaHandwriting,
+		Prompt:        "Write あ",
 	}
+
+	active := &mockGraderQuizActiveSession{}
 	llm := &mockLLM{
 		gradeHandwritingFn: func(
 			ctx context.Context,
@@ -455,10 +398,11 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 		active,
 		llm,
 	)
-	_, _, err := grader.GradeHandwriting(
+	_, _, err := grader.GradeHandwritingWithQuestion(
 		ctx,
 		sessionID,
 		questionID,
+		question,
 		[]byte("png"),
 	)
 	if !errors.Is(
@@ -481,70 +425,19 @@ func TestGradeHandwriting_AIUnavailable(t *testing.T) {
 	}
 }
 
-func TestGradeAnswer_AlreadyAnswered(t *testing.T) {
-	ctx := context.Background()
-	sessionID := 10
-	questionID := 1
-
-	active := &mockGraderQuizActiveSession{
-		getFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(
-				sessionID,
-				model.Question{
-					ID:            questionID,
-					CorrectAnswer: "apple",
-					Type:          model.QuestionMultipleChoice,
-				},
-				true,
-			), nil
-		},
-	}
-
-	grader := newGraderService(
-		active,
-		nil,
-	)
-	_, _, err := grader.GradeAnswer(
-		ctx,
-		sessionID,
-		questionID,
-		"apple",
-	)
-	if !errors.Is(
-		err,
-		ErrQuizActiveSessionAlreadyAnswered,
-	) {
-		t.Fatalf(
-			"expected ErrActiveSessionAlreadyAnswered, got %v",
-			err,
-		)
-	}
-}
-
 func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
 	questionID := 1
 	expectedErr := errors.New("record answer failed")
 
+	question := &model.Question{
+		ID:            questionID,
+		CorrectAnswer: "apple",
+		Type:          model.QuestionMultipleChoice,
+	}
+
 	active := &mockGraderQuizActiveSession{
-		getFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.QuizActiveSessionState, error) {
-			return activeStateForQuestion(
-				sessionID,
-				model.Question{
-					ID:            questionID,
-					CorrectAnswer: "apple",
-					Type:          model.QuestionMultipleChoice,
-				},
-				false,
-			), nil
-		},
 		recordAnswerFn: func(
 			ctx context.Context,
 			sid,
@@ -560,10 +453,11 @@ func TestGradeAnswer_RecordAnswerFails(t *testing.T) {
 		active,
 		nil,
 	)
-	_, _, err := grader.GradeAnswer(
+	_, _, err := grader.GradeAnswerWithQuestion(
 		ctx,
 		sessionID,
 		questionID,
+		question,
 		"apple",
 	)
 	if !errors.Is(

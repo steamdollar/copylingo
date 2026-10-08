@@ -33,24 +33,6 @@ type QuizSessionStore interface {
 	) error
 }
 
-type quizActiveSessionRepository interface {
-	LoadQuestionSessionWithStateBySessionID(
-		ctx context.Context,
-		sessionID int,
-	) (*model.QuizActiveSessionState, error)
-	FlushQuizActiveSession(
-		ctx context.Context,
-		state *model.QuizActiveSessionState,
-	) error
-}
-
-type quizActiveSessionScheduler interface {
-	ScheduleAnswer(
-		progress *model.UserQuestionProgress,
-		isCorrect bool,
-	)
-}
-
 // QuizSessionWrongAnswer contains enough data to render a completed wrong-answer summary without DB reads.
 type QuizSessionWrongAnswer struct {
 	SessionQuestion model.SessionQuestion
@@ -66,15 +48,15 @@ type QuizSessionResult struct {
 
 // quizActiveSessionService owns the Redis working set for in-progress learning sessions.
 type quizActiveSessionService struct {
-	repo  quizActiveSessionRepository
+	repo  QuizActiveSessionRepo
 	store QuizSessionStore
-	srs   quizActiveSessionScheduler
+	srs   *srsService
 }
 
 func newQuizActiveSessionService(
-	repo quizActiveSessionRepository,
+	repo QuizActiveSessionRepo,
 	store QuizSessionStore,
-	srs quizActiveSessionScheduler,
+	srs *srsService,
 ) *quizActiveSessionService {
 	return &quizActiveSessionService{
 		repo:  repo,

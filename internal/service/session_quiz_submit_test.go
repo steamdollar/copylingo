@@ -73,6 +73,7 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 			)
 			got, err := svc.SubmitQuizOption(
 				context.Background(),
+				1,
 				10,
 				1,
 				1,
@@ -130,6 +131,7 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 				)
 				_, err := svc.SubmitQuizOption(
 					context.Background(),
+					1,
 					10,
 					tt.questionID,
 					tt.optionIdx,
@@ -166,6 +168,7 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 			)
 			_, err := svc.SubmitQuizOption(
 				context.Background(),
+				1,
 				10,
 				2,
 				0,
@@ -188,6 +191,7 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 			svc := NewSessionService(SessionDeps{Stores: SessionStores{Quiz: newFakeQuizSessionStore()}})
 			_, err := svc.SubmitQuizOption(
 				context.Background(),
+				1,
 				10,
 				1,
 				0,
@@ -218,7 +222,7 @@ func TestSessionServiceSubmitQuizText(t *testing.T) {
 			)
 			got, err := svc.SubmitQuizText(
 				context.Background(),
-				QuizTextAnswer{SessionID: 10, QuestionIndex: 0, Text: "  KA "},
+				QuizTextAnswer{UserID: 1, SessionID: 10, QuestionIndex: 0, Text: "  KA "},
 			)
 			if err != nil || !got.IsCorrect || got.Answer != "ka" {
 				t.Fatalf(
@@ -266,6 +270,7 @@ func TestSessionServiceSubmitQuizText(t *testing.T) {
 			got, err := svc.SubmitQuizText(
 				context.Background(),
 				QuizTextAnswer{
+					UserID:        1,
 					SessionID:     10,
 					QuestionIndex: 0,
 					Text:          "I'm",
@@ -316,7 +321,7 @@ func TestSessionServiceSubmitQuizText(t *testing.T) {
 			)
 			_, err := svc.SubmitQuizText(
 				context.Background(),
-				QuizTextAnswer{SessionID: 10, QuestionIndex: 0, Text: "x"},
+				QuizTextAnswer{UserID: 1, SessionID: 10, QuestionIndex: 0, Text: "x"},
 			)
 			if !errors.Is(
 				err,
@@ -349,7 +354,7 @@ func TestSessionServiceSubmitQuizText(t *testing.T) {
 			)
 			_, err := svc.SubmitQuizText(
 				context.Background(),
-				QuizTextAnswer{SessionID: 10, QuestionIndex: 1, Text: "x"},
+				QuizTextAnswer{UserID: 1, SessionID: 10, QuestionIndex: 1, Text: "x"},
 			)
 			if !errors.Is(
 				err,
@@ -380,6 +385,7 @@ func TestSessionServiceSubmitQuizWordOrder(t *testing.T) {
 	for _, selection := range [][]int{{1}, {1, 1}, {1, 2}} {
 		if _, err := svc.SubmitQuizWordOrder(
 			context.Background(),
+			1,
 			10,
 			1,
 			selection,
@@ -397,6 +403,7 @@ func TestSessionServiceSubmitQuizWordOrder(t *testing.T) {
 
 	got, err := svc.SubmitQuizWordOrder(
 		context.Background(),
+		1,
 		10,
 		1,
 		[]int{1, 0},
@@ -415,6 +422,98 @@ func TestSessionServiceSubmitQuizWordOrder(t *testing.T) {
 		t.Fatalf(
 			"recorded %q",
 			answer,
+		)
+	}
+}
+
+// A caller that does not own the session must be rejected before anything is recorded.
+func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
+	const otherUserID int64 = 2
+	tests := []struct {
+		name     string
+		question model.Question
+		submit   func(svc *SessionService) error
+	}{
+		{
+			name: "option",
+			question: model.Question{
+				ID:            1,
+				Type:          model.QuestionMultipleChoice,
+				CorrectAnswer: "a",
+				Options:       json.RawMessage(`["a","b"]`),
+			},
+			submit: func(svc *SessionService) error {
+				_, err := svc.SubmitQuizOption(
+					context.Background(),
+					otherUserID,
+					10,
+					1,
+					0,
+				)
+				return err
+			},
+		},
+		{
+			name: "word order",
+			question: model.Question{
+				ID:            1,
+				Type:          model.QuestionWordOrder,
+				CorrectAnswer: "わたしはがくせい",
+				Options:       json.RawMessage(`["がくせい","わたしは"]`),
+			},
+			submit: func(svc *SessionService) error {
+				_, err := svc.SubmitQuizWordOrder(
+					context.Background(),
+					otherUserID,
+					10,
+					1,
+					[]int{1, 0},
+				)
+				return err
+			},
+		},
+		{
+			name:     "text",
+			question: model.Question{ID: 1, Type: model.QuestionFillBlank, CorrectAnswer: "ka"},
+			submit: func(svc *SessionService) error {
+				_, err := svc.SubmitQuizText(
+					context.Background(),
+					QuizTextAnswer{UserID: otherUserID, SessionID: 10, QuestionIndex: 0, Text: "ka"},
+				)
+				return err
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				svc, store := newQuizTestSession(
+					t,
+					submitTestState(tt.question),
+					nil,
+				)
+				err := tt.submit(svc)
+				if !errors.Is(
+					err,
+					ErrQuizActiveSessionUserMismatch,
+				) {
+					t.Fatalf(
+						"error = %v, want ErrQuizActiveSessionUserMismatch",
+						err,
+					)
+				}
+				if answer, isCorrect := recordedAnswer(
+					t,
+					store,
+				); answer != "" || isCorrect != nil {
+					t.Fatalf(
+						"answer recorded: %q %v",
+						answer,
+						isCorrect,
+					)
+				}
+			},
 		)
 	}
 }

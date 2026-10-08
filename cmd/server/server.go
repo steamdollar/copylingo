@@ -1,14 +1,9 @@
 package main
 
 import (
-	"log"
-
 	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/config"
-	"github.com/lsj/copylingo/internal/external"
-	"github.com/lsj/copylingo/internal/pipeline"
 	"github.com/lsj/copylingo/internal/redisstore"
-	"github.com/lsj/copylingo/internal/service"
 )
 
 // botComponents is the Telegram side initApp assembles. It stays inside
@@ -49,7 +44,6 @@ func initBot(
 		Drafts:             interactions,
 		Messages:           interactions,
 		Recovery:           interactions,
-		Timing:             interactions,
 		Study:              studyFlow,
 		PublicBaseURL:      cfg.Server.PublicBaseURL,
 	}
@@ -86,24 +80,4 @@ func initBot(
 		sessionFlow: sessionFlow,
 		studyFlow:   studyFlow,
 	}, nil
-}
-
-// initPipeline is kept for re-enabling content collection (ADR-057): startup
-// does not build it, and a caller creates ContentService on that path.
-func initPipeline(content *service.ContentService) *pipeline.Orchestrator {
-	// NHK News Easy pipeline
-	nhkClient := external.NewNHKClient()
-	nhkFetcher := pipeline.NewNHKFetcher(nhkClient)
-	processor := pipeline.NewPassThroughProcessor()
-	saver := content
-
-	orchestrator := pipeline.NewOrchestrator()
-	orchestrator.Register(
-		nhkFetcher,
-		processor,
-		saver,
-	)
-
-	log.Println("Content collection pipeline initialized")
-	return orchestrator
 }

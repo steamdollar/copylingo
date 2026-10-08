@@ -154,26 +154,6 @@ func (r *SessionRepository) CreateSessionMaterialsInTx(
 	return nil
 }
 
-func (r *SessionRepository) GetByID(
-	ctx context.Context,
-	id int,
-) (*model.Session, error) {
-	s := &model.Session{}
-	if err := r.db.GetContext(
-		ctx,
-		s,
-		`SELECT * FROM sessions WHERE id = $1`,
-		id,
-	); err != nil {
-		return nil, fmt.Errorf(
-			"SessionRepository.GetByID id=%d: %w",
-			id,
-			err,
-		)
-	}
-	return s, nil
-}
-
 // GetOldestUnfinished returns the highest-priority unfinished session for a user.
 // In-progress sessions take precedence over pending sessions; within a status,
 // the oldest created session is returned. A missing session is not an error.
@@ -335,65 +315,4 @@ func (r *SessionRepository) Start(
 		)
 	}
 	return nil
-}
-
-func (r *SessionRepository) Complete(
-	ctx context.Context,
-	id int,
-	correctCount int,
-) error {
-	result, err := r.db.ExecContext(
-		ctx,
-		`
-		UPDATE sessions SET
-			status = 'completed', correct_count = $2, completed_at = NOW()
-		WHERE id = $1
-	`,
-		id,
-		correctCount,
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"SessionRepository.Complete id=%d: %w",
-			id,
-			err,
-		)
-	}
-	if rows, err := result.RowsAffected(); err != nil {
-		return fmt.Errorf(
-			"SessionRepository.Complete id=%d rows affected: %w",
-			id,
-			err,
-		)
-	} else if rows == 0 {
-		return fmt.Errorf(
-			"SessionRepository.Complete id=%d: session not found",
-			id,
-		)
-	}
-	return nil
-}
-
-func (r *SessionRepository) GetTodaySessions(
-	ctx context.Context,
-	userID int64,
-) ([]model.Session, error) {
-	var sessions []model.Session
-	if err := r.db.SelectContext(
-		ctx,
-		&sessions,
-		`
-		SELECT * FROM sessions
-		WHERE user_id = $1 AND created_at::date = CURRENT_DATE
-		ORDER BY created_at
-	`,
-		userID,
-	); err != nil {
-		return nil, fmt.Errorf(
-			"SessionRepository.GetTodaySessions user_id=%d: %w",
-			userID,
-			err,
-		)
-	}
-	return sessions, nil
 }

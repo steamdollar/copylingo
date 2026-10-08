@@ -33,17 +33,6 @@ type StudySessionStore interface {
 	) error
 }
 
-type studyActiveSessionRepository interface {
-	LoadStudySessionWithStateBySessionID(
-		ctx context.Context,
-		sessionID int,
-	) (*model.StudyActiveSessionState, error)
-	FlushStudyActiveSession(
-		ctx context.Context,
-		state *model.StudyActiveSessionState,
-	) error
-}
-
 type studyActiveSessionStarter interface {
 	Start(
 		ctx context.Context,
@@ -53,13 +42,13 @@ type studyActiveSessionStarter interface {
 
 // studyActiveSessionService owns the Redis working set for in-progress study sessions.
 type studyActiveSessionService struct {
-	repo        studyActiveSessionRepository
+	repo        StudyActiveSessionRepo
 	sessionRepo studyActiveSessionStarter
 	store       StudySessionStore
 }
 
 func newStudyActiveSessionService(
-	repo studyActiveSessionRepository,
+	repo StudyActiveSessionRepo,
 	sessionRepo studyActiveSessionStarter,
 	store StudySessionStore,
 ) *studyActiveSessionService {

@@ -87,7 +87,7 @@ func initApp(cfg *config.Config) (_ *app, err error) {
 	a.bot = components.router
 	a.refresher = components.sessionFlow
 
-	// Content collection has no scheduled job (ADR-057); Orchestrator stays nil.
+	// Content collection has no scheduled job (ADR-057).
 	schedDeps := scheduler.Deps{
 		User:        svc.user,
 		Session:     svc.session,

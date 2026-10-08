@@ -22,16 +22,6 @@ const (
 	ttsHTTPTimeout   = 60 * time.Second
 )
 
-// TTSClient synthesizes text into a Telegram-ready OGG/Opus voice clip.
-type TTSClient interface {
-	// Synthesize returns OGG/Opus audio bytes for the given text, ready for
-	// Telegram sendVoice.
-	Synthesize(
-		ctx context.Context,
-		text string,
-	) ([]byte, error)
-}
-
 // transcoder converts raw PCM into OGG/Opus. It is a field on the client so tests
 // can substitute a fake and avoid the external ffmpeg dependency.
 type transcoder func(

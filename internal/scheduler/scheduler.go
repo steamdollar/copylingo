@@ -10,21 +10,19 @@ import (
 
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
-	"github.com/lsj/copylingo/internal/pipeline"
 )
 
 // userPushCron matches the 30-minute choices in each user's schedule settings.
 const userPushCron = "*/30 * * * *"
 
-// Scheduler runs the periodic user-session dispatch and retains content collection for future use.
+// Scheduler runs the periodic user-session dispatch.
 type Scheduler struct {
-	user         slotUsers
-	session      slotSessions
-	tip          tipTopUp
-	audio        audioTopUp
-	orchestrator *pipeline.Orchestrator
-	cron         *cron.Cron
-	dispatcher   *sessionDispatcher
+	user       slotUsers
+	session    slotSessions
+	tip        tipTopUp
+	audio      audioTopUp
+	cron       *cron.Cron
+	dispatcher *sessionDispatcher
 }
 
 // slotUsers finds the timezones in use and the users due at a slot time.
@@ -97,25 +95,23 @@ type pushClaims interface {
 // Deps wires Scheduler with the service calls it makes. Audio is optional:
 // it stays nil without a TTS key and the audio top-up is skipped.
 type Deps struct {
-	User         slotUsers
-	Session      slotSessions
-	Tip          tipTopUp
-	Audio        audioTopUp
-	QuizPusher   quizPusher
-	StudyPusher  studyPusher
-	Orchestrator *pipeline.Orchestrator
-	Cron         *cron.Cron
-	Claims       pushClaims
+	User        slotUsers
+	Session     slotSessions
+	Tip         tipTopUp
+	Audio       audioTopUp
+	QuizPusher  quizPusher
+	StudyPusher studyPusher
+	Cron        *cron.Cron
+	Claims      pushClaims
 }
 
 func New(deps Deps) *Scheduler {
 	s := &Scheduler{
-		user:         deps.User,
-		session:      deps.Session,
-		tip:          deps.Tip,
-		audio:        deps.Audio,
-		orchestrator: deps.Orchestrator,
-		cron:         deps.Cron,
+		user:    deps.User,
+		session: deps.Session,
+		tip:     deps.Tip,
+		audio:   deps.Audio,
+		cron:    deps.Cron,
 	}
 	s.dispatcher = newSessionDispatcher(
 		deps.Session,
@@ -186,46 +182,6 @@ func (s *Scheduler) Stop() {
 		"source",
 		"scheduler",
 	)
-}
-
-func (s *Scheduler) collectContent(ctx context.Context) error {
-	results := s.orchestrator.RunAll(ctx)
-	var failures int
-	for _, result := range results {
-		if result.Err != nil {
-			failures++
-			slog.ErrorContext(
-				ctx,
-				"Content collection failed",
-				"event",
-				"scheduler.collection.failed",
-				"fetcher",
-				result.FetcherName,
-				"error",
-				result.Err,
-			)
-			continue
-		}
-		slog.InfoContext(
-			ctx,
-			"Content collection completed",
-			"event",
-			"scheduler.collection.completed",
-			"fetcher",
-			result.FetcherName,
-			"saved",
-			result.SaveResult.Saved,
-			"duplicates",
-			result.SaveResult.Duplicates,
-		)
-	}
-	if failures > 0 {
-		return fmt.Errorf(
-			"%d content collections failed",
-			failures,
-		)
-	}
-	return nil
 }
 
 func (s *Scheduler) runJob(

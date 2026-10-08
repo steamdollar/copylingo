@@ -36,7 +36,7 @@ var allowedInternalImports = map[string][]string{
 	// config is allowed for the shared Mini App path constants (§8.8).
 	"bot":       {"callback", "config", "model", "observability", "service"},
 	"miniapp":   {"config", "model", "observability", "service"},
-	"scheduler": {"model", "observability", "pipeline"},
+	"scheduler": {"model", "observability"},
 }
 
 // driverOwners lists the internal packages allowed to import each driver or

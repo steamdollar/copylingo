@@ -40,12 +40,6 @@ func (m *mockSessionStore) CreateSession(
 		s,
 	)
 }
-func (m *mockSessionStore) GetByID(
-	ctx context.Context,
-	id int,
-) (*model.Session, error) {
-	return nil, nil
-}
 
 func (m *mockSessionStore) GetSessionsByStatus(
 	ctx context.Context,
@@ -279,12 +273,6 @@ func (m *mockSessionQuestionStore) CreateSessionQuestions(
 	sqs []model.SessionQuestion,
 ) error {
 	return nil
-}
-func (m *mockSessionQuestionStore) GetBySession(
-	ctx context.Context,
-	sessionID int,
-) ([]model.SessionQuestion, error) {
-	return nil, nil
 }
 
 func TestStartReview_NoneDue(t *testing.T) {

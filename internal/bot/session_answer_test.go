@@ -34,6 +34,7 @@ func TestHandleTextInput(t *testing.T) {
 	chatID := int64(123)
 	msg := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: chatID},
+		From: &tgbotapi.User{ID: 1},
 		Text: "apple",
 	}
 
@@ -61,7 +62,7 @@ func TestHandleTextInput(t *testing.T) {
 
 			state := &model.QuizActiveSessionState{
 				Version: model.QuizActiveSessionStateVersion,
-				Session: model.Session{ID: sessionID},
+				Session: model.Session{ID: sessionID, UserID: 1},
 				Items: []model.QuizActiveSessionQuestion{
 					{
 						SessionQuestion: model.SessionQuestion{QuestionID: 1},
@@ -119,7 +120,7 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 	questionID := 1
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
@@ -142,7 +143,7 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 		sf,
 		stateStores,
 		123,
-		nil,
+		&tgbotapi.User{ID: 1},
 		sessionID,
 		0,
 		"apple",
@@ -185,7 +186,7 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 	trueVal := true
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID, IsCorrect: &trueVal},
@@ -203,7 +204,7 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 		sf,
 		stateStores,
 		123,
-		nil,
+		&tgbotapi.User{ID: 1},
 		sessionID,
 		0,
 		"apple",
@@ -249,7 +250,7 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 	firstAnswered := true
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: 123},
 		Items: []model.QuizActiveSessionQuestion{
 			{
 				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &firstAnswered},
@@ -344,7 +345,7 @@ func TestShowHandwritingGraded(t *testing.T) {
 					stateStores,
 					&model.QuizActiveSessionState{
 						Version: model.QuizActiveSessionStateVersion,
-						Session: model.Session{ID: sessionID},
+						Session: model.Session{ID: sessionID, UserID: 1},
 						Items: []model.QuizActiveSessionQuestion{{
 							SessionQuestion: model.SessionQuestion{QuestionID: questionID},
 							Question:        model.Question{ID: questionID, MaterialID: &materialID},
@@ -437,5 +438,76 @@ func TestShowHandwritingGraded(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+// A malformed option index must be dropped instead of being read as option 0.
+func TestHandleAnswerCallback_NonNumericOptionIndexIsIgnored(t *testing.T) {
+	ctx := context.Background()
+	stateStores := newTestInteractionStores()
+	mAPI := &mockBotAPI{}
+	sf := newTestSessionFlow(
+		mAPI,
+		stateStores,
+		SessionFlowDeps{
+			Session: newTestSessionService(
+				stateStores,
+				service.SessionDeps{},
+			),
+		},
+	)
+
+	sessionID, questionID := 12, 1
+	seedQuizState(
+		stateStores,
+		&model.QuizActiveSessionState{
+			Version: model.QuizActiveSessionStateVersion,
+			Session: model.Session{ID: sessionID, UserID: 123},
+			Items: []model.QuizActiveSessionQuestion{
+				{
+					SessionQuestion: model.SessionQuestion{QuestionID: questionID},
+					Question: model.Question{
+						ID:            questionID,
+						Type:          model.QuestionMultipleChoice,
+						CorrectAnswer: "A",
+						Options:       json.RawMessage(`["A", "B"]`),
+					},
+				},
+			},
+		},
+	)
+
+	sf.HandleAnswerCallback(
+		ctx,
+		cbWithMessage(
+			fmt.Sprintf(
+				"q:%d:%d:x",
+				sessionID,
+				questionID,
+			),
+			123,
+			456,
+			123,
+		),
+	)
+
+	if len(mAPI.sentMessages) != 0 {
+		t.Fatalf(
+			"malformed callback produced messages: %d",
+			len(mAPI.sentMessages),
+		)
+	}
+	state, err := stateStores.quiz.Load(
+		ctx,
+		sessionID,
+	)
+	if err != nil {
+		t.Fatalf(
+			"load state: %v",
+			err,
+		)
+	}
+	if state.Items[0].SessionQuestion.IsCorrect != nil {
+		t.Fatal("malformed callback recorded an answer")
 	}
 }

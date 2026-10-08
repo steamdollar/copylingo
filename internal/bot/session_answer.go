@@ -35,6 +35,7 @@ func (sf *SessionFlow) processAnswer(
 	editMessageID := cb.Message.MessageID
 	result, err := sf.session.SubmitQuizOption(
 		ctx,
+		cb.From.ID,
 		sessionID,
 		questionID,
 		optionIdx,
@@ -91,6 +92,7 @@ func (sf *SessionFlow) HandleTextInput(
 	result, err := sf.session.SubmitQuizText(
 		ctx,
 		service.QuizTextAnswer{
+			UserID:        msg.From.ID,
 			SessionID:     sessionID,
 			QuestionIndex: activeQuestion.QuestionIndex,
 			Text:          msg.Text,
@@ -163,6 +165,20 @@ func (sf *SessionFlow) handleQuizAnswerError(
 		err,
 		service.ErrQuizInvalidOption,
 	):
+		return
+	case errors.Is(
+		err,
+		service.ErrQuizActiveSessionUserMismatch,
+	):
+		// Forged callback for another user's session: drop silently.
+		slog.WarnContext(
+			ctx,
+			"Quiz answer rejected: session owner mismatch",
+			"event",
+			"telegram.answer.owner_mismatch",
+			"error",
+			err,
+		)
 		return
 	default:
 		slog.ErrorContext(

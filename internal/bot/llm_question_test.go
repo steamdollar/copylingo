@@ -16,6 +16,7 @@ import (
 func storeQuizState(
 	t *testing.T,
 	stateStores *testInteractionStores,
+	ownerUserID int64,
 	sessionID,
 	questionID int,
 	q model.Question,
@@ -24,7 +25,7 @@ func storeQuizState(
 	t.Helper()
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID},
+		Session: model.Session{ID: sessionID, UserID: ownerUserID},
 		Items: []model.QuizActiveSessionQuestion{
 			{SessionQuestion: sq, Question: q},
 		},
@@ -89,6 +90,7 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 	storeQuizState(
 		t,
 		stateStores,
+		0,
 		sessionID,
 		questionID,
 		model.Question{
@@ -311,6 +313,7 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 			storeQuizState(
 				t,
 				stateStores,
+				owner.ID,
 				sessionID,
 				questionID,
 				mcQuestion,
@@ -368,6 +371,7 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 			storeQuizState(
 				t,
 				stateStores,
+				1,
 				sessionID,
 				questionID,
 				mcQuestion,
@@ -379,7 +383,7 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 				sf,
 				stateStores,
 				123,
-				nil,
+				&tgbotapi.User{ID: 1},
 				sessionID,
 				0,
 				"apple",

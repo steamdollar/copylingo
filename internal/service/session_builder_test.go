@@ -20,10 +20,6 @@ type mockQuestionFetcher struct {
 		limit,
 		kanjiRecallLimit int,
 	) ([]model.Question, error)
-	getByIDFn func(
-		ctx context.Context,
-		id int,
-	) (*model.Question, error)
 }
 
 func (m *mockQuestionFetcher) GetNewQuestions(
@@ -47,25 +43,12 @@ func (m *mockQuestionFetcher) GetNewQuestions(
 		kanjiRecallLimit,
 	)
 }
-func (m *mockQuestionFetcher) GetByID(
-	ctx context.Context,
-	id int,
-) (*model.Question, error) {
-	return m.getByIDFn(
-		ctx,
-		id,
-	)
-}
 
 type mockSessionStore struct {
 	createSessionFn func(
 		ctx context.Context,
 		s *model.Session,
 	) error
-	getByIDFn func(
-		ctx context.Context,
-		id int,
-	) (*model.Session, error)
 	getSessionsByStatusFn func(
 		ctx context.Context,
 		userID int64,
@@ -85,15 +68,6 @@ func (m *mockSessionStore) CreateSession(
 	return m.createSessionFn(
 		ctx,
 		s,
-	)
-}
-func (m *mockSessionStore) GetByID(
-	ctx context.Context,
-	id int,
-) (*model.Session, error) {
-	return m.getByIDFn(
-		ctx,
-		id,
 	)
 }
 
@@ -129,10 +103,6 @@ type mockSessionQuestionStore struct {
 		ctx context.Context,
 		sqs []model.SessionQuestion,
 	) error
-	getBySessionFn func(
-		ctx context.Context,
-		sessionID int,
-	) ([]model.SessionQuestion, error)
 }
 
 func (m *mockSessionQuestionStore) CreateSessionQuestions(
@@ -142,15 +112,6 @@ func (m *mockSessionQuestionStore) CreateSessionQuestions(
 	return m.createSessionQuestionsFn(
 		ctx,
 		sqs,
-	)
-}
-func (m *mockSessionQuestionStore) GetBySession(
-	ctx context.Context,
-	sessionID int,
-) ([]model.SessionQuestion, error) {
-	return m.getBySessionFn(
-		ctx,
-		sessionID,
 	)
 }
 

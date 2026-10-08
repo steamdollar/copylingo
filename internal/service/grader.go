@@ -12,26 +12,7 @@ import (
 	"github.com/lsj/copylingo/internal/observability"
 )
 
-type graderLLM interface {
-	GradeAnswer(
-		ctx context.Context,
-		questionPrompt,
-		correctAnswer,
-		userAnswer string,
-	) (external.GradeResult, error)
-	GradeHandwriting(
-		ctx context.Context,
-		questionPrompt,
-		correctAnswer string,
-		pngImage []byte,
-	) (external.GradeResult, error)
-}
-
 type graderQuizActiveSession interface {
-	Get(
-		ctx context.Context,
-		sessionID int,
-	) (*model.QuizActiveSessionState, error)
 	RecordAnswer(
 		ctx context.Context,
 		sessionID,
@@ -44,41 +25,17 @@ type graderQuizActiveSession interface {
 // graderService handles answer grading and result processing.
 type graderService struct {
 	quizActiveSession graderQuizActiveSession
-	llm               graderLLM
+	llm               QuizGradingLLM
 }
 
 func newGraderService(
 	quizActiveSession graderQuizActiveSession,
-	llm graderLLM,
+	llm QuizGradingLLM,
 ) *graderService {
 	return &graderService{
 		quizActiveSession: quizActiveSession,
 		llm:               llm,
 	}
-}
-
-// GradeAnswer grades a single answer and updates SRS accordingly.
-func (g *graderService) GradeAnswer(
-	ctx context.Context,
-	sessionID,
-	questionID int,
-	userAnswer string,
-) (bool, string, error) {
-	question, err := g.questionFromQuizActiveSession(
-		ctx,
-		sessionID,
-		questionID,
-	)
-	if err != nil {
-		return false, "", err
-	}
-	return g.GradeAnswerWithQuestion(
-		ctx,
-		sessionID,
-		questionID,
-		question,
-		userAnswer,
-	)
 }
 
 func (g *graderService) GradeAnswerWithQuestion(
@@ -129,29 +86,6 @@ func (g *graderService) GradeAnswerWithQuestion(
 	}
 
 	return isCorrect, feedback, nil
-}
-
-func (g *graderService) GradeHandwriting(
-	ctx context.Context,
-	sessionID,
-	questionID int,
-	renderedImage []byte,
-) (bool, string, error) {
-	question, err := g.questionFromQuizActiveSession(
-		ctx,
-		sessionID,
-		questionID,
-	)
-	if err != nil {
-		return false, "", err
-	}
-	return g.GradeHandwritingWithQuestion(
-		ctx,
-		sessionID,
-		questionID,
-		question,
-		renderedImage,
-	)
 }
 
 func (g *graderService) GradeHandwritingWithQuestion(
@@ -261,39 +195,4 @@ func (g *graderService) recordGradingResult(
 		userAnswer,
 		isCorrect,
 	)
-}
-
-func (g *graderService) questionFromQuizActiveSession(
-	ctx context.Context,
-	sessionID,
-	questionID int,
-) (*model.Question, error) {
-	if g.quizActiveSession == nil {
-		return nil, ErrQuizActiveSessionDependencyMissing
-	}
-	state, err := g.quizActiveSession.Get(
-		ctx,
-		sessionID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	item, _, ok := state.CurrentItemByQuestionID(questionID)
-	if !ok {
-		return nil, fmt.Errorf(
-			"%w session_id=%d question_id=%d",
-			ErrQuizActiveSessionQuestionNotFound,
-			sessionID,
-			questionID,
-		)
-	}
-	if item.SessionQuestion.IsCorrect != nil {
-		return nil, fmt.Errorf(
-			"%w session_id=%d question_id=%d",
-			ErrQuizActiveSessionAlreadyAnswered,
-			sessionID,
-			questionID,
-		)
-	}
-	return &item.Question, nil
 }

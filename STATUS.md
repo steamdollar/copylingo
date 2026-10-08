@@ -26,6 +26,8 @@
 
 > 각 항목은 `docs/todos/<file>.md`에 자기완결적 문서로 분리되어 있다. 작성/실행/완료 처리 규칙은 `AGENTS.md` §3 Case C 참조.
 
+- [ ] 구조 검토 후속: ~~죽은 코드 삭제(U2)~~ 완료 → service·bot 파일 prefix rename·테스트 재배치(U3) → 책임 이동(U4, SRS 단일화 등 일부 Case A 선결) + callback 이중 응답(실기기 확인 대기). 하위 패키지 분리는 하지 않음 see [docs/todos/structure_review_followups.md](docs/todos/structure_review_followups.md)
+
 - [ ] 손글씨 client/server rebuild 정합성 검증 — 검증 **도구**(`cmd/dev/handwriting_renderer` CLI + Mini App `?debug=1` export + 단위 테스트) 구현 완료. **사용자 수동 시각 비교만 남음** (Mini App에서 직접 그려 client.png/strokes.json export → 서버 PNG와 대조). see [docs/todos/handwriting_rebuild_parity_verification.md](docs/todos/handwriting_rebuild_parity_verification.md)
 
 - [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. **(Case A 선결: preset 비율/변경 UX/SRS 충돌 우선순위/vocab fallback 미결)** see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
@@ -36,6 +38,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-10-05 | 죽은 코드 삭제: 호출자 없는 repository 메서드 10개·읽지 않는 Redis 키·미사용/중복 interface·grader 테스트 전용 메서드, scheduler 콘텐츠 수집 연결 제거(pipeline 코드는 보존, ADR-057 보강) | [2610051735_dead_code_cleanup.md](docs/workthrough/2610/2610051735_dead_code_cleanup.md) |
+| 2026-10-05 | Quiz 답안 제출(선택지·어순·주관식)에 세션 소유자 검사 추가, callback 정수 파싱 실패를 0번 선택지로 처리하던 문제 수정 | [2610051431_quiz_answer_owner_check.md](docs/workthrough/2610/2610051431_quiz_answer_owner_check.md) |
 | 2026-10-05 | `go list` 기반 import 경계 테스트로 internal 패키지 간 import와 드라이버 소유를 고정 — 아키텍처 단순화 2·3단계 완료 (ADR-059 §8 E) | [2610051328_adr059_stage_e_import_boundary.md](docs/workthrough/2610/2610051328_adr059_stage_e_import_boundary.md) |
 | 2026-10-05 | `Services` 묶음 삭제, 외부 클라이언트·서비스 생성을 cmd/server로 이동, `app` Run/Close 생명주기 (ADR-059 §8 D) | [2610050008_adr059_stage_d_assembly_lifecycle.md](docs/workthrough/2610/2610050008_adr059_stage_d_assembly_lifecycle.md) |
 | 2026-10-04 | 기능별 Flow 분리, `*Bot` 역참조 제거, scheduler·Mini App에 Flow의 좁은 계약 주입 (ADR-059 §8 C) | [2610042335_adr059_stage_c_feature_flows.md](docs/workthrough/2610/2610042335_adr059_stage_c_feature_flows.md) |
