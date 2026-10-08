@@ -38,7 +38,8 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
-| 2026-10-08 | N4 seed 데이터를 DB row 모양의 공통 record로 통일(문항을 material 안에 넣은 `n4/records.json` 하나)하고 문항 유형과 무관한 seeding 경로 추가, 기존 question_key 보존 (ADR-066, N5는 미착수) | [workthrough](docs/workthrough/2610/2610081223_n4_unified_seed_records.md) |
+| 2026-10-08 | N5 seed 데이터를 record로 전환해 seeder를 경로 하나로 통일하고 seed 때 문항 생성을 제거, level당 JSON 하나(`data/ja/n4.json`, `n5.json`)로 정리, 앞으로 문항 유형은 JLPT 체계를 따름 (ADR-067, seed 출력 동일) | [workthrough](docs/workthrough/2610/2610081420_n5_unified_seed_records.md) |
+| 2026-10-08 | N4 seed 데이터를 DB row 모양의 공통 record로 통일(문항을 material 안에 넣은 `n4/records.json` 하나)하고 문항 유형과 무관한 seeding 경로 추가, 기존 question_key 보존 (ADR-066) | [workthrough](docs/workthrough/2610/2610081223_n4_unified_seed_records.md) |
 | 2026-10-08 | Seed 도구를 `cmd/ja` → `cmd/seeding`으로 이동, JSON을 `data/<언어>/`로 나누고 registry·`-language` 플래그에 언어 차원 추가 (ADR-065 B1, seed 출력 동일) | [workthrough](docs/workthrough/2610/2610081157_seeding_language_layout.md) |
 | 2026-10-08 | Study 플랜 신규 어휘 중심 재조정(ADR-064): 하루 신규 단어 12→24, 재학습·독해 재독 축소, `/study n`이 아침 플랜 비율을 따름 | [workthrough](docs/workthrough/2610/2610081045_study_plan_new_vocab_focus.md) |
 | 2026-10-07 | JLPT N5/N4 어휘 보충: Waller(구 출제기준 재구성) 리스트 기준으로 N5 249개, N4 365개(+seed 365개, 작성 문항 opus 검수) 추가, question seed upsert 파라미터 한도 버그 수정 | [workthrough](docs/workthrough/2610/2610072307_jlpt_vocab_supplement.md) |

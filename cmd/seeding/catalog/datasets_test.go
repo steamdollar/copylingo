@@ -2,7 +2,6 @@ package catalog
 
 import (
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -89,411 +88,6 @@ func TestLevelCatalogRegistry(t *testing.T) {
 	}
 }
 
-// Integrity regressions for the embedded datasets. The JSON files under data/<language>/
-// are the source of truth, so these checks catch a malformed or regressed file
-// at test time instead of at runtime. They inspect the package vars directly,
-// i.e. exactly what the seeder consumes.
-
-func TestN5Grammar_Integrity(t *testing.T) {
-	grammarPoints := levelCatalogForTest(
-		t,
-		"N5",
-	).GrammarPoints
-	if len(grammarPoints) != 80 {
-		t.Fatalf(
-			"expected 80 grammar points, got %d",
-			len(grammarPoints),
-		)
-	}
-	seen := make(
-		map[string]bool,
-		len(grammarPoints),
-	)
-	for i, p := range grammarPoints {
-		if p.ID == "" || p.Pattern == "" || p.MeaningKo == "" ||
-			p.Example == "" || p.ExampleReading == "" || p.ClozePrompt == "" || p.CorrectAnswer == "" {
-			t.Errorf(
-				"point %d (%q) has an empty required field",
-				i,
-				p.ID,
-			)
-		}
-		if seen[p.ID] {
-			t.Errorf(
-				"duplicate grammar ID %q",
-				p.ID,
-			)
-		}
-		seen[p.ID] = true
-
-		if len(p.FormOptions) < 2 {
-			t.Errorf(
-				"point %q: expected >=2 form options, got %d",
-				p.ID,
-				len(p.FormOptions),
-			)
-		}
-		found := false
-		for _, opt := range p.FormOptions {
-			if opt == p.CorrectAnswer {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf(
-				"point %q: correct answer %q not in form options %v",
-				p.ID,
-				p.CorrectAnswer,
-				p.FormOptions,
-			)
-		}
-	}
-}
-
-func TestN5Vocab_Integrity(t *testing.T) {
-	words := levelCatalogForTest(
-		t,
-		"N5",
-	).Words
-	if len(words) != 789 {
-		t.Fatalf(
-			"expected 789 vocab words, got %d",
-			len(words),
-		)
-	}
-	seen := make(
-		map[string]bool,
-		len(words),
-	)
-	for i, w := range words {
-		if w.ID == "" || w.Kana == "" || w.Kanji == "" || w.MeaningKo == "" || w.PartOfSpeech == "" {
-			t.Errorf(
-				"word %d (%q) has an empty required field",
-				i,
-				w.ID,
-			)
-		}
-		if seen[w.ID] {
-			t.Errorf(
-				"duplicate vocab ID %q",
-				w.ID,
-			)
-		}
-		seen[w.ID] = true
-	}
-}
-
-func TestKana_Integrity(t *testing.T) {
-	if len(KanaMap) != 208 {
-		t.Fatalf(
-			"expected 208 kana entries, got %d",
-			len(KanaMap),
-		)
-	}
-	for k, romaji := range KanaMap {
-		if k == "" || romaji == "" {
-			t.Errorf(
-				"kana entry %q→%q has an empty key or value",
-				k,
-				romaji,
-			)
-		}
-	}
-}
-
-func TestN5Listening_Integrity(t *testing.T) {
-	listeningQuestions := levelCatalogForTest(
-		t,
-		"N5",
-	).ListeningQuestions
-	if len(listeningQuestions) != 50 {
-		t.Fatalf(
-			"expected 50 listening questions, got %d",
-			len(listeningQuestions),
-		)
-	}
-
-	allowedSkills := map[model.Skill]bool{
-		model.SkillListeningTask:     true,
-		model.SkillListeningKeyPoint: true,
-		model.SkillListeningOutline:  true,
-	}
-	seenIDs := make(
-		map[string]bool,
-		len(listeningQuestions),
-	)
-	seenScripts := make(
-		map[string]bool,
-		len(listeningQuestions),
-	)
-	seenPrompts := make(
-		map[string]bool,
-		len(listeningQuestions),
-	)
-	for i, question := range listeningQuestions {
-		if wantID := fmt.Sprintf(
-			"n5_listening_%04d",
-			i+1,
-		); question.ID != wantID {
-			t.Errorf(
-				"listening question %d ID = %q, want %q",
-				i,
-				question.ID,
-				wantID,
-			)
-		}
-		if question.ID == "" || question.Script == "" || question.Prompt == "" ||
-			question.CorrectAnswer == "" || question.Explanation == "" {
-			t.Errorf(
-				"listening question %d (%q) has an empty required field",
-				i,
-				question.ID,
-			)
-		}
-		if seenIDs[question.ID] {
-			t.Errorf(
-				"duplicate listening ID %q",
-				question.ID,
-			)
-		}
-		seenIDs[question.ID] = true
-		if seenScripts[question.Script] {
-			t.Errorf(
-				"duplicate listening script for %q",
-				question.ID,
-			)
-		}
-		seenScripts[question.Script] = true
-		if seenPrompts[question.Prompt] {
-			t.Errorf(
-				"duplicate listening prompt for %q",
-				question.ID,
-			)
-		}
-		seenPrompts[question.Prompt] = true
-		if !allowedSkills[question.Skill] {
-			t.Errorf(
-				"question %q has unsupported skill %q",
-				question.ID,
-				question.Skill,
-			)
-		}
-		if question.Difficulty < 1 || question.Difficulty > 3 {
-			t.Errorf(
-				"question %q has difficulty %d, want 1..3",
-				question.ID,
-				question.Difficulty,
-			)
-		}
-		if len(question.Options) != 4 {
-			t.Errorf(
-				"question %q has %d options, want 4",
-				question.ID,
-				len(question.Options),
-			)
-		}
-
-		seenOptions := make(
-			map[string]bool,
-			len(question.Options),
-		)
-		for _, option := range question.Options {
-			if option == "" {
-				t.Errorf(
-					"question %q has an empty option",
-					question.ID,
-				)
-			}
-			if seenOptions[option] {
-				t.Errorf(
-					"question %q has duplicate option %q",
-					question.ID,
-					option,
-				)
-			}
-			seenOptions[option] = true
-		}
-		if !seenOptions[question.CorrectAnswer] {
-			t.Errorf(
-				"question %q correct answer %q is not in options",
-				question.ID,
-				question.CorrectAnswer,
-			)
-		}
-	}
-}
-
-func TestN5Reading_Integrity(t *testing.T) {
-	readingPassages := levelCatalogForTest(
-		t,
-		"N5",
-	).ReadingPassages
-	if len(readingPassages) != 40 {
-		t.Fatalf(
-			"expected 40 reading passages, got %d",
-			len(readingPassages),
-		)
-	}
-
-	// The seeder inlines passage/prompt/options into an HTML prompt without
-	// escaping, so the dataset itself must stay free of HTML-special characters.
-	assertNoHTMLSpecials := func(
-		id,
-		field,
-		value string,
-	) {
-		if strings.ContainsAny(
-			value,
-			"<>&",
-		) {
-			t.Errorf(
-				"passage %q field %s contains HTML-special characters: %q",
-				id,
-				field,
-				value,
-			)
-		}
-	}
-
-	seenIDs := make(
-		map[string]bool,
-		len(readingPassages),
-	)
-	seenPassages := make(
-		map[string]bool,
-		len(readingPassages),
-	)
-	seenPrompts := make(
-		map[string]bool,
-		len(readingPassages),
-	)
-	for i, passage := range readingPassages {
-		if wantID := fmt.Sprintf(
-			"n5_reading_%04d",
-			i+1,
-		); passage.ID != wantID {
-			t.Errorf(
-				"reading passage %d ID = %q, want %q",
-				i,
-				passage.ID,
-				wantID,
-			)
-		}
-		if passage.ID == "" || passage.Title == "" || passage.Passage == "" ||
-			passage.Reading == "" || passage.Prompt == "" ||
-			passage.CorrectAnswer == "" || passage.Explanation == "" {
-			t.Errorf(
-				"reading passage %d (%q) has an empty required field",
-				i,
-				passage.ID,
-			)
-		}
-		if seenIDs[passage.ID] {
-			t.Errorf(
-				"duplicate reading ID %q",
-				passage.ID,
-			)
-		}
-		seenIDs[passage.ID] = true
-		if seenPassages[passage.Passage] {
-			t.Errorf(
-				"duplicate reading passage text for %q",
-				passage.ID,
-			)
-		}
-		seenPassages[passage.Passage] = true
-		if seenPrompts[passage.Prompt] {
-			t.Errorf(
-				"duplicate reading prompt for %q",
-				passage.ID,
-			)
-		}
-		seenPrompts[passage.Prompt] = true
-		// reading_short only for the initial 10-passage corpus; other reading
-		// skills need a separate distribution decision before the 50 expansion.
-		if passage.Skill != model.SkillReadingShort {
-			t.Errorf(
-				"passage %q has unsupported skill %q",
-				passage.ID,
-				passage.Skill,
-			)
-		}
-		if passage.Difficulty < 1 || passage.Difficulty > 3 {
-			t.Errorf(
-				"passage %q has difficulty %d, want 1..3",
-				passage.ID,
-				passage.Difficulty,
-			)
-		}
-		if len(passage.KeyVocabulary) == 0 {
-			t.Errorf(
-				"passage %q has no key vocabulary",
-				passage.ID,
-			)
-		}
-		for _, vocab := range passage.KeyVocabulary {
-			if vocab.Surface == "" || vocab.Reading == "" || vocab.MeaningKo == "" {
-				t.Errorf(
-					"passage %q has an incomplete key vocabulary entry: %+v",
-					passage.ID,
-					vocab,
-				)
-			}
-		}
-		assertNoHTMLSpecials(
-			passage.ID,
-			"passage",
-			passage.Passage,
-		)
-		assertNoHTMLSpecials(
-			passage.ID,
-			"prompt",
-			passage.Prompt,
-		)
-
-		if len(passage.Options) != 4 {
-			t.Errorf(
-				"passage %q has %d options, want 4",
-				passage.ID,
-				len(passage.Options),
-			)
-		}
-		seenOptions := make(
-			map[string]bool,
-			len(passage.Options),
-		)
-		for _, option := range passage.Options {
-			if option == "" {
-				t.Errorf(
-					"passage %q has an empty option",
-					passage.ID,
-				)
-			}
-			if seenOptions[option] {
-				t.Errorf(
-					"passage %q has duplicate option %q",
-					passage.ID,
-					option,
-				)
-			}
-			seenOptions[option] = true
-			assertNoHTMLSpecials(
-				passage.ID,
-				"option",
-				option,
-			)
-		}
-		if !seenOptions[passage.CorrectAnswer] {
-			t.Errorf(
-				"passage %q correct answer %q is not in options",
-				passage.ID,
-				passage.CorrectAnswer,
-			)
-		}
-	}
-}
-
 func contains(
 	values []string,
 	want string,
@@ -506,9 +100,14 @@ func contains(
 	return false
 }
 
-// TestRecordCatalogIntegrity checks every level authored in the unified
-// record format (ADR-066). Keys are the upsert identity, so they must be
-// unique across levels. Only listening questions may sit outside a material.
+// The data/<language>/<level>.json files are the source of truth, so
+// these checks catch a malformed or regressed file at test time instead of at
+// seed time. They inspect the loaded catalogs, i.e. exactly what the seeder
+// consumes.
+
+// TestRecordCatalogIntegrity checks every registered level (ADR-066). Keys are
+// the upsert identity, so they must be unique across levels. Only listening
+// questions may sit outside a material.
 func TestRecordCatalogIntegrity(t *testing.T) {
 	t.Parallel()
 
@@ -523,29 +122,29 @@ func TestRecordCatalogIntegrity(t *testing.T) {
 		}
 		questionKeys[record.QuestionKey] = true
 	}
-	recordLevels := 0
 	for _, catalog := range LevelCatalogsFor(Japanese) {
-		if len(catalog.Materials) == 0 && len(catalog.Questions) == 0 {
-			continue
+		if len(catalog.Materials) == 0 {
+			t.Fatalf(
+				"level %s has no material records",
+				catalog.Level,
+			)
 		}
-		recordLevels++
 		for _, material := range catalog.Materials {
-			var payload map[string]any
 			if !strings.HasPrefix(
 				material.MaterialKey,
 				catalog.Language+":",
-			) || material.Category == "" || material.Title == "" || material.Difficulty < 1 ||
-				json.Unmarshal(
-					material.Payload,
-					&payload,
-				) != nil ||
-				len(payload) == 0 {
+			) || material.Category == "" || material.Title == "" || !validDifficulty(material.Difficulty) {
 				t.Fatalf(
 					"invalid %s material record %q",
 					catalog.Level,
 					material.MaterialKey,
 				)
 			}
+			assertMaterialPayload(
+				t,
+				catalog.Level,
+				material,
+			)
 			if materialKeys[material.MaterialKey] {
 				t.Fatalf(
 					"duplicate material key %q",
@@ -585,8 +184,69 @@ func TestRecordCatalogIntegrity(t *testing.T) {
 			checkQuestionKey(record)
 		}
 	}
-	if recordLevels == 0 {
-		t.Fatal("no level is authored in the unified record format")
+}
+
+// validDifficulty mirrors the materials/questions CHECK constraint in
+// migrations/001_init.sql, so a bad value fails here instead of mid-seed.
+func validDifficulty(difficulty int) bool {
+	return difficulty >= 1 && difficulty <= 10
+}
+
+// assertMaterialPayload checks the payload fields the bot's study cards read
+// per category. A new category must add its rules here.
+func assertMaterialPayload(
+	t *testing.T,
+	level string,
+	material MaterialRecord,
+) {
+	t.Helper()
+	var complete bool
+	switch material.Category {
+	case model.MaterialCategoryKana:
+		var payload KanaMaterialPayload
+		complete = json.Unmarshal(
+			material.Payload,
+			&payload,
+		) == nil &&
+			payload.Kana != "" && payload.Romaji != "" && payload.Script != ""
+	case model.MaterialCategoryVocabulary:
+		var payload VocabularyMaterialPayload
+		complete = json.Unmarshal(
+			material.Payload,
+			&payload,
+		) == nil &&
+			payload.Kana != "" && payload.Kanji != "" && payload.MeaningKo != "" && payload.PartOfSpeech != ""
+	case model.MaterialCategoryGrammar:
+		var payload GrammarMaterialPayload
+		complete = json.Unmarshal(
+			material.Payload,
+			&payload,
+		) == nil &&
+			payload.Pattern != "" && payload.MeaningKo != "" && payload.ExplanationKo != "" &&
+			payload.Example != "" && payload.ExampleReading != "" && payload.TranslationKo != ""
+	case model.MaterialCategoryReading:
+		var payload ReadingMaterialPayload
+		complete = json.Unmarshal(
+			material.Payload,
+			&payload,
+		) == nil &&
+			payload.Passage != "" && payload.Reading != "" && len(payload.KeyVocabulary) > 0
+	default:
+		t.Fatalf(
+			"%s material %q: no payload rules for category %q",
+			level,
+			material.MaterialKey,
+			material.Category,
+		)
+	}
+	if !complete {
+		t.Fatalf(
+			"%s material %q has an incomplete %s payload: %s",
+			level,
+			material.MaterialKey,
+			material.Category,
+			material.Payload,
+		)
 	}
 }
 
@@ -601,7 +261,7 @@ func assertQuestionRecord(
 		catalog.Language+":",
 	) || record.ItemType == "" || record.Type == "" || record.Category == "" || record.Prompt == "" ||
 		record.CorrectAnswer == "" ||
-		record.Difficulty < 1 {
+		!validDifficulty(record.Difficulty) {
 		t.Fatalf(
 			"invalid %s question record: %+v",
 			catalog.Level,
@@ -610,19 +270,20 @@ func assertQuestionRecord(
 	}
 	switch record.Type {
 	case model.QuestionMultipleChoice, model.QuestionReadingComp, model.QuestionListening:
-		if !contains(
-			record.Options,
-			record.CorrectAnswer,
-		) {
+		distinct := make(map[string]bool)
+		for _, option := range record.Options {
+			distinct[option] = true
+		}
+		if len(record.Options) != 4 || len(distinct) != 4 || !distinct[record.CorrectAnswer] {
 			t.Fatalf(
-				"question %q answer %q is not in options %v",
+				"question %q needs 4 distinct options including answer %q, got %v",
 				record.QuestionKey,
 				record.CorrectAnswer,
 				record.Options,
 			)
 		}
 	case model.QuestionWordOrder:
-		if len(record.Options) == 0 || strings.Join(
+		if len(record.Options) < 2 || strings.Join(
 			record.Options,
 			"",
 		) != record.CorrectAnswer {
@@ -640,49 +301,75 @@ func assertQuestionRecord(
 	}
 }
 
-// TestN4RecordsCoverOfficialItemTypes pins N4 to the JLPT item types the
-// app models, so a dropped record group under data/ja/n4/ is caught.
-func TestN4RecordsCoverOfficialItemTypes(t *testing.T) {
+// TestRecordLevelsCoverItemTypes pins each level's item types, so a dropped
+// record group is caught. N4 follows the JLPT taxonomy; N5 keeps the app's
+// beginner drills from before ADR-067 alongside JLPT-style items.
+func TestRecordLevelsCoverItemTypes(t *testing.T) {
 	t.Parallel()
 
-	want := map[model.Skill]bool{
-		model.SkillVocabKanjiReading:      true,
-		model.SkillVocabOrthography:       true,
-		model.SkillVocabContext:           true,
-		model.SkillVocabParaphrase:        true,
-		model.SkillVocabUsage:             true,
-		model.SkillGrammarForm:            true,
-		model.SkillSentenceComposition:    true,
-		model.SkillGrammarText:            true,
-		model.SkillReadingShort:           true,
-		model.SkillReadingMedium:          true,
-		model.SkillReadingInformation:     true,
-		model.SkillListeningTask:          true,
-		model.SkillListeningKeyPoint:      true,
-		model.SkillListeningVerbal:        true,
-		model.SkillListeningQuickResponse: true,
+	wantByLevel := map[string][]model.Skill{
+		"N5": {
+			model.SkillKanaReading,
+			model.SkillKanaRecall,
+			model.SkillKanaHandwriting,
+			model.SkillVocabMeaning,
+			model.SkillVocabRecall,
+			model.SkillVocabHandwriting,
+			model.SkillVocabKanjiRecall,
+			model.SkillVocabContext,
+			model.SkillGrammarForm,
+			model.SkillSentenceComposition,
+			model.SkillReadingShort,
+			model.SkillListeningTask,
+			model.SkillListeningKeyPoint,
+			model.SkillListeningOutline,
+		},
+		"N4": {
+			model.SkillVocabKanjiReading,
+			model.SkillVocabOrthography,
+			model.SkillVocabContext,
+			model.SkillVocabParaphrase,
+			model.SkillVocabUsage,
+			model.SkillGrammarForm,
+			model.SkillSentenceComposition,
+			model.SkillGrammarText,
+			model.SkillReadingShort,
+			model.SkillReadingMedium,
+			model.SkillReadingInformation,
+			model.SkillListeningTask,
+			model.SkillListeningKeyPoint,
+			model.SkillListeningVerbal,
+			model.SkillListeningQuickResponse,
+		},
 	}
-	catalog := levelCatalogForTest(
-		t,
-		"N4",
-	)
-	got := make(map[model.Skill]bool)
-	for _, material := range catalog.Materials {
-		for _, record := range material.Questions {
+	for level, skills := range wantByLevel {
+		want := make(map[model.Skill]bool)
+		for _, skill := range skills {
+			want[skill] = true
+		}
+		catalog := levelCatalogForTest(
+			t,
+			level,
+		)
+		got := make(map[model.Skill]bool)
+		for _, material := range catalog.Materials {
+			for _, record := range material.Questions {
+				got[record.ItemType] = true
+			}
+		}
+		for _, record := range catalog.Questions {
 			got[record.ItemType] = true
 		}
-	}
-	for _, record := range catalog.Questions {
-		got[record.ItemType] = true
-	}
-	if !reflect.DeepEqual(
-		got,
-		want,
-	) {
-		t.Fatalf(
-			"N4 item types = %v, want %v",
+		if !reflect.DeepEqual(
 			got,
 			want,
-		)
+		) {
+			t.Fatalf(
+				"%s item types = %v, want %v",
+				level,
+				got,
+				want,
+			)
+		}
 	}
 }

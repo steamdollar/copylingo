@@ -92,7 +92,7 @@ make infra
 make migrate
 
 # 3. Seed the current study materials and questions
-# Datasets live under cmd/seeding/data/<language>/; Japanese (ja) is the default and only language today.
+# Records live in cmd/seeding/data/<language>/<level>.json; Japanese (ja) is the default and only language today.
 go run ./cmd/seeding
 
 # 4. Run the Go server

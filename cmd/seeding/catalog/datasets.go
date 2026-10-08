@@ -1,119 +1,22 @@
 package catalog
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"strings"
 
 	"github.com/lsj/copylingo/cmd/seeding/data"
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// The JSON files under cmd/seeding/data/<language>/ are the content source of
-// truth; question- and material-generation logic stays in Go. Edit the JSON to
-// change content.
+// One JSON file per level, cmd/seeding/data/<language>/<level>.json, is the
+// content source of truth (ADR-066, ADR-067). The seeder only copies it into
+// the database; nothing is generated at seed time.
 
 // Japanese is the only seeded language today. The registry, data layout, and
-// seeder CLI are keyed by language, but the material builders here are still
-// Japanese-shaped (kana, kanji), so they stamp this code directly (ADR-065).
+// seeder CLI are keyed by language (ADR-065).
 const Japanese = "ja"
-
-const (
-	VocabDifficulty = 2
-
-	GrammarDifficulty = 2
-)
-
-type VocabWord struct {
-	ID           string `json:"id"`
-	Level        string `json:"level,omitempty"`
-	Kana         string `json:"kana"`
-	Kanji        string `json:"kanji"`
-	MeaningKo    string `json:"meaning_ko"`
-	PartOfSpeech string `json:"part_of_speech"`
-}
-
-type GrammarPoint struct {
-	ID            string `json:"id"`
-	Level         string `json:"level,omitempty"`
-	Pattern       string `json:"pattern"`
-	MeaningKo     string `json:"meaning_ko"`
-	ExplanationKo string `json:"explanation_ko"`
-	Example       string `json:"example"`
-	// ExampleReading is the full-hiragana reading of Example (katakana kept as-is),
-	// so learners can read kanji-heavy example sentences. Seeded into the grammar
-	// material payload and shown as a 읽기 line under the 예문.
-	ExampleReading string   `json:"example_reading"`
-	TranslationKo  string   `json:"translation_ko"`
-	ClozePrompt    string   `json:"cloze_prompt"`
-	CorrectAnswer  string   `json:"correct_answer"`
-	FormOptions    []string `json:"form_options"`
-}
-
-// VocabContext carries the cloze data for a single word's 文脈規定 questions.
-// WordID references an existing word in the same level catalog; coverage is partial by design
-// (only words with authored example sentences get context questions). Each
-// cloze in Clozes becomes one static question sharing FormOptions/CorrectAnswer.
-type VocabContext struct {
-	WordID        string   `json:"word_id"`
-	CorrectAnswer string   `json:"correct_answer"`
-	FormOptions   []string `json:"form_options"`
-	Clozes        []string `json:"clozes"`
-}
-
-// ListeningQuestion is an original listening-comprehension MCQ. Script is
-// synthesized into audio and is intentionally separate from the visible prompt.
-type ListeningQuestion struct {
-	ID            string      `json:"id"`
-	Level         string      `json:"level,omitempty"`
-	Skill         model.Skill `json:"skill"`
-	Script        string      `json:"script"`
-	Prompt        string      `json:"prompt"`
-	Options       []string    `json:"options"`
-	CorrectAnswer string      `json:"correct_answer"`
-	Explanation   string      `json:"explanation"`
-	AudioPath     string      `json:"audio_path,omitempty"`
-	Difficulty    int         `json:"difficulty"`
-}
-
-// ReadingVocabulary is one key-vocabulary entry surfaced on a reading study card.
-type ReadingVocabulary struct {
-	Surface   string `json:"surface"`
-	Reading   string `json:"reading"`
-	MeaningKo string `json:"meaning_ko"`
-}
-
-// ReadingPassage is an original reading passage plus one MCQ over it.
-// Passage/Reading/KeyVocabulary feed the study material; Prompt/Options/
-// CorrectAnswer/Explanation feed the quiz question (ADR-036).
-type ReadingPassage struct {
-	ID            string              `json:"id"`
-	Level         string              `json:"level,omitempty"`
-	Skill         model.Skill         `json:"skill"`
-	Title         string              `json:"title"`
-	Passage       string              `json:"passage"`
-	Reading       string              `json:"reading"`
-	KeyVocabulary []ReadingVocabulary `json:"key_vocabulary"`
-	Prompt        string              `json:"prompt"`
-	Options       []string            `json:"options"`
-	CorrectAnswer string              `json:"correct_answer"`
-	Explanation   string              `json:"explanation"`
-	Difficulty    int                 `json:"difficulty"`
-}
-
-// WordOrderQuestion is a static sentence-composition item. Chunks retain
-// their authored order in the catalog; the Telegram renderer shuffles them
-// deterministically per session/question while callbacks carry the original
-// option index.
-type WordOrderQuestion struct {
-	ID            string   `json:"id"`
-	GrammarID     string   `json:"grammar_id"`
-	Prompt        string   `json:"prompt"`
-	Chunks        []string `json:"chunks"`
-	CorrectAnswer string   `json:"correct_answer"`
-	Explanation   string   `json:"explanation"`
-}
 
 // MaterialRecord is one materials-table row as authored data (ADR-066),
 // with the questions that link to it nested underneath. Nesting mirrors the
@@ -150,67 +53,32 @@ type QuestionRecord struct {
 	Difficulty    int                    `json:"difficulty"`
 }
 
-// levelRecords is the shape of every JSON file in a record level directory.
-type levelRecords struct {
+// levelFile is the shape of every level JSON file.
+type levelFile struct {
 	Materials []MaterialRecord `json:"materials"`
 	Questions []QuestionRecord `json:"questions"`
 }
 
-// LevelCatalog groups every authored dataset by language and proficiency
-// level. Adding a level extends the registry instead of adding level-named Go
-// variables and branching throughout material or question assembly.
-//
-// Materials (with nested questions) and Questions (material-less) hold
-// levels converted to the unified record format; the typed fields above them
-// are the legacy N5 datasets that still go through type-specific builders
-// until they are converted.
+// LevelCatalog is one registered language level and its records. Materials
+// carry their nested questions; Questions holds the material-less ones.
 type LevelCatalog struct {
-	Language                    string
-	Level                       string
-	Words                       []VocabWord
-	GrammarPoints               []GrammarPoint
-	VocabContexts               []VocabContext
-	ListeningQuestions          []ListeningQuestion
-	ReadingPassages             []ReadingPassage
-	WordOrderQuestions          []WordOrderQuestion
-	Materials                   []MaterialRecord
-	Questions                   []QuestionRecord
-	GenerateVocabularyQuestions bool
-	GenerateGrammarQuestions    bool
+	Language  string
+	Level     string
+	Materials []MaterialRecord
+	Questions []QuestionRecord
 }
 
-// levelCatalogFiles names one level's datasets. Legacy file names resolve
-// under data/<language>/; recordDir names data/<language>/<recordDir>/,
-// whose JSON files hold unified records.
+// levelCatalogFiles registers one level and its file under data/<language>/.
 type levelCatalogFiles struct {
-	language                    string
-	level                       string
-	vocab                       string
-	grammar                     string
-	vocabContext                string
-	listening                   string
-	reading                     string
-	wordOrder                   string
-	recordDir                   string
-	generateVocabularyQuestions bool
-	generateGrammarQuestions    bool
+	language string
+	level    string
+	file     string
 }
 
 var catalogFiles = []levelCatalogFiles{
-	{
-		language: Japanese, level: "N5", vocab: "n5_vocab.json", grammar: "n5_grammar.json",
-		vocabContext: "n5_vocab_context.json", listening: "n5_listening.json",
-		reading: "n5_reading.json", wordOrder: "n5_word_order.json",
-		generateVocabularyQuestions: true, generateGrammarQuestions: true,
-	},
-	{language: Japanese, level: "N4", recordDir: "n4"},
+	{language: Japanese, level: "N5", file: "n5.json"},
+	{language: Japanese, level: "N4", file: "n4.json"},
 }
-
-// KanaMap maps each kana to its romaji. Script-label and hint logic lives in Go.
-var KanaMap = mustLoadJSONFile[map[string]string](
-	Japanese,
-	"kana.json",
-)
 
 var levelCatalogs = loadLevelCatalogs(catalogFiles)
 
@@ -249,8 +117,8 @@ func LevelCatalogFor(
 	return LevelCatalog{}, false
 }
 
-// DefaultProficiencyLevel is the level used by legacy single-level builders
-// and kana content. Each language's first registry entry owns that policy.
+// DefaultProficiencyLevel is the default level for single-level tools. Each
+// language's first registry entry owns that policy.
 func DefaultProficiencyLevel(language string) string {
 	catalogs := LevelCatalogsFor(language)
 	if len(catalogs) == 0 {
@@ -274,115 +142,31 @@ func loadLevelCatalogs(files []levelCatalogFiles) []LevelCatalog {
 	)
 	for _, file := range files {
 		language := normalizeLanguage(file.language)
-		records := loadRecordDir(
+		records := mustLoadLevelFile(
 			language,
-			file.recordDir,
+			file.file,
 		)
 		catalogs = append(
 			catalogs,
 			LevelCatalog{
-				Language: language,
-				Level:    strings.ToUpper(strings.TrimSpace(file.level)),
-				Words: loadOptionalJSONFile[[]VocabWord](
-					language,
-					file.vocab,
-				),
-				GrammarPoints: loadOptionalJSONFile[[]GrammarPoint](
-					language,
-					file.grammar,
-				),
-				VocabContexts: loadOptionalJSONFile[[]VocabContext](
-					language,
-					file.vocabContext,
-				),
-				ListeningQuestions: loadOptionalJSONFile[[]ListeningQuestion](
-					language,
-					file.listening,
-				),
-				ReadingPassages: loadOptionalJSONFile[[]ReadingPassage](
-					language,
-					file.reading,
-				),
-				WordOrderQuestions: loadOptionalJSONFile[[]WordOrderQuestion](
-					language,
-					file.wordOrder,
-				),
-				Materials:                   records.Materials,
-				Questions:                   records.Questions,
-				GenerateVocabularyQuestions: file.generateVocabularyQuestions,
-				GenerateGrammarQuestions:    file.generateGrammarQuestions,
+				Language:  language,
+				Level:     strings.ToUpper(strings.TrimSpace(file.level)),
+				Materials: records.Materials,
+				Questions: records.Questions,
 			},
 		)
 	}
 	return catalogs
 }
 
-func loadOptionalJSONFile[T any](
+// mustLoadLevelFile decodes data/<language>/<name> at package init time.
+// Unknown fields are rejected so a misspelled key (e.g. an optional
+// audio_script) fails loudly instead of being dropped. A failure is a data
+// defect, not a runtime condition, so it panics.
+func mustLoadLevelFile(
 	language,
 	name string,
-) T {
-	if name == "" {
-		var zero T
-		return zero
-	}
-	return mustLoadJSONFile[T](
-		language,
-		name,
-	)
-}
-
-// loadRecordDir merges every JSON file under data/<language>/<dir>/ in
-// file-name order. Each file has the same {materials, questions} shape, so a
-// level can live in one file or be split by count without code changes.
-func loadRecordDir(
-	language,
-	dir string,
-) levelRecords {
-	var records levelRecords
-	if dir == "" {
-		return records
-	}
-	pattern := language + "/" + dir + "/*.json"
-	names, err := fs.Glob(
-		data.FS,
-		pattern,
-	)
-	if err != nil {
-		panic(fmt.Errorf(
-			"catalog: glob %s datasets: %w",
-			pattern,
-			err,
-		))
-	}
-	for _, name := range names {
-		content, err := data.FS.ReadFile(name)
-		if err != nil {
-			panic(fmt.Errorf(
-				"catalog: read %s dataset: %w",
-				name,
-				err,
-			))
-		}
-		file := mustLoadJSON[levelRecords](
-			name,
-			content,
-		)
-		records.Materials = append(
-			records.Materials,
-			file.Materials...,
-		)
-		records.Questions = append(
-			records.Questions,
-			file.Questions...,
-		)
-	}
-	return records
-}
-
-func mustLoadJSONFile[T any](
-	language,
-	name string,
-) T {
+) levelFile {
 	path := language + "/" + name
 	content, err := data.FS.ReadFile(path)
 	if err != nil {
@@ -392,44 +176,15 @@ func mustLoadJSONFile[T any](
 			err,
 		))
 	}
-	return mustLoadJSON[T](
-		path,
-		content,
-	)
-}
-
-// loadJSON decodes an embedded dataset into T.
-func loadJSON[T any](
-	name string,
-	data []byte,
-) (T, error) {
-	var v T
-	if err := json.Unmarshal(
-		data,
-		&v,
-	); err != nil {
-		return v, fmt.Errorf(
-			"catalog: load %s dataset: %w",
-			name,
+	var file levelFile
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&file); err != nil {
+		panic(fmt.Errorf(
+			"catalog: decode %s dataset: %w",
+			path,
 			err,
-		)
+		))
 	}
-	return v, nil
-}
-
-// mustLoadJSON decodes an embedded dataset at package init time. A failure means
-// the embedded JSON is malformed — a build/data defect, not a runtime condition —
-// so panicking surfaces it immediately.
-func mustLoadJSON[T any](
-	name string,
-	data []byte,
-) T {
-	v, err := loadJSON[T](
-		name,
-		data,
-	)
-	if err != nil {
-		panic(err)
-	}
-	return v
+	return file
 }
