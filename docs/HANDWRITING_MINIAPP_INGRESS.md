@@ -90,7 +90,7 @@ export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
 
 make infra
 make migrate
-go run ./cmd/ja/seeder
+go run ./cmd/seeding
 go run ./cmd/server
 ```
 

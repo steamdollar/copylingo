@@ -92,8 +92,8 @@ make infra
 make migrate
 
 # 3. Seed the current study materials and questions
-# The current seed package contains Japanese learning content.
-go run ./cmd/ja/seeder
+# Datasets live under cmd/seeding/data/<language>/; Japanese (ja) is the default and only language today.
+go run ./cmd/seeding
 
 # 4. Run the Go server
 COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>" \
@@ -159,7 +159,7 @@ export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
 
 make infra
 make migrate
-go run ./cmd/ja/seeder
+go run ./cmd/seeding
 go run ./cmd/server
 ```
 

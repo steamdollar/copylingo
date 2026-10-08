@@ -14,7 +14,7 @@ func TestBuildVocabularyMaterials(t *testing.T) {
 
 	materials := BuildVocabularyMaterials(levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	).Words)
 	if len(materials) != 789 {
 		t.Fatalf(
@@ -37,7 +37,7 @@ func TestBuildVocabularyMaterialsPayload(t *testing.T) {
 
 	for _, material := range BuildVocabularyMaterials(levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	).Words) {
 		if material.MaterialKey != "ja:vocab:n5_word_024" {
 			continue
@@ -72,7 +72,7 @@ func TestBuildGrammarMaterials(t *testing.T) {
 
 	materials := BuildGrammarMaterials(levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	).GrammarPoints)
 	if len(materials) != 80 {
 		t.Fatalf(
@@ -91,8 +91,8 @@ func TestBuildGrammarMaterials(t *testing.T) {
 
 	for _, material := range materials {
 		if material.Category != model.MaterialCategoryGrammar ||
-			material.Language != VocabLanguage ||
-			material.ProficiencyLevel != DefaultProficiencyLevel() ||
+			material.Language != Japanese ||
+			material.ProficiencyLevel != DefaultProficiencyLevel(Japanese) ||
 			material.Difficulty != GrammarDifficulty {
 			t.Fatalf(
 				"unexpected grammar material metadata: %+v",
@@ -107,7 +107,7 @@ func TestBuildGrammarMaterialsPayload(t *testing.T) {
 
 	for _, material := range BuildGrammarMaterials(levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	).GrammarPoints) {
 		if material.MaterialKey != "ja:grammar:n5_grammar_009" {
 			continue
@@ -160,8 +160,8 @@ func TestBuildKanaMaterials(t *testing.T) {
 
 	for _, material := range materials {
 		if material.Category != model.MaterialCategoryKana ||
-			material.Language != VocabLanguage ||
-			material.ProficiencyLevel != DefaultProficiencyLevel() ||
+			material.Language != Japanese ||
+			material.ProficiencyLevel != DefaultProficiencyLevel(Japanese) ||
 			material.Difficulty != 1 {
 			t.Fatalf(
 				"unexpected kana material metadata: %+v",
@@ -177,7 +177,7 @@ func TestBuildAllMaterialsIncludesGrammar(t *testing.T) {
 	materials := BuildAllMaterials()
 	catalog := levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	)
 	want := len(KanaMap) + len(catalog.Words) + len(catalog.GrammarPoints) + len(catalog.ReadingPassages)
 	if len(materials) != want {
@@ -232,8 +232,8 @@ func TestBuildReadingMaterials(t *testing.T) {
 	material := materials[0]
 	if material.MaterialKey != "ja:reading:n5_reading_0001" ||
 		material.Category != model.MaterialCategoryReading ||
-		material.Language != VocabLanguage ||
-		material.ProficiencyLevel != DefaultProficiencyLevel() ||
+		material.Language != Japanese ||
+		material.ProficiencyLevel != DefaultProficiencyLevel(Japanese) ||
 		material.Title != "図書館のお知らせ" ||
 		material.Difficulty != 2 {
 		t.Fatalf(
@@ -314,7 +314,7 @@ func TestN5WordsIntegrity(t *testing.T) {
 
 	words := levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	).Words
 	if len(words) != 789 {
 		t.Fatalf(
@@ -349,7 +349,7 @@ func TestN5GrammarPointsIntegrity(t *testing.T) {
 
 	grammarPoints := levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	).GrammarPoints
 	if len(grammarPoints) != 80 {
 		t.Fatalf(
@@ -435,7 +435,7 @@ func TestN5VocabContextIntegrity(t *testing.T) {
 
 	catalog := levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	)
 	if len(catalog.VocabContexts) != 15 {
 		t.Fatalf(
@@ -567,7 +567,7 @@ func TestBuildAdditionalLevelMaterialsAreLevelAwareAndDoNotCollide(t *testing.T)
 
 	defaultCatalog := levelCatalogForTest(
 		t,
-		DefaultProficiencyLevel(),
+		DefaultProficiencyLevel(Japanese),
 	)
 	additionalCatalog := levelCatalogForTest(
 		t,

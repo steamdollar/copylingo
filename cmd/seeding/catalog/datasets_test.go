@@ -13,7 +13,10 @@ func levelCatalogForTest(
 	level string,
 ) LevelCatalog {
 	t.Helper()
-	catalog, ok := LevelCatalogFor(level)
+	catalog, ok := LevelCatalogFor(
+		Japanese,
+		level,
+	)
 	if !ok {
 		t.Fatalf(
 			"catalog for level %q not found",
@@ -26,22 +29,33 @@ func levelCatalogForTest(
 func TestLevelCatalogRegistry(t *testing.T) {
 	t.Parallel()
 
-	catalogs := LevelCatalogs()
+	catalogs := LevelCatalogsFor(Japanese)
 	if len(catalogs) < 2 {
 		t.Fatalf(
 			"catalog count = %d, want at least 2",
 			len(catalogs),
 		)
 	}
-	if catalogs[0].Level != DefaultProficiencyLevel() {
+	if catalogs[0].Level != DefaultProficiencyLevel(Japanese) {
 		t.Fatalf(
 			"default level = %q, first catalog = %q",
-			DefaultProficiencyLevel(),
+			DefaultProficiencyLevel(Japanese),
 			catalogs[0].Level,
 		)
 	}
 	for _, catalog := range catalogs {
-		got, ok := LevelCatalogFor("  " + strings.ToLower(catalog.Level) + "  ")
+		if catalog.Language != Japanese {
+			t.Fatalf(
+				"catalog %q language = %q, want %q",
+				catalog.Level,
+				catalog.Language,
+				Japanese,
+			)
+		}
+		got, ok := LevelCatalogFor(
+			" JA ",
+			"  "+strings.ToLower(catalog.Level)+"  ",
+		)
 		if !ok || got.Level != catalog.Level {
 			t.Fatalf(
 				"normalized lookup for %q = (%q, %v)",
@@ -51,12 +65,29 @@ func TestLevelCatalogRegistry(t *testing.T) {
 			)
 		}
 	}
-	if _, ok := LevelCatalogFor("N0"); ok {
+	if _, ok := LevelCatalogFor(
+		Japanese,
+		"N0",
+	); ok {
 		t.Fatal("unknown level unexpectedly resolved")
+	}
+	// A language without a data/<code>/ registry entry must not borrow
+	// another language's catalogs.
+	if got := LevelCatalogsFor("el"); len(got) != 0 {
+		t.Fatalf(
+			"unregistered language catalogs = %d, want 0",
+			len(got),
+		)
+	}
+	if _, ok := LevelCatalogFor(
+		"el",
+		catalogs[0].Level,
+	); ok {
+		t.Fatal("level resolved for an unregistered language")
 	}
 }
 
-// Integrity regressions for the embedded datasets. The JSON files under data/
+// Integrity regressions for the embedded datasets. The JSON files under data/<language>/
 // are the source of truth, so these checks catch a malformed or regressed file
 // at test time instead of at runtime. They inspect the package vars directly,
 // i.e. exactly what the seeder consumes.

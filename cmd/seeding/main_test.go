@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	ja "github.com/lsj/copylingo/cmd/ja/catalog"
+	"github.com/lsj/copylingo/cmd/seeding/catalog"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -17,12 +17,14 @@ var (
 )
 
 func catalogForTest(level string) levelCatalog {
-	for _, catalog := range levelCatalogs {
-		if catalog.Level == level {
-			return catalog
-		}
+	entry, ok := catalog.LevelCatalogFor(
+		catalog.Japanese,
+		level,
+	)
+	if !ok {
+		panic("test catalog not found: " + level)
 	}
-	panic("test catalog not found: " + level)
+	return entry
 }
 
 func TestKanaScriptLabel(t *testing.T) {
@@ -214,7 +216,7 @@ func TestAmbiguousReverseKanaQuestionsIncludeHint(t *testing.T) {
 			func(t *testing.T) {
 				t.Parallel()
 
-				romaji := ja.KanaMap[tt.kana]
+				romaji := catalog.KanaMap[tt.kana]
 				type2 := buildQuestion(
 					romaji,
 					tt.kana,
@@ -324,9 +326,9 @@ func TestBuildKanaQuestionsSetsStableQuestionKeys(t *testing.T) {
 
 	materialIDsByKana := make(
 		map[string]int,
-		len(ja.KanaMap),
+		len(catalog.KanaMap),
 	)
-	for kana := range ja.KanaMap {
+	for kana := range catalog.KanaMap {
 		materialIDsByKana[kana] = len(materialIDsByKana) + 1
 	}
 
@@ -483,11 +485,11 @@ func TestBuildKanaToMeaningQuestion(t *testing.T) {
 			model.CategoryVocabulary,
 		)
 	}
-	if q.Language != vocabLanguage {
+	if q.Language != catalog.Japanese {
 		t.Fatalf(
 			"language = %q, want %q",
 			q.Language,
-			vocabLanguage,
+			catalog.Japanese,
 		)
 	}
 	if q.ProficiencyLevel != defaultTestCatalog.Level {
@@ -764,11 +766,11 @@ func TestBuildGrammarMeaningQuestion(t *testing.T) {
 			model.CategoryGrammar,
 		)
 	}
-	if q.Language != vocabLanguage {
+	if q.Language != catalog.Japanese {
 		t.Fatalf(
 			"language = %q, want %q",
 			q.Language,
-			vocabLanguage,
+			catalog.Japanese,
 		)
 	}
 	if q.ProficiencyLevel != defaultTestCatalog.Level {
@@ -778,11 +780,11 @@ func TestBuildGrammarMeaningQuestion(t *testing.T) {
 			defaultTestCatalog.Level,
 		)
 	}
-	if q.Difficulty != ja.GrammarDifficulty {
+	if q.Difficulty != catalog.GrammarDifficulty {
 		t.Fatalf(
 			"difficulty = %d, want %d",
 			q.Difficulty,
-			ja.GrammarDifficulty,
+			catalog.GrammarDifficulty,
 		)
 	}
 	if q.CorrectAnswer != point.MeaningKo {
@@ -1006,7 +1008,7 @@ func TestBuildVocabularyQuestions(t *testing.T) {
 		if q.Skill != nil {
 			countBySkill[*q.Skill]++
 		}
-		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
+		if q.Language != catalog.Japanese || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
 			t.Fatalf(
 				"unexpected question metadata: %+v",
@@ -1175,8 +1177,8 @@ func TestBuildGrammarQuestions(t *testing.T) {
 	)
 	for _, q := range questions {
 		countByType[q.Type]++
-		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
-			q.Category != model.CategoryGrammar || q.Difficulty != ja.GrammarDifficulty {
+		if q.Language != catalog.Japanese || q.ProficiencyLevel != defaultTestCatalog.Level ||
+			q.Category != model.CategoryGrammar || q.Difficulty != catalog.GrammarDifficulty {
 			t.Fatalf(
 				"unexpected question metadata: %+v",
 				q,
@@ -1267,7 +1269,7 @@ func TestBuildVocabContextQuestions(t *testing.T) {
 				q,
 			)
 		}
-		if q.Language != vocabLanguage || q.ProficiencyLevel != defaultTestCatalog.Level ||
+		if q.Language != catalog.Japanese || q.ProficiencyLevel != defaultTestCatalog.Level ||
 			q.Category != model.CategoryVocabulary || q.Difficulty != vocabDifficulty {
 			t.Fatalf(
 				"unexpected question metadata: %+v",
@@ -1355,7 +1357,7 @@ func TestBuildListeningQuestions(t *testing.T) {
 	for i, question := range questions {
 		item := defaultTestCatalog.ListeningQuestions[i]
 		if question.Type != model.QuestionListening || question.Category != model.CategoryListening ||
-			question.Language != vocabLanguage || question.ProficiencyLevel != defaultTestCatalog.Level {
+			question.Language != catalog.Japanese || question.ProficiencyLevel != defaultTestCatalog.Level {
 			t.Fatalf(
 				"question %d has unexpected metadata: %+v",
 				i,
@@ -1636,7 +1638,7 @@ func TestBuildReadingQuestions(t *testing.T) {
 	if question.Type != model.QuestionMultipleChoice ||
 		question.Skill == nil || *question.Skill != model.SkillReadingShort ||
 		question.Category != model.CategoryReading ||
-		question.Language != vocabLanguage ||
+		question.Language != catalog.Japanese ||
 		question.ProficiencyLevel != defaultTestCatalog.Level ||
 		question.Difficulty != 2 {
 		t.Fatalf(

@@ -1,22 +1,24 @@
 package catalog
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/lsj/copylingo/cmd/seeding/data"
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// The JSON files under data/ are the content source of truth; question- and
-// material-generation logic stays in Go. Edit the JSON to change content.
+// The JSON files under cmd/seeding/data/<language>/ are the content source of
+// truth; question- and material-generation logic stays in Go. Edit the JSON to
+// change content.
 
-//go:embed data/*.json
-var dataFS embed.FS
+// Japanese is the only seeded language today. The registry, data layout, and
+// seeder CLI are keyed by language, but the material builders here are still
+// Japanese-shaped (kana, kanji), so they stamp this code directly (ADR-065).
+const Japanese = "ja"
 
 const (
-	VocabLanguage   = "ja"
 	VocabDifficulty = 2
 
 	GrammarDifficulty = 2
@@ -133,10 +135,11 @@ type QuestionSeed struct {
 	Difficulty    int                    `json:"difficulty"`
 }
 
-// LevelCatalog groups every authored dataset by proficiency level. Adding a
-// level extends the registry instead of adding level-named Go variables and
-// branching throughout material or question assembly.
+// LevelCatalog groups every authored dataset by language and proficiency
+// level. Adding a level extends the registry instead of adding level-named Go
+// variables and branching throughout material or question assembly.
 type LevelCatalog struct {
+	Language                    string
 	Level                       string
 	Words                       []VocabWord
 	GrammarPoints               []GrammarPoint
@@ -149,7 +152,10 @@ type LevelCatalog struct {
 	GenerateGrammarQuestions    bool
 }
 
+// levelCatalogFiles names one level's datasets; file names resolve under
+// data/<language>/.
 type levelCatalogFiles struct {
+	language                    string
 	level                       string
 	vocab                       string
 	grammar                     string
@@ -164,33 +170,55 @@ type levelCatalogFiles struct {
 
 var catalogFiles = []levelCatalogFiles{
 	{
-		level: "N5", vocab: "n5_vocab.json", grammar: "n5_grammar.json",
+		language: Japanese, level: "N5", vocab: "n5_vocab.json", grammar: "n5_grammar.json",
 		vocabContext: "n5_vocab_context.json", listening: "n5_listening.json",
 		reading: "n5_reading.json", wordOrder: "n5_word_order.json",
 		generateVocabularyQuestions: true, generateGrammarQuestions: true,
 	},
 	{
-		level: "N4", vocab: "n4_vocab.json", grammar: "n4_grammar.json",
+		language: Japanese, level: "N4", vocab: "n4_vocab.json", grammar: "n4_grammar.json",
 		listening: "n4_listening.json", reading: "n4_reading.json",
 		questionSeeds: "n4_question_seeds.json",
 	},
 }
 
 // KanaMap maps each kana to its romaji. Script-label and hint logic lives in Go.
-var KanaMap = mustLoadJSONFile[map[string]string]("kana.json")
+var KanaMap = mustLoadJSONFile[map[string]string](
+	Japanese,
+	"kana.json",
+)
 
 var levelCatalogs = loadLevelCatalogs(catalogFiles)
 
-// LevelCatalogs returns the registered catalogs in seeding order.
-func LevelCatalogs() []LevelCatalog {
-	return append([]LevelCatalog(nil), levelCatalogs...)
+// LevelCatalogsFor returns a language's registered catalogs in seeding order.
+// An unregistered language yields an empty slice.
+func LevelCatalogsFor(language string) []LevelCatalog {
+	language = normalizeLanguage(language)
+	catalogs := make(
+		[]LevelCatalog,
+		0,
+		len(levelCatalogs),
+	)
+	for _, catalog := range levelCatalogs {
+		if catalog.Language == language {
+			catalogs = append(
+				catalogs,
+				catalog,
+			)
+		}
+	}
+	return catalogs
 }
 
 // LevelCatalogFor resolves a catalog without exposing level-specific symbols.
-func LevelCatalogFor(level string) (LevelCatalog, bool) {
+func LevelCatalogFor(
+	language,
+	level string,
+) (LevelCatalog, bool) {
+	language = normalizeLanguage(language)
 	level = strings.ToUpper(strings.TrimSpace(level))
 	for _, catalog := range levelCatalogs {
-		if catalog.Level == level {
+		if catalog.Language == language && catalog.Level == level {
 			return catalog, true
 		}
 	}
@@ -198,54 +226,119 @@ func LevelCatalogFor(level string) (LevelCatalog, bool) {
 }
 
 // DefaultProficiencyLevel is the level used by legacy single-level builders
-// and kana content. The first registry entry owns that compatibility policy.
-func DefaultProficiencyLevel() string {
-	if len(levelCatalogs) == 0 {
-		panic("catalog: no level catalogs registered")
+// and kana content. Each language's first registry entry owns that policy.
+func DefaultProficiencyLevel(language string) string {
+	catalogs := LevelCatalogsFor(language)
+	if len(catalogs) == 0 {
+		panic(fmt.Sprintf(
+			"catalog: no level catalogs registered for language %q",
+			language,
+		))
 	}
-	return levelCatalogs[0].Level
+	return catalogs[0].Level
+}
+
+func normalizeLanguage(language string) string {
+	return strings.ToLower(strings.TrimSpace(language))
 }
 
 func loadLevelCatalogs(files []levelCatalogFiles) []LevelCatalog {
-	catalogs := make([]LevelCatalog, 0, len(files))
+	catalogs := make(
+		[]LevelCatalog,
+		0,
+		len(files),
+	)
 	for _, file := range files {
-		catalogs = append(catalogs, LevelCatalog{
-			Level:                       strings.ToUpper(strings.TrimSpace(file.level)),
-			Words:                       loadOptionalJSONFile[[]VocabWord](file.vocab),
-			GrammarPoints:               loadOptionalJSONFile[[]GrammarPoint](file.grammar),
-			VocabContexts:               loadOptionalJSONFile[[]VocabContext](file.vocabContext),
-			ListeningQuestions:          loadOptionalJSONFile[[]ListeningQuestion](file.listening),
-			ReadingPassages:             loadOptionalJSONFile[[]ReadingPassage](file.reading),
-			WordOrderQuestions:          loadOptionalJSONFile[[]WordOrderQuestion](file.wordOrder),
-			QuestionSeeds:               loadOptionalJSONFile[[]QuestionSeed](file.questionSeeds),
-			GenerateVocabularyQuestions: file.generateVocabularyQuestions,
-			GenerateGrammarQuestions:    file.generateGrammarQuestions,
-		})
+		language := normalizeLanguage(file.language)
+		catalogs = append(
+			catalogs,
+			LevelCatalog{
+				Language: language,
+				Level:    strings.ToUpper(strings.TrimSpace(file.level)),
+				Words: loadOptionalJSONFile[[]VocabWord](
+					language,
+					file.vocab,
+				),
+				GrammarPoints: loadOptionalJSONFile[[]GrammarPoint](
+					language,
+					file.grammar,
+				),
+				VocabContexts: loadOptionalJSONFile[[]VocabContext](
+					language,
+					file.vocabContext,
+				),
+				ListeningQuestions: loadOptionalJSONFile[[]ListeningQuestion](
+					language,
+					file.listening,
+				),
+				ReadingPassages: loadOptionalJSONFile[[]ReadingPassage](
+					language,
+					file.reading,
+				),
+				WordOrderQuestions: loadOptionalJSONFile[[]WordOrderQuestion](
+					language,
+					file.wordOrder,
+				),
+				QuestionSeeds: loadOptionalJSONFile[[]QuestionSeed](
+					language,
+					file.questionSeeds,
+				),
+				GenerateVocabularyQuestions: file.generateVocabularyQuestions,
+				GenerateGrammarQuestions:    file.generateGrammarQuestions,
+			},
+		)
 	}
 	return catalogs
 }
 
-func loadOptionalJSONFile[T any](name string) T {
+func loadOptionalJSONFile[T any](
+	language,
+	name string,
+) T {
 	if name == "" {
 		var zero T
 		return zero
 	}
-	return mustLoadJSONFile[T](name)
+	return mustLoadJSONFile[T](
+		language,
+		name,
+	)
 }
 
-func mustLoadJSONFile[T any](name string) T {
-	data, err := dataFS.ReadFile("data/" + name)
+func mustLoadJSONFile[T any](
+	language,
+	name string,
+) T {
+	path := language + "/" + name
+	content, err := data.FS.ReadFile(path)
 	if err != nil {
-		panic(fmt.Errorf("catalog: read %s dataset: %w", name, err))
+		panic(fmt.Errorf(
+			"catalog: read %s dataset: %w",
+			path,
+			err,
+		))
 	}
-	return mustLoadJSON[T](name, data)
+	return mustLoadJSON[T](
+		path,
+		content,
+	)
 }
 
 // loadJSON decodes an embedded dataset into T.
-func loadJSON[T any](name string, data []byte) (T, error) {
+func loadJSON[T any](
+	name string,
+	data []byte,
+) (T, error) {
 	var v T
-	if err := json.Unmarshal(data, &v); err != nil {
-		return v, fmt.Errorf("catalog: load %s dataset: %w", name, err)
+	if err := json.Unmarshal(
+		data,
+		&v,
+	); err != nil {
+		return v, fmt.Errorf(
+			"catalog: load %s dataset: %w",
+			name,
+			err,
+		)
 	}
 	return v, nil
 }
@@ -253,8 +346,14 @@ func loadJSON[T any](name string, data []byte) (T, error) {
 // mustLoadJSON decodes an embedded dataset at package init time. A failure means
 // the embedded JSON is malformed — a build/data defect, not a runtime condition —
 // so panicking surfaces it immediately.
-func mustLoadJSON[T any](name string, data []byte) T {
-	v, err := loadJSON[T](name, data)
+func mustLoadJSON[T any](
+	name string,
+	data []byte,
+) T {
+	v, err := loadJSON[T](
+		name,
+		data,
+	)
 	if err != nil {
 		panic(err)
 	}

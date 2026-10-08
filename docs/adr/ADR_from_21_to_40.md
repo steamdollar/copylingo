@@ -220,7 +220,7 @@
   - `questions.material_id INT NULL REFERENCES materials(id) ON DELETE SET NULL`을 추가한다.
   - `questions.material_id`에는 partial index를 둔다.
   - Seed Question 식별을 위해 `questions.question_key VARCHAR(255) UNIQUE`를 추가한다.
-  - JA seed catalog는 `cmd/ja`로 통합한다.
+  - JA seed catalog는 `cmd/ja`로 통합한다. (ADR-065에서 `cmd/seeding`의 언어별 구조로 이동)
   - `cmd/ja`는 Kana map, N5 Vocabulary 500개, Kana/Vocabulary Material builder, stable `material_key` helper의 SSOT다.
   - JA Seeder는 Kana Material과 Vocabulary Material을 모두 upsert한 뒤 `material_key`로 Material을 조회한다.
   - JA Seeder는 기존 Kana/Vocabulary Question 생성 유형을 유지하고 생성 Question에 `material_id`와 stable `question_key`를 저장한다.

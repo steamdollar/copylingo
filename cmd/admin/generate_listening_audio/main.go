@@ -12,7 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 
-	ja "github.com/lsj/copylingo/cmd/ja/catalog"
+	"github.com/lsj/copylingo/cmd/seeding/catalog"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/repository"
@@ -54,12 +54,12 @@ func waitForNextCycle(
 func main() {
 	language := flag.String(
 		"language",
-		"ja",
+		catalog.Japanese,
 		"question language",
 	)
 	level := flag.String(
 		"level",
-		ja.DefaultProficiencyLevel(),
+		catalog.DefaultProficiencyLevel(catalog.Japanese),
 		"proficiency level",
 	)
 	timeout := flag.Duration(

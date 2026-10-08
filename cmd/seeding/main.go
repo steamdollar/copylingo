@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"hash/fnv"
 	"log"
@@ -14,34 +15,31 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 
-	ja "github.com/lsj/copylingo/cmd/ja/catalog"
+	"github.com/lsj/copylingo/cmd/seeding/catalog"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/repository"
 )
 
-const (
-	vocabLanguage   = ja.VocabLanguage
-	vocabDifficulty = ja.VocabDifficulty
-)
+const vocabDifficulty = catalog.VocabDifficulty
 
-type vocabWord = ja.VocabWord
-type grammarPoint = ja.GrammarPoint
-type vocabContext = ja.VocabContext
-type listeningQuestion = ja.ListeningQuestion
-type readingPassage = ja.ReadingPassage
-type wordOrderQuestion = ja.WordOrderQuestion
-type questionSeed = ja.QuestionSeed
-type levelCatalog = ja.LevelCatalog
+type vocabWord = catalog.VocabWord
+type grammarPoint = catalog.GrammarPoint
+type vocabContext = catalog.VocabContext
+type listeningQuestion = catalog.ListeningQuestion
+type readingPassage = catalog.ReadingPassage
+type wordOrderQuestion = catalog.WordOrderQuestion
+type questionSeed = catalog.QuestionSeed
+type levelCatalog = catalog.LevelCatalog
 
-var levelCatalogs = ja.LevelCatalogs()
-
+// defaultProficiencyLevel is the Japanese registry default. The question
+// builders below are Japanese-shaped, so they resolve it for that language.
 func defaultProficiencyLevel() string {
-	return ja.DefaultProficiencyLevel()
+	return catalog.DefaultProficiencyLevel(catalog.Japanese)
 }
 
 func kanaScriptLabel(kana string) string {
-	return ja.ScriptLabel(kana)
+	return catalog.ScriptLabel(kana)
 }
 
 func kanaDisambiguationHint(kana string) string {
@@ -59,17 +57,34 @@ func kanaDisambiguationHint(kana string) string {
 	}
 }
 
-func appendKanaDisambiguationHint(prompt, kana string) string {
+func appendKanaDisambiguationHint(
+	prompt,
+	kana string,
+) string {
 	if hint := kanaDisambiguationHint(kana); hint != "" {
-		return fmt.Sprintf("%s<br>힌트: <b>%s</b>", prompt, hint)
+		return fmt.Sprintf(
+			"%s<br>힌트: <b>%s</b>",
+			prompt,
+			hint,
+		)
 	}
 	return prompt
 }
 
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.DB.Host, cfg.DB.Port, cfg.DB.User, cfg.DB.Password, cfg.DB.DBName, cfg.DB.SSLMode)
-	db, err := sqlx.Connect("postgres", dsn)
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.DB.Host,
+		cfg.DB.Port,
+		cfg.DB.User,
+		cfg.DB.Password,
+		cfg.DB.DBName,
+		cfg.DB.SSLMode,
+	)
+	db, err := sqlx.Connect(
+		"postgres",
+		dsn,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -77,52 +92,137 @@ func initDB(cfg *config.Config) (*sqlx.DB, error) {
 }
 
 func main() {
+	language := flag.String(
+		"language",
+		catalog.Japanese,
+		"seed catalog language (ISO 639-1); datasets live under cmd/seeding/data/<language>/",
+	)
+	flag.Parse()
+
+	levelCatalogs := catalog.LevelCatalogsFor(*language)
+	if len(levelCatalogs) == 0 {
+		log.Fatalf(
+			"No seed catalog registered for language %q",
+			*language,
+		)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf(
+			"Failed to load config: %v",
+			err,
+		)
 	}
 
 	db, err := initDB(cfg)
 	if err != nil {
-		log.Fatalf("Database connection failed: %v", err)
+		log.Fatalf(
+			"Database connection failed: %v",
+			err,
+		)
 	}
 	defer db.Close()
 
 	repos := repository.NewRepositories(db)
 	ctx := context.Background()
 
-	levels := make([]string, 0, len(levelCatalogs))
-	allWords := make([]vocabWord, 0)
-	allGrammarPoints := make([]grammarPoint, 0)
-	allReadingPassages := make([]readingPassage, 0)
-	for _, catalog := range levelCatalogs {
-		levels = append(levels, catalog.Level)
-		allWords = append(allWords, catalog.Words...)
-		allGrammarPoints = append(allGrammarPoints, catalog.GrammarPoints...)
-		allReadingPassages = append(allReadingPassages, catalog.ReadingPassages...)
+	levels := make(
+		[]string,
+		0,
+		len(levelCatalogs),
+	)
+	allWords := make(
+		[]vocabWord,
+		0,
+	)
+	allGrammarPoints := make(
+		[]grammarPoint,
+		0,
+	)
+	allReadingPassages := make(
+		[]readingPassage,
+		0,
+	)
+	for _, entry := range levelCatalogs {
+		levels = append(
+			levels,
+			entry.Level,
+		)
+		allWords = append(
+			allWords,
+			entry.Words...,
+		)
+		allGrammarPoints = append(
+			allGrammarPoints,
+			entry.GrammarPoints...,
+		)
+		allReadingPassages = append(
+			allReadingPassages,
+			entry.ReadingPassages...,
+		)
 	}
 
-	materials := ja.BuildAllMaterialsForLevels(levels...)
-	if err := repos.Material.UpsertBatch(ctx, materials); err != nil {
-		log.Fatalf("Failed to upsert Japanese materials batch: %v", err)
+	materials := catalog.BuildAllMaterialsForLevels(levels...)
+	if err := repos.Material.UpsertBatch(
+		ctx,
+		materials,
+	); err != nil {
+		log.Fatalf(
+			"Failed to upsert %s materials batch: %v",
+			*language,
+			err,
+		)
 	}
-	log.Printf("Successfully upserted %d Japanese materials.", len(materials))
+	log.Printf(
+		"Successfully upserted %d %s materials.",
+		len(materials),
+		*language,
+	)
 
-	materialIDsByKana, err := loadKanaMaterialIDs(ctx, repos.Material, ja.KanaMap)
+	materialIDsByKana, err := loadKanaMaterialIDs(
+		ctx,
+		repos.Material,
+		catalog.KanaMap,
+	)
 	if err != nil {
-		log.Fatalf("Failed to load kana materials: %v", err)
+		log.Fatalf(
+			"Failed to load kana materials: %v",
+			err,
+		)
 	}
-	materialIDsByWordID, err := loadVocabularyMaterialIDs(ctx, repos.Material, allWords)
+	materialIDsByWordID, err := loadVocabularyMaterialIDs(
+		ctx,
+		repos.Material,
+		allWords,
+	)
 	if err != nil {
-		log.Fatalf("Failed to load vocabulary materials: %v", err)
+		log.Fatalf(
+			"Failed to load vocabulary materials: %v",
+			err,
+		)
 	}
-	materialIDsByGrammarID, err := loadGrammarMaterialIDs(ctx, repos.Material, allGrammarPoints)
+	materialIDsByGrammarID, err := loadGrammarMaterialIDs(
+		ctx,
+		repos.Material,
+		allGrammarPoints,
+	)
 	if err != nil {
-		log.Fatalf("Failed to load grammar materials: %v", err)
+		log.Fatalf(
+			"Failed to load grammar materials: %v",
+			err,
+		)
 	}
-	materialIDsByReadingID, err := loadReadingMaterialIDs(ctx, repos.Material, allReadingPassages)
+	materialIDsByReadingID, err := loadReadingMaterialIDs(
+		ctx,
+		repos.Material,
+		allReadingPassages,
+	)
 	if err != nil {
-		log.Fatalf("Failed to load reading materials: %v", err)
+		log.Fatalf(
+			"Failed to load reading materials: %v",
+			err,
+		)
 	}
 
 	rng := rand.New(rand.NewSource(1))
@@ -136,50 +236,97 @@ func main() {
 		materialIDsByReadingID,
 	)
 	questions := buildKanaQuestions(materialIDsByKana)
-	for _, catalog := range levelCatalogs {
-		if catalog.GenerateVocabularyQuestions {
+	for _, entry := range levelCatalogs {
+		if entry.GenerateVocabularyQuestions {
 			questions = append(
 				questions,
-				buildVocabularyQuestionsForLevel(rng, catalog.Level, catalog.Words, materialIDsByWordID)...)
+				buildVocabularyQuestionsForLevel(
+					rng,
+					entry.Level,
+					entry.Words,
+					materialIDsByWordID,
+				)...,
+			)
 		}
 		questions = append(
 			questions,
 			buildVocabContextQuestionsForLevel(
 				rng,
-				catalog.Level,
-				catalog.VocabContexts,
-				wordsByID(catalog.Words),
+				entry.Level,
+				entry.VocabContexts,
+				wordsByID(entry.Words),
 				materialIDsByWordID,
-			)...)
-		if catalog.GenerateGrammarQuestions {
+			)...,
+		)
+		if entry.GenerateGrammarQuestions {
 			questions = append(
 				questions,
-				buildGrammarQuestionsForLevel(rng, catalog.Level, catalog.GrammarPoints, materialIDsByGrammarID)...)
+				buildGrammarQuestionsForLevel(
+					rng,
+					entry.Level,
+					entry.GrammarPoints,
+					materialIDsByGrammarID,
+				)...,
+			)
 		}
-		questions = append(questions, buildListeningQuestionsForLevel(catalog.Level, catalog.ListeningQuestions)...)
 		questions = append(
 			questions,
-			buildReadingQuestionsForLevel(catalog.Level, catalog.ReadingPassages, materialIDsByReadingID)...)
+			buildListeningQuestionsForLevel(
+				entry.Level,
+				entry.ListeningQuestions,
+			)...,
+		)
 		questions = append(
 			questions,
-			buildWordOrderQuestionsForLevel(catalog.Level, catalog.WordOrderQuestions, materialIDsByGrammarID)...)
-		questions = append(questions, buildQuestionSeeds(catalog.Level, catalog.QuestionSeeds, materialIDsByKey)...)
+			buildReadingQuestionsForLevel(
+				entry.Level,
+				entry.ReadingPassages,
+				materialIDsByReadingID,
+			)...,
+		)
+		questions = append(
+			questions,
+			buildWordOrderQuestionsForLevel(
+				entry.Level,
+				entry.WordOrderQuestions,
+				materialIDsByGrammarID,
+			)...,
+		)
+		questions = append(
+			questions,
+			buildQuestionSeeds(
+				entry.Level,
+				entry.QuestionSeeds,
+				materialIDsByKey,
+			)...,
+		)
 	}
 
-	if err := repos.Question.UpsertSeedBatch(ctx, questions); err != nil {
-		log.Printf("Failed to upsert Japanese questions batch: %v", err)
+	if err := repos.Question.UpsertSeedBatch(
+		ctx,
+		questions,
+	); err != nil {
+		log.Printf(
+			"Failed to upsert %s questions batch: %v",
+			*language,
+			err,
+		)
 		return
 	}
 
 	log.Printf(
-		"Successfully upserted %d Japanese questions across %d proficiency levels.",
+		"Successfully upserted %d %s questions across %d proficiency levels.",
 		len(questions),
+		*language,
 		len(levelCatalogs),
 	)
 }
 
 type readingMaterialStore interface {
-	GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error)
+	GetByMaterialKeys(
+		ctx context.Context,
+		keys []string,
+	) ([]model.Material, error)
 }
 
 func loadReadingMaterialIDs(
@@ -187,44 +334,78 @@ func loadReadingMaterialIDs(
 	store readingMaterialStore,
 	passages []readingPassage,
 ) (map[string]int, error) {
-	keys := make([]string, 0, len(passages))
-	keyByReadingID := make(map[string]string, len(passages))
+	keys := make(
+		[]string,
+		0,
+		len(passages),
+	)
+	keyByReadingID := make(
+		map[string]string,
+		len(passages),
+	)
 	for _, passage := range passages {
-		key := ja.MaterialKeyForReading(passage)
-		keys = append(keys, key)
+		key := catalog.MaterialKeyForReading(passage)
+		keys = append(
+			keys,
+			key,
+		)
 		keyByReadingID[passage.ID] = key
 	}
 
-	materials, err := store.GetByMaterialKeys(ctx, keys)
+	materials, err := store.GetByMaterialKeys(
+		ctx,
+		keys,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("load reading material ids: %w", err)
+		return nil, fmt.Errorf(
+			"load reading material ids: %w",
+			err,
+		)
 	}
 
-	idByKey := make(map[string]int, len(materials))
+	idByKey := make(
+		map[string]int,
+		len(materials),
+	)
 	for _, material := range materials {
 		idByKey[material.MaterialKey] = material.ID
 	}
 
-	materialIDsByReadingID := make(map[string]int, len(passages))
-	missing := make([]string, 0)
+	materialIDsByReadingID := make(
+		map[string]int,
+		len(passages),
+	)
+	missing := make(
+		[]string,
+		0,
+	)
 	for _, passage := range passages {
 		key := keyByReadingID[passage.ID]
 		id, ok := idByKey[key]
 		if !ok {
-			missing = append(missing, key)
+			missing = append(
+				missing,
+				key,
+			)
 			continue
 		}
 		materialIDsByReadingID[passage.ID] = id
 	}
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing reading materials: %s", strings.Join(missing, ", "))
+		return nil, fmt.Errorf(
+			"missing reading materials: %s",
+			strings.Join(
+				missing,
+				", ",
+			),
+		)
 	}
 
 	return materialIDsByReadingID, nil
 }
 
 func readingQuestionKey(passage readingPassage) string {
-	return ja.MaterialKeyForReading(passage) + ":question:1"
+	return catalog.MaterialKeyForReading(passage) + ":question:1"
 }
 
 // buildReadingQuestions builds one MCQ per reading passage. The prompt carries
@@ -236,7 +417,11 @@ func buildReadingQuestions(
 	passages []readingPassage,
 	materialIDsByReadingID map[string]int,
 ) []*model.Question {
-	return buildReadingQuestionsForLevel(defaultProficiencyLevel(), passages, materialIDsByReadingID)
+	return buildReadingQuestionsForLevel(
+		defaultProficiencyLevel(),
+		passages,
+		materialIDsByReadingID,
+	)
 }
 
 func buildReadingQuestionsForLevel(
@@ -245,16 +430,23 @@ func buildReadingQuestionsForLevel(
 	materialIDsByReadingID map[string]int,
 ) []*model.Question {
 	level = normalizeProficiencyLevel(level)
-	questions := make([]*model.Question, 0, len(passages))
+	questions := make(
+		[]*model.Question,
+		0,
+		len(passages),
+	)
 	for _, passage := range passages {
 		materialID, ok := materialIDsByReadingID[passage.ID]
 		if !ok {
-			log.Fatalf("reading: missing material for passage %q", passage.ID)
+			log.Fatalf(
+				"reading: missing material for passage %q",
+				passage.ID,
+			)
 		}
 		question := &model.Question{
 			Type:             model.QuestionMultipleChoice,
 			Skill:            model.SkillPtr(passage.Skill),
-			Language:         vocabLanguage,
+			Language:         catalog.Japanese,
 			ProficiencyLevel: level,
 			Category:         model.CategoryReading,
 			Prompt: fmt.Sprintf(
@@ -267,15 +459,28 @@ func buildReadingQuestionsForLevel(
 			Explanation:   passage.Explanation,
 			Difficulty:    passage.Difficulty,
 		}
-		setQuestionMaterial(question, materialID)
-		setQuestionKey(question, readingQuestionKey(passage))
-		questions = append(questions, question)
+		setQuestionMaterial(
+			question,
+			materialID,
+		)
+		setQuestionKey(
+			question,
+			readingQuestionKey(passage),
+		)
+		questions = append(
+			questions,
+			question,
+		)
 	}
 	return questions
 }
 
 func wordOrderQuestionKey(item wordOrderQuestion) string {
-	return fmt.Sprintf("ja:word_order:%s", item.ID)
+	return fmt.Sprintf(
+		"%s:word_order:%s",
+		catalog.Japanese,
+		item.ID,
+	)
 }
 
 // buildWordOrderQuestions creates one tap-to-build question per authored item
@@ -285,7 +490,11 @@ func buildWordOrderQuestions(
 	items []wordOrderQuestion,
 	materialIDsByGrammarID map[string]int,
 ) []*model.Question {
-	return buildWordOrderQuestionsForLevel(defaultProficiencyLevel(), items, materialIDsByGrammarID)
+	return buildWordOrderQuestionsForLevel(
+		defaultProficiencyLevel(),
+		items,
+		materialIDsByGrammarID,
+	)
 }
 
 func buildWordOrderQuestionsForLevel(
@@ -294,61 +503,105 @@ func buildWordOrderQuestionsForLevel(
 	materialIDsByGrammarID map[string]int,
 ) []*model.Question {
 	level = normalizeProficiencyLevel(level)
-	questions := make([]*model.Question, 0, len(items))
-	seenKeys := make(map[string]struct{}, len(items))
+	questions := make(
+		[]*model.Question,
+		0,
+		len(items),
+	)
+	seenKeys := make(
+		map[string]struct{},
+		len(items),
+	)
 	for _, item := range items {
 		if item.ID == "" || len(item.Chunks) == 0 || item.CorrectAnswer == "" {
-			log.Fatalf("word_order: invalid item %q", item.ID)
+			log.Fatalf(
+				"word_order: invalid item %q",
+				item.ID,
+			)
 		}
 		for _, chunk := range item.Chunks {
 			if chunk == "" {
-				log.Fatalf("word_order: empty chunk for %q", item.ID)
+				log.Fatalf(
+					"word_order: empty chunk for %q",
+					item.ID,
+				)
 			}
 		}
-		if strings.Join(item.Chunks, "") != item.CorrectAnswer {
-			log.Fatalf("word_order: chunks do not join to correct_answer for %q", item.ID)
+		if strings.Join(
+			item.Chunks,
+			"",
+		) != item.CorrectAnswer {
+			log.Fatalf(
+				"word_order: chunks do not join to correct_answer for %q",
+				item.ID,
+			)
 		}
 		materialID, ok := materialIDsByGrammarID[item.GrammarID]
 		if !ok {
-			log.Fatalf("word_order: missing grammar material for %q", item.GrammarID)
+			log.Fatalf(
+				"word_order: missing grammar material for %q",
+				item.GrammarID,
+			)
 		}
 		key := wordOrderQuestionKey(item)
 		if _, exists := seenKeys[key]; exists {
-			log.Fatalf("word_order: duplicate question key %q", key)
+			log.Fatalf(
+				"word_order: duplicate question key %q",
+				key,
+			)
 		}
 		seenKeys[key] = struct{}{}
 		question := &model.Question{
 			Type:             model.QuestionWordOrder,
 			Skill:            model.SkillPtr(model.SkillSentenceComposition),
-			Language:         vocabLanguage,
+			Language:         catalog.Japanese,
 			ProficiencyLevel: level,
 			Category:         model.CategoryGrammar,
 			Prompt:           item.Prompt,
 			Options:          mustJSON(item.Chunks),
 			CorrectAnswer:    item.CorrectAnswer,
 			Explanation:      item.Explanation,
-			Difficulty:       ja.GrammarDifficulty,
+			Difficulty:       catalog.GrammarDifficulty,
 		}
-		setQuestionKey(question, key)
-		setQuestionMaterial(question, materialID)
-		questions = append(questions, question)
+		setQuestionKey(
+			question,
+			key,
+		)
+		setQuestionMaterial(
+			question,
+			materialID,
+		)
+		questions = append(
+			questions,
+			question,
+		)
 	}
 	return questions
 }
 
 func buildListeningQuestions(items []listeningQuestion) []*model.Question {
-	return buildListeningQuestionsForLevel(defaultProficiencyLevel(), items)
+	return buildListeningQuestionsForLevel(
+		defaultProficiencyLevel(),
+		items,
+	)
 }
 
-func buildListeningQuestionsForLevel(level string, items []listeningQuestion) []*model.Question {
+func buildListeningQuestionsForLevel(
+	level string,
+	items []listeningQuestion,
+) []*model.Question {
 	level = normalizeProficiencyLevel(level)
-	questions := make([]*model.Question, 0, len(items))
+	questions := make(
+		[]*model.Question,
+		0,
+		len(items),
+	)
 	for _, item := range items {
 		script := item.Script
 		question := &model.Question{
 			Type:             model.QuestionListening,
 			Skill:            model.SkillPtr(item.Skill),
-			Language:         vocabLanguage,
+			Language:         catalog.Japanese,
 			ProficiencyLevel: level,
 			Category:         model.CategoryListening,
 			Prompt:           item.Prompt,
@@ -362,18 +615,38 @@ func buildListeningQuestionsForLevel(level string, items []listeningQuestion) []
 			audioPath := item.AudioPath
 			question.AudioPath = &audioPath
 		}
-		setQuestionKey(question, listeningQuestionKey(level, item.ID))
-		questions = append(questions, question)
+		setQuestionKey(
+			question,
+			listeningQuestionKey(
+				level,
+				item.ID,
+			),
+		)
+		questions = append(
+			questions,
+			question,
+		)
 	}
 	return questions
 }
 
-func listeningQuestionKey(level, sourceID string) string {
+func listeningQuestionKey(
+	level,
+	sourceID string,
+) string {
 	level = normalizeProficiencyLevel(level)
-	if strings.EqualFold(level, defaultProficiencyLevel()) {
-		return "ja:listening:" + sourceID
+	if strings.EqualFold(
+		level,
+		defaultProficiencyLevel(),
+	) {
+		return catalog.Japanese + ":listening:" + sourceID
 	}
-	return fmt.Sprintf("ja:listening:%s:%s", strings.ToLower(level), sourceID)
+	return fmt.Sprintf(
+		"%s:listening:%s:%s",
+		catalog.Japanese,
+		strings.ToLower(level),
+		sourceID,
+	)
 }
 
 func materialIDsForCatalogKeys(
@@ -384,20 +657,23 @@ func materialIDsForCatalogKeys(
 	grammarIDs map[string]int,
 	readingIDs map[string]int,
 ) map[string]int {
-	idsByKey := make(map[string]int, len(wordIDs)+len(grammarIDs)+len(readingIDs))
+	idsByKey := make(
+		map[string]int,
+		len(wordIDs)+len(grammarIDs)+len(readingIDs),
+	)
 	for _, word := range words {
 		if id, ok := wordIDs[word.ID]; ok {
-			idsByKey[ja.MaterialKeyForVocab(word)] = id
+			idsByKey[catalog.MaterialKeyForVocab(word)] = id
 		}
 	}
 	for _, point := range points {
 		if id, ok := grammarIDs[point.ID]; ok {
-			idsByKey[ja.MaterialKeyForGrammar(point)] = id
+			idsByKey[catalog.MaterialKeyForGrammar(point)] = id
 		}
 	}
 	for _, passage := range passages {
 		if id, ok := readingIDs[passage.ID]; ok {
-			idsByKey[ja.MaterialKeyForReading(passage)] = id
+			idsByKey[catalog.MaterialKeyForReading(passage)] = id
 		}
 	}
 	return idsByKey
@@ -410,9 +686,13 @@ func questionSeedSourceID(seed questionSeed) string {
 	return seed.ID
 }
 
-func questionSeedKey(level string, seed questionSeed) string {
+func questionSeedKey(
+	level string,
+	seed questionSeed,
+) string {
 	return fmt.Sprintf(
-		"ja:question:%s:%s",
+		"%s:question:%s:%s",
+		catalog.Japanese,
 		strings.ToLower(normalizeProficiencyLevel(level)),
 		questionSeedSourceID(seed),
 	)
@@ -424,16 +704,32 @@ func buildQuestionSeeds(
 	materialIDsByKey map[string]int,
 ) []*model.Question {
 	level = normalizeProficiencyLevel(level)
-	questions := make([]*model.Question, 0, len(seeds))
-	seenKeys := make(map[string]struct{}, len(seeds))
+	questions := make(
+		[]*model.Question,
+		0,
+		len(seeds),
+	)
+	seenKeys := make(
+		map[string]struct{},
+		len(seeds),
+	)
 	for _, seed := range seeds {
 		sourceID := questionSeedSourceID(seed)
 		if sourceID == "" || seed.ItemType == "" || seed.Prompt == "" || seed.CorrectAnswer == "" {
-			log.Fatalf("question_seed: incomplete seed %q", sourceID)
+			log.Fatalf(
+				"question_seed: incomplete seed %q",
+				sourceID,
+			)
 		}
-		key := questionSeedKey(level, seed)
+		key := questionSeedKey(
+			level,
+			seed,
+		)
 		if _, exists := seenKeys[key]; exists {
-			log.Fatalf("question_seed: duplicate question key %q", key)
+			log.Fatalf(
+				"question_seed: duplicate question key %q",
+				key,
+			)
 		}
 		seenKeys[key] = struct{}{}
 
@@ -452,7 +748,7 @@ func buildQuestionSeeds(
 		question := &model.Question{
 			Type:             questionType,
 			Skill:            model.SkillPtr(seed.ItemType),
-			Language:         vocabLanguage,
+			Language:         catalog.Japanese,
 			ProficiencyLevel: level,
 			Category:         category,
 			Prompt:           seed.Prompt,
@@ -471,17 +767,34 @@ func buildQuestionSeeds(
 		}
 		if category == model.CategoryListening {
 			if seed.MaterialKey != "" {
-				log.Fatalf("question_seed: listening seed %q cannot reference material %q", sourceID, seed.MaterialKey)
+				log.Fatalf(
+					"question_seed: listening seed %q cannot reference material %q",
+					sourceID,
+					seed.MaterialKey,
+				)
 			}
 		} else if seed.MaterialKey != "" {
 			materialID, ok := materialIDsByKey[seed.MaterialKey]
 			if !ok {
-				log.Fatalf("question_seed: missing material %q for %q", seed.MaterialKey, sourceID)
+				log.Fatalf(
+					"question_seed: missing material %q for %q",
+					seed.MaterialKey,
+					sourceID,
+				)
 			}
-			setQuestionMaterial(question, materialID)
+			setQuestionMaterial(
+				question,
+				materialID,
+			)
 		}
-		setQuestionKey(question, key)
-		questions = append(questions, question)
+		setQuestionKey(
+			question,
+			key,
+		)
+		questions = append(
+			questions,
+			question,
+		)
 	}
 	return questions
 }
@@ -507,33 +820,85 @@ func normalizeProficiencyLevel(level string) string {
 }
 
 func buildKanaQuestions(materialIDsByKana map[string]int) []*model.Question {
-	kanaList := make([]string, 0, len(ja.KanaMap))
-	romajiList := make([]string, 0, len(ja.KanaMap))
-	for k, v := range ja.KanaMap {
-		kanaList = append(kanaList, k)
-		romajiList = append(romajiList, v)
+	kanaList := make(
+		[]string,
+		0,
+		len(catalog.KanaMap),
+	)
+	romajiList := make(
+		[]string,
+		0,
+		len(catalog.KanaMap),
+	)
+	for k, v := range catalog.KanaMap {
+		kanaList = append(
+			kanaList,
+			k,
+		)
+		romajiList = append(
+			romajiList,
+			v,
+		)
 	}
 	sort.Strings(kanaList)
 	sort.Strings(romajiList)
 
-	questions := make([]*model.Question, 0, len(kanaList)*3)
+	questions := make(
+		[]*model.Question,
+		0,
+		len(kanaList)*3,
+	)
 
 	// Type 1: Kana -> Romaji (Existing)
 	for _, kana := range kanaList {
-		romaji := ja.KanaMap[kana]
-		question := buildQuestion(kana, romaji, romajiList, true)
-		setQuestionKey(question, kanaQuestionKey(kana, "reading"))
-		setQuestionMaterial(question, materialIDsByKana[kana])
-		questions = append(questions, question)
+		romaji := catalog.KanaMap[kana]
+		question := buildQuestion(
+			kana,
+			romaji,
+			romajiList,
+			true,
+		)
+		setQuestionKey(
+			question,
+			kanaQuestionKey(
+				kana,
+				"reading",
+			),
+		)
+		setQuestionMaterial(
+			question,
+			materialIDsByKana[kana],
+		)
+		questions = append(
+			questions,
+			question,
+		)
 	}
 
 	// Type 2: Romaji -> Kana (New)
 	for _, kana := range kanaList {
-		romaji := ja.KanaMap[kana]
-		question := buildQuestion(romaji, kana, kanaList, false)
-		setQuestionKey(question, kanaQuestionKey(kana, "recall"))
-		setQuestionMaterial(question, materialIDsByKana[kana])
-		questions = append(questions, question)
+		romaji := catalog.KanaMap[kana]
+		question := buildQuestion(
+			romaji,
+			kana,
+			kanaList,
+			false,
+		)
+		setQuestionKey(
+			question,
+			kanaQuestionKey(
+				kana,
+				"recall",
+			),
+		)
+		setQuestionMaterial(
+			question,
+			materialIDsByKana[kana],
+		)
+		questions = append(
+			questions,
+			question,
+		)
 	}
 
 	// Type 3: Romaji -> Kana handwriting (Mini App)
@@ -541,18 +906,36 @@ func buildKanaQuestions(materialIDsByKana map[string]int) []*model.Question {
 		if !shouldSeedHandwritingQuestion(kana) {
 			continue
 		}
-		romaji := ja.KanaMap[kana]
-		question := buildHandwritingQuestion(romaji, kana)
-		setQuestionKey(question, kanaQuestionKey(kana, "handwriting"))
-		setQuestionMaterial(question, materialIDsByKana[kana])
-		questions = append(questions, question)
+		romaji := catalog.KanaMap[kana]
+		question := buildHandwritingQuestion(
+			romaji,
+			kana,
+		)
+		setQuestionKey(
+			question,
+			kanaQuestionKey(
+				kana,
+				"handwriting",
+			),
+		)
+		setQuestionMaterial(
+			question,
+			materialIDsByKana[kana],
+		)
+		questions = append(
+			questions,
+			question,
+		)
 	}
 
 	return questions
 }
 
 type kanaMaterialStore interface {
-	GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error)
+	GetByMaterialKeys(
+		ctx context.Context,
+		keys []string,
+	) ([]model.Material, error)
 }
 
 func loadKanaMaterialIDs(
@@ -560,50 +943,91 @@ func loadKanaMaterialIDs(
 	store kanaMaterialStore,
 	kanaMap map[string]string,
 ) (map[string]int, error) {
-	keys := make([]string, 0, len(kanaMap))
-	keyByKana := make(map[string]string, len(kanaMap))
+	keys := make(
+		[]string,
+		0,
+		len(kanaMap),
+	)
+	keyByKana := make(
+		map[string]string,
+		len(kanaMap),
+	)
 	for kana := range kanaMap {
-		key := ja.MaterialKeyForKana(kana)
-		keys = append(keys, key)
+		key := catalog.MaterialKeyForKana(kana)
+		keys = append(
+			keys,
+			key,
+		)
 		keyByKana[kana] = key
 	}
 
-	materials, err := store.GetByMaterialKeys(ctx, keys)
+	materials, err := store.GetByMaterialKeys(
+		ctx,
+		keys,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("load kana material ids: %w", err)
+		return nil, fmt.Errorf(
+			"load kana material ids: %w",
+			err,
+		)
 	}
 
-	idByKey := make(map[string]int, len(materials))
+	idByKey := make(
+		map[string]int,
+		len(materials),
+	)
 	for _, material := range materials {
 		idByKey[material.MaterialKey] = material.ID
 	}
 
-	materialIDsByKana := make(map[string]int, len(kanaMap))
+	materialIDsByKana := make(
+		map[string]int,
+		len(kanaMap),
+	)
 	for kana, key := range keyByKana {
 		id, ok := idByKey[key]
 		if !ok {
-			return nil, fmt.Errorf("missing kana material: %s", key)
+			return nil, fmt.Errorf(
+				"missing kana material: %s",
+				key,
+			)
 		}
 		materialIDsByKana[kana] = id
 	}
 	return materialIDsByKana, nil
 }
 
-func setQuestionMaterial(question *model.Question, materialID int) {
+func setQuestionMaterial(
+	question *model.Question,
+	materialID int,
+) {
 	id := materialID
 	question.MaterialID = &id
 }
 
-func setQuestionKey(question *model.Question, questionKey string) {
+func setQuestionKey(
+	question *model.Question,
+	questionKey string,
+) {
 	question.QuestionKey = &questionKey
 }
 
-func kanaQuestionKey(kana, variant string) string {
-	return fmt.Sprintf("%s:%s", ja.MaterialKeyForKana(kana), variant)
+func kanaQuestionKey(
+	kana,
+	variant string,
+) string {
+	return fmt.Sprintf(
+		"%s:%s",
+		catalog.MaterialKeyForKana(kana),
+		variant,
+	)
 }
 
 type vocabularyMaterialStore interface {
-	GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error)
+	GetByMaterialKeys(
+		ctx context.Context,
+		keys []string,
+	) ([]model.Material, error)
 }
 
 func loadVocabularyMaterialIDs(
@@ -611,48 +1035,89 @@ func loadVocabularyMaterialIDs(
 	store vocabularyMaterialStore,
 	words []vocabWord,
 ) (map[string]int, error) {
-	keys := make([]string, 0, len(words))
-	keyByWordID := make(map[string]string, len(words))
+	keys := make(
+		[]string,
+		0,
+		len(words),
+	)
+	keyByWordID := make(
+		map[string]string,
+		len(words),
+	)
 	for _, word := range words {
 		key := vocabularyMaterialKey(word)
-		keys = append(keys, key)
+		keys = append(
+			keys,
+			key,
+		)
 		keyByWordID[word.ID] = key
 	}
 
-	materials, err := store.GetByMaterialKeys(ctx, keys)
+	materials, err := store.GetByMaterialKeys(
+		ctx,
+		keys,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("load vocabulary material ids: %w", err)
+		return nil, fmt.Errorf(
+			"load vocabulary material ids: %w",
+			err,
+		)
 	}
 
-	idByKey := make(map[string]int, len(materials))
+	idByKey := make(
+		map[string]int,
+		len(materials),
+	)
 	for _, material := range materials {
 		idByKey[material.MaterialKey] = material.ID
 	}
 
-	materialIDsByWordID := make(map[string]int, len(words))
-	missing := make([]string, 0)
+	materialIDsByWordID := make(
+		map[string]int,
+		len(words),
+	)
+	missing := make(
+		[]string,
+		0,
+	)
 	for _, word := range words {
 		key := keyByWordID[word.ID]
 		id, ok := idByKey[key]
 		if !ok {
-			missing = append(missing, key)
+			missing = append(
+				missing,
+				key,
+			)
 			continue
 		}
 		materialIDsByWordID[word.ID] = id
 	}
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing vocabulary materials: %s", strings.Join(missing, ", "))
+		return nil, fmt.Errorf(
+			"missing vocabulary materials: %s",
+			strings.Join(
+				missing,
+				", ",
+			),
+		)
 	}
 
 	return materialIDsByWordID, nil
 }
 
 func vocabularyMaterialKey(word vocabWord) string {
-	return ja.MaterialKeyForVocab(word)
+	return catalog.MaterialKeyForVocab(word)
 }
 
-func vocabularyQuestionKey(word vocabWord, variant string) string {
-	return fmt.Sprintf("%s:%s", vocabularyMaterialKey(word), variant)
+func vocabularyQuestionKey(
+	word vocabWord,
+	variant string,
+) string {
+	return fmt.Sprintf(
+		"%s:%s",
+		vocabularyMaterialKey(word),
+		variant,
+	)
 }
 
 func buildVocabularyQuestions(
@@ -660,7 +1125,12 @@ func buildVocabularyQuestions(
 	words []vocabWord,
 	materialIDsByWordID map[string]int,
 ) []*model.Question {
-	return buildVocabularyQuestionsForLevel(rng, defaultProficiencyLevel(), words, materialIDsByWordID)
+	return buildVocabularyQuestionsForLevel(
+		rng,
+		defaultProficiencyLevel(),
+		words,
+		materialIDsByWordID,
+	)
 }
 
 func buildVocabularyQuestionsForLevel(
@@ -670,20 +1140,55 @@ func buildVocabularyQuestionsForLevel(
 	materialIDsByWordID map[string]int,
 ) []*model.Question {
 	level = normalizeProficiencyLevel(level)
-	questions := make([]*model.Question, 0, len(words)*4)
+	questions := make(
+		[]*model.Question,
+		0,
+		len(words)*4,
+	)
 	for _, word := range words {
 		wordQuestions := []*model.Question{
-			buildKanaToMeaningQuestion(rng, word, words),
+			buildKanaToMeaningQuestion(
+				rng,
+				word,
+				words,
+			),
 			buildMeaningToKanaQuestion(word),
 			buildMeaningToKanaHandwritingQuestion(word),
 		}
-		setQuestionKey(wordQuestions[0], vocabularyQuestionKey(word, "meaning"))
-		setQuestionKey(wordQuestions[1], vocabularyQuestionKey(word, "recall"))
-		setQuestionKey(wordQuestions[2], vocabularyQuestionKey(word, "handwriting"))
+		setQuestionKey(
+			wordQuestions[0],
+			vocabularyQuestionKey(
+				word,
+				"meaning",
+			),
+		)
+		setQuestionKey(
+			wordQuestions[1],
+			vocabularyQuestionKey(
+				word,
+				"recall",
+			),
+		)
+		setQuestionKey(
+			wordQuestions[2],
+			vocabularyQuestionKey(
+				word,
+				"handwriting",
+			),
+		)
 		if shouldBuildKanjiRecallQuestion(word) {
 			kanjiRecall := buildKanjiRecallQuestion(word)
-			setQuestionKey(kanjiRecall, vocabularyQuestionKey(word, "kanji_recall"))
-			wordQuestions = append(wordQuestions, kanjiRecall)
+			setQuestionKey(
+				kanjiRecall,
+				vocabularyQuestionKey(
+					word,
+					"kanji_recall",
+				),
+			)
+			wordQuestions = append(
+				wordQuestions,
+				kanjiRecall,
+			)
 		}
 		for _, question := range wordQuestions {
 			question.ProficiencyLevel = level
@@ -693,7 +1198,10 @@ func buildVocabularyQuestionsForLevel(
 				question.MaterialID = &materialID
 			}
 		}
-		questions = append(questions, wordQuestions...)
+		questions = append(
+			questions,
+			wordQuestions...,
+		)
 	}
 	return questions
 }
@@ -703,7 +1211,10 @@ func shouldBuildKanjiRecallQuestion(word vocabWord) bool {
 		return false
 	}
 	for _, r := range word.Kanji {
-		if unicode.Is(unicode.Han, r) {
+		if unicode.Is(
+			unicode.Han,
+			r,
+		) {
 			return true
 		}
 	}
@@ -714,7 +1225,7 @@ func buildKanjiRecallQuestion(word vocabWord) *model.Question {
 	return &model.Question{
 		Type:             model.QuestionFillBlank,
 		Skill:            model.SkillPtr(model.SkillVocabKanjiRecall),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         model.CategoryVocabulary,
 		Prompt: fmt.Sprintf(
@@ -731,7 +1242,10 @@ func buildKanjiRecallQuestion(word vocabWord) *model.Question {
 
 // wordsByID indexes the vocabulary catalog by word ID for context-question lookups.
 func wordsByID(words []vocabWord) map[string]vocabWord {
-	byID := make(map[string]vocabWord, len(words))
+	byID := make(
+		map[string]vocabWord,
+		len(words),
+	)
 	for _, word := range words {
 		byID[word.ID] = word
 	}
@@ -748,7 +1262,13 @@ func buildVocabContextQuestions(
 	wordByID map[string]vocabWord,
 	materialIDsByWordID map[string]int,
 ) []*model.Question {
-	return buildVocabContextQuestionsForLevel(rng, defaultProficiencyLevel(), contexts, wordByID, materialIDsByWordID)
+	return buildVocabContextQuestionsForLevel(
+		rng,
+		defaultProficiencyLevel(),
+		contexts,
+		wordByID,
+		materialIDsByWordID,
+	)
 }
 
 func buildVocabContextQuestionsForLevel(
@@ -759,72 +1279,126 @@ func buildVocabContextQuestionsForLevel(
 	materialIDsByWordID map[string]int,
 ) []*model.Question {
 	level = normalizeProficiencyLevel(level)
-	questions := make([]*model.Question, 0, len(contexts)*3)
+	questions := make(
+		[]*model.Question,
+		0,
+		len(contexts)*3,
+	)
 	for _, vc := range contexts {
 		word, ok := wordByID[vc.WordID]
 		if !ok {
 			// material_id is a nullable FK, so a typo'd word_id would silently
 			// insert a NULL link instead of erroring. Fail hard: a context entry
 			// must reference a real catalog word.
-			log.Fatalf("vocab_context: unknown word_id %q for level %q", vc.WordID, level)
+			log.Fatalf(
+				"vocab_context: unknown word_id %q for level %q",
+				vc.WordID,
+				level,
+			)
 		}
 		materialID, ok := materialIDsByWordID[word.ID]
 		if !ok {
-			log.Fatalf("vocab_context: missing material for word_id %q", vc.WordID)
+			log.Fatalf(
+				"vocab_context: missing material for word_id %q",
+				vc.WordID,
+			)
 		}
 		for i, cloze := range vc.Clozes {
-			options := append([]string(nil), vc.FormOptions...)
-			rng.Shuffle(len(options), func(a, b int) {
-				options[a], options[b] = options[b], options[a]
-			})
+			options := append(
+				[]string(nil),
+				vc.FormOptions...,
+			)
+			rng.Shuffle(
+				len(options),
+				func(
+					a,
+					b int,
+				) {
+					options[a], options[b] = options[b], options[a]
+				},
+			)
 			question := &model.Question{
 				Type:             model.QuestionMultipleChoice,
 				Skill:            model.SkillPtr(model.SkillVocabContext),
-				Language:         vocabLanguage,
+				Language:         catalog.Japanese,
 				ProficiencyLevel: level,
 				Category:         model.CategoryVocabulary,
-				Prompt:           fmt.Sprintf("빈칸에 들어갈 알맞은 단어를 고르세요: <b>%s</b>", cloze),
-				Options:          mustJSON(options),
-				CorrectAnswer:    vc.CorrectAnswer,
-				Explanation:      formatExplanation(word),
-				Difficulty:       vocabDifficulty,
+				Prompt: fmt.Sprintf(
+					"빈칸에 들어갈 알맞은 단어를 고르세요: <b>%s</b>",
+					cloze,
+				),
+				Options:       mustJSON(options),
+				CorrectAnswer: vc.CorrectAnswer,
+				Explanation:   formatExplanation(word),
+				Difficulty:    vocabDifficulty,
 			}
 			id := materialID
 			question.MaterialID = &id
-			setQuestionKey(question, vocabularyQuestionKey(word, fmt.Sprintf("context:%d", i+1)))
-			questions = append(questions, question)
+			setQuestionKey(
+				question,
+				vocabularyQuestionKey(
+					word,
+					fmt.Sprintf(
+						"context:%d",
+						i+1,
+					),
+				),
+			)
+			questions = append(
+				questions,
+				question,
+			)
 		}
 	}
 	return questions
 }
 
-func buildKanaToMeaningQuestion(rng *rand.Rand, word vocabWord, wrongPool []vocabWord) *model.Question {
-	options := buildMeaningOptions(rng, word, wrongPool)
+func buildKanaToMeaningQuestion(
+	rng *rand.Rand,
+	word vocabWord,
+	wrongPool []vocabWord,
+) *model.Question {
+	options := buildMeaningOptions(
+		rng,
+		word,
+		wrongPool,
+	)
 
 	return &model.Question{
 		Type:             model.QuestionMultipleChoice,
 		Skill:            model.SkillPtr(model.SkillVocabMeaning),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         model.CategoryVocabulary,
-		Prompt:           fmt.Sprintf("다음 단어의 뜻을 고르세요: %s", formatWordPrompt(word)),
-		Options:          mustJSON(options),
-		CorrectAnswer:    word.MeaningKo,
-		Explanation:      formatExplanation(word),
-		Difficulty:       vocabDifficulty,
+		Prompt: fmt.Sprintf(
+			"다음 단어의 뜻을 고르세요: %s",
+			formatWordPrompt(word),
+		),
+		Options:       mustJSON(options),
+		CorrectAnswer: word.MeaningKo,
+		Explanation:   formatExplanation(word),
+		Difficulty:    vocabDifficulty,
 	}
 }
 
 func buildMeaningToKanaQuestion(word vocabWord) *model.Question {
 	scriptLabel := vocabularyScriptLabel(word.Kana)
-	prompt := fmt.Sprintf("뜻 <b>'%s'</b>에 해당하는 일본어 발음을 %s로 입력하세요", word.MeaningKo, scriptLabel)
+	prompt := fmt.Sprintf(
+		"뜻 <b>'%s'</b>에 해당하는 일본어 발음을 %s로 입력하세요",
+		word.MeaningKo,
+		scriptLabel,
+	)
 	if isCounterWord(word) {
-		prompt = fmt.Sprintf("다음 표현의 %s 읽기를 입력하세요: %s", scriptLabel, formatCounterReadingPrompt(word))
+		prompt = fmt.Sprintf(
+			"다음 표현의 %s 읽기를 입력하세요: %s",
+			scriptLabel,
+			formatCounterReadingPrompt(word),
+		)
 	}
 	return &model.Question{
 		Type:             model.QuestionFillBlank,
 		Skill:            model.SkillPtr(model.SkillVocabRecall),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         model.CategoryVocabulary,
 		Prompt:           prompt,
@@ -837,14 +1411,22 @@ func buildMeaningToKanaQuestion(word vocabWord) *model.Question {
 
 func buildMeaningToKanaHandwritingQuestion(word vocabWord) *model.Question {
 	scriptLabel := vocabularyScriptLabel(word.Kana)
-	prompt := fmt.Sprintf("뜻 <b>'%s'</b>에 해당하는 일본어 단어를 %s로 쓰세요", word.MeaningKo, scriptLabel)
+	prompt := fmt.Sprintf(
+		"뜻 <b>'%s'</b>에 해당하는 일본어 단어를 %s로 쓰세요",
+		word.MeaningKo,
+		scriptLabel,
+	)
 	if isCounterWord(word) {
-		prompt = fmt.Sprintf("다음 표현의 %s 읽기를 손글씨로 쓰세요: %s", scriptLabel, formatCounterReadingPrompt(word))
+		prompt = fmt.Sprintf(
+			"다음 표현의 %s 읽기를 손글씨로 쓰세요: %s",
+			scriptLabel,
+			formatCounterReadingPrompt(word),
+		)
 	}
 	return &model.Question{
 		Type:             model.QuestionKanaHandwriting,
 		Skill:            model.SkillPtr(model.SkillVocabHandwriting),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         model.CategoryVocabulary,
 		Prompt:           prompt,
@@ -868,55 +1450,104 @@ func vocabularyScriptLabel(kana string) string {
 	return "히라가나"
 }
 
-func buildMeaningOptions(rng *rand.Rand, word vocabWord, wrongPool []vocabWord) []string {
+func buildMeaningOptions(
+	rng *rand.Rand,
+	word vocabWord,
+	wrongPool []vocabWord,
+) []string {
 	options := []string{word.MeaningKo}
 	seen := map[string]bool{word.MeaningKo: true}
 
-	wrongMeanings := make([]string, 0, len(wrongPool))
+	wrongMeanings := make(
+		[]string,
+		0,
+		len(wrongPool),
+	)
 	for _, candidate := range wrongPool {
 		if candidate.MeaningKo == word.MeaningKo || seen[candidate.MeaningKo] {
 			continue
 		}
 		seen[candidate.MeaningKo] = true
-		wrongMeanings = append(wrongMeanings, candidate.MeaningKo)
+		wrongMeanings = append(
+			wrongMeanings,
+			candidate.MeaningKo,
+		)
 	}
 
-	rng.Shuffle(len(wrongMeanings), func(i, j int) {
-		wrongMeanings[i], wrongMeanings[j] = wrongMeanings[j], wrongMeanings[i]
-	})
+	rng.Shuffle(
+		len(wrongMeanings),
+		func(
+			i,
+			j int,
+		) {
+			wrongMeanings[i], wrongMeanings[j] = wrongMeanings[j], wrongMeanings[i]
+		},
+	)
 	for _, wrong := range wrongMeanings {
 		if len(options) >= 4 {
 			break
 		}
-		options = append(options, wrong)
+		options = append(
+			options,
+			wrong,
+		)
 	}
 
-	rng.Shuffle(len(options), func(i, j int) {
-		options[i], options[j] = options[j], options[i]
-	})
+	rng.Shuffle(
+		len(options),
+		func(
+			i,
+			j int,
+		) {
+			options[i], options[j] = options[j], options[i]
+		},
+	)
 	return options
 }
 
 func formatWordPrompt(word vocabWord) string {
 	if word.Kanji != word.Kana {
-		return fmt.Sprintf("<b>%s</b> (<b>%s</b>)", word.Kana, word.Kanji)
+		return fmt.Sprintf(
+			"<b>%s</b> (<b>%s</b>)",
+			word.Kana,
+			word.Kanji,
+		)
 	}
-	return fmt.Sprintf("<b>%s</b>", word.Kana)
+	return fmt.Sprintf(
+		"<b>%s</b>",
+		word.Kana,
+	)
 }
 
 func formatCounterReadingPrompt(word vocabWord) string {
 	if word.Kanji != "" && word.Kanji != word.Kana {
-		return fmt.Sprintf("<b>%s</b> (%s)", word.Kanji, word.MeaningKo)
+		return fmt.Sprintf(
+			"<b>%s</b> (%s)",
+			word.Kanji,
+			word.MeaningKo,
+		)
 	}
-	return fmt.Sprintf("<b>%s</b> (%s)", word.Kana, word.MeaningKo)
+	return fmt.Sprintf(
+		"<b>%s</b> (%s)",
+		word.Kana,
+		word.MeaningKo,
+	)
 }
 
 func formatExplanation(word vocabWord) string {
-	return fmt.Sprintf("<b>%s</b> / <b>%s</b> = %s", word.Kana, word.Kanji, word.MeaningKo)
+	return fmt.Sprintf(
+		"<b>%s</b> / <b>%s</b> = %s",
+		word.Kana,
+		word.Kanji,
+		word.MeaningKo,
+	)
 }
 
 type grammarMaterialStore interface {
-	GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error)
+	GetByMaterialKeys(
+		ctx context.Context,
+		keys []string,
+	) ([]model.Material, error)
 }
 
 func loadGrammarMaterialIDs(
@@ -924,48 +1555,89 @@ func loadGrammarMaterialIDs(
 	store grammarMaterialStore,
 	points []grammarPoint,
 ) (map[string]int, error) {
-	keys := make([]string, 0, len(points))
-	keyByGrammarID := make(map[string]string, len(points))
+	keys := make(
+		[]string,
+		0,
+		len(points),
+	)
+	keyByGrammarID := make(
+		map[string]string,
+		len(points),
+	)
 	for _, point := range points {
 		key := grammarMaterialKey(point)
-		keys = append(keys, key)
+		keys = append(
+			keys,
+			key,
+		)
 		keyByGrammarID[point.ID] = key
 	}
 
-	materials, err := store.GetByMaterialKeys(ctx, keys)
+	materials, err := store.GetByMaterialKeys(
+		ctx,
+		keys,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("load grammar material ids: %w", err)
+		return nil, fmt.Errorf(
+			"load grammar material ids: %w",
+			err,
+		)
 	}
 
-	idByKey := make(map[string]int, len(materials))
+	idByKey := make(
+		map[string]int,
+		len(materials),
+	)
 	for _, material := range materials {
 		idByKey[material.MaterialKey] = material.ID
 	}
 
-	materialIDsByGrammarID := make(map[string]int, len(points))
-	missing := make([]string, 0)
+	materialIDsByGrammarID := make(
+		map[string]int,
+		len(points),
+	)
+	missing := make(
+		[]string,
+		0,
+	)
 	for _, point := range points {
 		key := keyByGrammarID[point.ID]
 		id, ok := idByKey[key]
 		if !ok {
-			missing = append(missing, key)
+			missing = append(
+				missing,
+				key,
+			)
 			continue
 		}
 		materialIDsByGrammarID[point.ID] = id
 	}
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("missing grammar materials: %s", strings.Join(missing, ", "))
+		return nil, fmt.Errorf(
+			"missing grammar materials: %s",
+			strings.Join(
+				missing,
+				", ",
+			),
+		)
 	}
 
 	return materialIDsByGrammarID, nil
 }
 
 func grammarMaterialKey(point grammarPoint) string {
-	return ja.MaterialKeyForGrammar(point)
+	return catalog.MaterialKeyForGrammar(point)
 }
 
-func grammarQuestionKey(point grammarPoint, variant string) string {
-	return fmt.Sprintf("%s:%s", grammarMaterialKey(point), variant)
+func grammarQuestionKey(
+	point grammarPoint,
+	variant string,
+) string {
+	return fmt.Sprintf(
+		"%s:%s",
+		grammarMaterialKey(point),
+		variant,
+	)
 }
 
 func buildGrammarQuestions(
@@ -973,7 +1645,12 @@ func buildGrammarQuestions(
 	points []grammarPoint,
 	materialIDsByGrammarID map[string]int,
 ) []*model.Question {
-	return buildGrammarQuestionsForLevel(rng, defaultProficiencyLevel(), points, materialIDsByGrammarID)
+	return buildGrammarQuestionsForLevel(
+		rng,
+		defaultProficiencyLevel(),
+		points,
+		materialIDsByGrammarID,
+	)
 }
 
 func buildGrammarQuestionsForLevel(
@@ -983,14 +1660,34 @@ func buildGrammarQuestionsForLevel(
 	materialIDsByGrammarID map[string]int,
 ) []*model.Question {
 	level = normalizeProficiencyLevel(level)
-	questions := make([]*model.Question, 0, len(points)*2)
+	questions := make(
+		[]*model.Question,
+		0,
+		len(points)*2,
+	)
 	for _, point := range points {
 		pointQuestions := []*model.Question{
-			buildGrammarMeaningQuestion(rng, point, points),
+			buildGrammarMeaningQuestion(
+				rng,
+				point,
+				points,
+			),
 			buildGrammarFormQuestion(point),
 		}
-		setQuestionKey(pointQuestions[0], grammarQuestionKey(point, "meaning"))
-		setQuestionKey(pointQuestions[1], grammarQuestionKey(point, "form"))
+		setQuestionKey(
+			pointQuestions[0],
+			grammarQuestionKey(
+				point,
+				"meaning",
+			),
+		)
+		setQuestionKey(
+			pointQuestions[1],
+			grammarQuestionKey(
+				point,
+				"form",
+			),
+		)
 		if materialID, ok := materialIDsByGrammarID[point.ID]; ok {
 			for _, question := range pointQuestions {
 				question.ProficiencyLevel = level
@@ -1001,7 +1698,10 @@ func buildGrammarQuestionsForLevel(
 				question.ProficiencyLevel = level
 			}
 		}
-		questions = append(questions, pointQuestions...)
+		questions = append(
+			questions,
+			pointQuestions...,
+		)
 	}
 	return questions
 }
@@ -1014,7 +1714,7 @@ func buildGrammarMeaningQuestion(
 	return &model.Question{
 		Type:             model.QuestionMultipleChoice,
 		Skill:            model.SkillPtr(model.SkillGrammarForm),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         model.CategoryGrammar,
 		Prompt: fmt.Sprintf(
@@ -1022,10 +1722,14 @@ func buildGrammarMeaningQuestion(
 			point.Pattern,
 			point.Example,
 		),
-		Options:       mustJSON(buildGrammarMeaningOptions(rng, point, wrongPool)),
+		Options: mustJSON(buildGrammarMeaningOptions(
+			rng,
+			point,
+			wrongPool,
+		)),
 		CorrectAnswer: point.MeaningKo,
 		Explanation:   formatGrammarExplanation(point),
-		Difficulty:    ja.GrammarDifficulty,
+		Difficulty:    catalog.GrammarDifficulty,
 	}
 }
 
@@ -1033,14 +1737,17 @@ func buildGrammarFormQuestion(point grammarPoint) *model.Question {
 	return &model.Question{
 		Type:             model.QuestionMultipleChoice,
 		Skill:            model.SkillPtr(model.SkillGrammarForm),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         model.CategoryGrammar,
-		Prompt:           fmt.Sprintf("빈칸에 들어갈 알맞은 표현을 고르세요: <b>%s</b>", point.ClozePrompt),
-		Options:          mustJSON(point.FormOptions),
-		CorrectAnswer:    point.CorrectAnswer,
-		Explanation:      formatGrammarExplanation(point),
-		Difficulty:       ja.GrammarDifficulty,
+		Prompt: fmt.Sprintf(
+			"빈칸에 들어갈 알맞은 표현을 고르세요: <b>%s</b>",
+			point.ClozePrompt,
+		),
+		Options:       mustJSON(point.FormOptions),
+		CorrectAnswer: point.CorrectAnswer,
+		Explanation:   formatGrammarExplanation(point),
+		Difficulty:    catalog.GrammarDifficulty,
 	}
 }
 
@@ -1052,28 +1759,50 @@ func buildGrammarMeaningOptions(
 	options := []string{point.MeaningKo}
 	seen := map[string]bool{point.MeaningKo: true}
 
-	wrongMeanings := make([]string, 0, len(wrongPool))
+	wrongMeanings := make(
+		[]string,
+		0,
+		len(wrongPool),
+	)
 	for _, candidate := range wrongPool {
 		if candidate.MeaningKo == point.MeaningKo || seen[candidate.MeaningKo] {
 			continue
 		}
 		seen[candidate.MeaningKo] = true
-		wrongMeanings = append(wrongMeanings, candidate.MeaningKo)
+		wrongMeanings = append(
+			wrongMeanings,
+			candidate.MeaningKo,
+		)
 	}
 
-	rng.Shuffle(len(wrongMeanings), func(i, j int) {
-		wrongMeanings[i], wrongMeanings[j] = wrongMeanings[j], wrongMeanings[i]
-	})
+	rng.Shuffle(
+		len(wrongMeanings),
+		func(
+			i,
+			j int,
+		) {
+			wrongMeanings[i], wrongMeanings[j] = wrongMeanings[j], wrongMeanings[i]
+		},
+	)
 	for _, wrong := range wrongMeanings {
 		if len(options) >= 4 {
 			break
 		}
-		options = append(options, wrong)
+		options = append(
+			options,
+			wrong,
+		)
 	}
 
-	rng.Shuffle(len(options), func(i, j int) {
-		options[i], options[j] = options[j], options[i]
-	})
+	rng.Shuffle(
+		len(options),
+		func(
+			i,
+			j int,
+		) {
+			options[i], options[j] = options[j], options[i]
+		},
+	)
 	return options
 }
 
@@ -1091,7 +1820,10 @@ func formatGrammarExplanation(point grammarPoint) string {
 func mustJSON(values []string) json.RawMessage {
 	b, err := json.Marshal(values)
 	if err != nil {
-		panic(fmt.Sprintf("marshal options: %v", err))
+		panic(fmt.Sprintf(
+			"marshal options: %v",
+			err,
+		))
 	}
 	return b
 }
@@ -1110,7 +1842,12 @@ func shouldSeedHandwritingQuestion(kana string) bool {
 // answerVal is the correct answer (e.g., 'a' or '아').
 // wrongPool is the list of values to pick incorrect options from.
 // isToRomaji indicates if the answer is in Romaji (true) or Kana (false).
-func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji bool) *model.Question {
+func buildQuestion(
+	promptVal,
+	answerVal string,
+	wrongPool []string,
+	isToRomaji bool,
+) *model.Question {
 	rng := rand.New(rand.NewSource(deterministicSeed(promptVal + "|" + answerVal)))
 	isFillBlank := rng.Float32() < 0.7
 
@@ -1122,7 +1859,10 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 	var options []string
 	if !isFillBlank {
 		qType = model.QuestionMultipleChoice
-		options = append(options, answerVal)
+		options = append(
+			options,
+			answerVal,
+		)
 		for len(options) < 4 {
 			wrong := wrongPool[rng.Intn(len(wrongPool))]
 			if wrong == answerVal {
@@ -1136,10 +1876,21 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 				}
 			}
 			if !exists {
-				options = append(options, wrong)
+				options = append(
+					options,
+					wrong,
+				)
 			}
 		}
-		rng.Shuffle(len(options), func(i, j int) { options[i], options[j] = options[j], options[i] })
+		rng.Shuffle(
+			len(options),
+			func(
+				i,
+				j int,
+			) {
+				options[i], options[j] = options[j], options[i]
+			},
+		)
 	}
 
 	optBytes, _ := json.Marshal(options)
@@ -1152,30 +1903,56 @@ func buildQuestion(promptVal, answerVal string, wrongPool []string, isToRomaji b
 
 	if isToRomaji {
 		if isFillBlank {
-			prompt = fmt.Sprintf("다음 문자의 올바른 발음을 입력하세요: <b>%s</b>", promptVal)
+			prompt = fmt.Sprintf(
+				"다음 문자의 올바른 발음을 입력하세요: <b>%s</b>",
+				promptVal,
+			)
 		} else {
-			prompt = fmt.Sprintf("다음 문자의 올바른 발음을 고르시오: <b>%s</b>", promptVal)
+			prompt = fmt.Sprintf(
+				"다음 문자의 올바른 발음을 고르시오: <b>%s</b>",
+				promptVal,
+			)
 		}
 	} else {
 		if isFillBlank {
-			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 입력하세요", promptVal, scriptLabel)
+			prompt = fmt.Sprintf(
+				"발음 <b>'%s'</b>에 해당하는 %s 문자를 입력하세요",
+				promptVal,
+				scriptLabel,
+			)
 		} else {
-			prompt = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 고르시오", promptVal, scriptLabel)
+			prompt = fmt.Sprintf(
+				"발음 <b>'%s'</b>에 해당하는 %s 문자를 고르시오",
+				promptVal,
+				scriptLabel,
+			)
 		}
-		prompt = appendKanaDisambiguationHint(prompt, answerVal)
+		prompt = appendKanaDisambiguationHint(
+			prompt,
+			answerVal,
+		)
 	}
 
 	var explanation string
 	if isToRomaji {
-		explanation = fmt.Sprintf("<b>%s</b>의 발음은 <b>'%s'</b>입니다.", promptVal, answerVal)
+		explanation = fmt.Sprintf(
+			"<b>%s</b>의 발음은 <b>'%s'</b>입니다.",
+			promptVal,
+			answerVal,
+		)
 	} else {
-		explanation = fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자는 <b>%s</b>입니다.", promptVal, scriptLabel, answerVal)
+		explanation = fmt.Sprintf(
+			"발음 <b>'%s'</b>에 해당하는 %s 문자는 <b>%s</b>입니다.",
+			promptVal,
+			scriptLabel,
+			answerVal,
+		)
 	}
 
 	return &model.Question{
 		Type:             qType,
 		Skill:            model.SkillPtr(skill),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         "kana",
 		Prompt:           prompt,
@@ -1192,20 +1969,35 @@ func deterministicSeed(value string) int64 {
 	return int64(h.Sum64())
 }
 
-func buildHandwritingQuestion(romaji, kana string) *model.Question {
+func buildHandwritingQuestion(
+	romaji,
+	kana string,
+) *model.Question {
 	scriptLabel := kanaScriptLabel(kana)
-	prompt := fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자를 손글씨로 쓰세요", romaji, scriptLabel)
+	prompt := fmt.Sprintf(
+		"발음 <b>'%s'</b>에 해당하는 %s 문자를 손글씨로 쓰세요",
+		romaji,
+		scriptLabel,
+	)
 
 	return &model.Question{
 		Type:             model.QuestionKanaHandwriting,
 		Skill:            model.SkillPtr(model.SkillKanaHandwriting),
-		Language:         vocabLanguage,
+		Language:         catalog.Japanese,
 		ProficiencyLevel: defaultProficiencyLevel(),
 		Category:         "handwriting",
-		Prompt:           appendKanaDisambiguationHint(prompt, kana),
-		Options:          []byte("[]"),
-		CorrectAnswer:    kana,
-		Explanation:      fmt.Sprintf("발음 <b>'%s'</b>에 해당하는 %s 문자는 <b>%s</b>입니다.", romaji, scriptLabel, kana),
-		Difficulty:       1,
+		Prompt: appendKanaDisambiguationHint(
+			prompt,
+			kana,
+		),
+		Options:       []byte("[]"),
+		CorrectAnswer: kana,
+		Explanation: fmt.Sprintf(
+			"발음 <b>'%s'</b>에 해당하는 %s 문자는 <b>%s</b>입니다.",
+			romaji,
+			scriptLabel,
+			kana,
+		),
+		Difficulty: 1,
 	}
 }
