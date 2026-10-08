@@ -296,9 +296,7 @@ func main() {
 			)...,
 		)
 		recordQuestions, err := buildRecordQuestions(
-			entry.Language,
-			entry.Level,
-			entry.Questions,
+			entry,
 			recordMaterialIDs,
 		)
 		if err != nil {
@@ -663,9 +661,9 @@ func listeningQuestionKey(
 	)
 }
 
-// loadRecordMaterialIDs resolves every material_key referenced by unified
-// question records to its upserted row ID in one query. Unresolved keys are
-// reported per question by buildRecordQuestions.
+// loadRecordMaterialIDs resolves the upserted row ID of every record material
+// that has nested questions, in one query. Unresolved keys are reported per
+// question by buildRecordQuestions.
 func loadRecordMaterialIDs(
 	ctx context.Context,
 	store materialKeyStore,
@@ -675,20 +673,14 @@ func loadRecordMaterialIDs(
 		[]string,
 		0,
 	)
-	seenKeys := make(map[string]struct{})
 	for _, entry := range catalogs {
-		for _, record := range entry.Questions {
-			if record.MaterialKey == "" {
-				continue
+		for _, material := range entry.Materials {
+			if len(material.Questions) > 0 {
+				keys = append(
+					keys,
+					material.MaterialKey,
+				)
 			}
-			if _, seen := seenKeys[record.MaterialKey]; seen {
-				continue
-			}
-			seenKeys[record.MaterialKey] = struct{}{}
-			keys = append(
-				keys,
-				record.MaterialKey,
-			)
 		}
 	}
 	idsByKey := make(
@@ -714,26 +706,73 @@ func loadRecordMaterialIDs(
 	return idsByKey, nil
 }
 
-// buildRecordQuestions maps unified question records to rows. Every item
-// type takes this one path. The checks guard what the database and the bot
-// rely on: a unique upsert key, the fields every renderer reads, and the
-// listening/material split (listening plays audio instead of a material).
+// buildRecordQuestions maps a level's unified question records to rows:
+// questions nested under a material link to it, top-level questions stay
+// material-less. Every item type takes this one path. The checks guard what
+// the database and the bot rely on: a unique upsert key, the fields every
+// renderer reads, and the listening/material split (listening plays audio
+// instead of a material).
 func buildRecordQuestions(
-	language,
-	level string,
-	records []catalog.QuestionRecord,
+	entry levelCatalog,
 	materialIDsByKey map[string]int,
 ) ([]*model.Question, error) {
+	// Pair each record with its material first so one loop validates and
+	// maps nested and top-level records alike.
+	type linkedRecord struct {
+		record     catalog.QuestionRecord
+		materialID *int
+	}
+	linked := make(
+		[]linkedRecord,
+		0,
+		len(entry.Questions),
+	)
+	for _, material := range entry.Materials {
+		if len(material.Questions) == 0 {
+			continue
+		}
+		materialID, ok := materialIDsByKey[material.MaterialKey]
+		if !ok {
+			return nil, fmt.Errorf(
+				"material %q not found for its nested questions",
+				material.MaterialKey,
+			)
+		}
+		for _, record := range material.Questions {
+			if record.Category == model.CategoryListening {
+				return nil, fmt.Errorf(
+					"listening question record %q cannot belong to material %q",
+					record.QuestionKey,
+					material.MaterialKey,
+				)
+			}
+			linked = append(
+				linked,
+				linkedRecord{
+					record:     record,
+					materialID: &materialID,
+				},
+			)
+		}
+	}
+	for _, record := range entry.Questions {
+		linked = append(
+			linked,
+			linkedRecord{record: record},
+		)
+	}
+
 	questions := make(
 		[]*model.Question,
 		0,
-		len(records),
+		len(linked),
 	)
 	seenKeys := make(
 		map[string]struct{},
-		len(records),
+		len(linked),
 	)
-	for _, record := range records {
+	for _, item := range linked {
+		record := item.record
 		if record.QuestionKey == "" || record.ItemType == "" || record.Type == "" || record.Category == "" ||
 			record.Prompt == "" ||
 			record.CorrectAnswer == "" ||
@@ -753,8 +792,8 @@ func buildRecordQuestions(
 		question := &model.Question{
 			Type:             record.Type,
 			Skill:            model.SkillPtr(record.ItemType),
-			Language:         language,
-			ProficiencyLevel: level,
+			Language:         entry.Language,
+			ProficiencyLevel: entry.Level,
 			Category:         record.Category,
 			Prompt:           record.Prompt,
 			Options:          mustJSON(record.Options),
@@ -766,26 +805,10 @@ func buildRecordQuestions(
 			audioScript := record.AudioScript
 			question.AudioScript = &audioScript
 		}
-		if record.Category == model.CategoryListening {
-			if record.MaterialKey != "" {
-				return nil, fmt.Errorf(
-					"listening question record %q cannot reference material %q",
-					record.QuestionKey,
-					record.MaterialKey,
-				)
-			}
-		} else if record.MaterialKey != "" {
-			materialID, ok := materialIDsByKey[record.MaterialKey]
-			if !ok {
-				return nil, fmt.Errorf(
-					"question record %q: material %q not found",
-					record.QuestionKey,
-					record.MaterialKey,
-				)
-			}
+		if item.materialID != nil {
 			setQuestionMaterial(
 				question,
-				materialID,
+				*item.materialID,
 			)
 		}
 		setQuestionKey(

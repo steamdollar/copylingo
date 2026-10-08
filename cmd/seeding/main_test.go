@@ -1922,35 +1922,39 @@ func assertContainsAll(
 func TestBuildRecordQuestionsMapsRecords(t *testing.T) {
 	t.Parallel()
 
-	records := []catalog.QuestionRecord{
-		{
-			QuestionKey:   "ja:question:n4:sample_vocab",
-			MaterialKey:   "ja:vocab:n4_word_0001",
-			ItemType:      model.SkillVocabKanjiReading,
-			Type:          model.QuestionFillBlank,
-			Category:      model.CategoryVocabulary,
-			Prompt:        "「経験」의 읽기를 쓰세요.",
-			Options:       []string{},
-			CorrectAnswer: "けいけん",
-			Explanation:   "経験은 けいけん으로 읽습니다.",
-			Difficulty:    2,
+	vocab := catalog.QuestionRecord{
+		QuestionKey:   "ja:question:n4:sample_vocab",
+		ItemType:      model.SkillVocabKanjiReading,
+		Type:          model.QuestionFillBlank,
+		Category:      model.CategoryVocabulary,
+		Prompt:        "「経験」의 읽기를 쓰세요.",
+		Options:       []string{},
+		CorrectAnswer: "けいけん",
+		Explanation:   "経験은 けいけん으로 읽습니다.",
+		Difficulty:    2,
+	}
+	listening := catalog.QuestionRecord{
+		QuestionKey:   "ja:listening:n4:sample_listening",
+		ItemType:      model.SkillListeningTask,
+		Type:          model.QuestionListening,
+		Category:      model.CategoryListening,
+		Prompt:        "몇 시에 갑니까?",
+		Options:       []string{"9시", "10시"},
+		CorrectAnswer: "9시",
+		AudioScript:   "九時に行きます。",
+		Difficulty:    1,
+	}
+	entry := levelCatalog{
+		Language: catalog.Japanese,
+		Level:    "N4",
+		Materials: []catalog.MaterialRecord{
+			{MaterialKey: "ja:vocab:n4_word_0001", Questions: []catalog.QuestionRecord{vocab}},
+			{MaterialKey: "ja:vocab:n4_word_0002"},
 		},
-		{
-			QuestionKey:   "ja:listening:n4:sample_listening",
-			ItemType:      model.SkillListeningTask,
-			Type:          model.QuestionListening,
-			Category:      model.CategoryListening,
-			Prompt:        "몇 시에 갑니까?",
-			Options:       []string{"9시", "10시"},
-			CorrectAnswer: "9시",
-			AudioScript:   "九時に行きます。",
-			Difficulty:    1,
-		},
+		Questions: []catalog.QuestionRecord{listening},
 	}
 	questions, err := buildRecordQuestions(
-		catalog.Japanese,
-		"N4",
-		records,
+		entry,
 		map[string]int{"ja:vocab:n4_word_0001": 42},
 	)
 	if err != nil {
@@ -1959,33 +1963,33 @@ func TestBuildRecordQuestionsMapsRecords(t *testing.T) {
 			err,
 		)
 	}
-	if len(questions) != len(records) {
+	if len(questions) != 2 {
 		t.Fatalf(
-			"question count = %d, want %d",
+			"question count = %d, want 2",
 			len(questions),
-			len(records),
 		)
 	}
-	vocab := questions[0]
-	if vocab.QuestionKey == nil || *vocab.QuestionKey != records[0].QuestionKey ||
-		vocab.Language != catalog.Japanese ||
-		vocab.ProficiencyLevel != "N4" ||
-		vocab.MaterialID == nil ||
-		*vocab.MaterialID != 42 ||
-		vocab.Skill == nil ||
-		*vocab.Skill != model.SkillVocabKanjiReading ||
-		string(vocab.Options) != "[]" ||
-		vocab.AudioScript != nil {
+	nested := questions[0]
+	if nested.QuestionKey == nil || *nested.QuestionKey != vocab.QuestionKey ||
+		nested.Language != catalog.Japanese ||
+		nested.ProficiencyLevel != "N4" ||
+		nested.MaterialID == nil ||
+		*nested.MaterialID != 42 ||
+		nested.Skill == nil ||
+		*nested.Skill != model.SkillVocabKanjiReading ||
+		string(nested.Options) != "[]" ||
+		nested.AudioScript != nil {
 		t.Fatalf(
-			"vocab question mapped incorrectly: %+v",
-			vocab,
+			"nested question mapped incorrectly: %+v",
+			nested,
 		)
 	}
-	listening := questions[1]
-	if listening.MaterialID != nil || listening.AudioScript == nil || *listening.AudioScript != records[1].AudioScript {
+	standalone := questions[1]
+	if standalone.MaterialID != nil || standalone.AudioScript == nil ||
+		*standalone.AudioScript != listening.AudioScript {
 		t.Fatalf(
-			"listening question mapped incorrectly: %+v",
-			listening,
+			"material-less question mapped incorrectly: %+v",
+			standalone,
 		)
 	}
 }
@@ -1993,9 +1997,9 @@ func TestBuildRecordQuestionsMapsRecords(t *testing.T) {
 func TestBuildRecordQuestionsRejectsInvalidRecords(t *testing.T) {
 	t.Parallel()
 
+	const materialKey = "ja:grammar:n4_grammar_0001"
 	valid := catalog.QuestionRecord{
 		QuestionKey:   "ja:question:n4:valid",
-		MaterialKey:   "ja:grammar:n4_grammar_0001",
 		ItemType:      model.SkillGrammarForm,
 		Type:          model.QuestionMultipleChoice,
 		Category:      model.CategoryGrammar,
@@ -2004,46 +2008,71 @@ func TestBuildRecordQuestionsRejectsInvalidRecords(t *testing.T) {
 		CorrectAnswer: "そうです",
 		Difficulty:    2,
 	}
+	nestedUnder := func(
+		key string,
+		records ...catalog.QuestionRecord,
+	) levelCatalog {
+		return levelCatalog{
+			Language:  catalog.Japanese,
+			Level:     "N4",
+			Materials: []catalog.MaterialRecord{{MaterialKey: key, Questions: records}},
+		}
+	}
 	tests := []struct {
-		name    string
-		records func() []catalog.QuestionRecord
+		name  string
+		entry func() levelCatalog
 	}{
 		{
 			name: "missing prompt",
-			records: func() []catalog.QuestionRecord {
+			entry: func() levelCatalog {
 				record := valid
 				record.Prompt = ""
-				return []catalog.QuestionRecord{record}
+				return nestedUnder(
+					materialKey,
+					record,
+				)
 			},
 		},
 		{
 			name: "zero difficulty",
-			records: func() []catalog.QuestionRecord {
+			entry: func() levelCatalog {
 				record := valid
 				record.Difficulty = 0
-				return []catalog.QuestionRecord{record}
+				return nestedUnder(
+					materialKey,
+					record,
+				)
 			},
 		},
 		{
-			name: "duplicate key",
-			records: func() []catalog.QuestionRecord {
-				return []catalog.QuestionRecord{valid, valid}
+			name: "duplicate key across nested and top-level",
+			entry: func() levelCatalog {
+				entry := nestedUnder(
+					materialKey,
+					valid,
+				)
+				entry.Questions = []catalog.QuestionRecord{valid}
+				return entry
 			},
 		},
 		{
-			name: "listening with material",
-			records: func() []catalog.QuestionRecord {
+			name: "listening nested under material",
+			entry: func() levelCatalog {
 				record := valid
 				record.Category = model.CategoryListening
-				return []catalog.QuestionRecord{record}
+				return nestedUnder(
+					materialKey,
+					record,
+				)
 			},
 		},
 		{
 			name: "unresolved material",
-			records: func() []catalog.QuestionRecord {
-				record := valid
-				record.MaterialKey = "ja:grammar:missing"
-				return []catalog.QuestionRecord{record}
+			entry: func() levelCatalog {
+				return nestedUnder(
+					"ja:grammar:missing",
+					valid,
+				)
 			},
 		},
 	}
@@ -2054,10 +2083,8 @@ func TestBuildRecordQuestionsRejectsInvalidRecords(t *testing.T) {
 				t.Parallel()
 
 				if _, err := buildRecordQuestions(
-					catalog.Japanese,
-					"N4",
-					tt.records(),
-					map[string]int{valid.MaterialKey: 1},
+					tt.entry(),
+					map[string]int{materialKey: 1},
 				); err == nil {
 					t.Fatal("buildRecordQuestions accepted an invalid record")
 				}
@@ -2066,7 +2093,7 @@ func TestBuildRecordQuestionsRejectsInvalidRecords(t *testing.T) {
 	}
 }
 
-func TestLoadRecordMaterialIDsRequestsEachKeyOnce(t *testing.T) {
+func TestLoadRecordMaterialIDsRequestsOnlyMaterialsWithQuestions(t *testing.T) {
 	t.Parallel()
 
 	store := &recordingMaterialStore{
@@ -2076,10 +2103,12 @@ func TestLoadRecordMaterialIDsRequestsEachKeyOnce(t *testing.T) {
 	}
 	catalogs := []levelCatalog{
 		{
-			Questions: []catalog.QuestionRecord{
-				{MaterialKey: "ja:vocab:n4_word_0001"},
-				{MaterialKey: "ja:vocab:n4_word_0001"},
-				{Category: model.CategoryListening},
+			Materials: []catalog.MaterialRecord{
+				{
+					MaterialKey: "ja:vocab:n4_word_0001",
+					Questions:   []catalog.QuestionRecord{{QuestionKey: "ja:question:n4:a"}},
+				},
+				{MaterialKey: "ja:vocab:n4_word_0002"},
 			},
 		},
 	}
@@ -2096,7 +2125,7 @@ func TestLoadRecordMaterialIDsRequestsEachKeyOnce(t *testing.T) {
 	}
 	if len(store.requestedKeys) != 1 || store.requestedKeys[0] != "ja:vocab:n4_word_0001" {
 		t.Fatalf(
-			"requested keys = %v, want the one referenced key",
+			"requested keys = %v, want only the material with questions",
 			store.requestedKeys,
 		)
 	}

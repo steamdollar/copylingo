@@ -82,15 +82,17 @@
   - N5 문항 5,318개 중 3,668개(kana, 어휘 뜻·회상·손글씨·한자, 문법 뜻)는 JSON에 없고, seeder가 실행될 때 Go로 생성한다.
 - 결정:
   - 데이터 형식을 DB 테이블 row 모양 두 가지로 통일한다. seeder는 문항 유형을 몰라도 된다.
-    - `data/<language>/<level>/materials/*.json`: `{material_key, category, title, difficulty, payload}`. payload는 seeder가 해석하지 않고, category와 bot Study 화면 렌더러 사이의 계약이다.
-    - `data/<language>/<level>/questions/*.json`: `{question_key, material_key?, item_type, type, category, prompt, options, correct_answer, explanation, audio_script?, difficulty}`.
-    - language와 level은 디렉토리에서 정한다. 같은 schema라 파일을 어떻게 나누든 상관없다. 지금은 category별로 나눴다.
+    - level 디렉토리 `data/<language>/<level>/`의 모든 JSON 파일은 `{materials, questions}` 한 가지 모양이다.
+    - `materials[]`: `{material_key, category, title, difficulty, payload, questions[]}`. 그 material에 연결되는 문항을 `questions[]` 안에 넣는다. DB의 `questions.material_id` 1:N 외래키와 같은 구조라서, 없는 material을 가리키는 문항이 구조상 생길 수 없다. material 하나에 문항 수 제한은 없다. payload는 seeder가 해석하지 않고, category와 bot Study 화면 렌더러 사이의 계약이다.
+    - 최상위 `questions[]`: material이 없는 문항(청해)만 둔다. 문항 필드는 `{question_key, item_type, type, category, prompt, options, correct_answer, explanation, audio_script?, difficulty}`이다.
+    - language와 level은 디렉토리에서 정한다. 로더는 디렉토리 안의 `*.json`을 이름순으로 합친다. 그래서 지금은 level당 파일 하나(N4 `records.json`, 약 1.8MB)로 두고, 커지면 데이터만 개수 기준으로 나누면 된다. 코드는 바꿀 필요가 없다.
+    - (같은 날 보강) 처음에는 `materials/`와 `questions/`를 별도 파일로 두고 `material_key`로 연결했다. 위의 이유로 중첩 구조로 바꿨다.
   - `question_key`와 `material_key`는 모든 record에 명시한다(K1). DB upsert는 `ON CONFLICT (question_key)`로 기존 row를 찾고, 학습 진도는 `question_id`에 붙어 있다. 그래서 전환된 문항은 예전 builder가 만들던 key를 그대로 가진다(예: `ja:listening:n4:…`, `ja:reading:…:question:1`, `ja:question:n4:…`). key 형식이 여러 가지로 남지만 데이터의 차이일 뿐 코드에 분기는 없다.
     - 대안 K2(DB key를 한 번에 새 규칙으로 UPDATE)는 기각했다. 운영 DB를 직접 바꿔야 하고, 순서가 틀리면 중복 row가 생긴다.
   - 변환은 현재 builder의 출력을 그대로 저장하는 방식으로 한다. 그러면 변환 전후 seed 결과가 같다는 걸 key별로 비교해 증명할 수 있다.
   - N4를 먼저 전환한다. N5는 자동 생성 문항을 어떻게 할지(데이터로 저장 / 생성 도구로 보존) 결정한 뒤에 전환하고, 그때까지 기존 builder를 유지한다.
 - 결과:
-  - N4 legacy 파일 5개를 material 1,125개, question 1,405개짜리 record 파일로 바꿨다. `QuestionSeed` 타입, seed key 규칙(`source_id`에서 key 생성), `categoryForItemType`, 중복이던 material store interface 4개를 제거했다.
+  - N4 legacy 파일 5개를 `data/ja/n4/records.json` 하나(material 1,125개, 그 안의 문항 1,325개, 최상위 청해 80개)로 바꿨다. `QuestionSeed` 타입, seed key 규칙(`source_id`에서 key 생성), `categoryForItemType`, 중복이던 material store interface 4개를 제거했다.
   - `n4_grammar.json`의 cloze 필드(`cloze_prompt`, `correct_answer`, `form_options`) 100건은 N4 문법 문항 생성이 꺼져 있어서 쓰이지 않았다. payload에 없으므로 버렸다(git 이력에 남음). N4 파일에만 있던 `level` 필드도 버렸다.
   - 전환 기간에는 seeder 경로가 두 개다(N5 legacy builder, record 경로). N5까지 전환하면 legacy 경로 전체를 지운다.
   - 새 문항을 추가할 때 `question_key`를 직접 정해야 한다. catalog 테스트가 key의 유일성, 언어 접두어, material 참조를 검사한다.

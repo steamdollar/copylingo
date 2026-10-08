@@ -115,26 +115,30 @@ type WordOrderQuestion struct {
 	Explanation   string   `json:"explanation"`
 }
 
-// MaterialRecord is one materials-table row as authored data (ADR-066).
-// Language and level come from the record's data/<language>/<level>/
-// directory. Payload is opaque to the seeder; its shape is the contract
-// between the category and the bot's study-card renderer.
+// MaterialRecord is one materials-table row as authored data (ADR-066),
+// with the questions that link to it nested underneath. Nesting mirrors the
+// questions.material_id foreign key, so a question cannot point at a
+// material that is not seeded. Language and level come from the record's
+// data/<language>/<level>/ directory. Payload is opaque to the seeder; its
+// shape is the contract between the category and the bot's study-card
+// renderer.
 type MaterialRecord struct {
 	MaterialKey string                 `json:"material_key"`
 	Category    model.MaterialCategory `json:"category"`
 	Title       string                 `json:"title"`
 	Difficulty  int                    `json:"difficulty"`
 	Payload     json.RawMessage        `json:"payload"`
+	Questions   []QuestionRecord       `json:"questions,omitempty"`
 }
 
 // QuestionRecord is one questions-table row as authored data (ADR-066).
 // QuestionKey is the upsert identity and is written verbatim, so converted
 // questions keep the key (and therefore the row and learner progress) they
-// had under their former type-specific builders. MaterialKey links the
-// question to a study material; listening questions carry AudioScript instead.
+// had under their former type-specific builders. A record nested under a
+// material links to it; a top-level record has no material (listening plays
+// AudioScript instead).
 type QuestionRecord struct {
 	QuestionKey   string                 `json:"question_key"`
-	MaterialKey   string                 `json:"material_key,omitempty"`
 	ItemType      model.Skill            `json:"item_type"`
 	Type          model.QuestionType     `json:"type"`
 	Category      model.QuestionCategory `json:"category"`
@@ -146,13 +150,20 @@ type QuestionRecord struct {
 	Difficulty    int                    `json:"difficulty"`
 }
 
+// levelRecords is the shape of every JSON file in a record level directory.
+type levelRecords struct {
+	Materials []MaterialRecord `json:"materials"`
+	Questions []QuestionRecord `json:"questions"`
+}
+
 // LevelCatalog groups every authored dataset by language and proficiency
 // level. Adding a level extends the registry instead of adding level-named Go
 // variables and branching throughout material or question assembly.
 //
-// Materials/Questions hold levels converted to the unified record format;
-// the typed fields above them are the legacy N5 datasets that still go
-// through type-specific builders until they are converted.
+// Materials (with nested questions) and Questions (material-less) hold
+// levels converted to the unified record format; the typed fields above them
+// are the legacy N5 datasets that still go through type-specific builders
+// until they are converted.
 type LevelCatalog struct {
 	Language                    string
 	Level                       string
@@ -170,7 +181,7 @@ type LevelCatalog struct {
 
 // levelCatalogFiles names one level's datasets. Legacy file names resolve
 // under data/<language>/; recordDir names data/<language>/<recordDir>/,
-// whose materials/ and questions/ subdirectories hold unified records.
+// whose JSON files hold unified records.
 type levelCatalogFiles struct {
 	language                    string
 	level                       string
@@ -263,6 +274,10 @@ func loadLevelCatalogs(files []levelCatalogFiles) []LevelCatalog {
 	)
 	for _, file := range files {
 		language := normalizeLanguage(file.language)
+		records := loadRecordDir(
+			language,
+			file.recordDir,
+		)
 		catalogs = append(
 			catalogs,
 			LevelCatalog{
@@ -292,16 +307,8 @@ func loadLevelCatalogs(files []levelCatalogFiles) []LevelCatalog {
 					language,
 					file.wordOrder,
 				),
-				Materials: loadRecordDir[MaterialRecord](
-					language,
-					file.recordDir,
-					"materials",
-				),
-				Questions: loadRecordDir[QuestionRecord](
-					language,
-					file.recordDir,
-					"questions",
-				),
+				Materials:                   records.Materials,
+				Questions:                   records.Questions,
 				GenerateVocabularyQuestions: file.generateVocabularyQuestions,
 				GenerateGrammarQuestions:    file.generateGrammarQuestions,
 			},
@@ -324,18 +331,18 @@ func loadOptionalJSONFile[T any](
 	)
 }
 
-// loadRecordDir concatenates every JSON array under
-// data/<language>/<dir>/<kind>/ in file-name order. Records share one
-// schema, so how they are split across files is an authoring choice.
-func loadRecordDir[T any](
+// loadRecordDir merges every JSON file under data/<language>/<dir>/ in
+// file-name order. Each file has the same {materials, questions} shape, so a
+// level can live in one file or be split by count without code changes.
+func loadRecordDir(
 	language,
-	dir,
-	kind string,
-) []T {
+	dir string,
+) levelRecords {
+	var records levelRecords
 	if dir == "" {
-		return nil
+		return records
 	}
-	pattern := language + "/" + dir + "/" + kind + "/*.json"
+	pattern := language + "/" + dir + "/*.json"
 	names, err := fs.Glob(
 		data.FS,
 		pattern,
@@ -347,7 +354,6 @@ func loadRecordDir[T any](
 			err,
 		))
 	}
-	var records []T
 	for _, name := range names {
 		content, err := data.FS.ReadFile(name)
 		if err != nil {
@@ -357,12 +363,17 @@ func loadRecordDir[T any](
 				err,
 			))
 		}
-		records = append(
-			records,
-			mustLoadJSON[[]T](
-				name,
-				content,
-			)...,
+		file := mustLoadJSON[levelRecords](
+			name,
+			content,
+		)
+		records.Materials = append(
+			records.Materials,
+			file.Materials...,
+		)
+		records.Questions = append(
+			records.Questions,
+			file.Questions...,
 		)
 	}
 	return records

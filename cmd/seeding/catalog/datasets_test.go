@@ -508,68 +508,81 @@ func contains(
 
 // TestRecordCatalogIntegrity checks every level authored in the unified
 // record format (ADR-066). Keys are the upsert identity, so they must be
-// unique across levels; every non-listening question must point at a
-// material that the registry actually seeds.
+// unique across levels. Only listening questions may sit outside a material.
 func TestRecordCatalogIntegrity(t *testing.T) {
 	t.Parallel()
 
 	materialKeys := make(map[string]bool)
 	questionKeys := make(map[string]bool)
+	checkQuestionKey := func(record QuestionRecord) {
+		if questionKeys[record.QuestionKey] {
+			t.Fatalf(
+				"duplicate question key %q",
+				record.QuestionKey,
+			)
+		}
+		questionKeys[record.QuestionKey] = true
+	}
 	recordLevels := 0
 	for _, catalog := range LevelCatalogsFor(Japanese) {
 		if len(catalog.Materials) == 0 && len(catalog.Questions) == 0 {
 			continue
 		}
 		recordLevels++
-		if len(catalog.Materials) == 0 || len(catalog.Questions) == 0 {
-			t.Fatalf(
-				"%s record catalog must have materials and questions: materials=%d questions=%d",
-				catalog.Level,
-				len(catalog.Materials),
-				len(catalog.Questions),
-			)
-		}
-		for _, record := range catalog.Materials {
+		for _, material := range catalog.Materials {
 			var payload map[string]any
 			if !strings.HasPrefix(
-				record.MaterialKey,
+				material.MaterialKey,
 				catalog.Language+":",
-			) || record.Category == "" || record.Title == "" || record.Difficulty < 1 ||
+			) || material.Category == "" || material.Title == "" || material.Difficulty < 1 ||
 				json.Unmarshal(
-					record.Payload,
+					material.Payload,
 					&payload,
 				) != nil ||
 				len(payload) == 0 {
 				t.Fatalf(
-					"invalid %s material record: %+v",
+					"invalid %s material record %q",
 					catalog.Level,
-					record,
+					material.MaterialKey,
 				)
 			}
-			if materialKeys[record.MaterialKey] {
+			if materialKeys[material.MaterialKey] {
 				t.Fatalf(
 					"duplicate material key %q",
-					record.MaterialKey,
+					material.MaterialKey,
 				)
 			}
-			materialKeys[record.MaterialKey] = true
+			materialKeys[material.MaterialKey] = true
+			for _, record := range material.Questions {
+				assertQuestionRecord(
+					t,
+					catalog,
+					record,
+				)
+				if record.Category == model.CategoryListening {
+					t.Fatalf(
+						"listening question %q must not belong to material %q",
+						record.QuestionKey,
+						material.MaterialKey,
+					)
+				}
+				checkQuestionKey(record)
+			}
 		}
-	}
-	for _, catalog := range LevelCatalogsFor(Japanese) {
 		for _, record := range catalog.Questions {
 			assertQuestionRecord(
 				t,
 				catalog,
 				record,
-				materialKeys,
 			)
-			if questionKeys[record.QuestionKey] {
+			if record.Category != model.CategoryListening {
 				t.Fatalf(
-					"duplicate question key %q",
+					"material-less question %q must be listening, got %q",
 					record.QuestionKey,
+					record.Category,
 				)
 			}
-			questionKeys[record.QuestionKey] = true
+			checkQuestionKey(record)
 		}
 	}
 	if recordLevels == 0 {
@@ -581,7 +594,6 @@ func assertQuestionRecord(
 	t *testing.T,
 	catalog LevelCatalog,
 	record QuestionRecord,
-	materialKeys map[string]bool,
 ) {
 	t.Helper()
 	if !strings.HasPrefix(
@@ -620,26 +632,16 @@ func assertQuestionRecord(
 			)
 		}
 	}
-	if record.Category == model.CategoryListening {
-		if record.MaterialKey != "" || record.AudioScript == "" {
-			t.Fatalf(
-				"listening question %q must be material-less with an audio script",
-				record.QuestionKey,
-			)
-		}
-		return
-	}
-	if !materialKeys[record.MaterialKey] {
+	if record.Category == model.CategoryListening && record.AudioScript == "" {
 		t.Fatalf(
-			"question %q references unseeded material %q",
+			"listening question %q has no audio script",
 			record.QuestionKey,
-			record.MaterialKey,
 		)
 	}
 }
 
 // TestN4RecordsCoverOfficialItemTypes pins N4 to the JLPT item types the
-// app models, so a dropped file under data/ja/n4/questions/ is caught.
+// app models, so a dropped record group under data/ja/n4/ is caught.
 func TestN4RecordsCoverOfficialItemTypes(t *testing.T) {
 	t.Parallel()
 
@@ -660,11 +662,17 @@ func TestN4RecordsCoverOfficialItemTypes(t *testing.T) {
 		model.SkillListeningVerbal:        true,
 		model.SkillListeningQuickResponse: true,
 	}
-	got := make(map[model.Skill]bool)
-	for _, record := range levelCatalogForTest(
+	catalog := levelCatalogForTest(
 		t,
 		"N4",
-	).Questions {
+	)
+	got := make(map[model.Skill]bool)
+	for _, material := range catalog.Materials {
+		for _, record := range material.Questions {
+			got[record.ItemType] = true
+		}
+	}
+	for _, record := range catalog.Questions {
 		got[record.ItemType] = true
 	}
 	if !reflect.DeepEqual(
