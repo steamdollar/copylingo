@@ -8,7 +8,7 @@
 
 ## ADR-031: 청해 음성(TTS) 생성은 Gemini 2.5 native TTS로 사전 생성한다
 
-> TTS 설정의 현재 위치는 [ADR-055](ADR_from_41_to_60.md#adr-055-llm과-tts-설정을-하나의-타입으로-관리한다)를 따른다. 이 절의 `TTSConfig`·`tts.model`은 당시 구현 결정의 기록이다.
+> TTS 설정은 현재 `LLMConfig`에 합쳐져 있다(`llm.tts_model`, `llm.tts_voice_name`). 이 절의 `TTSConfig`·`tts.model`은 당시 구현 결정의 기록이다.
 
 - **날짜**: 2026-07-01
 - **상태**: 채택됨

@@ -1,6 +1,6 @@
 # CopyLingo — Agent Contract & Doc Router
 
-> Shared rules every AI agent must follow when working on CopyLingo. **Codex auto-loads this file directly**; **Claude / Gemini point to it from their own files (`CLAUDE.md`, `GEMINI.md`).** So this is the common entry **contract** for every agent — the SSOT for roles, work protocol, and project design criteria, and a **router** to detailed rules (coding conventions, architecture, delegation, etc. — the §6 satellite docs). Don't copy detail into this file; point to the owning doc.
+> Shared rules every AI agent must follow when working on CopyLingo. **Codex auto-loads this file directly**; **Claude points to it from its own file (`CLAUDE.md`).** So this is the common entry **contract** for every agent — the SSOT for roles, work protocol, and project design criteria, and a **router** to detailed rules (coding conventions, architecture, delegation, etc. — the §6 satellite docs). Don't copy detail into this file; point to the owning doc.
 
 ---
 
@@ -10,9 +10,8 @@ Each CLI auto-loads its own convention file. This mapping is tool-side behavior 
 
 | agent | auto-loaded file | how it reaches AGENTS.md |
 |---|---|---|
-| Claude Code | `CLAUDE.md` | delegated from `CLAUDE.md`'s first line |
+| Claude Code | `CLAUDE.md` | pointed to at the top of `CLAUDE.md` |
 | Codex | `AGENTS.md` | loads this file directly |
-| Gemini CLI | `GEMINI.md` | delegated from `GEMINI.md`'s first line |
 
 Each per-agent file is a **thin overlay on top of this document**; shared rules live here and in the §6 satellite docs.
 
@@ -25,13 +24,8 @@ Each per-agent file is a **thin overlay on top of this document**; shared rules 
 | actor | entry | responsibility |
 |---|---|---|
 | **User** | start of every session | **Final decision-maker.** Final approval on every decision (design, implementation direction, ADR adoption, TODO delegation, etc.). Agents propose, execute, and review, but **must get user confirmation on any non-trivial decision**. |
-| **Claude Code / Codex** (main agent) | user starts the session directly | Carries one task end to end — **design · implement · verify · review**. The two are **chosen by user preference**. Capability differences both agents should know about are recorded **here (§2)**; agent-specific usage patterns go to that agent's overlay file (`CLAUDE.md` / `GEMINI.md`). Escalates non-trivial judgment to the user. |
-| **native subagent** | native-spawned by the main agent | **Default delegation mechanism.** Runs bounded, parallelizable subtasks. Bulk mechanical work (large reads/classification/summarization) is **overridden down to the Haiku tier**. The main agent re-verifies results. |
-| **external executor** (Gemini=agy) | main agent dispatches via a self-contained TODO doc | **Special quota-isolation executor.** For high-volume generation batches only (estimated tokens > threshold). Executes to spec; stops and asks at decision points. |
-
-> **Native subagent is the default for delegation** — follow [`docs/NATIVE_SUBAGENT_DELEGATION.md`](docs/NATIVE_SUBAGENT_DELEGATION.md). The external Gemini CLI (=agy) is a **high-volume-generation escape valve** that isolates free quota; dispatch to it only via a self-contained TODO doc (dispatch rules [`GEMINI_CLI_DELEGATION.md`](docs/GEMINI_CLI_DELEGATION.md), executor contract [`GEMINI_CLI_EXECUTION.md`](docs/GEMINI_CLI_EXECUTION.md)). **Never send a task that isn't self-contained**, either way.
->
-> **ROI gate**: delegation is a token-saving tool, not a default. Size the work with a cheap local scan (`rg`/`git diff`/`go test`) first; if candidates are few or the task is mechanical, the main agent does it directly, and re-verifies any subagent result as the final owner. Switch to the external Gemini only on ① a user conserve directive or ② **estimated batch tokens > ~50k**, reporting the estimate when you do (the agent can't query Max-plan usage, so never self-judge "usage is tight"). Full criteria: [`docs/NATIVE_SUBAGENT_DELEGATION.md`](docs/NATIVE_SUBAGENT_DELEGATION.md) "Delegation ROI Gate / Executor Selection".
+| **Claude Code / Codex** (main agent) | user starts the session directly | Carries one task end to end — **design · implement · verify · review**. The two are **chosen by user preference**. Capability differences both agents should know about are recorded **here (§2)**; agent-specific usage patterns go to that agent's overlay file (`CLAUDE.md`). Escalates non-trivial judgment to the user. |
+| **native subagent** | native-spawned by the main agent | Runs bounded, self-contained subtasks. The main agent re-verifies results. When and how to delegate: [`docs/NATIVE_SUBAGENT_DELEGATION.md`](docs/NATIVE_SUBAGENT_DELEGATION.md). |
 
 ### Role substitution / fallback
 
@@ -65,7 +59,7 @@ A user request falls into one of these, and the deliverable and procedure differ
 - **Owner**: Claude / Codex
 - **Procedure**:
   1. Discuss with the user thoroughly. State tradeoffs at the assumed scale (see §4).
-  2. **Once the decision settles, the agent immediately adds an entry to the latest ADR file under `docs/adr/` (currently `ADR_from_41_to_60.md`) without waiting to be asked** (background / decision / consequences). The user often forgets to update ADRs, so do it proactively.
+  2. **Once the decision settles, the agent immediately adds an entry to the latest ADR file under `docs/adr/` (currently `ADR_from_61_to_80.md`) without waiting to be asked** (background / decision / consequences). The user often forgets to update ADRs, so do it proactively.
      - **Separate-file rule**: if the entry chunk is large or the decision is significant to the project, put it in a **separate file** (keeping the series numbering, e.g. `ADR-031_032_listening_audio_pipeline.md`) and leave a **pointer stub** (number + one-line summary + link) in the range file.
   3. If code changes follow, continue into Case B.
 - **Note**: don't default to "it's fine, single user" or "YAGNI" — rationale and application are in §4.
@@ -76,18 +70,17 @@ A user request falls into one of these, and the deliverable and procedure differ
 
 - **Owner**: Claude / Codex (user's choice)
 - **Procedure**:
-  1. **Start**: check "🔨 In progress" items in `STATUS.md` — judge relevance to the current request.
+  1. **Start**: check "🔨 진행 중" items in `STATUS.md` — judge relevance to the current request.
   2. **Plan**: for non-trivial work, agree the plan with the user before implementing.
   3. **Implement**: follow the `internal/` layer structure and coding conventions (§5).
-  4. **Verify**: `make test` is **required** for code/migration/config changes. For docs-only work, record the skip reason in the workthrough.
+  4. **Verify**: `make test` is **required** for code/migration/config changes. Docs-only work may skip it; say so in the final report.
      - **Go formatting before tests/handoff**: every agent must apply `goparams` to the Go files it created or edited, following [the agent formatting procedure](docs/CONVENTIONS.md#agent-go-formatting). Editor save hooks do not run for agent file writes. Repeat this step after subsequent Go edits; do not defer formatting to the user's next save.
      - For changes that must take effect in the local runtime (Go server, Mini App static assets, config), after verifying, **consult the [`Makefile`](Makefile) target manifest (header comment) to pick the right restart target** and restart the relevant instance — e.g. App with `make restart-app`, then confirm `http://localhost:8080/health`.
      - Restart DB/Redis/Tunnel only when you changed that component directly (`make restart-db` / `make restart-redis`).
   5. **Close**:
-     - Update `STATUS.md` — move "in progress" → "📝 recently done" **only when the current request completes the in-progress item itself**. A side task unrelated to the in-progress item (e.g. doc cleanup, handling an incidental finding) either leaves STATUS.md alone or adds a single line under "📝 recently done".
-     - For non-trivial work, create `docs/workthrough/YYMM/YYMMDDhhmm_<job>.md` (monthly subdirectory) — changed files, decisions, verification results.
+     - Update `STATUS.md` — move "🔨 진행 중" → "📝 최근 완료" **only when the current request completes the in-progress item itself**. A side task unrelated to the in-progress item (e.g. doc cleanup, handling an incidental finding) either leaves STATUS.md alone or adds a single line under "📝 최근 완료". "📝 최근 완료" keeps only the **last 30 days**; drop older rows when adding one (git log and `docs/workthrough/` keep the history).
+     - Create `docs/workthrough/YYMM/YYMMDDhhmm_<job>.md` (monthly subdirectory) **only when it records something found nowhere else** (not in an ADR, the code, or `git log`): ① a non-obvious root cause, incident, or lesson; ② measurement/verification evidence for a significant feature; ③ an operational or migration procedure someone will need again; ④ a significant design choice too small for an ADR. A changed-file list plus "make test passed" is not a reason — the commit message covers it.
      - If a decision was made, update the latest ADR file under `docs/adr/`.
-     - Update `ROADMAP.md` only on milestone completion.
 - **Language**: implementation plans and workthroughs are written in **Korean**.
 
 ### Case C. Splitting off and delegating a TODO
@@ -111,11 +104,11 @@ A user request falls into one of these, and the deliverable and procedure differ
 3. Register a one-line summary + doc link in `STATUS.md`:
    `- [ ] <one-line summary> — see [docs/todos/<file>.md](docs/todos/<file>.md)`
 
-#### Execution (owner agent in a separate session — main agent or external Gemini=agy)
+#### Execution (owner agent in a separate session)
 
-1. Find the plan path in `STATUS.md` → read `docs/todos/<task>.md` carefully. If clear, start immediately and **follow Case B steps 3 (implement) → 4 (verify) → 5 (close) as-is**; if any judgment beyond what the plan pins is needed, stop and ask the user. (An external Gemini CLI executor follows the [`docs/GEMINI_CLI_EXECUTION.md`](docs/GEMINI_CLI_EXECUTION.md) contract.)
+1. Find the plan path in `STATUS.md` → read `docs/todos/<task>.md` carefully. If clear, start immediately and **follow Case B steps 3 (implement) → 4 (verify) → 5 (close) as-is**; if any judgment beyond what the plan pins is needed, stop and ask the user.
 2. **Extra handling at Case C close** (on top of Case B close):
-   - remove that TODO's checkbox item from `STATUS.md` (separate from Case B's "in progress → recently done" rule)
+   - remove that TODO's checkbox item from `STATUS.md` (separate from Case B's "진행 중 → 최근 완료" rule)
    - delete `docs/todos/<task>.md` (preserved in git history)
 
 ### Transitions between cases
@@ -166,13 +159,10 @@ Cases often change mid-work. Handle all of these explicitly (no implicit case ch
 
 - [README.md](README.md) — project overview, tech stack, local dev/deploy
 - [STATUS.md](STATUS.md) — current work state (🚨 read before working)
-- [ROADMAP.md](ROADMAP.md) — overall Phase/Subphase progress
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system structure, data flow, callback convention
-- [docs/adr/](docs/adr/) — technical decision records (split by range: `ADR_from_01_to_20.md`, `ADR_from_21_to_40.md`, `ADR_from_41_to_60.md`; large/significant decisions live in separate files with a pointer stub in the range file, e.g. `ADR-031_032_listening_audio_pipeline.md`)
+- [docs/adr/](docs/adr/) — technical decision records (split by range: `ADR_from_01_to_20.md`, `ADR_from_21_to_40.md`, `ADR_from_41_to_60.md`, `ADR_from_61_to_80.md`; large/significant decisions live in separate files with a pointer stub in the range file, e.g. `ADR-031_032_listening_audio_pipeline.md`)
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — coding conventions (Go / Telegram bot / DB / config)
-- [docs/workthrough/](docs/workthrough/) — detailed records of completed work
+- [docs/workthrough/](docs/workthrough/) — incidents, verification evidence and procedures found nowhere else (criteria: §3 Case B Close)
 - [docs/todos/](docs/todos/) — self-contained plan docs for TODOs executed in a separate session
 - [docs/NATIVE_SUBAGENT_DELEGATION.md](docs/NATIVE_SUBAGENT_DELEGATION.md) — runtime native child-agent spawn protocol
-- [docs/GEMINI_CLI_DELEGATION.md](docs/GEMINI_CLI_DELEGATION.md) — Gemini CLI external delegation, retry, recovery protocol
-- [docs/GEMINI_CLI_EXECUTION.md](docs/GEMINI_CLI_EXECUTION.md) — minimal execution contract read by an invoked Gemini CLI executor
-- [Makefile](Makefile) — dev commands (`make test`, `make infra`, `make migrate`, `make build`, etc.); its **header comment is a target manifest** — read that instead of the whole file, and consult it to pick a restart target after a runtime-affecting change. Also tabulated in README.md's "Makefile" section
+- [Makefile](Makefile) — dev commands (`make test`, `make infra`, `make migrate`, `make build`, etc.); its **header comment is a target manifest** — read that instead of the whole file, and consult it to pick a restart target after a runtime-affecting change

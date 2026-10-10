@@ -341,6 +341,60 @@ func TestRenderByType(t *testing.T) {
 		},
 	)
 
+	// The header shows the question's own level before the review marker and
+	// drops the marker when the question has no level.
+	t.Run(
+		"HeaderLevel",
+		func(t *testing.T) {
+			tests := []struct {
+				name       string
+				level      string
+				isReview   bool
+				wantHeader string
+			}{
+				{"with level", "N4", false, "📝 <b>문제 1/5</b> · N4\n\n"},
+				{"with level and review", "N5", true, "📝 <b>문제 1/5</b> · N5 🔄\n\n"},
+				{"without level", "", false, "📝 <b>문제 1/5</b>\n\n"},
+			}
+			for _, tt := range tests {
+				t.Run(
+					tt.name,
+					func(t *testing.T) {
+						q := model.Question{
+							Type:             model.QuestionMultipleChoice,
+							ProficiencyLevel: tt.level,
+							Prompt:           "Choose one",
+							Options:          json.RawMessage(`["A", "B"]`),
+						}
+						text, _, done := sf.renderByType(
+							ctx,
+							1,
+							nil,
+							10,
+							0,
+							5,
+							q,
+							tt.isReview,
+						)
+						if done {
+							t.Fatal("expected not done")
+						}
+						if !strings.HasPrefix(
+							text,
+							tt.wantHeader,
+						) {
+							t.Errorf(
+								"header = %q, want prefix %q",
+								text,
+								tt.wantHeader,
+							)
+						}
+					},
+				)
+			}
+		},
+	)
+
 	t.Run(
 		"Subjective",
 		func(t *testing.T) {

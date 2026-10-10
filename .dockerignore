@@ -36,7 +36,6 @@ Makefile
 .env
 .env.example
 docs/
-ROADMAP.md
 STATUS.md
 AGENTS.md
 CLAUDE.md

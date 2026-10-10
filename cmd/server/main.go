@@ -8,8 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	_ "github.com/lib/pq"
-
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/observability"
 )

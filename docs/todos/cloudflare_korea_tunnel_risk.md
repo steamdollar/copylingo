@@ -16,7 +16,7 @@
 - [scripts/start_quick_tunnel.sh](../../scripts/start_quick_tunnel.sh) — `cloudflared tunnel --url http://localhost:8080` 실행, `*.trycloudflare.com` URL 파싱.
 - [Makefile](../../Makefile) — tunnel 기동/재시작 타깃, `COPYLINGO_SERVER_PUBLIC_BASE_URL` 반영.
 - `.env`의 `COPYLINGO_SERVER_PUBLIC_BASE_URL` — Mini App public base URL(현재 trycloudflare 도메인).
-- 관련 문서: 손글씨 Mini App ingress ADR(`ADR_from_01_to_20.md` 인근), README Mini App/Tunnel 설정 절.
+- 관련 문서: 손글씨 Mini App ingress ADR-011(`docs/adr/ADR_from_01_to_20.md`), README Mini App/Tunnel 설정 절.
 
 ## 후보 접근법 (Case A에서 택1 — 미결)
 
@@ -30,7 +30,6 @@
 
 1. 위 A/B/C 중 어느 방향인가. (포트폴리오 §4 관점 + 운영 부담 + 8GB 제약 고려)
 2. B라면 어떤 대체 ingress인가(무료 tier·안정성·Telegram Mini App https 요건 충족 여부).
-3. 우선순위: 청해(진행 중) 완료 후인가, 그 전 선제 대응인가.
 
 ## 검증 방법 (실행 시)
 
@@ -40,5 +39,4 @@
 
 ## off-limits / 메모
 
-- 청해 기능(ADR-031/032)과 독립. 청해 진행을 막지 않는다.
 - R2는 이 프로젝트에서 미채택(ADR-032)이므로 R2 차단 자체는 본 과제 범위 밖. 여기 대상은 **Mini App tunnel ingress**뿐.

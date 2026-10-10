@@ -153,6 +153,7 @@ type botMessages struct {
 	questionCompleted                   string
 	linkedMaterialSettingsButton        string
 	questionFormat                      string
+	questionLevelMarkerFormat           string
 	reviewQuestionMarker                string
 	handwritingURLUnavailable           string
 	handwritingPrompt                   string
@@ -400,7 +401,8 @@ JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
 		resultsButton:                       "📊 결과 보기",
 		questionCompleted:                   "✅ 모든 문제를 풀었습니다!",
 		linkedMaterialSettingsButton:        "⚙️ 연결 자료 설정",
-		questionFormat:                      "📝 <b>문제 %d/%d</b>%s\n\n%s",
+		questionFormat:                      "📝 <b>문제 %d/%d</b>%s%s\n\n%s",
+		questionLevelMarkerFormat:           " · %s",
 		reviewQuestionMarker:                " 🔄",
 		handwritingURLUnavailable:           "\n\n⚠️ 손글씨 Mini App URL 설정이 필요합니다. `COPYLINGO_SERVER_PUBLIC_BASE_URL`을 설정해 주세요.",
 		handwritingPrompt:                   "\n\n✍️ 아래 버튼을 눌러 화면에 글자를 써 주세요.\n제출 후 이 채팅으로 돌아와 다음 문제를 진행하면 됩니다.",

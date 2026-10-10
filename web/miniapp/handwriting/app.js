@@ -447,7 +447,7 @@ function setToolsDisabled(disabled) {
 
 // ?debug=1 일 때만: 서버 RenderPNG()와 정합성을 비교하기 위한 개발용 export 버튼을 단다.
 // client.png(현재 canvas) + strokes.json(서버 입력과 동일한 stroke 배열)을 내보낸다.
-// 운영 UI에는 노출하지 않는다. docs/todos/handwriting_rebuild_parity_verification.md 참고.
+// 운영 UI에는 노출하지 않는다. 비교 절차는 cmd/dev/handwriting_renderer 주석 참고.
 function setupDebugExport() {
   if (params.get("debug") !== "1") return;
 

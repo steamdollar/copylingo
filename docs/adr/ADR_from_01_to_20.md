@@ -86,16 +86,6 @@
 
 ---
 
-## ADR-008: 콘텐츠 비율 4:6 (뉴스:시험대비)
-
-- **날짜**: 2026-03-11
-- **상태**: 채택됨
-- **맥락**: 실용적 일본어 + 시험 합격이라는 이중 목표. 사용자가 뉴스 40%, 시험 대비 60% 비율 제안.
-- **결정**: 수집 및 문제 생성 시 뉴스 40%, 시험 대비 60% 비율 유지
-- **조정**: 레벨별로 비율 조정 가능 (초급은 시험대비 비중 높게, 고급은 뉴스 비중 높게)
-
----
-
 ## ADR-009: 다국어 지원 스키마
 
 - **날짜**: 2026-03-22
@@ -179,35 +169,6 @@
 
 ---
 
-## ADR-012: Bot 세션 메시지 렌더링은 nullable editMessageID로 분기
-
-- **날짜**: 2026-05-08
-- **상태**: 채택됨
-- **맥락**:
-  - `SessionFlow.showQuestion`은 기존 Telegram 메시지를 수정할지, 새 메시지를 보낼지 결정해야 한다.
-  - 기존 구현은 `messageID int`에 실제 Telegram 메시지 ID와 `0` sentinel을 함께 담았다.
-  - `messageID > 0`은 기존 메시지 edit, `messageID == 0`은 새 메시지 send라는 암묵 규약이었으나, `0`이 실제 엔티티 ID처럼 읽혀 흐름 이해가 어려웠다.
-  - 손글씨 Mini App 문항은 Web App 버튼이 붙은 메시지를 별도로 남기고, 제출 후 다음 문제는 새 Telegram 메시지로 보내야 한다.
-- **결정**:
-  - 세션 플로우에서 메시지 렌더링 분기는 `editMessageID *int`로 표현한다.
-  - `editMessageID != nil`이면 해당 Telegram 메시지를 수정한다.
-  - `editMessageID == nil`이면 편집할 봇 메시지가 없거나 새 메시지 UX가 필요한 것으로 보고 새 Telegram 메시지를 보낸다.
-  - 손글씨 Mini App의 "제출 후 다음 문제" 흐름은 기존 메시지의 버튼만 제거하고, 다음 문제를 새 메시지로 렌더링한다.
-  - 객관식 callback처럼 버튼이 붙은 봇 메시지가 명확한 경우에는 `editMessageID`를 전달해 기존 메시지를 피드백으로 수정한다.
-- **장점**:
-  - `0` sentinel의 이중 의미를 제거해 코드 독해성이 좋아진다.
-  - Telegram 메시지 ID와 렌더링 모드가 더 명확히 구분된다.
-  - 손글씨 Mini App 왕복 흐름에서 메시지 히스토리를 보존하는 의도가 코드에 드러난다.
-- **단점**:
-  - 호출부에서 로컬 변수 주소를 넘기는 작은 보일러플레이트가 생긴다.
-  - `nil` 의미를 이해해야 하므로 함수 시그니처와 주석을 함께 유지해야 한다.
-- **대안**:
-  - `messageID int` + `0` sentinel 유지: 구현은 단순하지만 의미가 불명확해 기각
-  - `QuestionRenderMode` enum 추가: 가장 명시적이지만 현재 분기 규모에는 과한 구조라 보류
-  - `sendNew bool` 인자 추가: bool과 message ID 조합이 불일치할 수 있어 기각
-
----
-
 ## ADR-013: 활성 세션 상태는 Redis 작업영역 + 세션 종료 시 DB 일괄 flush
 
 - **날짜**: 2026-05-09
@@ -250,30 +211,6 @@
 
 ---
 
-## ADR-014: 세션 구성 비율 및 문제 유형 분포
-
-- **날짜**: 2026-05-11
-- **상태**: **검토 중 (Open)** — 사용자가 인지과학 관점에서 재설계 예정. 결정 시점에 "채택됨"으로 갱신.
-- **맥락**:
-  - 현재 `internal/service/session_builder.go`의 세션 구성 비율은 다음과 같음:
-    - 오전 세션: 15문제 = 새 9 (60%) + 복습 6 (40%)
-    - 오후 세션: 10문제 = 새 2 (20%) + 복습 8 (80%)
-    - 카테고리(뉴스/시험대비) 비율: `GetNewQuestions(..., category="", ...)` 형태로 호출되어 세션 단계에서 미적용. ADR-008은 *수집 단계*의 4:6 비율을 정의했지만 세션 빌드에는 강제 메커니즘이 없음.
-  - 위 비율은 초기 구현 시의 직관값이며, **인지과학적 근거(망각 곡선, spaced repetition, interleaving, desirable difficulty 등)를 반영한 설계는 미수행**.
-  - 본 ADR은 작업 중 세션 빌드 규칙이 문서(이전 AGENTS.md §7)와 코드 사이에서 드리프트되어 있던 것을 발견하면서 분리됨. 잘못된 문서를 그대로 유지하는 것보다, 결정되지 않은 영역임을 ADR로 명시하는 편이 안전.
-- **결정해야 할 사항**:
-  - 세션 유형별 새/복습 비율 (오전 / 오후 / on-demand `BuildReviewSession`)
-  - 한 세션 내 문제 유형(객관식 · 빈칸채우기 · 번역 · 듣기 · 독해 · 어순배열) 분포
-  - 카테고리 비율(뉴스/시험대비)을 세션 단계에서도 강제할지, 수집 단계의 ADR-008만으로 충분한지
-  - 비율의 인지과학적 근거 reference 정리
-- **다음 단계 (사용자 본인 작업, 에이전트 위임 대상 아님)**:
-  - 망각 곡선, spaced repetition, interleaving vs blocking, desirable difficulty 관련 reference 수집·정리
-  - 위 결과를 바탕으로 비율 재산정
-  - 결정 후 본 ADR을 "채택됨"으로 갱신 + `session_builder.go`의 const 갱신
-- **운영 원칙**: 결정 후에도 비율은 **코드의 const + 본 ADR로만 관리**한다. 별도 문서 사본을 두지 않음 (드리프트 재발 방지).
-
----
-
 ## ADR-015: 학습 팁(Tips) 시스템 도입 — LLM 채점 대기 시간 활용
 
 - **날짜**: 2026-05-11
@@ -299,7 +236,7 @@
   - 정적 JSON: 다국어/레벨 확장 어려움, 컨텐츠 큐레이션 수동.
   - on-demand 생성 (Mini App 열 때마다 LLM 호출): 비용·지연 폭증, 동일 사용자에게 같은 tip 보이지 않게 하기 어려움.
   - 별도 seeder CLI 일회성 실행: scheduler 통합 대비 운영 포인트 증가, "점진 누적" 특성 살리기 어려움.
-- **후속 TODO**: `docs/todos/tip_scheduler_generation.md` — (language, proficiency_level) 잔고가 임계치 미만일 때 scheduler 가 LLM 으로 tip 을 보충하는 생성 경로.
+- **후속 TODO** (완료): (language, proficiency_level) 잔고가 임계치 미만일 때 scheduler 가 LLM 으로 tip 을 보충하는 생성 경로.
 
 ---
 
@@ -333,6 +270,10 @@
   - 엄격 채점 유지: 학습 정확도는 높아질 수 있으나 모바일 손글씨 UX에서 좌절감과 재시도 비용이 커져 기각.
   - local OCR/heuristic 선채점: LLM 호출 감소 가능성이 있으나 kana stroke/shape 판정 구현 비용과 정확도 검증 부담이 커서 후속 최적화 후보로 보류.
   - 모델 교체(`gemini-2.0-flash-lite`, `gemini-2.5-flash-lite`) 실험: latency/cost 개선 가능성이 있으나 채점 품질 A/B가 필요하므로 별도 실험으로 분리.
+- **이후 보강** (같은 방향의 prompt 조정이라 별도 ADR에서 이 항목으로 합침):
+  - 2026-05-30: open-ended OCR이 아니라 `Expected Text` 기반 conditional verification으로 명시. 대체 transcription을 탐색하지 않고, feedback에서 대체 문자를 언급하지 않는다(실패 사례 `オ`→`才`).
+  - 2026-05-31: LLM은 서버가 rebuild한 static PNG의 최종 bitmap만 평가한다. 획순·시작점·작성 방향은 판정과 feedback 근거에서 제외하고, 요음 작은 kana는 비율·모양을 요구하지 않는다.
+  - 2026-08-04: acceptance-first. 기본값을 `is_correct=true`로 두고, 확인 가능한 결함 하나를 high confidence로 명명할 수 있을 때만 오답 처리한다. feedback은 기본적으로 빈 문자열이다.
 
 ---
 
@@ -372,79 +313,11 @@
 
 ---
 
-## ADR-018: 손글씨 가나 채점은 Expected Text 기반 Conditional Verification으로 제한
-
-- **날짜**: 2026-05-30
-- **상태**: 채택됨
-- **연관 ADR**: ADR-016 (손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선)
-- **맥락**:
-  - ADR-016에 따라 초보자 모바일 손글씨의 false negative를 줄이는 prompt rubric을 적용했으나, 실제 사용에서 맞게 쓴 `ふ`, `オ`, `ニャ`, `びゃ`가 오답 처리되는 사례가 추가로 발생했다.
-  - 특히 `オ`를 visually similar kanji인 `才`로 판정한 사례는 모델이 `Expected Text` 검증보다 대체 OCR 해석을 우선할 수 있음을 보여준다.
-  - 이 기능은 시험식 OCR이 아니라 정답을 이미 알고 있는 학습 흐름의 Binary Grading이다. 대체 transcription 생성은 채점 목적에 필요하지 않다.
-- **결정**:
-  - 손글씨 채점 prompt를 `Expected Text` 기반 **Conditional Verification**으로 명시한다.
-  - `Expected Text`가 plausible하게 읽히면 다른 kana 또는 kanji 해석 가능성이 있더라도 accept한다.
-  - 모델이 대체 transcription을 탐색하거나 우선하지 않도록 지시한다.
-  - rough mobile handwriting, joined/separated strokes, uneven proportions, ambiguous small kana, dakuten/handakuten 등은 plausibly present하면 accept한다.
-  - 특정 문자에만 과적합되지 않도록 범용 규칙을 우선 기술하고, 실제 실패 사례인 `Expected Text: オ`, alternative interpretation `才`를 대표 예시 하나로만 추가한다.
-  - 정답 feedback은 empty string으로 유지한다. 오답 feedback은 Expected Text에서 명확히 누락되거나 잘못된 feature가 있을 때만 짧은 한국어 correction note 한 문장으로 반환한다.
-  - feedback에서 대체 문자를 제안, transcription, 언급하지 않는다. 신뢰할 수 있는 correction note가 없으면 empty string을 반환한다.
-- **장점**:
-  - Binary Verification 경계를 명확히 하여 대체 OCR 해석으로 인한 false negative를 줄인다.
-  - 예시를 하나로 제한해 특정 문자에 대한 anchoring과 prompt 비대화를 억제한다.
-  - 오답 feedback을 Expected Text 기준으로 제한해 학습 UX를 유지하면서 대체 OCR 해석으로의 회귀를 억제한다.
-- **단점 / 트레이드오프**:
-  - false negative 감소를 우선하므로 visually similar character에 대한 false positive가 증가할 수 있다.
-  - 오답 feedback을 제한하므로 대체 문자 비교를 활용한 상세 교정은 제공하지 않는다.
-  - prompt 변경만으로 모델의 판정 일관성이 완전히 보장되지는 않는다. 실제 사례 기반 회귀 검증이 별도로 필요하다.
-- **대안**:
-  - 범용 규칙만 추가: anchoring 위험은 가장 낮지만 실제 실패 모드의 우선순위를 모델에 충분히 전달하지 못할 수 있어 기각.
-  - 여러 few-shot 예시 추가: 사례별 적중률은 높아질 수 있으나 prompt가 회귀 테스트 목록처럼 비대해지고 특정 문자에 과적합될 수 있어 기각.
-  - 기존 ADR-016만 유지: 대체 OCR 해석에 대한 명시적 제한이 없어 기각.
-
----
-
-## ADR-019: 손글씨 채점은 Static PNG Evidence Boundary 안에서만 판정
-
-- **날짜**: 2026-05-31
-- **상태**: 채택됨
-- **연관 ADR**: ADR-016 (손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선), ADR-018 (손글씨 가나 채점은 Expected Text 기반 Conditional Verification으로 제한)
-- **맥락**:
-  - Mini App은 사용자가 손가락으로 그린 sampled stroke points를 서버에 전송한다.
-  - 서버는 points를 static PNG로 rebuild하고, LLM에는 최종 PNG만 전달한다.
-  - LLM에는 stroke 순서, 시작점, 진행 방향 같은 temporal pen-movement 정보가 전달되지 않는다.
-  - 실제 사용에서 LLM이 획순이나 작성 방향을 근거로 feedback을 생성하고, `ン/ソ`, `シ/ツ`, `ヤ/や`, 탁점/반탁점처럼 bitmap상 애매한 입력을 오답 처리하는 false negative가 발생했다.
-- **결정**:
-  - Prompt에 입력 provenance를 짧게 명시한다: 모바일 canvas에서 수집한 sampled stroke points를 서버가 static PNG로 rebuild했고, LLM은 그 PNG만 받는다.
-  - LLM은 final visible bitmap만 평가한다.
-  - 획순, 시작점, 작성 방향, pen movement를 추론하거나 채점 근거로 사용하지 않는다.
-  - feedback에서도 획순, 시작점, 작성 방향, pen movement를 언급하지 않는다.
-  - 다른 문자와 구분하려면 temporal pen-movement 정보가 필요한 경우, `Expected Text`가 plausible하면 정답 처리한다.
-  - script identity 또는 diacritic type이 rough mobile handwriting에서 애매하면, `Expected Text`가 plausible한 경우 정답 처리한다.
-  - 요음의 작은 `ゃ/ゅ/ょ`, `ャ/ュ/ョ`는 손가락 입력에서 비율과 shape가 거칠 수 있으므로 textbook size, proportions, exact shape를 요구하지 않는다.
-  - 요음은 expected 위치에 plausible한 두 번째 작은 mark가 있고 전체 `Expected Text`가 plausible하면 정답 처리한다.
-  - 요음 오답 처리는 작은 kana가 명확히 없거나 unrelated shape로 명확히 대체된 경우로 제한한다.
-  - 특정 혼동 문자 pair를 Prompt에 계속 누적하지 않고 범용 규칙으로 유지한다.
-- **장점**:
-  - LLM 입력에 존재하지 않는 정보를 근거로 한 hallucination을 억제한다.
-  - `Expected Text` 기반 Conditional Verification의 판정 경계를 더 명확히 한다.
-  - 문자 pair별 예시 누적으로 인한 Prompt 비대화와 anchoring을 줄인다.
-- **단점 / 트레이드오프**:
-  - 애매한 문자와 mark를 정답 처리하므로 false positive가 증가할 수 있다.
-  - Prompt만으로 provider model의 규칙 준수를 완전히 보장할 수 없다.
-  - 서버 rebuild PNG 자체의 손실 여부는 별도 Renderer 정합성 검증이 필요하다.
-- **대안**:
-  - 혼동 문자 pair별 few-shot 예시 추가: 단기 적중률은 올라갈 수 있으나 Prompt 유지보수 부담과 anchoring 위험이 커서 기각.
-  - 획순 feedback만 금지하고 provenance는 생략: 금지 이유와 evidence boundary가 약해져 기각.
-  - Do nothing: 근거 없는 획순 feedback과 false negative가 지속되어 기각.
-
----
-
 ## ADR-020: 손글씨 PNG Renderer는 Bounded Aspect-Ratio Canvas를 사용
 
 - **날짜**: 2026-05-31
 - **상태**: 채택됨
-- **연관 ADR**: ADR-016 (손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선), ADR-019 (손글씨 채점은 Static PNG Evidence Boundary 안에서만 판정)
+- **연관 ADR**: ADR-016 (손글씨 가나 채점은 False Negative 최소화와 빠른 판정을 우선, static PNG evidence boundary 보강 포함)
 - **맥락**:
   - Mini App은 답안 글자 수에 비례해 가로로 긴 canvas를 제공한다.
   - 기존 서버 Renderer는 모든 답안을 고정 `512x512` PNG로 rebuild했다.
@@ -458,6 +331,7 @@
   - 짧거나 세로로 긴 답안은 폭을 `512px` 아래로 줄이지 않는다.
   - padding은 기존 `48px`, brush 반경은 높이 기준 비례값을 유지한다.
   - `512~1536px` 범위는 calibration 시작점으로 사용하고, 실제 품질·latency 확인 후 별도 ADR로 조정할 수 있다.
+  - (2026-06 조정) 탁점·작은 kana가 다운스케일 후에도 남도록 높이 `768px`, 폭 `768~2304px`, padding `72px`로 올렸다(`internal/service/handwriting_render.go`).
 - **장점**:
   - 다글자 답안의 작은 feature를 고정 정사각형보다 더 많은 픽셀로 보존한다.
   - 원본 비율을 유지해 stretch distortion을 만들지 않는다.

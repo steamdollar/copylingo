@@ -4,6 +4,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/lsj/copylingo/internal/bootstrap"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/redisstore"
@@ -49,25 +50,9 @@ func newServices(
 	// With no key, audio stays nil; SessionFlow and the scheduler skip it.
 	var audio *service.AudioService
 	if cfg.LLM.APIKey != "" {
-		audio = service.NewAudioService(
+		audio = bootstrap.NewAudioService(
+			cfg,
 			repos.Question,
-			external.NewTTSClient(external.TTSOptions{
-				APIKey:  cfg.LLM.APIKey,
-				BaseURL: cfg.LLM.BaseURL,
-				Model:   cfg.LLM.TTSModel,
-				Voice:   cfg.LLM.TTSVoiceName,
-				VoiceB:  cfg.LLM.TTSVoiceNameB,
-			}),
-			external.NewS3AudioStore(external.S3Options{
-				Endpoint:     cfg.Storage.Endpoint,
-				Region:       cfg.Storage.Region,
-				Bucket:       cfg.Storage.Bucket,
-				AccessKey:    cfg.Storage.AccessKey,
-				SecretKey:    cfg.Storage.SecretKey,
-				UsePathStyle: cfg.Storage.UsePathStyle,
-			}),
-			cfg.LLM.TTSVoiceName,
-			cfg.LLM.TTSVoiceNameB,
 		)
 	}
 

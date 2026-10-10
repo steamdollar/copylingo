@@ -14,8 +14,17 @@ import (
 )
 
 type materialDB interface {
-	SelectContext(context.Context, any, string, ...any) error
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	SelectContext(
+		context.Context,
+		any,
+		string,
+		...any,
+	) error
+	ExecContext(
+		context.Context,
+		string,
+		...any,
+	) (sql.Result, error)
 }
 
 type MaterialRepository struct {
@@ -24,24 +33,6 @@ type MaterialRepository struct {
 
 func NewMaterialRepository(db *sqlx.DB) *MaterialRepository {
 	return &MaterialRepository{db: db}
-}
-
-// GetByMaterialKeys returns materials whose stable material keys are included in keys.
-func (r *MaterialRepository) GetByMaterialKeys(ctx context.Context, keys []string) ([]model.Material, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-
-	var materials []model.Material
-	if err := r.db.SelectContext(ctx, &materials, `
-		SELECT *
-		FROM materials
-		WHERE material_key = ANY($1)
-		ORDER BY material_key
-	`, pq.Array(keys)); err != nil {
-		return nil, fmt.Errorf("MaterialRepository.GetByMaterialKeys count=%d: %w", len(keys), err)
-	}
-	return materials, nil
 }
 
 // GetMaterialsByPlan returns materials according to the per-category new and
@@ -65,14 +56,32 @@ func (r *MaterialRepository) GetMaterialsByPlan(
 	}
 	quotaJSON, err := json.Marshal(plan.Quotas)
 	if err != nil {
-		return nil, fmt.Errorf("MaterialRepository.GetMaterialsByPlan marshal plan: %w", err)
+		return nil, fmt.Errorf(
+			"MaterialRepository.GetMaterialsByPlan marshal plan: %w",
+			err,
+		)
 	}
 
 	var materials []model.Material
-	if err := r.db.SelectContext(ctx, &materials, studySessionMaterialsQuery,
-		userID, language, level, pq.Array(levels), quotaJSON, limit); err != nil {
-		return nil, fmt.Errorf("MaterialRepository.GetMaterialsByPlan user_id=%d language=%s level=%s limit=%d: %w",
-			userID, language, level, limit, err)
+	if err := r.db.SelectContext(
+		ctx,
+		&materials,
+		studySessionMaterialsQuery,
+		userID,
+		language,
+		level,
+		pq.Array(levels),
+		quotaJSON,
+		limit,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"MaterialRepository.GetMaterialsByPlan user_id=%d language=%s level=%s limit=%d: %w",
+			userID,
+			language,
+			level,
+			limit,
+			err,
+		)
 	}
 	return materials, nil
 }
@@ -288,15 +297,43 @@ var studySessionMaterialsQuery = `
 	LIMIT $6
 `
 
-// UpsertBatch inserts or refreshes materials identified by their stable material key.
-func (r *MaterialRepository) UpsertBatch(ctx context.Context, materials []*model.Material) error {
+// UpsertBatch inserts or refreshes materials identified by their stable
+// material key and sets each material's ID to its row ID, so callers can link
+// questions without a second lookup.
+func (r *MaterialRepository) UpsertBatch(
+	ctx context.Context,
+	materials []*model.Material,
+) error {
 	if len(materials) == 0 {
 		return nil
 	}
 
 	query, args := buildMaterialBatchUpsertQuery(materials)
-	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("MaterialRepository.UpsertBatch count=%d: %w", len(materials), err)
+	var rows []struct {
+		ID          int    `db:"id"`
+		MaterialKey string `db:"material_key"`
+	}
+	if err := r.db.SelectContext(
+		ctx,
+		&rows,
+		query,
+		args...,
+	); err != nil {
+		return fmt.Errorf(
+			"MaterialRepository.UpsertBatch count=%d: %w",
+			len(materials),
+			err,
+		)
+	}
+	idsByKey := make(
+		map[string]int,
+		len(rows),
+	)
+	for _, row := range rows {
+		idsByKey[row.MaterialKey] = row.ID
+	}
+	for _, material := range materials {
+		material.ID = idsByKey[material.MaterialKey]
 	}
 	return nil
 }
@@ -313,7 +350,11 @@ func buildMaterialBatchUpsertQuery(materials []*model.Material) (string, []any) 
 		VALUES
 	`)
 
-	args := make([]any, 0, len(materials)*columnCount)
+	args := make(
+		[]any,
+		0,
+		len(materials)*columnCount,
+	)
 	for i, material := range materials {
 		if i > 0 {
 			query.WriteString(",")
@@ -322,9 +363,17 @@ func buildMaterialBatchUpsertQuery(materials []*model.Material) (string, []any) 
 		base := i * columnCount
 		query.WriteString(fmt.Sprintf(
 			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
+			base+1,
+			base+2,
+			base+3,
+			base+4,
+			base+5,
+			base+6,
+			base+7,
+			base+8,
 		))
-		args = append(args,
+		args = append(
+			args,
 			material.MaterialKey,
 			material.ContentID,
 			material.Category,
@@ -345,6 +394,7 @@ func buildMaterialBatchUpsertQuery(materials []*model.Material) (string, []any) 
 			title = EXCLUDED.title,
 			payload = EXCLUDED.payload,
 			difficulty = EXCLUDED.difficulty
+		RETURNING id, material_key
 	`)
 
 	return query.String(), args

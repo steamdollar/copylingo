@@ -36,20 +36,154 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 
 	query, args := buildMaterialBatchUpsertQuery(materials)
 
-	if !strings.Contains(query, "INSERT INTO materials") {
-		t.Fatalf("query = %q, want insert statement", query)
+	if !strings.Contains(
+		query,
+		"INSERT INTO materials",
+	) {
+		t.Fatalf(
+			"query = %q, want insert statement",
+			query,
+		)
 	}
-	if !strings.Contains(query, "($1, $2, $3, $4, $5, $6, $7, $8)") {
-		t.Fatalf("query = %q, want first placeholder group", query)
+	if !strings.Contains(
+		query,
+		"($1, $2, $3, $4, $5, $6, $7, $8)",
+	) {
+		t.Fatalf(
+			"query = %q, want first placeholder group",
+			query,
+		)
 	}
-	if !strings.Contains(query, "($9, $10, $11, $12, $13, $14, $15, $16)") {
-		t.Fatalf("query = %q, want second placeholder group", query)
+	if !strings.Contains(
+		query,
+		"($9, $10, $11, $12, $13, $14, $15, $16)",
+	) {
+		t.Fatalf(
+			"query = %q, want second placeholder group",
+			query,
+		)
 	}
-	if !strings.Contains(query, "ON CONFLICT (material_key) DO UPDATE") {
-		t.Fatalf("query = %q, want material key upsert", query)
+	if !strings.Contains(
+		query,
+		"ON CONFLICT (material_key) DO UPDATE",
+	) {
+		t.Fatalf(
+			"query = %q, want material key upsert",
+			query,
+		)
+	}
+	if !strings.Contains(
+		query,
+		"RETURNING id, material_key",
+	) {
+		t.Fatalf(
+			"query = %q, want returned row IDs",
+			query,
+		)
 	}
 	if len(args) != 16 {
-		t.Fatalf("len(args) = %d, want 16", len(args))
+		t.Fatalf(
+			"len(args) = %d, want 16",
+			len(args),
+		)
+	}
+}
+
+func TestMaterialUpsertBatchSetsRowIDsPostgres(t *testing.T) {
+	dsn := os.Getenv("COPYLINGO_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("COPYLINGO_TEST_DATABASE_URL is not set")
+	}
+
+	ctx := context.Background()
+	db, err := sqlx.Open(
+		"postgres",
+		dsn,
+	)
+	if err != nil {
+		t.Fatalf("open test database failed")
+	}
+	defer db.Close()
+	tx, err := db.BeginTxx(
+		ctx,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("begin test transaction failed")
+	}
+	defer tx.Rollback()
+
+	for _, statement := range []string{
+		`CREATE TEMP TABLE materials (
+			id serial PRIMARY KEY, material_key text NOT NULL UNIQUE, content_id integer,
+			category text NOT NULL, language text NOT NULL, proficiency_level text NOT NULL,
+			title text NOT NULL, payload jsonb NOT NULL, difficulty integer NOT NULL,
+			created_at timestamptz NOT NULL DEFAULT NOW()
+		) ON COMMIT DROP`,
+		`INSERT INTO materials (id, material_key, category, language, proficiency_level, title, payload, difficulty)
+			VALUES (40, 'existing', 'vocabulary', 'ja', 'N5', 'old', '{}', 1)`,
+	} {
+		if _, err := tx.ExecContext(
+			ctx,
+			statement,
+		); err != nil {
+			t.Fatalf(
+				"fixture setup failed: %v",
+				err,
+			)
+		}
+	}
+
+	// An updated row keeps its ID and an inserted row gets a new one; both
+	// must come back on the materials the caller passed in.
+	materials := []*model.Material{
+		{
+			MaterialKey:      "existing",
+			Category:         model.MaterialCategoryVocabulary,
+			Language:         "ja",
+			ProficiencyLevel: "N5",
+			Title:            "new",
+			Payload:          []byte(`{}`),
+			Difficulty:       1,
+		},
+		{
+			MaterialKey:      "inserted",
+			Category:         model.MaterialCategoryGrammar,
+			Language:         "ja",
+			ProficiencyLevel: "N5",
+			Title:            "g",
+			Payload:          []byte(`{}`),
+			Difficulty:       1,
+		},
+	}
+	repo := &MaterialRepository{db: tx}
+	if err := repo.UpsertBatch(
+		ctx,
+		materials,
+	); err != nil {
+		t.Fatalf(
+			"UpsertBatch: %v",
+			err,
+		)
+	}
+	var insertedID int
+	if err := tx.GetContext(
+		ctx,
+		&insertedID,
+		`SELECT id FROM materials WHERE material_key = 'inserted'`,
+	); err != nil {
+		t.Fatalf(
+			"select inserted row: %v",
+			err,
+		)
+	}
+	if materials[0].ID != 40 || materials[1].ID != insertedID || insertedID == 0 {
+		t.Fatalf(
+			"IDs = (%d, %d), want (40, %d)",
+			materials[0].ID,
+			materials[1].ID,
+			insertedID,
+		)
 	}
 }
 
@@ -69,8 +203,15 @@ func TestStudySessionMaterialsQueryUsesQuotaBucketsAndFallbacks(t *testing.T) {
 		"LIMIT $6",
 		"category_order ASC",
 	} {
-		if !strings.Contains(studySessionMaterialsQuery, want) {
-			t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+		if !strings.Contains(
+			studySessionMaterialsQuery,
+			want,
+		) {
+			t.Fatalf(
+				"studySessionMaterialsQuery does not contain %q:\n%s",
+				want,
+				studySessionMaterialsQuery,
+			)
 		}
 	}
 }
@@ -84,12 +225,25 @@ func TestStudySessionMaterialsQueryPolicyGuards(t *testing.T) {
 		"(rd.category <> 'reading' OR rd.primary_count < rd.category_total)",
 		"CASE WHEN s.bucket = 'new' THEN 0 ELSE 1 END",
 	} {
-		if !strings.Contains(studySessionMaterialsQuery, want) {
-			t.Fatalf("studySessionMaterialsQuery does not contain %q:\n%s", want, studySessionMaterialsQuery)
+		if !strings.Contains(
+			studySessionMaterialsQuery,
+			want,
+		) {
+			t.Fatalf(
+				"studySessionMaterialsQuery does not contain %q:\n%s",
+				want,
+				studySessionMaterialsQuery,
+			)
 		}
 	}
-	if strings.Contains(studySessionMaterialsQuery, "LIMIT $5") {
-		t.Fatalf("studySessionMaterialsQuery still uses the old limit placeholder:\n%s", studySessionMaterialsQuery)
+	if strings.Contains(
+		studySessionMaterialsQuery,
+		"LIMIT $5",
+	) {
+		t.Fatalf(
+			"studySessionMaterialsQuery still uses the old limit placeholder:\n%s",
+			studySessionMaterialsQuery,
+		)
 	}
 }
 
@@ -103,7 +257,10 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db, err := sqlx.Open("postgres", dsn)
+	db, err := sqlx.Open(
+		"postgres",
+		dsn,
+	)
 	if err != nil {
 		t.Fatalf("open test database failed")
 	}
@@ -111,7 +268,10 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 	if err := db.PingContext(ctx); err != nil {
 		t.Fatalf("ping test database failed")
 	}
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.BeginTxx(
+		ctx,
+		nil,
+	)
 	if err != nil {
 		t.Fatalf("begin test transaction failed")
 	}
@@ -160,7 +320,10 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 			(100, 42, 'study', 'pending'), (101, 42, 'study', 'in_progress')`,
 		`INSERT INTO session_materials (session_id, material_id) VALUES (100, 2), (101, 14)`,
 	} {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
+		if _, err := tx.ExecContext(
+			ctx,
+			statement,
+		); err != nil {
 			t.Fatalf("fixture setup failed")
 		}
 	}
@@ -172,12 +335,26 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 1},
 		{Category: model.MaterialCategoryReading, NewCount: 1},
 	}}
-	got, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, morning)
+	got, err := repo.GetMaterialsByPlan(
+		ctx,
+		42,
+		"ja",
+		"N4",
+		levels,
+		morning,
+	)
 	if err != nil {
-		t.Fatalf("morning selection failed: %v", err)
+		t.Fatalf(
+			"morning selection failed: %v",
+			err,
+		)
 	}
 	if len(got) != morning.TotalMaterialCount() {
-		t.Fatalf("morning result count = %d, want %d", len(got), morning.TotalMaterialCount())
+		t.Fatalf(
+			"morning result count = %d, want %d",
+			len(got),
+			morning.TotalMaterialCount(),
+		)
 	}
 	gotIDs := make(map[int]model.Material)
 	for _, material := range got {
@@ -185,16 +362,26 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 	}
 	for _, id := range []int{1, 3, 5, 6, 8, 10, 12} {
 		if _, ok := gotIDs[id]; !ok {
-			t.Fatalf("morning result missing expected material %d: %#v", id, gotIDs)
+			t.Fatalf(
+				"morning result missing expected material %d: %#v",
+				id,
+				gotIDs,
+			)
 		}
 	}
 	for _, id := range []int{2, 7, 14, 16} {
 		if _, ok := gotIDs[id]; ok {
-			t.Fatalf("morning result included excluded material %d", id)
+			t.Fatalf(
+				"morning result included excluded material %d",
+				id,
+			)
 		}
 	}
 	if gotIDs[1].ProficiencyLevel != "N4" || gotIDs[3].ProficiencyLevel != "N4" {
-		t.Fatalf("new vocabulary did not prefer current level: %#v", gotIDs)
+		t.Fatalf(
+			"new vocabulary did not prefer current level: %#v",
+			gotIDs,
+		)
 	}
 
 	evening := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
@@ -202,127 +389,198 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
 		{Category: model.MaterialCategoryReading, ReviewCount: 2},
 	}}
-	eveningMaterials, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, evening)
+	eveningMaterials, err := repo.GetMaterialsByPlan(
+		ctx,
+		42,
+		"ja",
+		"N4",
+		levels,
+		evening,
+	)
 	if err != nil {
-		t.Fatalf("evening selection failed: %v", err)
+		t.Fatalf(
+			"evening selection failed: %v",
+			err,
+		)
 	}
 	readingCount := 0
 	for _, material := range eveningMaterials {
 		if material.Category == model.MaterialCategoryReading {
 			readingCount++
 			if material.ID == 12 || material.ID == 14 {
-				t.Fatalf("evening selection included new reading material %d", material.ID)
+				t.Fatalf(
+					"evening selection included new reading material %d",
+					material.ID,
+				)
 			}
 		}
 	}
 	if readingCount > 2 {
-		t.Fatalf("evening selection exceeded reading cap: %d", readingCount)
+		t.Fatalf(
+			"evening selection exceeded reading cap: %d",
+			readingCount,
+		)
 	}
 
-	t.Run("new vocabulary fills shortages after due reviews", func(t *testing.T) {
-		if _, err := tx.ExecContext(ctx, `SAVEPOINT vocabulary_top_up`); err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			if _, err := tx.ExecContext(ctx, `ROLLBACK TO SAVEPOINT vocabulary_top_up`); err != nil {
-				t.Error(err)
-			}
-		}()
-		for _, statement := range []string{
-			`INSERT INTO materials (id, material_key, category, language, proficiency_level, title, payload, difficulty)
-			 SELECT id, 'extra-v' || id, 'vocabulary', 'ja', 'N4', 'extra', '{}', 2
-			 FROM generate_series(20, 59) AS id`,
-			`INSERT INTO materials (id, material_key, category, language, proficiency_level, title, payload, difficulty) VALUES
-			 (17, 'extra-g', 'grammar', 'ja', 'N4', 'extra', '{}', 1),
-			 (18, 'extra-r', 'reading', 'ja', 'N4', 'extra', '{}', 1)`,
-		} {
-			if _, err := tx.ExecContext(ctx, statement); err != nil {
+	t.Run(
+		"new vocabulary fills shortages after due reviews",
+		func(t *testing.T) {
+			if _, err := tx.ExecContext(
+				ctx,
+				`SAVEPOINT vocabulary_top_up`,
+			); err != nil {
 				t.Fatal(err)
 			}
-		}
-
-		for _, tt := range []struct {
-			name    string
-			plan    model.StudySessionPlan
-			wantNew [3]int // vocabulary, grammar, reading
-			wantDue []int
-		}{
-			{
-				name: "morning reaches twenty with grammar and reading quotas intact",
-				plan: model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
-					{Category: model.MaterialCategoryVocabulary, NewCount: 8, ReviewCount: 7},
-					{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
-					{Category: model.MaterialCategoryReading, NewCount: 1},
-				}},
-				wantNew: [3]int{14, 1, 1}, wantDue: []int{5, 6, 10, 16},
-			},
-			{
-				name: "evening reaches twenty four without new reading",
-				plan: evening, wantNew: [3]int{18, 1, 0}, wantDue: []int{5, 6, 10, 13, 16},
-			},
-			{
-				name: "cross category due reviews precede extra new vocabulary",
-				plan: model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
-					{Category: model.MaterialCategoryVocabulary, NewCount: 1, ReviewCount: 4},
-					{Category: model.MaterialCategoryGrammar},
-				}},
-				wantNew: [3]int{1, 0, 0}, wantDue: []int{5, 6, 10, 16},
-			},
-		} {
-			t.Run(tt.name, func(t *testing.T) {
-				materials, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, tt.plan)
-				if err != nil {
+			defer func() {
+				if _, err := tx.ExecContext(
+					ctx,
+					`ROLLBACK TO SAVEPOINT vocabulary_top_up`,
+				); err != nil {
+					t.Error(err)
+				}
+			}()
+			for _, statement := range []string{
+				`INSERT INTO materials (id, material_key, category, language, proficiency_level, title, payload, difficulty)
+			 SELECT id, 'extra-v' || id, 'vocabulary', 'ja', 'N4', 'extra', '{}', 2
+			 FROM generate_series(20, 59) AS id`,
+				`INSERT INTO materials (id, material_key, category, language, proficiency_level, title, payload, difficulty) VALUES
+			 (17, 'extra-g', 'grammar', 'ja', 'N4', 'extra', '{}', 1),
+			 (18, 'extra-r', 'reading', 'ja', 'N4', 'extra', '{}', 1)`,
+			} {
+				if _, err := tx.ExecContext(
+					ctx,
+					statement,
+				); err != nil {
 					t.Fatal(err)
 				}
-				if len(materials) != tt.plan.TotalMaterialCount() {
-					t.Fatalf("count = %d, want %d", len(materials), tt.plan.TotalMaterialCount())
-				}
-				seen := make(map[int]bool)
-				var newCounts [3]int
-				for _, material := range materials {
-					if seen[material.ID] {
-						t.Fatalf("duplicate material %d", material.ID)
-					}
-					seen[material.ID] = true
-					switch material.ID {
-					case 2, 7, 14:
-						t.Fatalf("included pending, in-progress, or future review material %d", material.ID)
-					case 5, 6, 10, 13, 16:
-						continue
-					}
-					if material.ProficiencyLevel != "N4" {
-						t.Fatalf("selected adjacent-level new material despite current-level supply: %d", material.ID)
-					}
-					switch material.Category {
-					case model.MaterialCategoryVocabulary:
-						newCounts[0]++
-					case model.MaterialCategoryGrammar:
-						newCounts[1]++
-					case model.MaterialCategoryReading:
-						newCounts[2]++
-					}
-				}
-				if newCounts != tt.wantNew {
-					t.Fatalf("new counts (vocabulary, grammar, reading) = %v, want %v", newCounts, tt.wantNew)
-				}
-				for _, id := range tt.wantDue {
-					if !seen[id] {
-						t.Fatalf("extra new vocabulary displaced due review %d", id)
-					}
-				}
-			})
-		}
-	})
+			}
+
+			for _, tt := range []struct {
+				name    string
+				plan    model.StudySessionPlan
+				wantNew [3]int // vocabulary, grammar, reading
+				wantDue []int
+			}{
+				{
+					name: "morning reaches twenty with grammar and reading quotas intact",
+					plan: model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+						{Category: model.MaterialCategoryVocabulary, NewCount: 8, ReviewCount: 7},
+						{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
+						{Category: model.MaterialCategoryReading, NewCount: 1},
+					}},
+					wantNew: [3]int{14, 1, 1}, wantDue: []int{5, 6, 10, 16},
+				},
+				{
+					name: "evening reaches twenty four without new reading",
+					plan: evening, wantNew: [3]int{18, 1, 0}, wantDue: []int{5, 6, 10, 13, 16},
+				},
+				{
+					name: "cross category due reviews precede extra new vocabulary",
+					plan: model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
+						{Category: model.MaterialCategoryVocabulary, NewCount: 1, ReviewCount: 4},
+						{Category: model.MaterialCategoryGrammar},
+					}},
+					wantNew: [3]int{1, 0, 0}, wantDue: []int{5, 6, 10, 16},
+				},
+			} {
+				t.Run(
+					tt.name,
+					func(t *testing.T) {
+						materials, err := repo.GetMaterialsByPlan(
+							ctx,
+							42,
+							"ja",
+							"N4",
+							levels,
+							tt.plan,
+						)
+						if err != nil {
+							t.Fatal(err)
+						}
+						if len(materials) != tt.plan.TotalMaterialCount() {
+							t.Fatalf(
+								"count = %d, want %d",
+								len(materials),
+								tt.plan.TotalMaterialCount(),
+							)
+						}
+						seen := make(map[int]bool)
+						var newCounts [3]int
+						for _, material := range materials {
+							if seen[material.ID] {
+								t.Fatalf(
+									"duplicate material %d",
+									material.ID,
+								)
+							}
+							seen[material.ID] = true
+							switch material.ID {
+							case 2, 7, 14:
+								t.Fatalf(
+									"included pending, in-progress, or future review material %d",
+									material.ID,
+								)
+							case 5, 6, 10, 13, 16:
+								continue
+							}
+							if material.ProficiencyLevel != "N4" {
+								t.Fatalf(
+									"selected adjacent-level new material despite current-level supply: %d",
+									material.ID,
+								)
+							}
+							switch material.Category {
+							case model.MaterialCategoryVocabulary:
+								newCounts[0]++
+							case model.MaterialCategoryGrammar:
+								newCounts[1]++
+							case model.MaterialCategoryReading:
+								newCounts[2]++
+							}
+						}
+						if newCounts != tt.wantNew {
+							t.Fatalf(
+								"new counts (vocabulary, grammar, reading) = %v, want %v",
+								newCounts,
+								tt.wantNew,
+							)
+						}
+						for _, id := range tt.wantDue {
+							if !seen[id] {
+								t.Fatalf(
+									"extra new vocabulary displaced due review %d",
+									id,
+								)
+							}
+						}
+					},
+				)
+			}
+		},
+	)
 
 	fallbackPlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, NewCount: 4},
 	}}
-	fallback, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, fallbackPlan)
+	fallback, err := repo.GetMaterialsByPlan(
+		ctx,
+		42,
+		"ja",
+		"N4",
+		levels,
+		fallbackPlan,
+	)
 	if err != nil {
-		t.Fatalf("same-category fallback failed: %v", err)
+		t.Fatalf(
+			"same-category fallback failed: %v",
+			err,
+		)
 	}
 	if len(fallback) != 4 || fallback[0].ID == 2 {
-		t.Fatalf("same-category fallback result = %#v", fallback)
+		t.Fatalf(
+			"same-category fallback result = %#v",
+			fallback,
+		)
 	}
 	newCount := 0
 	for _, material := range fallback {
@@ -331,46 +589,88 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 		}
 	}
 	if newCount > fallbackPlan.Quotas[0].NewCount {
-		t.Fatalf("same-category fallback exceeded new quota: %d", newCount)
+		t.Fatalf(
+			"same-category fallback exceeded new quota: %d",
+			newCount,
+		)
 	}
 
-	if _, err := tx.ExecContext(ctx, `DELETE FROM user_material_progress WHERE material_id IN (10, 16)`); err != nil {
+	if _, err := tx.ExecContext(
+		ctx,
+		`DELETE FROM user_material_progress WHERE material_id IN (10, 16)`,
+	); err != nil {
 		t.Fatalf("fallback fixture update failed")
 	}
 	otherDuePlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, ReviewCount: 0},
 		{Category: model.MaterialCategoryGrammar, NewCount: 2},
 	}}
-	otherDue, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, otherDuePlan)
+	otherDue, err := repo.GetMaterialsByPlan(
+		ctx,
+		42,
+		"ja",
+		"N4",
+		levels,
+		otherDuePlan,
+	)
 	if err != nil {
-		t.Fatalf("other-category fallback failed: %v", err)
+		t.Fatalf(
+			"other-category fallback failed: %v",
+			err,
+		)
 	}
 	if len(otherDue) != 2 {
-		t.Fatalf("other-category fallback result count = %d, want 2", len(otherDue))
+		t.Fatalf(
+			"other-category fallback result count = %d, want 2",
+			len(otherDue),
+		)
 	}
 	for _, material := range otherDue {
 		if material.ID == 1 || material.ID == 3 || material.ID == 4 {
-			t.Fatalf("other-category fallback added new material: %#v", otherDue)
+			t.Fatalf(
+				"other-category fallback added new material: %#v",
+				otherDue,
+			)
 		}
 	}
 
 	scarcePlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, ReviewCount: 10},
 	}}
-	scarce, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", levels, scarcePlan)
+	scarce, err := repo.GetMaterialsByPlan(
+		ctx,
+		42,
+		"ja",
+		"N4",
+		levels,
+		scarcePlan,
+	)
 	if err != nil {
-		t.Fatalf("scarce selection failed: %v", err)
+		t.Fatalf(
+			"scarce selection failed: %v",
+			err,
+		)
 	}
 	// Only three new vocabulary materials (including adjacent-level N5) and
 	// two due reviews are eligible. Shorten only after exhausting both pools.
 	wantScarce := map[int]bool{1: true, 3: true, 4: true, 5: true, 6: true}
 	if len(scarce) != len(wantScarce) {
-		t.Fatalf("scarce count = %d, want %d", len(scarce), len(wantScarce))
+		t.Fatalf(
+			"scarce count = %d, want %d",
+			len(scarce),
+			len(wantScarce),
+		)
 	}
 	for _, material := range scarce {
 		if !wantScarce[material.ID] {
-			t.Fatalf("unexpected or duplicate scarce material %d", material.ID)
+			t.Fatalf(
+				"unexpected or duplicate scarce material %d",
+				material.ID,
+			)
 		}
-		delete(wantScarce, material.ID)
+		delete(
+			wantScarce,
+			material.ID,
+		)
 	}
 }

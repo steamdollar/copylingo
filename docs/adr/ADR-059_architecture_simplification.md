@@ -4,7 +4,7 @@
 - 상태: **구현 완료(2026-10-05) — 1단계, 2·3단계(§8 세분화 순서 A~E) 모두 완료. A·B 2026-09-30, C 2026-10-04, D·E 2026-10-05**
 - 보강: 2026-09-30 — 서비스 2계층·생성자 규칙·하위 계층 규칙 추가 (§8)
 - 범위: 패키지 간 호출 경계, Quiz·Study 책임 배치, Redis 접근, 서버 인스턴스 생성·주입
-- 관련 결정: [ADR-057·058·060](ADR_from_41_to_60.md), [1단계 구현 기록](../workthrough/2609/2609262045_redis_access_boundary.md)
+- 관련 결정: [ADR-057·058·060](ADR_from_41_to_60.md)
 
 ## 1. 배경과 목표
 
@@ -41,7 +41,7 @@
 
 줄 수 자체를 패키지 분리 기준으로 사용하지 않는다. 다음 코드가 책임 분산의 직접적인 근거다.
 
-- [Services](../../internal/service/services.go)는 서비스 16개를 공개하고, Bot은 그중 12개에 접근한다.
+- `Services`(당시 `internal/service/services.go`, D단계에서 삭제)는 서비스 16개를 공개하고, Bot은 그중 12개에 접근한다.
 - [SessionFlow](../../internal/bot/session_flow.go)와 [StudyFlow](../../internal/bot/study_flow.go)는 `*Bot` 전체를 받아 API·설정·서비스·Redis에 접근한다.
 - [SessionBuilder](../../internal/service/session_builder.go)는 생성 외에 조회·시작도 담당한다. 완료는 [Grader](../../internal/service/grader.go)에 있다.
 - [봇 답안 처리](../../internal/bot/session_answer.go)는 AI 채점 설정이 없으면 직접 `QuizActiveSession.RecordAnswer(false)`를 호출한다.
@@ -78,7 +78,7 @@ flowchart LR
 
 ### 1단계: Redis 저장 구현을 모으기
 
-신규 패키지 `internal/redisstore`가 키·직렬화·TTL·Redis 오류 변환·원자적 명령을 소유한다. 기존 Redis TODO를 실행했으며 구체적인 저장 계약과 검증 결과는 [1단계 구현 기록](../workthrough/2609/2609262045_redis_access_boundary.md)에 남겼다.
+신규 패키지 `internal/redisstore`가 키·직렬화·TTL·Redis 오류 변환·원자적 명령을 소유한다. 기존 Redis TODO를 실행했으며 구체적인 저장 계약과 검증 결과는 1단계 구현 기록에 남겼다.
 
 ```mermaid
 flowchart LR
@@ -367,7 +367,7 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 
 #### 8.6.1 B단계 구현 중 확정 사항 (2026-09-30)
 
-구현 기록은 [B단계 workthrough](../workthrough/2609/2609300127_adr059_stage_b_session_service.md)에 있다. 계획서(`docs/todos/adr059_stage_b_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
+B단계 구현 기록(workthrough)은 정리했고 git 이력에 남는다. 계획서(`docs/todos/adr059_stage_b_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
 
 | 대상 | 결정 | 근거 |
 |---|---|---|
@@ -380,7 +380,7 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 
 ### 8.7 C단계 결정 (2026-10-01~04)
 
-구현 기록은 [C단계 workthrough](../workthrough/2610/2610042335_adr059_stage_c_feature_flows.md)에 있다. 계획서(`docs/todos/adr059_stage_c_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
+C단계 구현 기록(workthrough)은 정리했고 git 이력에 남는다. 계획서(`docs/todos/adr059_stage_c_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
 
 | 대상 | 결정 | 근거 |
 |---|---|---|
@@ -395,13 +395,13 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 
 ### 8.8 D단계 결정 (2026-10-04~05)
 
-구현 기록은 [D단계 workthrough](../workthrough/2610/2610050008_adr059_stage_d_assembly_lifecycle.md)에 있다. 계획서(`docs/todos/adr059_stage_d_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
+D단계 구현 기록(workthrough)은 정리했고 git 이력에 남는다. 계획서(`docs/todos/adr059_stage_d_plan.md`)는 완료 처리로 삭제했으며 git 이력에 남는다.
 
 | 대상 | 결정 | 근거 |
 |---|---|---|
 | 서비스 전달 | cmd/server 내부 unexported `services` struct를 `newServices`가 만든다. `initApp`이 bot·scheduler·Mini App을 조립할 때 필드를 하나씩 넘긴다. | §8.3 묶음 규칙과 `botComponents` 선례. 소비자 패키지는 묶음을 보지 않는다. `initApp`에 모두 펼치면 약 200줄이 된다. |
 | LLM client | `NewLLMClient`가 `*DefaultLLMClient`를 반환한다. `external.LLMClient` 인터페이스와 Tier2 `llmService`를 삭제한다. §8.4의 "`GenerateTips`를 인터페이스에 정식 포함"을 이 방식으로 대체한다. | `llmService`는 도달하지 않는 nil 검사만 하는 전달 계층이고 cmd/server에서 만들 수 없다. 이를 지우면 남는 인터페이스는 소비자 없는 생산자 측 선언이다. 서비스는 이미 소비자 정의 인터페이스(`QuizGradingLLM`·`tipGeneratorLLM`·`LearningQuestionLLM`)로 범위를 좁힌다. |
-| external 설정 | `LLMOptions`·`TTSOptions`·`S3Options`를 받는다. cfg → options 매핑은 조립부(cmd/server, cmd/admin)가 한다. | §8.4. `observability.LoggerOptions` 선례. |
+| external 설정 | `LLMOptions`·`TTSOptions`·`S3Options`를 받는다. cfg → options 매핑은 조립부(cmd/server, cmd/admin)가 한다. 둘 이상의 바이너리가 쓰는 매핑은 `internal/bootstrap`에 둔다([ADR-069](ADR_from_61_to_80.md#adr-069-cmd-바이너리-공통-셋업을-internalbootstrap으로-모은다)). | §8.4. `observability.LoggerOptions` 선례. |
 | `app` | `initApp(cfg) (*app, error)`·`Run(ctx) error`·`Close()`. `Run`은 HTTP 포트를 먼저 bind한 뒤 scheduler → bot polling → 재시작 Mini App 갱신 → `Serve` 순으로 시작한다. ctx 취소나 serve 실패 시 bot → HTTP(10초) → scheduler 순으로 멈춘다. `Close`는 DB → Redis 순이다. signal은 `initApp` 성공 후 등록한다. | §4 "초기화 중간 실패 시 정리, 종료 순서 명확화". 포트 충돌이면 아무것도 시작하지 않고 오류를 반환한다(이전: goroutine 안의 `log.Fatalf`). 기동 중 Ctrl+C는 기존처럼 즉시 종료된다. |
 | scheduler 계약 | `Deps.Services`를 User·Session·Tip·Audio 좁은 인터페이스로 바꾼다. 서비스 nil 분기는 제거하고 Audio nil 분기는 유지한다. | §8.7 nil 방어 선례. Audio는 TTS key가 없으면 production에서도 nil이다. |
 | 콘텐츠 수집 | `initPipeline`은 `*service.ContentService`를 인자로 받는다. 기동 시 ContentService를 만들지 않는다. | ADR-057 "시작 시 만들지 않으며 관련 생성 코드는 유지". |
@@ -410,12 +410,12 @@ B단계 착수 전 Discovery 결과로 §8.2의 Tier1 구성을 다음과 같이
 
 ### 8.9 E단계 결정 (2026-10-05)
 
-구현 기록은 [E단계 workthrough](../workthrough/2610/2610051328_adr059_stage_e_import_boundary.md)에 있다. 규칙의 원본은 [`internal/import_boundary_test.go`](../../internal/import_boundary_test.go)의 두 표다.
+E단계 구현 기록(workthrough)은 정리했고 git 이력에 남는다. 규칙의 원본은 [`internal/import_boundary_test.go`](../../internal/import_boundary_test.go)의 두 표다.
 
 | 대상 | 결정 | 근거 |
 |---|---|---|
 | 검사 방식 | `go list`로 `internal/...` 각 패키지의 non-test import를 읽어 패키지별 허용 목록(allowlist)과 비교한다. 목록에 없는 내부 import와 규칙이 없는 새 패키지는 실패한다. | 금지 목록은 새 패키지나 처음 생긴 경로를 놓친다. 허용 목록은 경계 변경을 같은 diff의 표 수정으로 드러낸다. depguard 같은 별도 lint 설정 없이 `make test`에서 돈다. |
-| 드라이버·SDK 소유 | go-redis → `redisstore`, `lib/pq` → `repository`, sqlx → `repository`·`service`·`testutil`, Telegram → `bot`, go-openai·AWS SDK → `external`. 그 밖의 third-party(gin·cron·viper 등)는 검사하지 않는다. | §3·§5 Redis 키·포맷 소유와 raw Redis 타입 노출 금지, §8.7 Mini App의 `tgbotapi` 금지, ADR-061 서비스 트랜잭션. 프레임워크는 계층 경계가 아니다. |
+| 드라이버·SDK 소유 | go-redis → `redisstore`, `lib/pq` → `repository`(ADR-069에서 `bootstrap` 추가), sqlx → `repository`·`service`·`testutil`(ADR-069에서 `bootstrap` 추가), Telegram → `bot`, go-openai·AWS SDK → `external`. 그 밖의 third-party(gin·cron·viper 등)는 검사하지 않는다. | §3·§5 Redis 키·포맷 소유와 raw Redis 타입 노출 금지, §8.7 Mini App의 `tgbotapi` 금지, ADR-061 서비스 트랜잭션. 프레임워크는 계층 경계가 아니다. |
 | 검사 범위 | `internal/...`의 non-test 파일만. `cmd/*`와 `_test.go`는 제외한다. | `cmd/server`는 조립부라 모든 패키지를 import한다(§5). 테스트는 실제 구현을 조립하려고 다른 계층 타입을 쓴다(bot 테스트의 `external.GradeResult`, scheduler 테스트의 `service.NewSessionService`). |
 | `external`의 `observability` | 허용한다. §8.4 "하위 계층은 `model`과 드라이버만"의 유일한 예외다. | LLM 호출 로그 속성(`observability.WithAttrs`)만 쓰며 계층 의존을 만들지 않는다. |
 | 테스트 위치 | `internal/` 루트의 테스트 전용 패키지(`internal_test`). | 새 패키지 디렉터리를 만들지 않는다(§8.1 "패키지를 늘리지 않는다"). 검사 대상 트리의 루트라 찾기 쉽다. |

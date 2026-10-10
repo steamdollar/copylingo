@@ -152,6 +152,15 @@ func (sf *SessionFlow) renderByType(
 	isReview bool,
 ) (string, *tgbotapi.InlineKeyboardMarkup, bool) {
 	messages := botMessagesByLocale[botDefaultLocale]
+	// Sessions mix the current level with adjacent ones (ADR-046), so the header
+	// names each question's level; questions without one omit the marker.
+	levelTag := ""
+	if question.ProficiencyLevel != "" {
+		levelTag = fmt.Sprintf(
+			messages.questionLevelMarkerFormat,
+			question.ProficiencyLevel,
+		)
+	}
 	reviewTag := ""
 	if isReview {
 		reviewTag = messages.reviewQuestionMarker
@@ -160,6 +169,7 @@ func (sf *SessionFlow) renderByType(
 		messages.questionFormat,
 		questionIdx+1,
 		totalQuestions,
+		levelTag,
 		reviewTag,
 		question.Prompt,
 	)

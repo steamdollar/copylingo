@@ -8,8 +8,8 @@
 
 ## New session start procedure
 
-1. Read [`AGENTS.md`](AGENTS.md) thoroughly — entry rules / role matrix / 3-case work protocol / decision criteria / coding rules
-2. Check [`STATUS.md`](STATUS.md) — assess how the current "🔨 In progress" items relate to the user's request
+1. Read [`AGENTS.md`](AGENTS.md) thoroughly — entry rules / role matrix / Case 0·A·B·C work protocol / decision criteria / coding rules
+2. Check [`STATUS.md`](STATUS.md) — assess how the current "🔨 진행 중" items relate to the user's request
 3. Classify the user's request per the **Case classification in AGENTS.md §3** (default **Case 0**; escalate explicitly to A/B/C), then start the corresponding procedure
 
 ---

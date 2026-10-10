@@ -6,17 +6,17 @@
 
 ## Go code
 
-1. **Package structure**: split by layer under `internal/` (`model`, `repository`, `service`, `bot`, `pipeline`, `external`).
+1. **Package structure**: split by responsibility under `internal/`. Allowed imports between packages are pinned by `internal/import_boundary_test.go` (see [ARCHITECTURE.md](ARCHITECTURE.md)).
 2. **DB access**: write raw SQL with `sqlx`.
 3. **Error handling**:
    - Don't log at the point of error; attach context and return with the `fmt.Errorf("context: %w", err)` pattern.
-   - The repository layer includes searchable error context based on the function name / key identifiers (e.g. `SessionQuestionRepository.GetBySession session_id=%d: %w`).
+   - The repository layer includes searchable error context based on the function name / key identifiers (e.g. `QuestionRepository.UpsertSeedBatch count=%d batch_size=%d: %w`).
    - The service layer wraps only when adding new business meaning. A plain repository pass-through returns the error as-is.
    - If `err` isn't reused afterward, narrow its scope with `if err := ...; err != nil` or `if _, err := ...; err != nil`.
 4. **ID**: DB PKs are SERIAL (auto-increment). Only the `users` table uses the Telegram ID (BIGINT).
 5. **Context**: every repository/service method takes `context.Context` as its first argument.
 6. **Logging**:
-   - Currently uses the standard `log` library (may switch to structured logging later).
+   - Use `log/slog` (JSON handler, `internal/observability`). Request attributes such as `interaction_id` come from the context.
    - Lower layers like the repository don't log directly.
    - Boundary layers — bot handlers, HTTP handlers, scheduler jobs — log once, with user/task context.
 7. **Tests**: `*_test.go` files, located in the same package.
@@ -24,7 +24,7 @@
 
 ### Agent Go formatting
 
-Primary·subagent·외부 executor 모두 Go 파일 작성·수정 후, 테스트와 인계/완료 보고 전에 VS Code와 같은 `goparams`를 적용한다. 파일 도구나 셸로 코드를 쓰는 동작은 VS Code 저장 시 포맷을 실행하지 않는다.
+Main agent·subagent 모두 Go 파일 작성·수정 후, 테스트와 인계/완료 보고 전에 VS Code와 같은 `goparams`를 적용한다. 파일 도구나 셸로 코드를 쓰는 동작은 VS Code 저장 시 포맷을 실행하지 않는다.
 
 - **대상**: 이번 작업에서 직접 생성·수정한 `.go` 파일만 명시한다. 다른 작업자의 변경까지 포함하는 전체 dirty 파일 목록이나 저장소 전체를 일괄 포맷하지 않는다.
 - **순서**: 코드 수정 → 필요한 import 정리·기존 포맷 → `goparams` → `make test` 및 최종 diff 확인. 이후 Go 코드를 다시 수정하면 해당 파일에 재적용한다. 포맷 실패는 해결하거나 미완료로 보고하며 사용자 저장에 맡기지 않는다.
@@ -56,8 +56,8 @@ Go 파일을 변경하지 않은 문서 전용 작업은 이 단계를 생략한
 
 1. **Migrations**: this project does not accumulate migration SQL across multiple files — it keeps **only `migrations/001_init.sql`**. When the schema changes, merge it into `001_init.sql` instead of creating a new `002_*.sql`. `make migrate` can apply `NNN_*.sql` in order, but the operating rule is a single SQL file.
 2. **Naming**: snake_case, plural table names (`users`, `questions`, `sessions`).
-3. **Timestamp**: every table has `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`.
-4. **JSONB**: use where a flexible structure is needed (questions.options, sessions.questions, article_responses.conversation).
+3. **Timestamp**: new tables get `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`.
+4. **JSONB**: use where a flexible structure is needed (`questions.options`, `materials.payload`).
 5. **Indexes**: add only when needed. No standalone index on a low-cardinality column (boolean, enum, etc.).
 
 ## Config

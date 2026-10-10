@@ -37,15 +37,27 @@ var allowedInternalImports = map[string][]string{
 	"bot":       {"callback", "config", "model", "observability", "service"},
 	"miniapp":   {"config", "model", "observability", "service"},
 	"scheduler": {"model", "observability"},
+
+	// Setup shared by the cmd/ binaries: connections and config → options
+	// mapping. No package above may import it (ADR-069).
+	"bootstrap": {"config", "external", "repository", "service"},
 }
 
 // driverOwners lists the internal packages allowed to import each driver or
 // SDK, keyed by import path prefix. Only these packages see raw Redis,
 // database, Telegram or external API types (ADR-059 §3, §5, §8.7).
 var driverOwners = map[string][]string{
-	"github.com/redis/go-redis/":        {"redisstore"},
-	"github.com/lib/pq":                 {"repository"},
-	"github.com/jmoiron/sqlx":           {"repository", "service", "testutil"}, // service owns transactions (ADR-061)
+	"github.com/redis/go-redis/": {"redisstore"},
+	"github.com/lib/pq": {
+		"bootstrap",
+		"repository",
+	}, // bootstrap opens the connection (ADR-069)
+	"github.com/jmoiron/sqlx": {
+		"bootstrap",
+		"repository",
+		"service",
+		"testutil",
+	}, // service owns transactions (ADR-061)
 	"github.com/go-telegram-bot-api/":   {"bot"},
 	"github.com/sashabaranov/go-openai": {"external"},
 	"github.com/aws/":                   {"external"},

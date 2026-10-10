@@ -16,14 +16,6 @@
 - 결정: 두 서비스는 타입별 세션 저장소의 `Load/Save/Delete`를 직접 호출한다. JSON 및 버전·세션 ID 검사는 Redis 저장소의 `Load`에서 함께 처리한다. 세션 상태 미발견·손상 오류는 공통 `model.ErrSessionStoreNotFound/Corrupt`를 사용하고, 저장소 대역에 필요한 타입별 계약은 유지한다. 사용하지 않는 Study 메서드는 제거한다.
 - 결과: `workingSetStore`와 그 백엔드 계약·오류 번역 설정이 사라지고 Redis 키·TTL·완료 시 DB 반영 흐름은 유지된다. 저장소 계약은 서비스 단위 테스트에서 Redis 없이 세션 상태를 주입하는 경계로 남는다.
 
-## ADR-063: Study Redis 진행 상태에서 version 필드를 제거한다
-
-- 날짜: 2026-09-28
-- 상태: 승인됨
-- 배경: `StudyActiveSessionState`의 `Version`은 현재 값 `1`만 기록하며, Redis의 Study 키에는 별도 세대 구분이 없다. JSON 해석과 요청한 session ID 일치 여부만으로 잘못된 상태를 걸러낼 수 있다.
-- 결정: Study 상태의 `Version` 필드, 상수, 저장 시 대입과 version 검사를 제거한다. JSON 오류와 session ID 불일치 검사는 유지한다. Quiz 상태의 독립적인 version 검사는 변경하지 않는다.
-- 결과: 기존 Redis JSON에 남은 `version` 값은 Go JSON 해석 시 무시되므로 마이그레이션 없이 읽을 수 있다. 앞으로 Study 상태 형식이 호환되지 않게 바뀌면 version 필드에 의존하지 말고 필요한 시점에 Redis 키 세대 구분이나 명시적 무효화를 추가한다.
-
 ## ADR-064: Study 플랜을 신규 어휘 중심으로 재조정한다
 
 - 날짜: 2026-10-08
@@ -63,8 +55,10 @@
     - `cmd/ja/seeder` → `cmd/seeding`(main), `cmd/ja/catalog` → `cmd/seeding/catalog`, JSON → `cmd/seeding/data/<언어 코드>/`.
     - `go:embed`는 `..` 경로를 쓸 수 없으므로 `cmd/seeding/data` 패키지가 `*/*.json`을 embed하고, catalog가 `<language>/<file>`로 읽는다.
     - registry 항목과 `LevelCatalog`에 `Language`를 둔다. 조회는 `LevelCatalogsFor(language)`, `LevelCatalogFor(language, level)`, `DefaultProficiencyLevel(language)`로 바꾼다.
+    - → ADR-068에서 `catalog`·`data` 패키지를 `cmd/seeding`에 합쳤다. registry 목록은 파일 경로로 대체했고, 조회 함수는 `levelCatalogsFor(language)` 하나만 남았다(이후 `loadLevelCatalogs(language)`로 바꿈).
     - 언어 코드는 `catalog.Japanese` 상수 하나로 모은다. material/question key 접두어와 `Language` 필드는 이 상수에서 만든다. 값은 그대로라서 DB의 `material_key`·`question_key`는 바뀌지 않는다.
     - seeder에 `-language` 플래그(기본 `ja`)를 둔다. 이름은 기존 `generate_listening_audio`의 `-language`에 맞췄다. 등록되지 않은 언어면 바로 종료한다.
+    - → 2026-10-10: flag를 없애고 필수 위치 인자로 바꿨다(`go run ./cmd/seeding ja`). 인자 개수가 틀리거나 `data/` 아래 없는 언어면 사용법과 가능한 언어 목록을 보여주고 exit 2로 끝난다. 대소문자·공백 정규화도 지웠다.
   - B2 (다음 단계, 미착수): 일본어 전용 builder(kana, vocab kana/kanji 문항, `ScriptLabel`, 탁점 hint)를 `cmd/seeding/ja`로 분리한다. → ADR-066에서 데이터를 공통 record로 옮기는 방향으로 대체됐다.
   - 하지 않기로 한 것: vocab schema를 `word/reading` 등으로 일반화하거나 언어 plugin interface를 두는 일은 두 번째 언어가 실제로 들어올 때 한다. 구현체가 하나뿐인 interface는 설계가 맞는지 검증할 수 없다. 또 payload 키를 바꾸면 DB 데이터 migration과 bot 렌더러 수정까지 번진다.
 - 결과:
@@ -120,6 +114,56 @@
 - 결과:
   - N5 legacy 파일 7개(`kana.json`, `n5_*.json`)를 `data/ja/n5.json` 하나로 대체했다. material 1,117개, 그 안의 문항 3,863개, 최상위 청해 50개다. `n4/records.json`은 `data/ja/n4.json`으로 옮겼다.
   - 변경 전후 seed 출력이 key별로 같다(material 2,242개, question 5,318개, 차이 0). 기존 DB를 다시 seed할 필요가 없다.
-  - 데이터 검사를 record 공통 규칙으로 옮겼다. category별 payload 필수 필드, 선택형 문항의 서로 다른 선지 4개, 난이도 범위(DB CHECK와 같은 1~10), level별 item type 고정이다. 로더는 모르는 JSON 필드를 거부한다.
+  - 데이터 검사를 record 공통 규칙으로 옮겼다. category별 payload 필수 필드, 선택형 문항의 서로 다른 선지 4개, 난이도 범위(DB CHECK와 같은 1~10), level별 item type 고정이다. 로더는 모르는 JSON 필드를 거부한다. (→ 2026-10-10: 로드된 level 데이터에서 `Language`·`Level` 필드를 지우면서 level별 item type 고정 검사도 지웠다.)
   - 선지는 문항마다 고정이고, 런타임에는 순서만 섞인다. 매번 다른 선지가 필요하면 후보 풀을 데이터에 두고 런타임에 3개를 뽑는 방식을 별도 결정으로 다룬다.
   - 파일 하나가 너무 커지면 나눌 때 registry와 로더를 같이 고쳐야 한다(지금 N5 2.4MB, N4 1.8MB).
+
+## ADR-068: seed catalog 패키지를 seeder에 합치고 record 타입을 model 타입으로 바꾼다
+
+- 날짜: 2026-10-08
+- 상태: 승인됨. ADR-065의 `cmd/seeding/catalog`·`cmd/seeding/data` 패키지 분리를 대체한다
+- 배경:
+  - `catalog` 패키지는 데이터를 material row로 바꾸는 규칙(유형별 builder, `MaterialKeyFor*` key 규칙)을 DB 쓰기와 분리하려고 만들었다(`1ca4684`). ADR-067 이후 JSON이 이미 DB row 모양이라 그 규칙이 없다. record 타입, JSON 로더, registry, 필드를 복사하는 `BuildRecordMaterials`만 남았다.
+  - 패키지 밖 사용처는 seeder와 `generate_listening_audio`의 flag 기본값(`DefaultProficiencyLevel`) 하나였다. 이 기본값 때문에 admin 바이너리가 seed JSON 약 4MB를 같이 embed했다.
+  - `data` 패키지는 `go:embed`가 `..`를 못 쓰기 때문에 있었다. embed 선언을 `cmd/seeding`에 두면 `data/*/*.json`은 하위 경로라서 이 제약이 없다.
+- 결정:
+  - `catalog`와 `data` 패키지를 `cmd/seeding`(main)의 `records.go`로 합친다. JSON 위치는 그대로다. (2026-10-10에 `records.go`·`records_test.go`를 `main.go`·`main_test.go`로 합쳤다.)
+  - 운영 코드에서 쓰지 않던 것은 정리한다. `LevelCatalogFor`는 테스트 helper로(2026-10-10에 이 helper도 지웠다), category별 payload 타입은 테스트 파일로 옮긴다. `DefaultProficiencyLevel`은 지운다. registry에 직접 쓴 언어·level 값을 다시 정규화하던 코드도 지운다(flag 입력의 언어 정규화는 유지. 2026-10-10에 이것도 지웠다).
+  - admin 도구는 flag 기본값을 `"ja"`, `"N5"` 문자열로 직접 쓴다.
+  - (같은 날 보강) 타입 중복을 정리한다.
+    - seed JSON을 `model.Material`·`model.Question`으로 바로 읽는다. 파일 key가 두 타입의 JSON tag와 같아서 가능하다. `questionRecord`, `levelFile`, `linkedRecord`, 필드 복사용 `buildRecordMaterials`를 지운다. `materialRecord`는 `model.Material`에 중첩 문항을 붙인 래퍼만 남는다.
+    - 언어와 level은 파일 경로에서 정한다(`data/ja/n5.json` → `ja`, `N5`). registry 목록과 그 타입을 지운다. 새 언어나 level은 파일만 추가하면 된다.
+    - `Material.UpsertBatch`가 `RETURNING id, material_key`로 각 material의 `ID`를 채운다. seeder의 ID 재조회(`materialKeyStore`, `loadRecordMaterialIDs`)와, 그 용도로만 쓰이던 `GetByMaterialKeys`를 지운다.
+    - 테스트의 payload 타입 5개를 category별 필수 key 표 하나로 바꾼다.
+  - (2026-10-10 보강) seeder 실행 코드를 줄인다.
+    - 전역 registry(`registeredCatalogs`)와 언어 필터(`levelCatalogsFor`) 대신 `loadLevelCatalogs(language)` 함수가 요청한 언어의 파일만 읽는다. 실패는 panic 대신 error로 돌려준다. (같은 날 레벨별 묶음 없이 material·question 목록을 바로 돌려주는 `loadRecords`로 바꿨다.)
+    - `buildRecordQuestions`의 내용 검사(필수 필드, 중복 key, 청해 위치)를 지운다. 같은 embed 파일을 테스트(현재 `main_test.go`)가 검사한다. DB가 돌려준 row ID로 연결하는 검사만 남긴다. (→ 2026-10-10: 이 row ID 검사도 지웠다. material upsert가 `ON CONFLICT DO UPDATE ... RETURNING`으로 모든 row의 ID를 돌려주고, 0이 들어가도 `questions.material_id` FK가 거부한다. 연결은 `collectQuestions`가 한다.)
+    - question upsert가 실패해도 exit 0으로 끝나던 버그를 고친다(`log.Fatalf`).
+    - DB 연결은 [ADR-069](#adr-069-cmd-바이너리-공통-셋업을-internalbootstrap으로-모은다)의 `bootstrap.OpenDB`를 쓴다.
+- 결과:
+  - seed 쪽 패키지가 3개에서 1개가 됐다. seed 동작과 데이터는 바뀌지 않는다.
+  - admin 도구의 기본 level과 registry 첫 항목은 따로 관리된다. 어긋나도 영향은 admin flag 기본값뿐이다.
+  - 타입 정리 전후 seed 출력(material 2,242개, question 5,318개)이 key별로 같다.
+  - seed 순서가 파일 경로순(n4 → n5)이 된다. 빈 DB에 새로 seed하면 N4 row가 먼저 id를 받는다. 기존 DB는 key로 upsert하므로 영향이 없다.
+  - seed 파일 형식이 model의 JSON tag에 묶인다. tag 이름을 바꾸면 로더가 기존 key를 모르는 필드로 거부하므로 테스트에서 드러난다.
+  - model 타입에는 DB가 채우는 필드(`id`, `content_id`, `audio_path` 등)도 있어서, JSON에 써도 디코딩은 통과한다. 데이터 테스트가 이 필드들이 비어 있는지 검사한다.
+  - 보강 후 seeder는 데이터 내용을 검사하지 않는다. JSON을 고친 뒤 `make test` 없이 seed하면 빈 문자열 같은 값이 DB 제약에 걸리지 않고 들어갈 수 있다. 중복 question key는 같은 INSERT 문 안이면 PostgreSQL이 거부하지만, batch가 나뉘면 뒤 row가 앞 row를 덮어쓴다.
+  - 다른 언어를 추가할 때 seeder 변경은 없다. `data/<code>/<level>.json` 파일만 추가한다. 언어별 차이(문자, 어형 변화, CEFR 같은 level 체계)는 payload를 읽는 bot 렌더러와 서버 level 규칙에서 처리해야 한다.
+
+## ADR-069: cmd 바이너리 공통 셋업을 `internal/bootstrap`으로 모은다
+
+- 날짜: 2026-10-10
+- 상태: 승인됨. [ADR-059](ADR-059_architecture_simplification.md) §8.8 "cfg → options 매핑은 조립부가 한다"와 §8.9 드라이버 소유 표를 보강한다
+- 배경:
+  - `initDB`가 `cmd/` 5곳(server, seeding, admin 3개)에 복사돼 있었다. 그중 3곳은 `config.DBConfig.DSN()`을 쓰지 않고 DSN 문자열을 직접 조립했다. 설정 항목이 늘면 이 3곳만 어긋난다.
+  - TTS client·S3 store·`AudioService` 조립(cfg → `TTSOptions`·`S3Options` 매핑)이 server와 `generate_listening_audio`에 똑같이 있었다.
+  - 5곳 모두 `_ "github.com/lib/pq"`를 import했다. `repository`가 이미 `lib/pq`를 import하므로 driver 등록에는 필요 없었다.
+  - 연결 생성은 쿼리를 다루는 `repository`의 역할이 아니다. import 경계상 sqlx·`lib/pq`를 쓸 수 있는 곳이 `repository`뿐이라는 이유로 그곳에 두면 역할이 섞인다.
+- 결정:
+  - 둘 이상의 `cmd/` 바이너리가 쓰는 셋업 코드는 `internal/bootstrap`에 둔다. 지금은 `OpenDB(config.DBConfig)`와 `NewAudioService(cfg, questions)` 두 개다.
+  - 한 바이너리만 쓰는 셋업은 그 바이너리에 남긴다. server의 connection pool 설정, Redis 연결, logger, Telegram 조립이 그렇다. 바이너리마다 다른 정책(API key가 없을 때 server는 audio 없이 뜨고 admin 도구는 거부)도 호출부가 정한다.
+  - `bootstrap`은 `config`·`external`·`repository`·`service`를 import할 수 있다. `internal/` 안에서는 아무도 `bootstrap`을 import하지 않는다. `lib/pq`·sqlx 소유 목록에 `bootstrap`을 추가한다(`internal/import_boundary_test.go`).
+- 결과:
+  - `cmd/`의 `initDB` 4개와 blank import 5개가 없어졌다. server의 `initDB`는 `OpenDB` 위에 pool 설정만 더한다.
+  - `internal/` 패키지가 하나 늘었다. ADR-059 §8.1은 그 보강 기간에 패키지 수를 12개로 유지했지만, 영구 규칙은 아니다.
+  - 새 admin 도구는 `bootstrap.OpenDB(cfg.DB)` 한 줄로 DB에 연결한다. DSN 형식이 바뀌어도 `config.DBConfig.DSN()` 한 곳만 고치면 된다.

@@ -1,6 +1,6 @@
-# 구조 검토 후속 작업 (U2~U4 + callback 이중 응답)
+# 구조 검토 후속 작업 (U3~U4 + callback 이중 응답)
 
-> 2026-10-05 ADR-059 완료 후 구조 검토(Case 0)의 결과. U1(Quiz 답안 소유자 검사·callback 파싱)은 완료 — [workthrough](../workthrough/2610/2610051431_quiz_answer_owner_check.md).
+> 2026-10-05 ADR-059 완료 후 구조 검토(Case 0)의 결과. U1(Quiz 답안 소유자 검사·callback 파싱)과 U2(죽은 코드 삭제, 커밋 0d07cfe)는 완료 — [workthrough](../workthrough/2610/2610051431_quiz_answer_owner_check.md).
 > 줄 번호는 커밋 54b7736 + U1 기준이다. 어긋나면 심볼로 다시 찾는다.
 
 ## 확정된 결정 (재논의 불필요)
@@ -11,8 +11,7 @@
   - service 하위 패키지 후보는 `handwriting_render.go` 하나다(std만 import). 얻는 이득이 dev 도구 link 범위뿐이라 보류한다.
   - U3에서 이 판단을 비용 수치와 함께 ADR-059 §8.10으로 남긴다.
 - **파일이 많아 보이는 원인은 이름이다.** 같은 개념에 필드명·타입명·파일명이 따로 붙어 있고, 테스트 파일이 소스와 대응하지 않는다.
-- **진행 순서는 U2 → U3 → U4다.** 각 단위는 독립 커밋이고, `make test` 통과가 완료 조건이다.
-  - 삭제(U2)를 rename(U3)보다 먼저 한다. 지울 파일을 옮기지 않기 위해서다.
+- **진행 순서는 U3 → U4다.** 각 단위는 독립 커밋이고, `make test` 통과가 완료 조건이다.
 
 ## 0. callback 이중 응답 (사용자 실기기 확인 대기)
 
@@ -22,21 +21,6 @@
 - **수정 방향 (확인 후)**: 응답 책임을 한쪽에 둔다.
   - 권장안: settings·material preference prefix의 callback은 router가 사전 응답하지 않는다.
   - 이때 해당 handler의 모든 경로가 응답하는지 확인한다.
-
-## U2. 죽은 코드 삭제 (동작 변화 없음) — ✅ 완료 2026-10-05
-
-> 완료: [workthrough](../workthrough/2610/2610051735_dead_code_cleanup.md). 수집 경로는 scheduler·server 연결만 제거하고 pipeline 코드는 보존했다(사용자 결정). 아래 표는 기록용이다.
-
-| 대상 | 위치 | 근거 |
-|---|---|---|
-| 호출자 0인 repository 메서드 10개 | `session_repo.go` `GetByID`(:157)·`Complete`(:340)·`GetTodaySessions`(:377), `session_question_repo.go` :38·:49·:67, `question_repo.go` `CreateBatch`(:30)·`GetByID`(:63), `user_repo.go` `Update`(:47), `content_repo.go` `GetArticles`(:34) | grep 0건(테스트 포함). `Complete`는 상태 가드와 flush가 없어 위험하다. bot/service 테스트 mock의 같은 메서드도 함께 지운다. |
-| Redis `session:%d:question_start` | `redisstore/interactions.go:18,89`, `bot/interactions.go:56` `QuestionTimingStore`, `SessionFlowDeps.Timing`, 쓰는 곳 `bot/session_question.go:120`·`bot/session_flow.go:721` | 읽는 코드가 없다(Go·JS). Initial commit부터 그렇다. |
-| 생산자 측 interface | `external/tts_client.go:26` `TTSClient`, `external/audio_store.go:24` `AudioStore` | 참조 0건. §8.8에서 `LLMClient`를 지운 것과 같은 이유다. |
-| method set이 같은 interface 5쌍 | `service/session.go:95`=`quiz_active_session.go:36`, `:107`=`study_active_session.go:36`, `:131`=`grader.go:15`, `:119`=`study_session.go:154`, `:87`=`session_builder.go:55` | Tier2 필드 타입을 exported 쪽으로 통일한다. subset interface(`questionFetcher` 등)는 mock이 쓰므로 유지한다. |
-| `quizActiveSessionScheduler` | `service/quiz_active_session.go:47` | test double이 없다. 모두 `newSRSService(nil)`을 쓴다. |
-| grader의 테스트 전용 메서드 | `service/grader.go:61` `GradeAnswer`, `:134` `GradeHandwriting`, `:266` `questionFromQuizActiveSession` | `grader_test.go`에서만 호출한다. 같은 경로를 `session_quiz_submit_test.go`·`quiz_active_session_test.go`가 검증한다. |
-| `model.UserMaterialProgress` | `model/material.go:34` | 참조 0건 |
-| scheduler 콘텐츠 수집 경로 | `scheduler/scheduler.go:25,106` `Orchestrator`, `:191` `collectContent`, `cmd/server/server.go:93` `initPipeline` | `golangci-lint unused` 2건. allowlist의 scheduler→pipeline 간선이 이것 때문에 남아 있다. **ADR-057(수집 비활성·코드 보존)과 충돌하므로 먼저 사용자 확인이 필요하다.** 최소안은 scheduler에서만 제거하고 `initPipeline`을 `cmd/admin/collect_content` 진입점으로 옮기는 것이다. |
 
 ## U3. rename·이동 (동작 변화 없음, `git mv` 위주)
 
@@ -61,7 +45,7 @@
 - 공유 fake를 `session_fakes_test.go`로 모은다.
 - `session_builder_test.go`(1951줄)는 level scope 테스트를 level_policy 테스트와 합치고, 나머지는 mix/caps로 나눈다.
 
-문서는 `docs/ARCHITECTURE.md:39-41`과 `docs/todos/user_selectable_session_mix_presets.md:6,54`를 갱신한다.
+문서는 `docs/ARCHITECTURE.md:39-41`과 `docs/todos/user_selectable_session_mix_presets.md` 배경를 갱신한다.
 
 **bot**
 
@@ -112,7 +96,7 @@
 | Quiz 소유자 검사 4가지 방식 | `session_quiz_start.go:116`(`!= 0` 생략, 도달 불가: `sessions.user_id` NOT NULL), `quiz_active_session.go:245`, `session_quiz_complete.go:32`, `session_quiz_handwriting.go:95` | `quizProgress.loadOwned` 하나로 통일. 제출 경로는 U1에서 처리 | 없음 |
 | SRS 정책 2벌·반올림 불일치 | Quiz는 Go `srs.go:83-93`(`int()` 절사), Study는 SQL `study_active_session_repo.go:420-437`(`ROUND`). interval 15·ease 2.5에서 37일 vs 38일 | 단일 구현 여부와 반올림 규칙(원본 SM-2는 올림)을 결정 | **ADR 필요** |
 | `*_active_session_repo` 이름이 실제 역할을 숨김 | `repository/quiz_active_session_repo.go:16`, `study_active_session_repo.go:15`: Postgres 스냅샷 적재와 4테이블 완료 커밋(자체 tx, ADR-061의 유일한 예외). 에러 prefix가 rename 전 이름 `ActiveSessionRepository.FlushActiveSession` 그대로 | `QuizCompletionRepository`·`LoadQuizSnapshot`·`CommitQuizCompletion` 식 rename, prefix 수정, 수동 tx를 `WithinTx`로 | rename 범위 확인 |
-| scheduler의 backlog 정책 | `scheduler/dispatcher.go:13` `maxUnfinishedSessions=3`, `:177` 호출 순서 조정 | `SessionService.SessionForSlot(...) (session, isReminder, err)`로 흡수. mode→pusher 라우팅은 scheduler에 둔다 | ADR-053 갱신 |
+| scheduler의 backlog 정책 | `scheduler/dispatcher.go:13` `maxUnfinishedSessions=3`, `:177` 호출 순서 조정 | `SessionService.SessionForSlot(...) (session, isReminder, err)`로 흡수. mode→pusher 라우팅은 scheduler에 둔다 | ADR-045 갱신 |
 | LLM 질문 준비 코드 3벌 | `bot/session_flow.go:605-659`, `study_flow.go:586-673`, `llm_question.go:87-139` | `llm_question.go`의 free function `armLLMQuestion`으로 합침. `studyInputStore` 제거 | 없음 |
 | `buildSession` 350줄 | `service/session_builder.go:145-495` | review / due / new relay / persist를 private method로 분리 | 없음 |
 | Redis 상태 손상 시 처리 | `ErrSessionStoreCorrupt`를 쓰는 곳 0. redisstore가 키를 지운 뒤 service는 NotFound만 재구성 | Corrupt도 DB에서 재구성 | 동작 변화, 테스트 동반 |
@@ -126,4 +110,4 @@
 ## 손대지 말 것
 
 - import allowlist(`internal/import_boundary_test.go`)의 구조. 간선 제거는 같은 diff에서 표를 수정한다.
-- ADR-057 콘텐츠 수집 비활성 결정. U2의 scheduler 경로 삭제는 사용자 확인 후에만 한다.
+- ADR-057 콘텐츠 수집 비활성 결정(pipeline 코드는 보존).

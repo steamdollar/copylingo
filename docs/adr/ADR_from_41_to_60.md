@@ -57,24 +57,9 @@
   - 조각 tap마다 작은 Redis write가 발생하지만, 전체 Active Session blob을 다시 저장하지 않아 write amplification을 제한한다.
   - Drag UX와 다국어 delimiter·복수 정답 지원은 현재 일본어 Telegram MVP 범위에서 제외한다.
 
-## ADR-044: Go toolchain과 container builder를 1.27.0으로 올린다
-
-- **날짜**: 2026-08-24
-- **상태**: 채택됨
-- **맥락**:
-  - Project의 `go.mod`는 Go 1.25.5, Docker builder는 `golang:1.25-alpine`에 고정돼 있어 local과 container의 patch version이 일치하지 않았다.
-  - Go 1.27.0은 2026-08-19 정식 release됐고 Go 1 compatibility를 유지한다.
-- **결정**:
-  - `go.mod` minimum Go version을 `1.27.0`, Docker builder image를 `golang:1.27.0-alpine`로 올려 local·CI·container build 기준을 같은 patch version으로 맞춘다.
-  - Upgrade와 dependency version 변경을 분리하고, Go 1.27 신규 language·standard-library API는 이 작업에서 도입하지 않는다.
-  - Go 1.27.0으로 `go mod tidy`, `make test`, binary build, container rebuild, health check를 모두 통과해야 upgrade를 완료한다.
-- **결과 / 트레이드오프**:
-  - 최신 supported toolchain의 runtime·compiler·standard-library 개선을 사용하고 local/container 재현성을 높인다.
-  - `.0` release의 초기 regression 가능성은 있지만 full test·container smoke로 현재 application contract를 검증하고, 문제 시 두 version pin을 같이 revert한다.
-
 ## ADR-045: Scheduled Session backlog를 합산 3개까지 허용한다
 
-> `schedule.max_unfinished_sessions` 설정 방식은 ADR-053에서 제거했다. 사용자별 미완료 세션 3개 상한과 재알림 규칙은 유지한다.
+> `schedule.max_unfinished_sessions` 설정은 이후 제거했다. 사용자별 미완료 세션 3개 상한과 재알림 규칙은 유지한다.
 
 - **날짜**: 2026-08-30
 - **상태**: 채택됨
@@ -161,30 +146,6 @@
 - 사용자별 슬롯 시각은 DB에 두고, 서버는 매시 `:00`·`:30`에 발송 대상을 조회한다. 기존 전역 시각별 발송 및 자동 콘텐츠 수집 cron 등록을 제거한다.
 - 상세: [ADR-052_single_push_cron.md](ADR-052_single_push_cron.md)
 
-## ADR-053: 미완료 세션 상한을 발송 규칙으로 고정한다
-
-- 날짜: 2026-09-26
-- 상태: 승인됨
-- 배경: ADR-045의 `schedule.max_unfinished_sessions`는 현재 `ScheduleConfig`의 유일한 값이며, 기본값 3과 허용 상한 3이 같아 설정으로는 상한을 낮추는 일만 가능하다.
-- 결정: 서버 설정과 시작 시 범위 검증을 제거한다. 사용자마다 미완료 세션 수를 따로 조회하고, 발송 시 공통 상한 3개에 도달하면 기존 세션을 재알림하는 ADR-045 규칙은 유지한다.
-- 결과: 발송 정책을 바꾸려면 코드를 수정해야 한다. 사용자별 상한 조정이 실제 요구사항이 되면 사용자 설정과 그 입력 경계에서 다룬다.
-
-## ADR-054: TTS 활성화 설정을 제거한다
-
-- 날짜: 2026-09-26
-- 상태: 승인됨
-- 배경: 청해 음성 생성은 기본으로 활성화되어 있고, `tts.enabled`는 서비스 생성과 관리 명령에서만 확인한다.
-- 결정: `tts.enabled` 설정과 활성화 분기를 제거한다. API 키가 있으면 청해 음성 서비스를 구성한다. API 키가 없는 환경에서는 기존처럼 서비스를 구성하지 않고 관리 명령은 실행을 중단한다.
-- 결과: TTS를 환경변수로 끌 수 없으며, 모델·음성 설정은 계속 사용할 수 있다.
-
-## ADR-055: LLM과 TTS 설정을 하나의 타입으로 관리한다
-
-- 날짜: 2026-09-26
-- 상태: 승인됨
-- 배경: TTS는 LLM과 API 키를 공유하며, 별도 `TTSConfig`에는 모델과 음성 이름만 남아 있다.
-- 결정: TTS 모델과 음성 이름을 `LLMConfig`로 옮긴다. 설정 키는 `llm.tts_model`, `llm.tts_voice_name`이며 환경변수는 각각 `COPYLINGO_LLM_TTS_MODEL`, `COPYLINGO_LLM_TTS_VOICE_NAME`이다.
-- 결과: 설정 타입과 YAML 구역 하나를 줄인다. 채팅은 OpenAI 호환 API, TTS는 Gemini native API를 사용하며 호출 방식은 유지한다. 이전 `COPYLINGO_TTS_MODEL`, `COPYLINGO_TTS_VOICE_NAME`은 더 이상 읽지 않는다.
-
 ## ADR-056: 새 청해 대화 음성은 A/B 두 화자로 합성한다
 
 - 날짜: 2026-09-26
@@ -231,7 +192,6 @@
   - `cmd/server`에서 같은 Redis 연결로 각 저장 구현을 생성한다. 연결 생성·종료와 health Ping은 서버에 남긴다. `service.NewServices`의 저장소·외부 클라이언트 조립과 서버 초기화 구조 전체 변경은 후속 단계로 남긴다.
 - 결과: 저장 형식은 `redisstore`에서 확인하고, 소비자는 사용하는 기능만 알게 된다. 기존 Redis 데이터를 그대로 읽으며 별도 마이그레이션·초기화는 하지 않는다. malformed JSON 삭제와 오류 전달, one-shot 입력 소비, 발송 오류 시 fail-open 및 기존 claim 유지 정책을 보존한다.
 - 검증: 전체 `make test` 통과, 소비자 4개 패키지의 raw Redis·키 참조 0건, 앱 재시작 후 `/health` 정상. 전용 DB 환경변수가 없는 PostgreSQL 통합 테스트 6개는 건너뛰었다.
-- 작업 기록: [2609262045_redis_access_boundary.md](../workthrough/2609/2609262045_redis_access_boundary.md)
 - 후속 정리 (2026-09-27): 같은 패키지에서 외부용 세션 API와 공통 JSON 저장 구현, 입력 상태·어순 초안·Mini App 상태를 역할별 파일로 나눴다. 키·TTL·동작·생성자와 주입 구조는 유지하며 새로운 패키지나 객체는 추가하지 않는다.
 - 저장 타입 단순화 (2026-09-27): 상태 타입과 키만 다른 `QuizSessions`·`StudySessions` 포장 타입 및 전달 메서드를 제거한다. 공통 `SessionStore[T]`가 소비자의 `Load/Save/Delete` 계약을 직접 구현하고, 기존 이름의 생성 함수는 각 상태 타입과 키를 지정한다. 학습 규칙·상태 모델·Redis 저장 형식은 구분을 유지한다.
 - 세션 저장소 생성 조건 (2026-09-27): Redis 클라이언트 생성·연결 확인은 서버의 `initRedis`에서 보장한다. 실패하면 기존 `initInfra` → `run` → `main` 오류 처리로 서버 시작을 중단한다. 세션 저장소의 생성자와 `Load/Save/Delete`는 정상 주입을 전제로 하며 별도 nil 검사를 하지 않는다. `NewQuizSessions`·`NewStudySessions`가 기존 `sessionRedis` 인터페이스를 직접 받아 운영과 테스트에서 같은 생성자를 사용하고, 테스트용 비공개 생성자는 제거한다. 실제 Redis 명령 실패는 error로 전달하며 `SessionStore`의 zero value는 지원하지 않는다.

@@ -5,17 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
-)
-
-var failedHandwritingImageDir = filepath.Join(
-	"logs",
-	"images",
 )
 
 var (
@@ -136,35 +129,6 @@ func (s *SessionService) SubmitHandwriting(
 			err,
 		)
 	}
-	if !isCorrect {
-		imagePath, err := saveFailedHandwritingImage(
-			item.SessionQuestion.ID,
-			renderedImage,
-		)
-		if err != nil {
-			slog.ErrorContext(
-				ctx,
-				"Failed to save wrong handwriting image",
-				"event",
-				"handwriting.service.failed_image_save_failed",
-				"session_question_id",
-				item.SessionQuestion.ID,
-				"error",
-				err,
-			)
-		} else {
-			slog.InfoContext(
-				ctx,
-				"Saved wrong handwriting image",
-				"event",
-				"handwriting.service.failed_image_saved",
-				"session_question_id",
-				item.SessionQuestion.ID,
-				"image_path",
-				imagePath,
-			)
-		}
-	}
 	slog.InfoContext(
 		ctx,
 		"Handwriting service completed",
@@ -186,37 +150,4 @@ func (s *SessionService) SubmitHandwriting(
 		CorrectAnswer: question.CorrectAnswer,
 		Explanation:   question.Explanation,
 	}, nil
-}
-
-func saveFailedHandwritingImage(
-	sessionQuestionID int,
-	renderedImage []byte,
-) (string, error) {
-	if err := os.MkdirAll(
-		failedHandwritingImageDir,
-		0o755,
-	); err != nil {
-		return "", fmt.Errorf(
-			"create failed handwriting image directory: %w",
-			err,
-		)
-	}
-	imagePath := filepath.Join(
-		failedHandwritingImageDir,
-		fmt.Sprintf(
-			"%d.png",
-			sessionQuestionID,
-		),
-	)
-	if err := os.WriteFile(
-		imagePath,
-		renderedImage,
-		0o644,
-	); err != nil {
-		return "", fmt.Errorf(
-			"write failed handwriting image: %w",
-			err,
-		)
-	}
-	return imagePath, nil
 }

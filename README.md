@@ -2,29 +2,28 @@
 
 CopyLingo is a personal language-learning automation app built around Telegram.
 
-It manages study materials, generates practice exercises, delivers them through Telegram, grades user answers, and schedules review sessions with an SRS-style workflow. I use the current deployment for Japanese study, while the study model, content pipeline, and delivery flow are designed to support additional target languages. The project is both a real tool and a backend portfolio project focused on practical automation, data modeling, and service integration.
+It manages seeded study materials and practice questions, delivers them through Telegram, grades user answers, and schedules review sessions with an SRS-style workflow. I use the current deployment for Japanese study, while the study model, seed format, and delivery flow are designed to support additional target languages. The project is both a real tool and a backend portfolio project focused on practical automation, data modeling, and service integration.
 
 ## What it does
 
 Core flow:
 
 ```text
-Study material → exercise generation → Telegram delivery → answer submission → grading → spaced review
+Seeded material/question records → Telegram push (Study/Quiz) → answer → grading → spaced review
 ```
 
 Main capabilities:
 
-- Manages seeded language-learning materials and generated practice questions
-- Generates exercises for vocabulary, script recognition, reading, handwriting, and listening
-- Delivers questions through a Telegram bot with inline interactions
+- Seeds language-learning materials and questions from JSON records (`cmd/seeding`, data in `cmd/seeding/data/<lang>/<level>.json`)
+- Covers vocabulary, script recognition, reading, handwriting, and listening questions
+- Delivers Study cards and Quiz questions through a Telegram bot with inline interactions
 - Supports Telegram Mini App based handwriting submissions
-- Generates listening audio with Gemini native TTS and transcodes raw PCM into Telegram-ready OGG/Opus
-- Caches speech audio in S3-compatible object storage and reuses Telegram file IDs
-- Stores learning materials, questions, sessions, and review state in PostgreSQL
-- Uses Redis for session/cache-related runtime state
+- Answer/handwriting grading, learning Q&A, and tip generation via an OpenAI-compatible endpoint (Gemini)
+- Listening audio: Gemini native TTS, raw PCM transcoded to OGG/Opus with ffmpeg, cached in S3-compatible storage (content-addressed), Telegram file IDs reused
+- Stores materials, questions, sessions, and review state in PostgreSQL; session/runtime state in Redis
 - Produces structured application logs with interaction IDs for debugging
 
-Planned content ingestion from external reading and language-proficiency sources is tracked separately in the roadmap and project documents.
+An NHK collection pipeline exists in `internal/pipeline` but is not wired (ADR-057).
 
 ## Why this project exists
 
@@ -38,12 +37,8 @@ That means the project intentionally focuses on backend concerns such as data mo
 ## Engineering highlights
 
 - SQL-first PostgreSQL data access with sqlx, explicit queries, and versioned migrations
-- Idempotent seeders for reproducible learning-content generation
+- Idempotent seeders for reproducible learning content
 - SRS-based session building and scheduled review flows
-- Gemini-powered exercise generation and native speech synthesis
-- PCM-to-OGG/Opus transcoding for Telegram voice delivery
-- Content-addressed audio caching in S3-compatible object storage
-- Telegram file ID reuse to avoid redundant audio uploads
 - Telegram Mini App validation, session ownership checks, and server-side handwriting grading
 - Structured JSON logging with interaction IDs across HTTP, Telegram updates, and scheduled jobs
 
@@ -56,50 +51,50 @@ That means the project intentionally focuses on backend concerns such as data mo
           ├── PostgreSQL :5432
           ├── Redis :6379
           ├── Gemini API
-          │     ├── exercise generation
+          │     ├── grading, Q&A, tips
           │     └── native TTS
           ├── ffmpeg (PCM → OGG/Opus)
           └── MinIO / S3-compatible object storage
 ```
 
-The Go server owns question generation orchestration, Telegram interaction handling, grading, review scheduling, Mini App endpoints, and supporting API calls. For listening exercises, it generates speech with Gemini native TTS, transcodes the audio with ffmpeg, stores it in S3-compatible object storage, and reuses cached Telegram file IDs.
+The Go server owns Telegram interaction handling, grading, review scheduling, and Mini App endpoints. Package layers and data flow: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Tech stack
 
 | Area | Technology | Notes |
 |---|---|---|
-| Language | Go 1.25 | Main backend application |
+| Language | Go 1.27 | Main backend application |
 | HTTP framework | Gin | Health checks, admin/API endpoints, Mini App endpoints |
 | Telegram | go-telegram-bot-api/v5 | Bot interactions and inline keyboard flows |
 | Database | PostgreSQL 16 | SQL-first access with sqlx, explicit queries, and versioned migrations |
 | Cache/runtime state | Redis 7 | Session/cache handling and runtime state |
 | Configuration | Viper | YAML + environment variable override |
 | Scheduler | robfig/cron/v3 | Batch jobs and scheduled learning flows |
-| LLM runtime | Gemini | Exercise generation through an OpenAI-compatible chat endpoint |
+| LLM runtime | Gemini | Grading, learning Q&A, and tips through an OpenAI-compatible chat endpoint |
 | TTS | Gemini native TTS + ffmpeg | Pre-generated speech transcoded to OGG/Opus for Telegram |
 | Object storage | MinIO / S3-compatible storage | Content-addressed speech audio cache |
 | Infrastructure | Docker + Docker Compose | PostgreSQL, Redis, MinIO, and app runtime |
 
 ## Local development
 
-The recommended local setup runs PostgreSQL, Redis, and MinIO through Docker while the Go server runs directly on the host machine. Host-based execution requires Go 1.25, the PostgreSQL client, and ffmpeg. The full Docker image already includes ffmpeg.
+The recommended local setup runs PostgreSQL, Redis, and MinIO through Docker while the Go server runs directly on the host machine. Host-based execution requires Go 1.27, the PostgreSQL client, and ffmpeg. The full Docker image already includes ffmpeg.
 
 ```bash
-# 1. Start PostgreSQL, Redis, MinIO, and the audio bucket initializer
+# 1. Configure the bot token and API key (see .env.example)
+cp .env.example .env   # fill COPYLINGO_TELEGRAM_TOKEN and COPYLINGO_LLM_API_KEY
+
+# 2. Start PostgreSQL, Redis, MinIO, and the audio bucket initializer
 make infra
 
-# 2. Apply database migrations
-make migrate
-
 # 3. Seed the current study materials and questions
-# Records live in cmd/seeding/data/<language>/<level>.json; Japanese (ja) is the default and only language today.
-go run ./cmd/seeding
+# Records live in cmd/seeding/data/<language>/<level>.json; ja is the only language today.
+go run ./cmd/seeding ja
 
 # 4. Run the Go server
-COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>" \
-COPYLINGO_LLM_API_KEY="<gemini-api-key>" \
 go run ./cmd/server
 ```
+
+A fresh DB volume is already initialized by the `migrations/` initdb mount (`docker-compose.yml`). Run `PGPASSWORD=copylingo make migrate` only for an existing volume.
 
 Or use:
 
@@ -123,8 +118,8 @@ Core variables:
 | Variable | Purpose |
 |---|---|
 | `COPYLINGO_TELEGRAM_TOKEN` | Telegram bot token |
-| `COPYLINGO_LLM_API_KEY` | Gemini API key used for exercise generation and native TTS |
-| `COPYLINGO_LLM_MODEL` | Exercise-generation model override |
+| `COPYLINGO_LLM_API_KEY` | Gemini API key used for grading, tips, and native TTS |
+| `COPYLINGO_LLM_MODEL` | Chat model override (grading, tips) |
 | `COPYLINGO_SERVER_PUBLIC_BASE_URL` | Public HTTPS base URL required for Telegram Mini App flows |
 
 Object storage can use the local MinIO defaults from `config.yaml` or be overridden for another S3-compatible service:
@@ -144,45 +139,9 @@ For local Mini App testing, `COPYLINGO_SERVER_PUBLIC_BASE_URL` must point to a p
 
 ## Telegram Mini App + Cloudflare Tunnel
 
-Handwriting questions are submitted through a Telegram Mini App. This requires an externally reachable HTTPS URL.
+Handwriting questions are submitted through a Telegram Mini App, which needs a public HTTPS URL. `make tunnel` starts a Cloudflare quick tunnel and writes the URL to `.env`. Then restart the server, or use `make tmux` to run everything. Register the tunnel host in BotFather.
 
-Current Mini App endpoints:
-
-- `GET /miniapp/handwriting`
-- `POST /api/miniapp/handwriting/submit`
-
-Local test flow:
-
-```bash
-export COPYLINGO_TELEGRAM_TOKEN="<telegram-bot-token>"
-export COPYLINGO_LLM_API_KEY="<gemini-api-key>"
-
-make infra
-make migrate
-go run ./cmd/seeding
-go run ./cmd/server
-```
-
-Start a Cloudflare Tunnel:
-
-```bash
-make tunnel
-```
-
-Then set the public base URL:
-
-```bash
-export COPYLINGO_SERVER_PUBLIC_BASE_URL="https://xxxxx.trycloudflare.com"
-go run ./cmd/server
-```
-
-Required checks:
-
-- Register the Mini App/Web App domain in BotFather.
-- Ensure the `public_base_url` host matches the registered Telegram domain.
-- Restart the server when the tunnel URL changes.
-
-More detail: [`docs/HANDWRITING_MINIAPP_INGRESS.md`](docs/HANDWRITING_MINIAPP_INGRESS.md)
+Endpoints, security notes, and operations: [`docs/HANDWRITING_MINIAPP_INGRESS.md`](docs/HANDWRITING_MINIAPP_INGRESS.md)
 
 ## Deployment
 
@@ -196,6 +155,9 @@ COPYLINGO_SERVER_PUBLIC_BASE_URL=https://copylingo.example.com
 EOF
 
 docker compose up -d
+
+# Seed content from the host (the image builds only ./cmd/server)
+go run ./cmd/seeding ja   # connects to localhost:5432
 ```
 
 Compose startup is guarded by health checks for the stateful dependencies, and a one-shot MinIO job creates the audio bucket:
@@ -237,39 +199,26 @@ Logging configuration:
 | `COPYLINGO_LOGGING_RETENTION_DAYS` | `30` |
 | `COPYLINGO_LOGGING_TIMEZONE` | `Asia/Seoul` |
 
-Security note: tokens, Telegram `init_data`, raw user answers, and handwriting stroke coordinates are not written to logs.
+Design and log security rules: [Structured Logging in `docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#structured-logging).
 
 ## Makefile
 
-| Command | Description |
-|---|---|
-| `make infra` | Start PostgreSQL, Redis, MinIO, and the audio bucket initializer |
-| `make run` | Run the Go server locally |
-| `make build` | Build binary to `bin/copylingo` |
-| `make migrate` | Apply database migrations |
-| `make docker-up` | Start the full Docker Compose stack |
-| `make docker-down` | Stop the full Docker Compose stack |
-| `make test` | Run tests |
+See the target manifest in the `Makefile` header comment.
 
 ## Project docs
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture and data flow
-- [`docs/ADR.md`](docs/ADR.md) — architecture decision records
-- [`docs/HISTORY.md`](docs/HISTORY.md) — development history
+- [`docs/adr/`](docs/adr/) — architecture decision records
+- [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) — coding conventions
 - [`AGENTS.md`](AGENTS.md) — project context and coding rules for agent-assisted development
-- [`ROADMAP.md`](ROADMAP.md) — project roadmap and phase tracking
-- [`CURRENT_TASK.md`](CURRENT_TASK.md) — current work item and next implementation target
+- [`STATUS.md`](STATUS.md) — current work state and recently completed work
 
 ## Agent-assisted development workflow
 
 For continuing work with a coding agent in a new session:
 
 ```text
-Read AGENTS.md and continue from CURRENT_TASK.md
+Read AGENTS.md and STATUS.md, then continue
 ```
 
-When an agent finishes a task, update documents in this order:
-
-```text
-CURRENT_TASK.md → ROADMAP.md → docs/HISTORY.md
-```
+Agents record decisions in `docs/adr/` and work state in `STATUS.md` (see AGENTS.md §3).

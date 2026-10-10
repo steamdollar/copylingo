@@ -13,7 +13,7 @@
 
 ## 2. 변경 파일 및 세부 내용
 
-### 1) [internal/model/question.go](../../internal/model/question.go)
+### 1) [internal/model/question.go](../../../internal/model/question.go)
 - `(q *Question) ShuffleOptions(sessionID int) error` 메서드 추가:
   - `len(q.Options) <= 1` 또는 옵션이 비어있는 경우 No-op 처리 (주관식/빈칸 채우기 안전).
   - `fnv.New64a()`로 `fmt.Sprintf("%d:%d", sessionID, q.ID)` 해시 생성 후 `rand.New(rand.NewSource(...))`로 셔플.
@@ -24,7 +24,7 @@
 - Redis 캐시 미스로 복구(`Get` $\rightarrow$ `CreateFromDB`) 시에도 동일한 Seed로 동일 순서 복원 보장.
 
 ### 3) 단위 테스트 추가
-- **[internal/model/question_test.go](../../internal/model/question_test.go)**: `TestQuestion_ShuffleOptions`
+- **[internal/model/question_test.go](../../../internal/model/question_test.go)**: `TestQuestion_ShuffleOptions`
   - 동일 sessionID/questionID에 대한 결정론적 일관성 검증.
   - 옵션 원소 100% 보존 검증.
   - 서로 다른 sessionID에 대한 순열 다양성 검증.

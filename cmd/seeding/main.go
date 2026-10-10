@@ -2,60 +2,110 @@
 // (ADR-065, ADR-066, ADR-067). Every level is authored as records in
 // cmd/seeding/data/<language>/<level>.json, so seeding is one copy path
 // regardless of question type.
+//
+// Usage: go run ./cmd/seeding <language>
 package main
 
 import (
+	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
-	"flag"
 	"fmt"
+	"io/fs"
 	"log"
+	"os"
+	"path"
+	"slices"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 
-	"github.com/lsj/copylingo/cmd/seeding/catalog"
+	"github.com/lsj/copylingo/internal/bootstrap"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/repository"
 )
 
-type levelCatalog = catalog.LevelCatalog
+// The build fails unless data/<language>/<level>.json files exist, so data/
+// holds only language directories and every embedded path below is readable.
+//
+//go:embed data/*/*.json
+var seedDataFS embed.FS
 
-func initDB(cfg *config.Config) (*sqlx.DB, error) {
-	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		cfg.DB.Host,
-		cfg.DB.Port,
-		cfg.DB.User,
-		cfg.DB.Password,
-		cfg.DB.DBName,
-		cfg.DB.SSLMode,
-	)
-	db, err := sqlx.Connect(
-		"postgres",
-		dsn,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return db, nil
+// levelData is one decoded level file (data/<language>/<level>.json): the
+// level's materials with their nested questions, plus material-less questions.
+type levelData struct {
+	Materials []materialRecord `json:"materials"`
+	Questions []model.Question `json:"questions"`
+}
+
+type materialRecord struct {
+	model.Material
+	Questions []model.Question `json:"questions,omitempty"`
 }
 
 func main() {
-	language := flag.String(
-		"language",
-		catalog.Japanese,
-		"seed catalog language (ISO 639-1); datasets live under cmd/seeding/data/<language>/",
-	)
-	flag.Parse()
+	language, db := setup()
+	defer db.Close()
 
-	levelCatalogs := catalog.LevelCatalogsFor(*language)
-	if len(levelCatalogs) == 0 {
+	materials, looseQuestions, err := loadRecords(language)
+	if err != nil {
 		log.Fatalf(
-			"No seed catalog registered for language %q",
-			*language,
+			"Failed to load %s seed records: %v",
+			language,
+			err,
 		)
+	}
+
+	if err := seedRecords(
+		context.Background(),
+		repository.NewRepositories(db),
+		materials,
+		looseQuestions,
+	); err != nil {
+		log.Fatalf(
+			"Failed to seed %s records: %v",
+			language,
+			err,
+		)
+	}
+}
+
+// setup turns the command line and environment into a validated language and
+// an open database. A bad argument prints usage and exits 2 before any config
+// or database work; config and connection failures are fatal.
+func setup() (string, *sqlx.DB) {
+	entries, _ := fs.ReadDir(
+		seedDataFS,
+		"data",
+	)
+	languages := make(
+		[]string,
+		0,
+		len(entries),
+	)
+	for _, entry := range entries {
+		languages = append(
+			languages,
+			entry.Name(),
+		)
+	}
+	language, err := parseLanguageArg(
+		os.Args[1:],
+		languages,
+	)
+	if err != nil {
+		fmt.Fprintf(
+			os.Stderr,
+			"%v\n\nUsage: go run ./cmd/seeding <language>\nValid languages: %s\n",
+			err,
+			strings.Join(
+				languages,
+				", ",
+			),
+		)
+		os.Exit(2)
 	}
 
 	cfg, err := config.Load()
@@ -65,290 +115,171 @@ func main() {
 			err,
 		)
 	}
-
-	db, err := initDB(cfg)
+	db, err := bootstrap.OpenDB(cfg.DB)
 	if err != nil {
 		log.Fatalf(
 			"Database connection failed: %v",
 			err,
 		)
 	}
-	defer db.Close()
+	return language, db
+}
 
-	repos := repository.NewRepositories(db)
-	ctx := context.Background()
-
-	var materials []*model.Material
-	for _, entry := range levelCatalogs {
-		materials = append(
-			materials,
-			catalog.BuildRecordMaterials(
-				entry.Language,
-				entry.Level,
-				entry.Materials,
-			)...,
+// parseLanguageArg takes the one positional argument, which must name an
+// embedded data directory exactly, without case or space normalization.
+func parseLanguageArg(
+	args []string,
+	languages []string,
+) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf(
+			"expected one language argument, got %d",
+			len(args),
 		)
+	}
+	language := args[0]
+	if !slices.Contains(
+		languages,
+		language,
+	) {
+		return "", fmt.Errorf(
+			"unknown language %q",
+			language,
+		)
+	}
+	return language, nil
+}
+
+// loadRecords decodes every level file of a validated language, failing on
+// unknown fields so a misspelled key is not silently dropped. Each row gets
+// the language and the file's level (data/ja/n5.json -> N5), so adding a
+// level is a data change.
+func loadRecords(language string) ([]*materialRecord, []*model.Question, error) {
+	// The pattern is fixed and the language names an embedded directory.
+	levelFilePaths, _ := fs.Glob(
+		seedDataFS,
+		path.Join(
+			"data",
+			language,
+			"*.json",
+		),
+	)
+
+	var materials []*materialRecord
+	var looseQuestions []*model.Question
+	for _, filePath := range levelFilePaths {
+		content, _ := seedDataFS.ReadFile(filePath)
+		var data levelData
+		decoder := json.NewDecoder(bytes.NewReader(content))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&data); err != nil {
+			return nil, nil, fmt.Errorf(
+				"decode %s: %w",
+				filePath,
+				err,
+			)
+		}
+
+		// The pointers reach into data's slices, so the material IDs set by
+		// the upsert are visible to collectQuestions.
+		level := strings.ToUpper(strings.TrimSuffix(
+			path.Base(filePath),
+			".json",
+		))
+		for i := range data.Materials {
+			material := &data.Materials[i]
+			material.Language = language
+			material.ProficiencyLevel = level
+			for j := range material.Questions {
+				material.Questions[j].Language = language
+				material.Questions[j].ProficiencyLevel = level
+			}
+			materials = append(
+				materials,
+				material,
+			)
+		}
+		for i := range data.Questions {
+			question := &data.Questions[i]
+			question.Language = language
+			question.ProficiencyLevel = level
+			looseQuestions = append(
+				looseQuestions,
+				question,
+			)
+		}
+	}
+	return materials, looseQuestions, nil
+}
+
+// seedRecords upserts every material first, because UpsertBatch sets the
+// material IDs that nested questions link to, then every question.
+func seedRecords(
+	ctx context.Context,
+	repos *repository.Repositories,
+	materials []*materialRecord,
+	looseQuestions []*model.Question,
+) error {
+	materialRows := make(
+		[]*model.Material,
+		len(materials),
+	)
+	for i, material := range materials {
+		materialRows[i] = &material.Material
 	}
 	if err := repos.Material.UpsertBatch(
 		ctx,
-		materials,
+		materialRows,
 	); err != nil {
-		log.Fatalf(
-			"Failed to upsert %s materials batch: %v",
-			*language,
+		return fmt.Errorf(
+			"upsert materials batch: %w",
 			err,
 		)
 	}
 	log.Printf(
-		"Successfully upserted %d %s materials.",
-		len(materials),
-		*language,
+		"Successfully upserted %d materials.",
+		len(materialRows),
 	)
 
-	recordMaterialIDs, err := loadRecordMaterialIDs(
-		ctx,
-		repos.Material,
-		levelCatalogs,
+	questions := collectQuestions(
+		materials,
+		looseQuestions,
 	)
-	if err != nil {
-		log.Fatalf(
-			"Failed to load record materials: %v",
-			err,
-		)
-	}
-
-	var questions []*model.Question
-	for _, entry := range levelCatalogs {
-		recordQuestions, err := buildRecordQuestions(
-			entry,
-			recordMaterialIDs,
-		)
-		if err != nil {
-			log.Fatalf(
-				"Failed to build %s %s record questions: %v",
-				entry.Language,
-				entry.Level,
-				err,
-			)
-		}
-		questions = append(
-			questions,
-			recordQuestions...,
-		)
-	}
-
 	if err := repos.Question.UpsertSeedBatch(
 		ctx,
 		questions,
 	); err != nil {
-		log.Printf(
-			"Failed to upsert %s questions batch: %v",
-			*language,
+		return fmt.Errorf(
+			"upsert questions batch: %w",
 			err,
 		)
-		return
 	}
-
 	log.Printf(
-		"Successfully upserted %d %s questions across %d proficiency levels.",
+		"Successfully upserted %d questions.",
 		len(questions),
-		*language,
-		len(levelCatalogs),
 	)
+	return nil
 }
 
-// materialKeyStore resolves upserted materials by their stable key.
-type materialKeyStore interface {
-	GetByMaterialKeys(
-		ctx context.Context,
-		keys []string,
-	) ([]model.Material, error)
-}
-
-// loadRecordMaterialIDs resolves the upserted row ID of every record material
-// that has nested questions, in one query. Unresolved keys are reported per
-// question by buildRecordQuestions.
-func loadRecordMaterialIDs(
-	ctx context.Context,
-	store materialKeyStore,
-	catalogs []levelCatalog,
-) (map[string]int, error) {
-	keys := make(
-		[]string,
-		0,
-	)
-	for _, entry := range catalogs {
-		for _, material := range entry.Materials {
-			if len(material.Questions) > 0 {
-				keys = append(
-					keys,
-					material.MaterialKey,
-				)
-			}
-		}
-	}
-	idsByKey := make(
-		map[string]int,
-		len(keys),
-	)
-	if len(keys) == 0 {
-		return idsByKey, nil
-	}
-	materials, err := store.GetByMaterialKeys(
-		ctx,
-		keys,
-	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"get record materials by key: %w",
-			err,
-		)
-	}
+// collectQuestions links each nested question to its material's upserted row
+// and appends the material-less questions.
+func collectQuestions(
+	materials []*materialRecord,
+	looseQuestions []*model.Question,
+) []*model.Question {
+	var questions []*model.Question
 	for _, material := range materials {
-		idsByKey[material.MaterialKey] = material.ID
-	}
-	return idsByKey, nil
-}
-
-// buildRecordQuestions maps a level's unified question records to rows:
-// questions nested under a material link to it, top-level questions stay
-// material-less. Every item type takes this one path. The checks guard what
-// the database and the bot rely on: a unique upsert key, the fields every
-// renderer reads, and the listening/material split (listening plays audio
-// instead of a material).
-func buildRecordQuestions(
-	entry levelCatalog,
-	materialIDsByKey map[string]int,
-) ([]*model.Question, error) {
-	// Pair each record with its material first so one loop validates and
-	// maps nested and top-level records alike.
-	type linkedRecord struct {
-		record     catalog.QuestionRecord
-		materialID *int
-	}
-	linked := make(
-		[]linkedRecord,
-		0,
-		len(entry.Questions),
-	)
-	for _, material := range entry.Materials {
-		if len(material.Questions) == 0 {
-			continue
-		}
-		materialID, ok := materialIDsByKey[material.MaterialKey]
-		if !ok {
-			return nil, fmt.Errorf(
-				"material %q not found for its nested questions",
-				material.MaterialKey,
-			)
-		}
-		for _, record := range material.Questions {
-			if record.Category == model.CategoryListening {
-				return nil, fmt.Errorf(
-					"listening question record %q cannot belong to material %q",
-					record.QuestionKey,
-					material.MaterialKey,
-				)
-			}
-			linked = append(
-				linked,
-				linkedRecord{
-					record:     record,
-					materialID: &materialID,
-				},
-			)
-		}
-	}
-	for _, record := range entry.Questions {
-		linked = append(
-			linked,
-			linkedRecord{record: record},
-		)
-	}
-
-	questions := make(
-		[]*model.Question,
-		0,
-		len(linked),
-	)
-	seenKeys := make(
-		map[string]struct{},
-		len(linked),
-	)
-	for _, item := range linked {
-		record := item.record
-		if record.QuestionKey == "" || record.ItemType == "" || record.Type == "" || record.Category == "" ||
-			record.Prompt == "" ||
-			record.CorrectAnswer == "" ||
-			record.Difficulty < 1 {
-			return nil, fmt.Errorf(
-				"question record %q: missing required field",
-				record.QuestionKey,
-			)
-		}
-		if _, exists := seenKeys[record.QuestionKey]; exists {
-			return nil, fmt.Errorf(
-				"question record %q: duplicate question key",
-				record.QuestionKey,
-			)
-		}
-		seenKeys[record.QuestionKey] = struct{}{}
-		question := &model.Question{
-			Type:             record.Type,
-			Skill:            model.SkillPtr(record.ItemType),
-			Language:         entry.Language,
-			ProficiencyLevel: entry.Level,
-			Category:         record.Category,
-			Prompt:           record.Prompt,
-			Options:          mustJSON(record.Options),
-			CorrectAnswer:    record.CorrectAnswer,
-			Explanation:      record.Explanation,
-			Difficulty:       record.Difficulty,
-		}
-		if record.AudioScript != "" {
-			audioScript := record.AudioScript
-			question.AudioScript = &audioScript
-		}
-		if item.materialID != nil {
-			setQuestionMaterial(
+		for i := range material.Questions {
+			question := &material.Questions[i]
+			question.MaterialID = &material.ID
+			questions = append(
+				questions,
 				question,
-				*item.materialID,
 			)
 		}
-		setQuestionKey(
-			question,
-			record.QuestionKey,
-		)
-		questions = append(
-			questions,
-			question,
-		)
 	}
-	return questions, nil
-}
-
-func setQuestionMaterial(
-	question *model.Question,
-	materialID int,
-) {
-	id := materialID
-	question.MaterialID = &id
-}
-
-func setQuestionKey(
-	question *model.Question,
-	questionKey string,
-) {
-	question.QuestionKey = &questionKey
-}
-
-func mustJSON(values []string) json.RawMessage {
-	b, err := json.Marshal(values)
-	if err != nil {
-		panic(fmt.Sprintf(
-			"marshal options: %v",
-			err,
-		))
-	}
-	return b
+	return append(
+		questions,
+		looseQuestions...,
+	)
 }

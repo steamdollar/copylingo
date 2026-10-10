@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/external"
@@ -131,17 +129,13 @@ func TestSubmitHandwriting_Success(t *testing.T) {
 	}
 }
 
-func TestSubmitHandwriting_WrongSavesRenderedImage(t *testing.T) {
+func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
 	sessionID := 10
 	questionID := 1
-	imageDir := t.TempDir()
-	previousImageDir := failedHandwritingImageDir
-	failedHandwritingImageDir = imageDir
-	defer func() { failedHandwritingImageDir = previousImageDir }()
 
-	svc, _ := newHandwritingTestSession(
+	svc, store := newHandwritingTestSession(
 		t,
 		handwritingState(
 			userID,
@@ -178,20 +172,10 @@ func TestSubmitHandwriting_WrongSavesRenderedImage(t *testing.T) {
 	if res.IsCorrect {
 		t.Fatal("expected wrong handwriting result")
 	}
-	got, err := os.ReadFile(filepath.Join(
-		imageDir,
-		"100.png",
-	))
-	if err != nil {
+	if recorded := store.values[sessionID].Items[0].SessionQuestion.IsCorrect; recorded == nil || *recorded {
 		t.Fatalf(
-			"failed to read saved image: %v",
-			err,
-		)
-	}
-	if string(got) != "fake-image" {
-		t.Fatalf(
-			"saved image = %q, want fake-image",
-			string(got),
+			"recorded IsCorrect = %v, want false",
+			recorded,
 		)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/lsj/copylingo/internal/bootstrap"
 	"github.com/lsj/copylingo/internal/config"
 )
 
@@ -27,10 +28,7 @@ func initInfra(cfg *config.Config) (*sqlx.DB, *redis.Client, error) {
 }
 
 func initDB(cfg *config.Config) (*sqlx.DB, error) {
-	db, err := sqlx.Connect(
-		"postgres",
-		cfg.DB.DSN(),
-	)
+	db, err := bootstrap.OpenDB(cfg.DB)
 	if err != nil {
 		return nil, err
 	}

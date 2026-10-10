@@ -2,9 +2,9 @@
 
 ## 배경 / 목적
 
-현재 Daily Session은 서버의 단일 정책으로 문제 조합을 결정한다.
-`internal/service/session_builder.go`는 Vocabulary 최소 `ceil(totalQuestions / 3)` 슬롯을 먼저 예약한 뒤,
-나머지를 Random Slot Relay로 채운다.
+현재 Quiz 세션(morning/evening)은 서버의 단일 정책으로 문제 조합을 결정한다.
+`internal/service/session_builder.go`는 Vocabulary `ceil(total/3)`, Listening 1개, Reading 상한 1개를 예약하고
+현재 레벨 문제를 약 4/5로 맞춘 뒤 나머지를 채운다(ADR-041/046/050).
 
 사용자가 학습 목적에 따라 Vocabulary, Kana, Handwriting 비율을 선택할 수 있도록 preset 기반 설정을 추가한다.
 임의 숫자 입력보다 preset을 우선하여 유효성 검증과 운영 복잡도를 제한한다.
@@ -20,61 +20,11 @@
 
 ## 변경할 파일
 
-### `internal/model/user.go`
+Case A 결정 후 작성한다. 출발점:
 
-Before:
-
-```go
-type User struct {
-    // 기존 사용자 설정
-}
-```
-
-After:
-
-```go
-type SessionMixPreset string
-
-const (
-    SessionMixPresetBalanced SessionMixPreset = "balanced"
-    // Case A에서 확정한 preset 추가
-)
-
-type User struct {
-    // 기존 사용자 설정
-    SessionMixPreset SessionMixPreset `db:"session_mix_preset" json:"session_mix_preset"`
-}
-```
-
-### `migrations/001_init.sql`
-
-`users` 테이블에 `session_mix_preset VARCHAR(...) NOT NULL DEFAULT 'balanced'`를 추가한다.
-허용값 검증 방식은 기존 migration 스타일을 확인한 뒤 적용한다.
-
-### `internal/service/session_builder.go`
-
-Before:
-
-```go
-reservedVocabularyCount := divideRoundingUp(totalQuestions, minVocabularyRatioDenominator)
-```
-
-After:
-
-```go
-mix := resolveSessionMixPreset(user.SessionMixPreset, totalQuestions)
-```
-
-Case A에서 확정한 preset을 슬롯 수로 변환하고, 재고 부족 시 합의한 fallback을 적용한다.
-
-### `internal/bot/handler.go`, `internal/bot/session_flow.go`
-
-설정 변경 Callback과 Inline Keyboard를 추가한다.
-Callback Data 규약은 기존 `menu:{action}` 형식을 확장하며, 확정된 형식을 `docs/ARCHITECTURE.md`에 기록한다.
-
-### Repository 및 테스트
-
-`internal/repository/user_repo.go`, `internal/service/session_builder_test.go`, 관련 Bot 테스트를 갱신한다.
+- `internal/service/session_builder.go` — 현재 조합 규칙(`buildSession`의 예약 슬롯 계산)
+- `internal/model/user.go` + `migrations/001_init.sql` — 사용자별 preset 저장
+- `internal/bot/settings.go` — 설정 UI(`settings:` callback prefix)
 
 ## 검증 방법
 
@@ -91,6 +41,5 @@ make test
 
 ## 건드리면 안 되는 영역
 
-- Study Module의 `materials` SSOT 연결은 별도 작업으로 유지한다.
 - Question Seeder 데이터 자체를 preset 구현과 함께 변경하지 않는다.
 - 임의 비율 입력 UI는 preset 운영 결과를 확인하기 전 추가하지 않는다.

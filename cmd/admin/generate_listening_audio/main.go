@@ -5,33 +5,14 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
-
-	"github.com/lsj/copylingo/cmd/seeding/catalog"
+	"github.com/lsj/copylingo/internal/bootstrap"
 	"github.com/lsj/copylingo/internal/config"
-	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/repository"
 	"github.com/lsj/copylingo/internal/service"
 )
-
-func initDB(cfg *config.Config) (*sqlx.DB, error) {
-	db, err := sqlx.Connect(
-		"postgres",
-		cfg.DB.DSN(),
-	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"connect database: %w",
-			err,
-		)
-	}
-	return db, nil
-}
 
 func waitForNextCycle(
 	ctx context.Context,
@@ -54,12 +35,12 @@ func waitForNextCycle(
 func main() {
 	language := flag.String(
 		"language",
-		catalog.Japanese,
+		"ja",
 		"question language",
 	)
 	level := flag.String(
 		"level",
-		catalog.DefaultProficiencyLevel(catalog.Japanese),
+		"N5",
 		"proficiency level",
 	)
 	timeout := flag.Duration(
@@ -85,7 +66,7 @@ func main() {
 		log.Fatal("listening TTS requires llm.api_key")
 	}
 
-	db, err := initDB(cfg)
+	db, err := bootstrap.OpenDB(cfg.DB)
 	if err != nil {
 		log.Fatalf(
 			"database connection failed: %v",
@@ -121,25 +102,9 @@ func main() {
 		return
 	}
 
-	audio := service.NewAudioService(
+	audio := bootstrap.NewAudioService(
+		cfg,
 		repos.Question,
-		external.NewTTSClient(external.TTSOptions{
-			APIKey:  cfg.LLM.APIKey,
-			BaseURL: cfg.LLM.BaseURL,
-			Model:   cfg.LLM.TTSModel,
-			Voice:   cfg.LLM.TTSVoiceName,
-			VoiceB:  cfg.LLM.TTSVoiceNameB,
-		}),
-		external.NewS3AudioStore(external.S3Options{
-			Endpoint:     cfg.Storage.Endpoint,
-			Region:       cfg.Storage.Region,
-			Bucket:       cfg.Storage.Bucket,
-			AccessKey:    cfg.Storage.AccessKey,
-			SecretKey:    cfg.Storage.SecretKey,
-			UsePathStyle: cfg.Storage.UsePathStyle,
-		}),
-		cfg.LLM.TTSVoiceName,
-		cfg.LLM.TTSVoiceNameB,
 	)
 	cycles := (len(pending) + service.AudioGeneratePerCycle - 1) / service.AudioGeneratePerCycle
 	log.Printf(

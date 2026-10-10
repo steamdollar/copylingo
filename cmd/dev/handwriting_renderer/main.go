@@ -1,11 +1,16 @@
 // Command handwriting_renderer rebuilds a stroke JSON into the server-side PNG
 // so client Canvas output and server RenderPNG() can be compared for parity.
 //
-// Dev-only tool. See docs/todos/handwriting_rebuild_parity_verification.md.
+// Dev-only tool for false negatives in handwriting grading. Open the Mini App
+// with ?debug=1, draw a sample and export strokes.json and client.png, then
+// render server.png from the same strokes:
 //
 //	go run ./cmd/dev/handwriting_renderer \
 //	  -input tmp/handwriting-parity/handakuten/strokes.json \
 //	  -output tmp/handwriting-parity/handakuten/server.png
+//
+// Compare stroke joins, small marks (dakuten, small kana) and aspect ratio.
+// Margins and overall size may differ: the server normalizes the bounding box.
 package main
 
 import (
@@ -29,8 +34,16 @@ type parityInput struct {
 }
 
 func main() {
-	input := flag.String("input", "", "path to stroke JSON exported from the Mini App")
-	output := flag.String("output", "", "path to write the server-rebuilt PNG")
+	input := flag.String(
+		"input",
+		"",
+		"path to stroke JSON exported from the Mini App",
+	)
+	output := flag.String(
+		"output",
+		"",
+		"path to write the server-rebuilt PNG",
+	)
 	flag.Parse()
 
 	if *input == "" || *output == "" {
@@ -38,30 +51,64 @@ func main() {
 		log.Fatal("both -input and -output are required")
 	}
 
-	if err := run(*input, *output); err != nil {
-		log.Fatalf("render handwriting parity PNG: %v", err)
+	if err := run(
+		*input,
+		*output,
+	); err != nil {
+		log.Fatalf(
+			"render handwriting parity PNG: %v",
+			err,
+		)
 	}
-	log.Printf("wrote server-rebuilt PNG to %s", *output)
+	log.Printf(
+		"wrote server-rebuilt PNG to %s",
+		*output,
+	)
 }
 
-func run(inputPath, outputPath string) error {
+func run(
+	inputPath,
+	outputPath string,
+) error {
 	raw, err := os.ReadFile(inputPath)
 	if err != nil {
-		return fmt.Errorf("read input %s: %w", inputPath, err)
+		return fmt.Errorf(
+			"read input %s: %w",
+			inputPath,
+			err,
+		)
 	}
 
 	var in parityInput
-	if err := json.Unmarshal(raw, &in); err != nil {
-		return fmt.Errorf("parse stroke JSON %s: %w", inputPath, err)
+	if err := json.Unmarshal(
+		raw,
+		&in,
+	); err != nil {
+		return fmt.Errorf(
+			"parse stroke JSON %s: %w",
+			inputPath,
+			err,
+		)
 	}
 
 	pngBytes, err := service.NewDefaultPNGStrokeRenderer().RenderPNG(in.Strokes)
 	if err != nil {
-		return fmt.Errorf("render PNG: %w", err)
+		return fmt.Errorf(
+			"render PNG: %w",
+			err,
+		)
 	}
 
-	if err := os.WriteFile(outputPath, pngBytes, 0o644); err != nil {
-		return fmt.Errorf("write output %s: %w", outputPath, err)
+	if err := os.WriteFile(
+		outputPath,
+		pngBytes,
+		0o644,
+	); err != nil {
+		return fmt.Errorf(
+			"write output %s: %w",
+			outputPath,
+			err,
+		)
 	}
 	return nil
 }
