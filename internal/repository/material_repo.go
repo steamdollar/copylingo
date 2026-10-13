@@ -297,6 +297,45 @@ var studySessionMaterialsQuery = `
 	LIMIT $6
 `
 
+// GetLevelProgress counts, per level of language, all materials and the ones
+// the user has studied at least once. Levels come back in lexical order; the
+// caller applies the language's proficiency order.
+func (r *MaterialRepository) GetLevelProgress(
+	ctx context.Context,
+	userID int64,
+	language string,
+) ([]model.LevelProgress, error) {
+	var progress []model.LevelProgress
+	if err := r.db.SelectContext(
+		ctx,
+		&progress,
+		`
+		SELECT
+			m.proficiency_level AS level,
+			COUNT(*) AS total_materials,
+			COUNT(ump.material_id) AS studied_materials
+		FROM materials m
+		LEFT JOIN user_material_progress ump
+			ON ump.user_id = $1
+			AND ump.material_id = m.id
+			AND ump.times_studied > 0
+		WHERE m.language = $2
+		GROUP BY m.proficiency_level
+		ORDER BY m.proficiency_level
+	`,
+		userID,
+		language,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"MaterialRepository.GetLevelProgress user_id=%d language=%s: %w",
+			userID,
+			language,
+			err,
+		)
+	}
+	return progress, nil
+}
+
 // UpsertBatch inserts or refreshes materials identified by their stable
 // material key and sets each material's ID to its row ID, so callers can link
 // questions without a second lookup.

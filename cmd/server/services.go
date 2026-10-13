@@ -80,6 +80,7 @@ func newServices(
 		analyzer: service.NewAnalyzerService(
 			repos.User,
 			repos.SessionQuestion,
+			repos.Material,
 		),
 		tip: tip,
 		llmQuestion: service.NewLLMQuestionService(

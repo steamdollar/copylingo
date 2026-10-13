@@ -167,3 +167,70 @@
   - `cmd/`의 `initDB` 4개와 blank import 5개가 없어졌다. server의 `initDB`는 `OpenDB` 위에 pool 설정만 더한다.
   - `internal/` 패키지가 하나 늘었다. ADR-059 §8.1은 그 보강 기간에 패키지 수를 12개로 유지했지만, 영구 규칙은 아니다.
   - 새 admin 도구는 `bootstrap.OpenDB(cfg.DB)` 한 줄로 DB에 연결한다. DSN 형식이 바뀌어도 `config.DBConfig.DSN()` 한 곳만 고치면 된다.
+
+## ADR-070: Telegram Bot API 호출 실패는 `TelegramClient` 한 곳에서 log한다
+
+- 날짜: 2026-10-11
+- 상태: 승인됨. [CONVENTIONS.md](../CONVENTIONS.md) Go §6 "하위 layer는 직접 log하지 않는다"의 예외로 둔다
+- 배경:
+  - bot flow에서 `TelegramClient`를 호출하는 곳이 111곳이다. 그중 105곳이 반환 error를 버린다. 결과 메시지 같은 전송은 보내고 잊는 방식이라 실패해도 할 일이 없기 때문이다.
+  - 2026-10-11 Quiz 세션 중 결과 메시지(정답 표시 + [다음 문제] 버튼) 전송이 Telegram 429로 거부됐다. slog log에는 아무것도 남지 않았다. tgbotapi Debug stdout을 뒤져서야 원인이 나왔다. 사용자는 다음 문제로 넘어갈 버튼이 없어 진행이 멈췄다.
+  - `TelegramClient` method는 `context.Context`를 받지 않는다. 그래서 boundary에서 log하려면 105곳을 모두 고쳐야 한다.
+- 결정:
+  - `TelegramClient`의 모든 API 호출이 `send`/`request` wrapper를 지나게 한다. 실패하면 WARN `telegram.api.failed`를 한 번 남긴다.
+  - log field는 `method`, 대상(`chat_id` 또는 `callback_query_id`), `error`다. Telegram이 거부한 경우 `error_code`와 `retry_after_sec`를 더한다. 그래서 rate limit과 네트워크 오류를 구분할 수 있다.
+  - error는 지금처럼 호출자에게도 돌려준다. 호출자의 처리 방식은 바꾸지 않는다.
+  - Quiz 텍스트 답을 기다리는 문제가 없어서 일반 텍스트를 무시할 때 INFO `telegram.message.ignored`를 남긴다. "bot이 답이 없다"는 신고가 전송 실패인지 무시인지 log로 가릴 수 있게 하려는 것이다.
+- 버린 대안:
+  - 105곳 모두에서 error를 검사하고 log: `interaction_id`가 붙어 정확하다. 하지만 같은 코드가 105번 반복된다. 새 호출이 추가될 때 빠뜨리기도 쉽다.
+  - 모든 method에 ctx 추가: `interaction_id`를 얻는 대신 105곳을 고쳐야 한다. 실패 log가 생긴 뒤 상관관계가 실제로 부족하다고 확인되면 다시 검토한다.
+- 결과:
+  - Bot API 실패가 전부 slog JSON log에 남는다. 새 호출도 `TelegramClient`를 거치면 자동으로 포함된다.
+  - log에 `interaction_id`가 없다. update log와는 시간과 `chat_id`로 맞춘다.
+  - 이미 error를 검사하고 직접 log하는 호출자 6곳은 같은 실패가 두 줄로 남을 수 있다.
+  - 내용이 같은 edit(`message is not modified`) 같은 무해한 400도 WARN으로 남는다. 잡음이 많아지면 level을 조정한다.
+  - 429 retry는 여기서 다루지 않는다. 이 log로 실패 빈도를 본 뒤 따로 결정한다.
+
+
+## ADR-071: 진행 중 Quiz에서 대기 중이 아닌 텍스트는 이어하기로 받는다
+
+- 날짜: 2026-10-11
+- 상태: 승인됨
+- 배경:
+  - Quiz 텍스트 답을 받으면 bot은 "텍스트 입력 대기" 상태를 먼저 지운 뒤 결과 메시지([다음 문제] 버튼 포함)를 보낸다.
+  - 결과 메시지 전송이 실패하면(2026-10-11 Telegram 429, [ADR-070](#adr-070-telegram-bot-api-호출-실패는-telegramclient-한-곳에서-log한다)) 사용자에게 누를 버튼이 없다. 같은 답을 다시 보내도 대기 중인 입력이 없어 무시된다. 그래서 진행이 막힌다.
+  - 버튼 경로는 이미 복구된다. 답이 이미 처리된 버튼을 다시 누르면 다음 미답 문제로 보낸다(`redirectToNextUnansweredQuestion`). 메뉴 "학습 시작"도 진행 중 Quiz를 이어 준다. 하지만 막힌 사용자가 그 경로를 알 방법이 없다.
+- 결정:
+  - 일반 텍스트가 LLM 질문도 텍스트 답도 아니면, 그 사용자의 진행 중 Quiz(DB `in_progress`, 최신 1건)를 찾는다. 있으면 아래 순서로 보낸다.
+    1. "진행 중인 퀴즈로 돌아갈게요" 안내. 직전 문제의 정오답을 함께 보여준다. 결과 메시지가 사라졌을 수 있기 때문이다. 정오답은 working set에서 읽는다.
+    2. 다음 미답 문제. 메뉴 이어하기와 같은 `showQuestion`을 쓴다. 다음 문제가 텍스트 문제면 텍스트 입력 대기 상태도 다시 걸린다.
+  - 진행 중 Quiz가 없으면 지금처럼 무시하고 `telegram.message.ignored`를 log한다.
+  - working set이 만료됐으면 기존 "세션 상태가 만료되었습니다" 안내와 메인 메뉴를 보낸다.
+- 버린 대안:
+  - 결과 전송 성공 후에 텍스트 입력 대기 상태를 지우기: 결과 메시지 하나만 고친다. 다음 문제 전송 실패 같은 다른 경로는 그대로 막힌다.
+  - 전송 retry(429는 `retry_after` 대기, 5xx는 backoff): 짧은 장애의 빈도는 줄인다. 이번처럼 2분 가는 장애는 못 막는다. 이 ADR과 별개로 따로 판단한다.
+- 결과:
+  - 진행 중 Quiz가 있으면 아무 텍스트나 보내도 현재 위치로 돌아온다. 결과 메시지가 사라져도 사용자 혼자 복구할 수 있다.
+  - 대기 중이 아닌 텍스트가 올 때마다 DB 조회가 1번 일어난다. 진행 중 Quiz가 있으면 메시지 2개가 더 나간다. `sessions(user_id)` index가 없어 user 수가 늘면 조회 비용이 커진다. 대기 중이 아닌 텍스트일 때만 조회하므로 지금은 index를 추가하지 않는다.
+  - 진행 중 Study 세션(버튼 전용)은 대상이 아니다. 같은 막힘이 Study에서 확인되면 다시 검토한다.
+
+
+## ADR-072: 통계 진도는 `user_material_progress`를 읽을 때 집계한다
+
+- 날짜: 2026-10-13
+- 상태: 승인됨
+- 배경:
+  - 통계 메뉴에는 정답률만 있었다. 레벨별로 학습 자료를 얼마나 봤는지 알 방법이 없었다.
+  - "본 자료"를 무엇으로 셀지 정해야 했다. 후보는 Study 세션에 배정된 자료(`session_materials`)와 Study 카드에서 학습 처리된 자료(`user_material_progress`)다.
+- 결정:
+  - 통계를 `정답률 | 진도` 탭으로 나눈다. `menu:stats`는 정답률 탭, `stats:progress`는 진도 탭이다. 같은 메시지를 edit해서 탭을 바꾼다.
+  - 진도는 사용자 언어의 레벨별 `(한 번이라도 학습한 자료 수) / (전체 자료 수)`다. 학습 기준은 `user_material_progress.times_studied > 0`이다. SRS와 유지·제외 설정이 이미 쓰는 기준이다. 세션에 배정만 되고 카드를 넘기지 않은 자료는 세지 않는다.
+  - 분모는 해당 레벨 자료 전체다. 학습 제외 자료도 포함한다. 비율은 내림해서 모두 학습했을 때만 100%가 된다.
+  - 탭을 열 때마다 `materials` LEFT JOIN `user_material_progress` 한 번으로 집계한다. cache나 사용자별 counter는 두지 않는다.
+- 버린 대안:
+  - 사용자·레벨별 counter 테이블: 읽기는 O(1)이 된다. 대신 Study flush마다 counter를 같이 갱신해야 하고, seed로 자료가 늘면 분모를 다시 맞춰야 한다. 탭은 사용자가 누를 때만 열리므로 쓰기 경로를 복잡하게 할 이유가 없다.
+  - Redis cache: 같은 이유로 무효화 지점만 늘어난다.
+- 결과:
+  - 비용은 catalog 크기에 비례한다. 진행 상태는 PK `(user_id, material_id)`로 찾는다. dev DB(ja 자료 2,242개)에서 실행 2.8ms였다. 사용자 수가 늘어도 요청당 비용은 그대로다.
+  - catalog가 수만 개로 커지거나 진도를 push 메시지처럼 자주 계산하게 되면 counter나 cache를 다시 검토한다.
+  - Quiz에서 연결 문항만 푼 자료는 진도에 들어가지 않는다.

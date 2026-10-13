@@ -61,12 +61,17 @@ type commandSession interface {
 	) (*model.Session, error)
 }
 
-// userStatsReader computes the numbers behind /stats and /streak.
+// userStatsReader computes the numbers behind /stats, /streak and the
+// stats menu tabs.
 type userStatsReader interface {
 	GetUserStats(
 		ctx context.Context,
 		userID int64,
 	) (*model.UserStats, error)
+	GetLevelProgress(
+		ctx context.Context,
+		userID int64,
+	) ([]model.LevelProgress, error)
 }
 
 // inputClearer drops a chat's pending typed answer and LLM mode on /exit.
@@ -367,9 +372,27 @@ func (b *Bot) handleMessage(
 			return
 		}
 		// Route plain text to session flow for FillBlank questions
-		b.sessionFlow.HandleTextInput(
+		if b.sessionFlow.HandleTextInput(
 			ctx,
 			msg,
+		) {
+			return
+		}
+		// No question is waiting for typed input: bring an in-progress Quiz
+		// back to its current position instead of leaving the user stuck.
+		if b.sessionFlow.ResumeQuizFromText(
+			ctx,
+			msg,
+		) {
+			return
+		}
+		// Nothing to resume, so the bot sends no reply. Log it so a "the bot
+		// went silent" report can be told apart from a failed send.
+		slog.InfoContext(
+			ctx,
+			"Text message ignored: no pending text input",
+			"event",
+			"telegram.message.ignored",
 		)
 		return
 	}
@@ -466,6 +489,11 @@ func (b *Bot) handleCallback(
 		)
 	case data == callbackMenuStats:
 		b.handleStatsCallback(
+			ctx,
+			cb,
+		)
+	case data == callbackStatsProgress:
+		b.handleStatsProgressCallback(
 			ctx,
 			cb,
 		)
@@ -668,20 +696,133 @@ func (b *Bot) handleStatsCallback(
 		stats.ListeningAccuracy,
 	)
 
-	backBtn := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(
-				botMessagesByLocale[botDefaultLocale].menuHomeButton,
-				callbackMenuMain,
-			),
-		),
-	)
-
+	keyboard := statsTabKeyboard(callbackMenuStats)
 	b.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
 		text,
-		&backBtn,
+		&keyboard,
+	)
+}
+
+// handleStatsProgressCallback shows the progress tab: per level, the share of
+// materials the user has studied at least once.
+func (b *Bot) handleStatsProgressCallback(
+	ctx context.Context,
+	cb *tgbotapi.CallbackQuery,
+) {
+	messages := botMessagesByLocale[botDefaultLocale]
+	progress, err := b.analyzer.GetLevelProgress(
+		ctx,
+		cb.From.ID,
+	)
+	if err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to get level progress for stats callback",
+			slog.Any(
+				"error",
+				err,
+			),
+		)
+		b.telegram.SendMessage(
+			cb.Message.Chat.ID,
+			messages.statsCommandFailed,
+		)
+		return
+	}
+
+	lines := make(
+		[]string,
+		0,
+		len(progress),
+	)
+	for _, level := range progress {
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				messages.statsProgressLineFormat,
+				level.Level,
+				progressBar(level.Percent()),
+				level.Percent(),
+				level.StudiedMaterials,
+				level.TotalMaterials,
+			),
+		)
+	}
+	body := messages.statsProgressEmpty
+	if len(lines) > 0 {
+		body = strings.Join(
+			lines,
+			"\n",
+		)
+	}
+
+	keyboard := statsTabKeyboard(callbackStatsProgress)
+	b.telegram.EditMessage(
+		cb.Message.Chat.ID,
+		cb.Message.MessageID,
+		fmt.Sprintf(
+			messages.statsProgressFormat,
+			body,
+		),
+		&keyboard,
+	)
+}
+
+// statsTabKeyboard renders the 정답률 | 진도 tabs, marking the tab whose
+// callback is activeCallback, above the home button.
+func statsTabKeyboard(activeCallback string) tgbotapi.InlineKeyboardMarkup {
+	messages := botMessagesByLocale[botDefaultLocale]
+	tabLabel := func(
+		label string,
+		callbackData string,
+	) string {
+		if callbackData != activeCallback {
+			return label
+		}
+		return fmt.Sprintf(
+			messages.statsActiveTabFormat,
+			label,
+		)
+	}
+
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				tabLabel(
+					messages.statsAccuracyTabButton,
+					callbackMenuStats,
+				),
+				callbackMenuStats,
+			),
+			tgbotapi.NewInlineKeyboardButtonData(
+				tabLabel(
+					messages.statsProgressTabButton,
+					callbackStatsProgress,
+				),
+				callbackStatsProgress,
+			),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				messages.menuHomeButton,
+				callbackMenuMain,
+			),
+		),
+	)
+}
+
+// progressBar draws percent as 10 cells, one filled cell per full 10%.
+func progressBar(percent int) string {
+	const progressBarCells = 10
+	filledCells := percent / 10
+	return strings.Repeat(
+		"▓",
+		filledCells,
+	) + strings.Repeat(
+		"░",
+		progressBarCells-filledCells,
 	)
 }
 

@@ -30,12 +30,18 @@
 
 - [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. **(Case A 선결: preset 비율/변경 UX/SRS 충돌 우선순위/vocab fallback 미결)** see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
 
+- [ ] 정규 Quiz 하위 레벨 due 복습 starvation 버그 — 현재 레벨 due가 세션 크기+2개를 넘으면 N5 due가 한 문제도 안 나옴(9/29 이후 0개, N5 due 512개 적체). 하위 레벨 전용 due 조회로 수정 see [docs/todos/quiz_lower_level_due_starvation.md](docs/todos/quiz_lower_level_due_starvation.md)
+
 - [ ] Cloudflare Tunnel(cloudflared/trycloudflare) Korea-block 노출 대응 — 손글씨 Mini App ingress가 Cloudflare 의존이라 한국 재차단 시 통째 중단 위험(현시점 도달은 정상). **(Case A 선결: 자체 도메인+named tunnel vs 비-CF ingress vs accept+monitor 미결)** see [docs/todos/cloudflare_korea_tunnel_risk.md](docs/todos/cloudflare_korea_tunnel_risk.md)
 
 ## 📝 최근 완료
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-10-13 | JLPT N3 seed 추가: Waller 리스트 기준 단어 1,766개(한자어 읽기·표기 문항은 스크립트, 가나 단어 문항은 sonnet 작성·opus 전수 검수)와 문법 98개(문항 3종), N3 단어는 흔한 단어부터 나오도록 `difficulty`에 빈도 반영 | [2610132130](docs/workthrough/2610/2610132130_jlpt_n3_seed.md) |
+| 2026-10-13 | 통계를 `정답률 \| 진도` 탭으로 나누고, 진도 탭에 레벨별로 Study에서 한 번이라도 학습한 자료 비율 표시 (ADR-072) | - |
+| 2026-10-11 | 진행 중 Quiz에서 대기 중이 아닌 텍스트를 받으면 직전 문제 정오답 안내 + 다음 미답 문제 재전송(결과 메시지 유실 시 dead end 해소, ADR-071) | [2610111020](docs/workthrough/2610/2610111020_telegram_429_silent_quiz_stall.md) |
+| 2026-10-11 | Telegram Bot API 호출 실패를 `TelegramClient`에서 WARN `telegram.api.failed`(method·chat_id·error_code·retry_after_sec)로 log, 대기 중인 텍스트 입력 없이 무시된 메시지를 INFO `telegram.message.ignored`로 log (ADR-070) | [2610111020](docs/workthrough/2610/2610111020_telegram_429_silent_quiz_stall.md) |
 | 2026-10-10 | seeder 언어를 필수 위치 인자로 변경(`go run ./cmd/seeding ja`, 인자 개수가 틀리거나 없는 언어면 사용법과 언어 목록을 보여주고 exit 2), `records.go`·`records_test.go`를 `main.go`·`main_test.go`로 합침, seeder 함수 10개를 6개로 합치고 일어날 수 없는 guard(row ID 0, embed 읽기 에러)와 level별 검사 제거, 쓰지 않는 `cmd/admin/build_study_sessions` 삭제(scheduler `BuildForSlot`·bot 즉시 study가 대체), `reset_learning_data`를 TRUNCATE 상수 하나와 `main`으로 합침 | - |
 | 2026-10-10 | Quiz 문제 헤더에 문제별 레벨 표시(`📝 문제 3/17 · N4 🔄`), level 없는 문제는 생략 | - |
 | 2026-10-10 | `cmd/` 5곳에 복사된 `initDB`와 server·admin의 audio 조립을 `internal/bootstrap`(`OpenDB`·`NewAudioService`)으로 모음, seeder 로더를 함수로 바꾸고 테스트와 겹치는 런타임 검사 제거, question upsert 실패 시 exit 0 버그 수정 (ADR-069, ADR-068 보강) | - |

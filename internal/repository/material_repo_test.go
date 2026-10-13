@@ -674,3 +674,87 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 		)
 	}
 }
+
+func TestGetLevelProgressPostgres(t *testing.T) {
+	dsn := os.Getenv("COPYLINGO_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("COPYLINGO_TEST_DATABASE_URL is not set")
+	}
+
+	ctx := context.Background()
+	db, err := sqlx.Open(
+		"postgres",
+		dsn,
+	)
+	if err != nil {
+		t.Fatalf("open test database failed")
+	}
+	defer db.Close()
+	tx, err := db.BeginTxx(
+		ctx,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("begin test transaction failed")
+	}
+	defer tx.Rollback()
+
+	// Material 3 is another user's progress, 5 has a zero-study row, 6 is
+	// another language; none of them may count for user 42 in ja.
+	for _, statement := range []string{
+		`CREATE TEMP TABLE materials (
+			id integer PRIMARY KEY, language text NOT NULL, proficiency_level text NOT NULL
+		) ON COMMIT DROP`,
+		`CREATE TEMP TABLE user_material_progress (
+			user_id bigint NOT NULL, material_id integer NOT NULL,
+			times_studied integer NOT NULL, PRIMARY KEY (user_id, material_id)
+		) ON COMMIT DROP`,
+		`INSERT INTO materials (id, language, proficiency_level) VALUES
+			(1, 'ja', 'N5'), (2, 'ja', 'N5'), (3, 'ja', 'N5'),
+			(4, 'ja', 'N4'), (5, 'ja', 'N4'), (6, 'el', 'A1')`,
+		`INSERT INTO user_material_progress (user_id, material_id, times_studied) VALUES
+			(42, 1, 3), (42, 2, 1), (7, 3, 1), (42, 5, 0), (42, 6, 1)`,
+	} {
+		if _, err := tx.ExecContext(
+			ctx,
+			statement,
+		); err != nil {
+			t.Fatalf(
+				"fixture setup failed: %v",
+				err,
+			)
+		}
+	}
+
+	got, err := (&MaterialRepository{db: tx}).GetLevelProgress(
+		ctx,
+		42,
+		"ja",
+	)
+	if err != nil {
+		t.Fatalf(
+			"GetLevelProgress failed: %v",
+			err,
+		)
+	}
+	want := []model.LevelProgress{
+		{Level: "N4", TotalMaterials: 2, StudiedMaterials: 0},
+		{Level: "N5", TotalMaterials: 3, StudiedMaterials: 2},
+	}
+	if len(got) != len(want) {
+		t.Fatalf(
+			"progress = %+v, want %+v",
+			got,
+			want,
+		)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf(
+				"progress = %+v, want %+v",
+				got,
+				want,
+			)
+		}
+	}
+}

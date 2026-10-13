@@ -763,11 +763,25 @@ func (s *statRepoStub) GetCategoryAccuracy(
 	return map[string]float64{"vocabulary": 80, "grammar": 60}, nil
 }
 
+type materialProgressRepoStub struct{}
+
+func (m *materialProgressRepoStub) GetLevelProgress(
+	ctx context.Context,
+	userID int64,
+	language string,
+) ([]model.LevelProgress, error) {
+	return []model.LevelProgress{
+		{Level: "N4", TotalMaterials: 200, StudiedMaterials: 10},
+		{Level: "N5", TotalMaterials: 100, StudiedMaterials: 42},
+	}, nil
+}
+
 func botWithAnalyzer() (*Bot, *mockBotAPI) {
 	mAPI := &mockBotAPI{}
 	analyzer := service.NewAnalyzerService(
 		&analyzerUserRepoStub{streak: 5},
 		&statRepoStub{},
+		&materialProgressRepoStub{},
 	)
 	b := newTestBot(
 		mAPI,
@@ -860,6 +874,92 @@ func TestHandleStatsCallback(t *testing.T) {
 			"expected stats text, got %q",
 			edit.Text,
 		)
+	}
+	assertStatsTabs(
+		t,
+		edit,
+		callbackMenuStats,
+	)
+}
+
+func TestHandleStatsProgressCallback(t *testing.T) {
+	b, mAPI := botWithAnalyzer()
+
+	b.handleCallback(
+		context.Background(),
+		cbWithMessage(
+			callbackStatsProgress,
+			1,
+			2,
+			3,
+		),
+	)
+
+	var edit tgbotapi.EditMessageTextConfig
+	found := false
+	for _, sent := range mAPI.sentMessages {
+		if candidate, ok := sent.(tgbotapi.EditMessageTextConfig); ok {
+			edit = candidate
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("expected progress edit message")
+	}
+	n5Line := "<b>N5</b>  ▓▓▓▓░░░░░░ 42% (42/100)"
+	n4Line := "<b>N4</b>  ░░░░░░░░░░ 5% (10/200)"
+	n5Index := strings.Index(
+		edit.Text,
+		n5Line,
+	)
+	n4Index := strings.Index(
+		edit.Text,
+		n4Line,
+	)
+	if n5Index < 0 || n4Index < 0 || n5Index > n4Index {
+		t.Fatalf(
+			"progress text = %q, want N5 line then N4 line",
+			edit.Text,
+		)
+	}
+	assertStatsTabs(
+		t,
+		edit,
+		callbackStatsProgress,
+	)
+}
+
+// assertStatsTabs checks the 정답률 | 진도 tab row marks only activeCallback.
+func assertStatsTabs(
+	t *testing.T,
+	edit tgbotapi.EditMessageTextConfig,
+	activeCallback string,
+) {
+	t.Helper()
+	if edit.ReplyMarkup == nil || len(edit.ReplyMarkup.InlineKeyboard) == 0 {
+		t.Fatal("expected stats tab keyboard")
+	}
+	tabs := edit.ReplyMarkup.InlineKeyboard[0]
+	if len(tabs) != 2 {
+		t.Fatalf(
+			"tab count = %d, want 2",
+			len(tabs),
+		)
+	}
+	for _, tab := range tabs {
+		active := strings.HasSuffix(
+			tab.Text,
+			"✓",
+		)
+		if active != (*tab.CallbackData == activeCallback) {
+			t.Errorf(
+				"tab %q (%s) active=%v, want active only for %s",
+				tab.Text,
+				*tab.CallbackData,
+				active,
+				activeCallback,
+			)
+		}
 	}
 }
 

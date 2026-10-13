@@ -30,3 +30,19 @@ type WeakArea struct {
 	Accuracy         float64          `json:"accuracy"`
 	Total            int              `json:"total"`
 }
+
+// LevelProgress is how many of one level's materials a user has studied at
+// least once in Study.
+type LevelProgress struct {
+	Level            string `db:"level"`
+	TotalMaterials   int    `db:"total_materials"`
+	StudiedMaterials int    `db:"studied_materials"`
+}
+
+// Percent rounds down so a level reads 100% only when every material was studied.
+func (p LevelProgress) Percent() int {
+	if p.TotalMaterials == 0 {
+		return 0
+	}
+	return p.StudiedMaterials * 100 / p.TotalMaterials
+}

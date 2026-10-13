@@ -28,11 +28,13 @@ const (
 	callbackRootSession  = "session"
 	callbackRootStudy    = "study"
 	callbackRootSettings = "settings"
+	callbackRootStats    = "stats"
 
 	callbackPrefixMenu     = callbackRootMenu + ":"
 	callbackPrefixSession  = callbackRootSession + ":"
 	callbackPrefixStudy    = callbackRootStudy + ":"
 	callbackPrefixSettings = callbackRootSettings + ":"
+	callbackPrefixStats    = callbackRootStats + ":"
 )
 
 const (
@@ -64,6 +66,7 @@ const (
 	callbackMenuStudy        = callbackPrefixMenu + "study"
 	callbackMenuReview       = callbackPrefixMenu + "review"
 	callbackMenuStats        = callbackPrefixMenu + "stats"
+	callbackStatsProgress    = callbackPrefixStats + "progress"
 	callbackMenuSettings     = callbackPrefixMenu + "settings"
 	callbackSettingsView     = callbackPrefixSettings + "view"
 	callbackSettingsTimezone = callbackPrefixSettings + "tz"

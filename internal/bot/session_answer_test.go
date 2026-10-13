@@ -511,3 +511,195 @@ func TestHandleAnswerCallback_NonNumericOptionIndexIsIgnored(t *testing.T) {
 		t.Fatal("malformed callback recorded an answer")
 	}
 }
+
+// newResumeTestSessionFlow wires a SessionFlow whose user has the given
+// in-progress sessions and whose Quiz working set is state (nil = expired).
+func newResumeTestSessionFlow(
+	api *mockBotAPI,
+	inProgress []model.Session,
+	state *model.QuizActiveSessionState,
+) *SessionFlow {
+	stores := newTestInteractionStores()
+	if state != nil {
+		seedQuizState(
+			stores,
+			state,
+		)
+	}
+	sessionStore := &mockSessionStore{
+		getSessionsByStatusFn: func(
+			ctx context.Context,
+			userID int64,
+			status model.SessionStatus,
+		) ([]model.Session, error) {
+			if status == model.SessionInProgress {
+				return inProgress, nil
+			}
+			return nil, nil
+		},
+	}
+	return newTestSessionFlow(
+		api,
+		stores,
+		SessionFlowDeps{
+			Session: newTestSessionService(
+				stores,
+				service.SessionDeps{SessionRepo: sessionStore},
+			),
+		},
+	)
+}
+
+func TestResumeQuizFromTextReportsLastResultAndResendsNextQuestion(t *testing.T) {
+	correct, wrong := true, false
+	tests := []struct {
+		name      string
+		isCorrect *bool
+		wantLine  string
+	}{
+		{
+			name:      "last answer correct",
+			isCorrect: &correct,
+			wantLine:  "직전 문제 1/2: ✅ 정답",
+		},
+		{
+			name:      "last answer wrong shows correct answer",
+			isCorrect: &wrong,
+			wantLine:  "직전 문제 1/2: ❌ 오답 · 정답 <b>すばらしい</b>",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				api := &mockBotAPI{}
+				sf := newResumeTestSessionFlow(
+					api,
+					[]model.Session{{ID: 10, Mode: model.SessionModeQuiz}},
+					&model.QuizActiveSessionState{
+						Version: model.QuizActiveSessionStateVersion,
+						Session: model.Session{ID: 10},
+						Items: []model.QuizActiveSessionQuestion{
+							{
+								SessionQuestion: model.SessionQuestion{IsCorrect: tt.isCorrect},
+								Question: model.Question{
+									ID:            1,
+									Prompt:        "Q1",
+									Type:          model.QuestionFillBlank,
+									CorrectAnswer: "すばらしい",
+								},
+							},
+							{
+								Question: model.Question{
+									ID:      2,
+									Prompt:  "Q2",
+									Type:    model.QuestionMultipleChoice,
+									Options: json.RawMessage(`["A","B"]`),
+								},
+							},
+						},
+					},
+				)
+
+				resumed := sf.ResumeQuizFromText(
+					context.Background(),
+					&tgbotapi.Message{
+						Text: "すばらしい",
+						From: &tgbotapi.User{ID: 123},
+						Chat: &tgbotapi.Chat{ID: 456},
+					},
+				)
+
+				if !resumed {
+					t.Fatal("ResumeQuizFromText = false, want true")
+				}
+				if len(api.sentMessages) != 2 {
+					t.Fatalf(
+						"sent messages = %d, want 2 (notice + next question)",
+						len(api.sentMessages),
+					)
+				}
+				notice := api.sentMessages[0].(tgbotapi.MessageConfig)
+				if !strings.Contains(
+					notice.Text,
+					tt.wantLine,
+				) {
+					t.Fatalf(
+						"notice = %q, want line %q",
+						notice.Text,
+						tt.wantLine,
+					)
+				}
+				next := api.sentMessages[1].(tgbotapi.MessageConfig)
+				if !strings.Contains(
+					next.Text,
+					"Q2",
+				) {
+					t.Fatalf(
+						"next question = %q, want Q2",
+						next.Text,
+					)
+				}
+			},
+		)
+	}
+}
+
+func TestResumeQuizFromTextWithoutInProgressQuizSendsNothing(t *testing.T) {
+	api := &mockBotAPI{}
+	sf := newResumeTestSessionFlow(
+		api,
+		nil,
+		nil,
+	)
+
+	if sf.ResumeQuizFromText(
+		context.Background(),
+		&tgbotapi.Message{
+			Text: "hello",
+			From: &tgbotapi.User{ID: 123},
+			Chat: &tgbotapi.Chat{ID: 456},
+		},
+	) {
+		t.Fatal("ResumeQuizFromText = true, want false")
+	}
+	if len(api.sentMessages) != 0 {
+		t.Fatalf(
+			"sent messages = %d, want 0",
+			len(api.sentMessages),
+		)
+	}
+}
+
+func TestResumeQuizFromTextWithExpiredStateShowsUnavailable(t *testing.T) {
+	api := &mockBotAPI{}
+	sf := newResumeTestSessionFlow(
+		api,
+		[]model.Session{{ID: 10, Mode: model.SessionModeQuiz}},
+		nil,
+	)
+
+	if !sf.ResumeQuizFromText(
+		context.Background(),
+		&tgbotapi.Message{
+			Text: "hello",
+			From: &tgbotapi.User{ID: 123},
+			Chat: &tgbotapi.Chat{ID: 456},
+		},
+	) {
+		t.Fatal("ResumeQuizFromText = false, want true")
+	}
+	if len(api.sentMessages) != 1 {
+		t.Fatalf(
+			"sent messages = %d, want 1",
+			len(api.sentMessages),
+		)
+	}
+	sent := api.sentMessages[0].(tgbotapi.MessageConfig)
+	if sent.Text != botMessagesByLocale[botDefaultLocale].activeSessionUnavailable {
+		t.Fatalf(
+			"sent = %q, want active session unavailable",
+			sent.Text,
+		)
+	}
+}

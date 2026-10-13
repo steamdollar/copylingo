@@ -60,6 +60,12 @@ type botMessages struct {
 	statsCommandFailed      string
 	statsOverviewFormat     string
 	statsMenuFormat         string
+	statsAccuracyTabButton  string
+	statsProgressTabButton  string
+	statsActiveTabFormat    string
+	statsProgressFormat     string
+	statsProgressLineFormat string
+	statsProgressEmpty      string
 	streakCommandFailed     string
 	streakFormat            string
 	helpMessage             string
@@ -131,6 +137,9 @@ type botMessages struct {
 	// Quiz sessions and question rendering.
 	sessionFetchFailed                  string
 	activeSessionUnavailable            string
+	quizResumeNotice                    string
+	quizResumeLastCorrectFormat         string
+	quizResumeLastWrongFormat           string
 	pendingSessionsEmpty                string
 	studySessionReadyFormat             string
 	quizSessionReadyFormat              string
@@ -278,7 +287,7 @@ JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
 🈲 한자: %.0f%%
 📚 독해: %.0f%%
 🎧 청해: %.0f%%`,
-		statsMenuFormat: `📊 <b>학습 통계</b>
+		statsMenuFormat: `📊 <b>학습 통계 · 정답률</b>
 
 📅 오늘: %d문제 (정답률 %.0f%%)
 🔥 스트릭: %d일
@@ -286,8 +295,17 @@ JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
 📝 어휘: %.0f%% | 📖 문법: %.0f%%
 🈲 한자: %.0f%% | 📚 독해: %.0f%%
 🎧 청해: %.0f%%`,
-		streakCommandFailed: "❌ 스트릭 정보를 불러올 수 없습니다.",
-		streakFormat:        "🔥 현재 스트릭: <b>%d일</b> 연속 학습 중!",
+		statsAccuracyTabButton: "🎯 정답률",
+		statsProgressTabButton: "📈 진도",
+		statsActiveTabFormat:   "%s ✓",
+		statsProgressFormat: `📊 <b>학습 통계 · 진도</b>
+<i>Study에서 한 번이라도 학습한 자료 비율</i>
+
+%s`,
+		statsProgressLineFormat: "<b>%s</b>  %s %d%% (%d/%d)",
+		statsProgressEmpty:      "아직 등록된 학습 자료가 없습니다.",
+		streakCommandFailed:     "❌ 스트릭 정보를 불러올 수 없습니다.",
+		streakFormat:            "🔥 현재 스트릭: <b>%d일</b> 연속 학습 중!",
 		helpMessage: `📖 <b>CopyLingo 도움말</b>
 
 <b>명령어:</b>
@@ -380,6 +398,9 @@ JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
 
 		sessionFetchFailed:                  "❌ 세션 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
 		activeSessionUnavailable:            "⚠️ 진행 중 세션 상태가 만료되었습니다. 새 세션을 다시 시작해 주세요.",
+		quizResumeNotice:                    "↩️ 진행 중인 퀴즈로 돌아갈게요.",
+		quizResumeLastCorrectFormat:         "\n직전 문제 %d/%d: ✅ 정답",
+		quizResumeLastWrongFormat:           "\n직전 문제 %d/%d: ❌ 오답 · 정답 <b>%s</b>",
 		pendingSessionsEmpty:                "📚 현재 대기 중인 학습 세션이 없습니다.\n다음 세션이 자동으로 전송될 예정입니다!",
 		studySessionReadyFormat:             "☀️ <b>Study Session 준비됨</b>\n\n총 %d개 Material\n\n준비되면 시작 버튼을 누르세요!",
 		quizSessionReadyFormat:              "📚 <b>학습 세션 준비됨</b>\n\n총 %d문제\n유형: %s\n\n준비되면 시작 버튼을 누르세요!",

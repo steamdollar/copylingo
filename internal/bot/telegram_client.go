@@ -1,8 +1,10 @@
 package bot
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -50,6 +52,90 @@ func (c *TelegramClient) StopUpdates() {
 	c.api.StopReceivingUpdates()
 }
 
+// send and request are the only paths to the Bot API. A failed call is logged
+// here because most flows fire and forget outbound messages; without this a
+// rejected send (e.g. 429 dropping a "next question" keyboard) leaves no trace.
+// The methods take no context, so entries carry the target instead of
+// interaction_id; correlate them with the update log by time and chat_id.
+func (c *TelegramClient) send(
+	method string,
+	target slog.Attr,
+	chattable tgbotapi.Chattable,
+) (tgbotapi.Message, error) {
+	sent, err := c.api.Send(chattable)
+	if err != nil {
+		logTelegramAPIFailure(
+			method,
+			target,
+			err,
+		)
+	}
+	return sent, err
+}
+
+func (c *TelegramClient) request(
+	method string,
+	target slog.Attr,
+	chattable tgbotapi.Chattable,
+) error {
+	_, err := c.api.Request(chattable)
+	if err != nil {
+		logTelegramAPIFailure(
+			method,
+			target,
+			err,
+		)
+	}
+	return err
+}
+
+// logTelegramAPIFailure adds Telegram's error_code and retry_after when the
+// API rejected the call, so rate limits are distinguishable from network errors.
+func logTelegramAPIFailure(
+	method string,
+	target slog.Attr,
+	err error,
+) {
+	attrs := []any{
+		"event",
+		"telegram.api.failed",
+		"method",
+		method,
+		target,
+		"error",
+		err,
+	}
+	var apiErr *tgbotapi.Error
+	if errors.As(
+		err,
+		&apiErr,
+	) {
+		attrs = append(
+			attrs,
+			"error_code",
+			apiErr.Code,
+		)
+		if apiErr.RetryAfter > 0 {
+			attrs = append(
+				attrs,
+				"retry_after_sec",
+				apiErr.RetryAfter,
+			)
+		}
+	}
+	slog.Warn(
+		"Telegram API call failed",
+		attrs...,
+	)
+}
+
+func chatTarget(chatID int64) slog.Attr {
+	return slog.Int64(
+		"chat_id",
+		chatID,
+	)
+}
+
 // TODO: sendMessage, SendMessageWithKeyboard 굳이 따로 두는 이유가?
 // SendMessage sends a text message to a chat.
 func (c *TelegramClient) SendMessage(
@@ -61,7 +147,11 @@ func (c *TelegramClient) SendMessage(
 		sanitizeTelegramHTML(text),
 	)
 	msg.ParseMode = "HTML"
-	_, err := c.api.Send(msg)
+	_, err := c.send(
+		"sendMessage",
+		chatTarget(chatID),
+		msg,
+	)
 	return err
 }
 
@@ -79,7 +169,11 @@ func (c *TelegramClient) SendMessageWithKeyboard(
 	if len(keyboard.InlineKeyboard) > 0 {
 		msg.ReplyMarkup = keyboard
 	}
-	_, err := c.api.Send(msg)
+	_, err := c.send(
+		"sendMessage",
+		chatTarget(chatID),
+		msg,
+	)
 	return err
 }
 
@@ -95,7 +189,11 @@ func (c *TelegramClient) SendMessageWithReplyMarkup(
 	)
 	msg.ParseMode = "HTML"
 	msg.ReplyMarkup = replyMarkup
-	sent, err := c.api.Send(msg)
+	sent, err := c.send(
+		"sendMessage",
+		chatTarget(chatID),
+		msg,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -111,7 +209,11 @@ func (c *TelegramClient) SendVoiceFileID(
 		chatID,
 		tgbotapi.FileID(fileID),
 	)
-	_, err := c.api.Send(voice)
+	_, err := c.send(
+		"sendVoice",
+		chatTarget(chatID),
+		voice,
+	)
 	return err
 }
 
@@ -125,7 +227,11 @@ func (c *TelegramClient) SendVoiceBytes(
 		chatID,
 		tgbotapi.FileBytes{Name: "listening.ogg", Bytes: data},
 	)
-	sent, err := c.api.Send(voice)
+	sent, err := c.send(
+		"sendVoice",
+		chatTarget(chatID),
+		voice,
+	)
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +252,11 @@ func (c *TelegramClient) EditMessageReplyMarkup(
 		messageID,
 		markup,
 	)
-	_, err := c.api.Send(edit)
+	_, err := c.send(
+		"editMessageReplyMarkup",
+		chatTarget(chatID),
+		edit,
+	)
 	return err
 }
 
@@ -166,7 +276,11 @@ func (c *TelegramClient) EditMessage(
 	if keyboard != nil && len(keyboard.InlineKeyboard) > 0 {
 		edit.ReplyMarkup = keyboard
 	}
-	_, err := c.api.Send(edit)
+	_, err := c.send(
+		"editMessageText",
+		chatTarget(chatID),
+		edit,
+	)
 	return err
 }
 
@@ -181,7 +295,11 @@ func (c *TelegramClient) ClearInlineKeyboard(
 			MessageID: messageID,
 		},
 	}
-	_, err := c.api.Send(edit)
+	_, err := c.send(
+		"editMessageReplyMarkup",
+		chatTarget(chatID),
+		edit,
+	)
 	return err
 }
 
@@ -190,11 +308,17 @@ func (c *TelegramClient) AnswerCallback(
 	callbackID string,
 	text string,
 ) error {
-	_, err := c.api.Request(tgbotapi.NewCallback(
-		callbackID,
-		text,
-	))
-	return err
+	return c.request(
+		"answerCallbackQuery",
+		slog.String(
+			"callback_query_id",
+			callbackID,
+		),
+		tgbotapi.NewCallback(
+			callbackID,
+			text,
+		),
+	)
 }
 
 // AnswerCallbackAlert acknowledges a callback query with a modal alert.
@@ -202,11 +326,17 @@ func (c *TelegramClient) AnswerCallbackAlert(
 	callbackID string,
 	text string,
 ) error {
-	_, err := c.api.Request(tgbotapi.NewCallbackWithAlert(
-		callbackID,
-		text,
-	))
-	return err
+	return c.request(
+		"answerCallbackQuery",
+		slog.String(
+			"callback_query_id",
+			callbackID,
+		),
+		tgbotapi.NewCallbackWithAlert(
+			callbackID,
+			text,
+		),
+	)
 }
 
 // SendChatAction shows a transient status such as "typing" in the chat.
@@ -214,9 +344,12 @@ func (c *TelegramClient) SendChatAction(
 	chatID int64,
 	action string,
 ) error {
-	_, err := c.api.Request(tgbotapi.NewChatAction(
-		chatID,
-		action,
-	))
-	return err
+	return c.request(
+		"sendChatAction",
+		chatTarget(chatID),
+		tgbotapi.NewChatAction(
+			chatID,
+			action,
+		),
+	)
 }

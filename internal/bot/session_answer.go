@@ -134,6 +134,114 @@ func (sf *SessionFlow) HandleTextInput(
 	return true
 }
 
+// ResumeQuizFromText answers plain text that no question is waiting for while
+// a Quiz is in progress. A text answer clears the pending input before its
+// result is sent, so a lost result message (e.g. Telegram 429) left no button
+// to continue and every retyped answer was dropped. Instead, it reports the
+// last answered question and re-sends the next unanswered one, the same screen
+// the menu resume shows (ADR-071). It returns false when no Quiz is in progress.
+func (sf *SessionFlow) ResumeQuizFromText(
+	ctx context.Context,
+	msg *tgbotapi.Message,
+) bool {
+	if msg.From == nil {
+		return false
+	}
+	sessions, err := sf.session.ListByStatus(
+		ctx,
+		msg.From.ID,
+		model.SessionInProgress,
+	)
+	if err != nil {
+		slog.ErrorContext(
+			ctx,
+			"Failed to look up in-progress Quiz for text input",
+			"event",
+			"telegram.session.in_progress_lookup_failed",
+			"error",
+			err,
+		)
+		return false
+	}
+	session, ok := firstQuizSession(sessions)
+	if !ok {
+		return false
+	}
+
+	ctx = observability.WithAttrs(
+		ctx,
+		slog.Int(
+			"session_id",
+			session.ID,
+		),
+	)
+	messages := botMessagesByLocale[botDefaultLocale]
+	state, err := sf.session.QuizProgress(
+		ctx,
+		session.ID,
+	)
+	if err != nil {
+		// The working set expired, so there is no position to resume from.
+		sf.telegram.SendMessageWithKeyboard(
+			msg.Chat.ID,
+			messages.activeSessionUnavailable,
+			*mainMenuKeyboard(),
+		)
+		return true
+	}
+	nextIdx := state.NextUnansweredIndex()
+	sf.telegram.SendMessage(
+		msg.Chat.ID,
+		quizResumeNotice(
+			state,
+			nextIdx,
+		),
+	)
+	sf.showQuestion(
+		ctx,
+		msg.Chat.ID,
+		nil,
+		session.ID,
+		nextIdx,
+	)
+	slog.InfoContext(
+		ctx,
+		"Quiz resumed from text input",
+		"event",
+		"telegram.session.resumed_from_text",
+		"question_index",
+		nextIdx,
+	)
+	return true
+}
+
+// quizResumeNotice repeats the last answered question's result, because the
+// message that carried it may never have reached the user.
+func quizResumeNotice(
+	state *model.QuizActiveSessionState,
+	nextIdx int,
+) string {
+	messages := botMessagesByLocale[botDefaultLocale]
+	lastIdx := nextIdx - 1
+	if lastIdx < 0 {
+		return messages.quizResumeNotice
+	}
+	last := state.Items[lastIdx]
+	if last.SessionQuestion.IsCorrect != nil && *last.SessionQuestion.IsCorrect {
+		return messages.quizResumeNotice + fmt.Sprintf(
+			messages.quizResumeLastCorrectFormat,
+			lastIdx+1,
+			len(state.Items),
+		)
+	}
+	return messages.quizResumeNotice + fmt.Sprintf(
+		messages.quizResumeLastWrongFormat,
+		lastIdx+1,
+		len(state.Items),
+		last.Question.CorrectAnswer,
+	)
+}
+
 // handleQuizAnswerError maps a rejected answer to its screen: a stale answer
 // re-renders the next unanswered question, unexpected grading failures are
 // logged, and unresolvable targets are ignored.

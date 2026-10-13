@@ -18,6 +18,7 @@
 6. **Logging**:
    - Use `log/slog` (JSON handler, `internal/observability`). Request attributes such as `interaction_id` come from the context.
    - Lower layers like the repository don't log directly.
+     - Exception: `bot.TelegramClient` logs every failed Bot API call once (WARN `telegram.api.failed`), because most callers fire and forget sends and drop the error ([ADR-070](adr/ADR_from_61_to_80.md#adr-070-telegram-bot-api-호출-실패는-telegramclient-한-곳에서-log한다)).
    - Boundary layers — bot handlers, HTTP handlers, scheduler jobs — log once, with user/task context.
 7. **Tests**: `*_test.go` files, located in the same package.
 8. **Parameter layout**: 함수 매개변수와 호출 인자가 2개 이상이면 줄 길이와 관계없이 각각 별도 줄에 쓴다. 반환값 목록은 기존 스타일을 유지한다. VS Code에서는 `cmd/dev/goparams`를 custom formatter로 연결해 저장 시 적용한다. 기존 gofmt/golines는 이 개행을 유지한다.
