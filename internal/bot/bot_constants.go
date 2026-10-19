@@ -44,6 +44,7 @@ const (
 	callbackActionAsk     = "ask"
 	callbackActionExclude = "exclude"
 	callbackActionCard    = "card"
+	callbackActionKanji   = "kanji"
 
 	callbackActionWordOrder       = "wo"
 	callbackActionWordOrderSelect = "a"
@@ -93,6 +94,7 @@ const (
 	formatStudyPolicy    = callbackPrefixStudy + "%d:" + callback.QuestionActionPolicy + ":%d"
 	formatStudyPolicySet = callbackPrefixStudy + "%d:" + callback.QuestionActionPolicy + ":%d:%s"
 	formatStudyCard      = callbackPrefixStudy + "%d:" + callbackActionCard + ":%d"
+	formatStudyKanji     = callbackPrefixStudy + "%d:" + callbackActionKanji + ":%d"
 
 	formatMaterialPreferences      = callbackPrefixSettings + callbackActionMaterials + ":%d"
 	formatMaterialRestore          = callbackPrefixSettings + callbackActionRestore + ":%d:%d"

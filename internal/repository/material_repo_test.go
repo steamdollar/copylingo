@@ -758,3 +758,159 @@ func TestGetLevelProgressPostgres(t *testing.T) {
 		}
 	}
 }
+
+func TestListStudiedSoundSeriesWordsPostgres(t *testing.T) {
+	dsn := os.Getenv("COPYLINGO_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("COPYLINGO_TEST_DATABASE_URL is not set")
+	}
+
+	ctx := context.Background()
+	db, err := sqlx.Open(
+		"postgres",
+		dsn,
+	)
+	if err != nil {
+		t.Fatalf("open test database failed")
+	}
+	defer db.Close()
+	tx, err := db.BeginTxx(
+		ctx,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("begin test transaction failed")
+	}
+	defer tx.Rollback()
+
+	// vocab builds a vocabulary payload whose kanji char has sound part sound.
+	vocab := func(
+		word,
+		char,
+		sound string,
+	) string {
+		return `{"kanji":"` + word + `","kanji_notes":[{"char":"` + char +
+			`","parts":[{"part":"氵","role":"meaning"},{"part":"` + sound + `","role":"sound"}]}]}`
+	}
+	// User 42 studied 1, 2, 6, 8, 9, 10 and 11. Excluded: 3 (same kanji 清 as
+	// the card), 4 (never studied), 5 (another user's row), 6 (over the
+	// per-part limit, oldest), 7 (other language), 9 (null notes), 10 (the
+	// card itself), 11 (not vocabulary).
+	for _, statement := range []string{
+		`CREATE TEMP TABLE materials (
+			id integer PRIMARY KEY, language text NOT NULL, category text NOT NULL,
+			payload jsonb NOT NULL
+		) ON COMMIT DROP`,
+		`CREATE TEMP TABLE user_material_progress (
+			user_id bigint NOT NULL, material_id integer NOT NULL,
+			times_studied integer NOT NULL, last_studied_at timestamptz,
+			PRIMARY KEY (user_id, material_id)
+		) ON COMMIT DROP`,
+		`INSERT INTO materials (id, language, category, payload) VALUES
+			(1, 'ja', 'vocabulary', '` + vocab(
+			"晴れ",
+			"晴",
+			"青",
+		) + `'),
+			(2, 'ja', 'vocabulary', '` + vocab(
+			"精神",
+			"精",
+			"青",
+		) + `'),
+			(3, 'ja', 'vocabulary', '` + vocab(
+			"清書",
+			"清",
+			"青",
+		) + `'),
+			(4, 'ja', 'vocabulary', '` + vocab(
+			"静か",
+			"静",
+			"青",
+		) + `'),
+			(5, 'ja', 'vocabulary', '` + vocab(
+			"情報",
+			"情",
+			"青",
+		) + `'),
+			(6, 'ja', 'vocabulary', '` + vocab(
+			"請求",
+			"請",
+			"青",
+		) + `'),
+			(7, 'el', 'vocabulary', '` + vocab(
+			"晴天",
+			"晴",
+			"青",
+		) + `'),
+			(8, 'ja', 'vocabulary', '` + vocab(
+			"時計",
+			"時",
+			"寺",
+		) + `'),
+			(9, 'ja', 'vocabulary', '{"kanji":"水","kanji_notes":null}'),
+			(10, 'ja', 'vocabulary', '` + vocab(
+			"清潔",
+			"清",
+			"青",
+		) + `'),
+			(11, 'ja', 'grammar', '` + vocab(
+			"晴れる",
+			"晴",
+			"青",
+		) + `')`,
+		`INSERT INTO user_material_progress (user_id, material_id, times_studied, last_studied_at) VALUES
+			(42, 1, 1, '2026-10-10'), (42, 2, 2, '2026-10-12'), (42, 3, 1, '2026-10-13'),
+			(42, 4, 0, NULL), (7, 5, 1, '2026-10-13'), (42, 6, 1, '2026-10-01'),
+			(42, 7, 1, '2026-10-13'), (42, 8, 1, '2026-10-11'), (42, 9, 1, '2026-10-13'),
+			(42, 10, 1, '2026-10-13'), (42, 11, 1, '2026-10-13')`,
+	} {
+		if _, err := tx.ExecContext(
+			ctx,
+			statement,
+		); err != nil {
+			t.Fatalf(
+				"fixture setup failed: %v",
+				err,
+			)
+		}
+	}
+
+	got, err := (&MaterialRepository{db: tx}).ListStudiedSoundSeriesWords(
+		ctx,
+		42,
+		"ja",
+		10,
+		[]string{"青", "寺"},
+		[]string{"清", "潔"},
+		2,
+	)
+	if err != nil {
+		t.Fatalf(
+			"ListStudiedSoundSeriesWords failed: %v",
+			err,
+		)
+	}
+	// Part order follows the DB collation, so compare per part; words within a
+	// part come most recently studied first.
+	byPart := make(map[string][]string)
+	for _, word := range got {
+		byPart[word.SoundPart] = append(
+			byPart[word.SoundPart],
+			word.Word,
+		)
+	}
+	if strings.Join(
+		byPart["青"],
+		",",
+	) != "精神,晴れ" ||
+		strings.Join(
+			byPart["寺"],
+			",",
+		) != "時計" ||
+		len(byPart) != 2 {
+		t.Fatalf(
+			"words = %+v, want 青: 精神,晴れ and 寺: 時計",
+			got,
+		)
+	}
+}

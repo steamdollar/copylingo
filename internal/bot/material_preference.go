@@ -280,14 +280,8 @@ func (sf *StudyFlow) handleMaterialPreference(
 		)
 		return
 	}
-	var item *model.StudySessionMaterial
-	for i := range state.Items {
-		if state.Items[i].SessionMaterial.MaterialID == materialID {
-			item = &state.Items[i]
-			break
-		}
-	}
-	if item == nil {
+	item, ok := state.ItemByMaterialID(materialID)
+	if !ok {
 		sf.telegram.AnswerCallbackAlert(
 			cb.ID,
 			botMessagesByLocale[botDefaultLocale].materialNotInSession,

@@ -336,6 +336,84 @@ func (r *MaterialRepository) GetLevelProgress(
 	return progress, nil
 }
 
+// ListStudiedSoundSeriesWords returns up to perPart vocabulary words per sound
+// part that the user has studied, whose kanji notes use one of soundParts as
+// the sound component. Notes for excludeChars (the current card's kanji) and
+// the current material are skipped, so only other kanji of the series remain.
+// The scan starts from the user's progress rows, so it stays bounded per user
+// without an index on payload.
+func (r *MaterialRepository) ListStudiedSoundSeriesWords(
+	ctx context.Context,
+	userID int64,
+	language string,
+	excludeMaterialID int,
+	soundParts []string,
+	excludeChars []string,
+	perPart int,
+) ([]model.StudiedSeriesWord, error) {
+	var words []model.StudiedSeriesWord
+	if err := r.db.SelectContext(
+		ctx,
+		&words,
+		`
+		WITH matches AS (
+			SELECT DISTINCT
+				part->>'part' AS sound_part,
+				m.id AS material_id,
+				m.payload->>'kanji' AS word,
+				ump.last_studied_at
+			FROM user_material_progress ump
+			JOIN materials m ON m.id = ump.material_id
+			CROSS JOIN LATERAL jsonb_array_elements(
+				CASE WHEN jsonb_typeof(m.payload->'kanji_notes') = 'array'
+					THEN m.payload->'kanji_notes'
+					ELSE '[]'::jsonb
+				END
+			) AS note
+			CROSS JOIN LATERAL jsonb_array_elements(note->'parts') AS part
+			WHERE ump.user_id = $1
+				AND ump.times_studied > 0
+				AND m.language = $2
+				AND m.category = $3
+				AND m.id <> $4
+				AND part->>'role' = $5
+				AND part->>'part' = ANY($6)
+				AND NOT (note->>'char' = ANY($7))
+		),
+		ranked AS (
+			SELECT
+				sound_part,
+				word,
+				ROW_NUMBER() OVER (
+					PARTITION BY sound_part
+					ORDER BY last_studied_at DESC NULLS LAST, material_id
+				) AS word_rank
+			FROM matches
+		)
+		SELECT sound_part, word
+		FROM ranked
+		WHERE word_rank <= $8
+		ORDER BY sound_part, word_rank
+	`,
+		userID,
+		language,
+		model.MaterialCategoryVocabulary,
+		excludeMaterialID,
+		model.KanjiPartSound,
+		pq.Array(soundParts),
+		pq.Array(excludeChars),
+		perPart,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"MaterialRepository.ListStudiedSoundSeriesWords user_id=%d material_id=%d: %w",
+			userID,
+			excludeMaterialID,
+			err,
+		)
+	}
+	return words, nil
+}
+
 // UpsertBatch inserts or refreshes materials identified by their stable
 // material key and sets each material's ID to its row ID, so callers can link
 // questions without a second lookup.

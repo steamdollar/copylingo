@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/lsj/copylingo/internal/model"
 )
@@ -165,6 +167,129 @@ func assertMaterialPayload(
 			)
 		}
 	}
+}
+
+// TestKanjiNotes checks the optional vocabulary "kanji_notes" (ADR-073). The
+// key is omitted rather than null or empty, notes decode strictly, and each
+// kanji's note is identical in every word that uses it, so a fix made in one
+// word but not the others fails here.
+func TestKanjiNotes(t *testing.T) {
+	t.Parallel()
+
+	materials, _, err := loadRecords(japanese)
+	if err != nil {
+		t.Fatalf(
+			"loadRecords: %v",
+			err,
+		)
+	}
+	noteByChar := make(map[string]string)
+	keyByChar := make(map[string]string)
+	for _, material := range materials {
+		if material.Category != model.MaterialCategoryVocabulary {
+			continue
+		}
+		var payload struct {
+			Kanji      string           `json:"kanji"`
+			KanjiNotes *json.RawMessage `json:"kanji_notes"`
+		}
+		if err := json.Unmarshal(
+			material.Payload,
+			&payload,
+		); err != nil {
+			t.Fatalf(
+				"material %q payload: %v",
+				material.MaterialKey,
+				err,
+			)
+		}
+		if payload.KanjiNotes == nil {
+			continue
+		}
+		var notes []model.KanjiNote
+		decoder := json.NewDecoder(bytes.NewReader(*payload.KanjiNotes))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&notes); err != nil || len(notes) == 0 {
+			t.Fatalf(
+				"material %q kanji_notes must be a non-empty note list: %v",
+				material.MaterialKey,
+				err,
+			)
+		}
+		seen := make(map[string]bool)
+		for _, note := range notes {
+			if utf8.RuneCountInString(note.Char) != 1 || !strings.Contains(
+				payload.Kanji,
+				note.Char,
+			) || seen[note.Char] {
+				t.Fatalf(
+					"material %q: note char %q must be one kanji of %q, once",
+					material.MaterialKey,
+					note.Char,
+					payload.Kanji,
+				)
+			}
+			seen[note.Char] = true
+			if problem := kanjiNoteProblem(note); problem != "" {
+				t.Fatalf(
+					"material %q kanji %q: %s",
+					material.MaterialKey,
+					note.Char,
+					problem,
+				)
+			}
+			encoded, _ := json.Marshal(note)
+			if previous, ok := noteByChar[note.Char]; ok && previous != string(encoded) {
+				t.Fatalf(
+					"kanji %q has different notes in %q and %q",
+					note.Char,
+					keyByChar[note.Char],
+					material.MaterialKey,
+				)
+			}
+			noteByChar[note.Char] = string(encoded)
+			keyByChar[note.Char] = material.MaterialKey
+		}
+	}
+}
+
+// kanjiNoteProblem returns why a note breaks the schema rules, or "".
+func kanjiNoteProblem(note model.KanjiNote) string {
+	if !note.Type.Valid() || strings.TrimSpace(note.ExplanationKo) == "" {
+		return "needs a valid type and explanation_ko"
+	}
+	var sound *model.KanjiPart
+	hasForm := false
+	for i, part := range note.Parts {
+		if utf8.RuneCountInString(part.Part) != 1 || !part.Role.Valid() {
+			return "each part needs one character and a valid role"
+		}
+		switch part.Role {
+		case model.KanjiPartSound:
+			if sound != nil || part.GlossKo != "" {
+				return "at most one sound part, without gloss_ko"
+			}
+			sound = &note.Parts[i]
+		default:
+			if part.GlossKo == "" || part.On != "" {
+				return "meaning and form parts need gloss_ko and no on"
+			}
+			hasForm = hasForm || part.Role == model.KanjiPartForm
+		}
+	}
+	if note.Type == model.KanjiNotePhonoSemantic {
+		if sound == nil && !hasForm {
+			return "phono_semantic needs a sound part, or a form part when simplified"
+		}
+	} else if sound != nil {
+		return "only phono_semantic may have a sound part"
+	}
+	for _, kanji := range note.Series {
+		if sound == nil || sound.On == "" || kanji.On != sound.On || utf8.RuneCountInString(kanji.Char) != 1 {
+			return "series needs a sound part with on, and each entry must share that on"
+		}
+	}
+	return ""
 }
 
 func assertQuestionRecord(

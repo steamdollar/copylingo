@@ -44,6 +44,15 @@ func (s *StudyActiveSessionState) ItemByOrder(materialOrder int) (*StudySessionM
 	return nil, -1, false
 }
 
+func (s *StudyActiveSessionState) ItemByMaterialID(materialID int) (*StudySessionMaterial, bool) {
+	for idx := range s.Items {
+		if s.Items[idx].SessionMaterial.MaterialID == materialID {
+			return &s.Items[idx], true
+		}
+	}
+	return nil, false
+}
+
 func (s *StudyActiveSessionState) ItemAt(idx int) (*StudySessionMaterial, bool) {
 	if idx < 0 || idx >= len(s.Items) {
 		return nil, false

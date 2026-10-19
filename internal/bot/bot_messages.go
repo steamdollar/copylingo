@@ -33,6 +33,19 @@ type botMessages struct {
 	readingFormat                      string
 	translationFormat                  string
 	keyVocabularyFormat                string
+	kanjiNotesButton                   string
+	kanjiNotesUnavailable              string
+	kanjiNotesHeadingFormat            string
+	kanjiNoteTitleFormat               string
+	kanjiTypePhonoSemantic             string
+	kanjiTypeCompound                  string
+	kanjiTypeIndicative                string
+	kanjiTypePictograph                string
+	kanjiPartGlossFormat               string
+	kanjiSoundPartFormat               string
+	kanjiSoundPartNoOnFormat           string
+	kanjiSeriesFormat                  string
+	kanjiStudiedSeriesFormat           string
 	activationUnavailable              string
 	modeActivated                      string
 	cancelButton                       string
@@ -234,6 +247,19 @@ var botMessagesByLocale = map[string]botMessages{
 		readingFormat:                      "읽기: %s",
 		translationFormat:                  "해석: %s",
 		keyVocabularyFormat:                "핵심 어휘:\n%s",
+		kanjiNotesButton:                   "🈁 한자 해설",
+		kanjiNotesUnavailable:              "❌ 한자 해설을 불러오지 못했습니다.",
+		kanjiNotesHeadingFormat:            "🈁 <b>한자 해설</b>\n\n<b>%s</b> (%s)",
+		kanjiNoteTitleFormat:               "<b>%s</b> · %s",
+		kanjiTypePhonoSemantic:             "형성문자",
+		kanjiTypeCompound:                  "회의문자",
+		kanjiTypeIndicative:                "지사문자",
+		kanjiTypePictograph:                "상형문자",
+		kanjiPartGlossFormat:               "%s(%s)",
+		kanjiSoundPartFormat:               "%s(%s · 발음)",
+		kanjiSoundPartNoOnFormat:           "%s(발음)",
+		kanjiSeriesFormat:                  "같은 발음 요소: %s",
+		kanjiStudiedSeriesFormat:           "%s 계열로 배운 단어: %s",
 		activationUnavailable:              "❌ LLM mode를 활성화할 수 없습니다.",
 		modeActivated:                      "🤖 <b>LLM mode 활성화</b>\n질문을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.",
 		cancelButton:                       "❌ 취소",
