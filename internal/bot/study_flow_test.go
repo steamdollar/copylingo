@@ -1094,7 +1094,8 @@ func TestRenderKanjiNotes(t *testing.T) {
 func TestStudyFlowKanjiNotes(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
-	userID := int64(123)
+	// The owner sees the ask-LLM button, so the row order can be checked.
+	userID := llmAllowedTelegramUserIDs[0]
 	api := &mockBotAPI{}
 	sessionStore := &botStudySessionStore{
 		session: &model.Session{
@@ -1181,14 +1182,31 @@ func TestStudyFlowKanjiNotes(t *testing.T) {
 			userID,
 		),
 	)
-	if !slices.Contains(
-		allCallbackData(lastEditMessage(
-			t,
-			api,
-		)),
+	cardData := allCallbackData(lastEditMessage(
+		t,
+		api,
+	))
+	kanjiIndex := slices.Index(
+		cardData,
 		kanjiData,
-	) {
+	)
+	if kanjiIndex < 0 {
 		t.Fatalf("card with notes has no kanji button")
+	}
+	askIndex := slices.Index(
+		cardData,
+		fmt.Sprintf(
+			formatStudyAskLLM,
+			sessionID,
+			0,
+		),
+	)
+	if askIndex < 0 || kanjiIndex > askIndex {
+		t.Fatalf(
+			"kanji button index %d, ask button index %d; want kanji above ask",
+			kanjiIndex,
+			askIndex,
+		)
 	}
 
 	flow.HandleCallback(

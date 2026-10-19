@@ -296,11 +296,12 @@ func (sf *SessionFlow) renderByType(
 		if err != nil || len(options) == 0 {
 			return "", nil, true
 		}
-		return text, buildMCQKeyboard(
+		optionList, keyboard := buildMCQ(
 			sessionID,
 			question.ID,
 			options,
-		), false
+		)
+		return text + optionList, keyboard, false
 
 	case model.QuestionWordOrder:
 		wordOrderText, keyboard, done := sf.renderWordOrder(
@@ -333,11 +334,12 @@ func (sf *SessionFlow) renderByType(
 		if err != nil || len(options) == 0 {
 			return "", nil, true
 		}
-		return text, buildMCQKeyboard(
+		optionList, keyboard := buildMCQ(
 			sessionID,
 			question.ID,
 			options,
-		), false
+		)
+		return text + optionList, keyboard, false
 	}
 }
 
@@ -355,15 +357,19 @@ func handwritingCellCount(answer string) int {
 	return cells
 }
 
-// buildMCQKeyboard uses one button per row when an option is too wide for a
-// two-column layout. Shared by plain multiple-choice and listening comprehension.
-func buildMCQKeyboard(
+// buildMCQ renders the option picker and returns (optionList, keyboard).
+// Short options stay on a two-column keyboard and optionList is empty.
+// Telegram draws button labels on one line and truncates long ones, so when
+// any option is too wide, the full options are listed in the message text and
+// the buttons carry only their numbers. Shared by plain multiple-choice and
+// listening comprehension.
+func buildMCQ(
 	sessionID,
 	questionID int,
 	options []string,
-) *tgbotapi.InlineKeyboardMarkup {
+) (string, *tgbotapi.InlineKeyboardMarkup) {
 	const maxTwoColumnOptionWidth = 16
-	buttonsPerRow := 2
+	fitsTwoColumns := true
 	for _, option := range options {
 		width := 0
 		for _, r := range option {
@@ -373,25 +379,60 @@ func buildMCQKeyboard(
 			}
 		}
 		if width > maxTwoColumnOptionWidth {
-			buttonsPerRow = 1
+			fitsTwoColumns = false
 			break
+		}
+	}
+	answerButton := func(label string, optionIndex int) tgbotapi.InlineKeyboardButton {
+		return tgbotapi.NewInlineKeyboardButtonData(
+			label,
+			fmt.Sprintf(
+				formatQuestionAnswer,
+				sessionID,
+				questionID,
+				optionIndex,
+			),
+		)
+	}
+
+	if !fitsTwoColumns {
+		var optionList strings.Builder
+		optionList.WriteString("\n")
+		numberRow := make(
+			[]tgbotapi.InlineKeyboardButton,
+			0,
+			len(options),
+		)
+		for i, option := range options {
+			number := strconv.Itoa(i + 1)
+			fmt.Fprintf(
+				&optionList,
+				"\n%s. %s",
+				number,
+				escapeHTML(option),
+			)
+			numberRow = append(
+				numberRow,
+				answerButton(
+					number,
+					i,
+				),
+			)
+		}
+		return optionList.String(), &tgbotapi.InlineKeyboardMarkup{
+			InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{numberRow},
 		}
 	}
 
 	var rows [][]tgbotapi.InlineKeyboardButton
-	for i := 0; i < len(options); i += buttonsPerRow {
+	for i := 0; i < len(options); i += 2 {
 		var row []tgbotapi.InlineKeyboardButton
-		for j := i; j < i+buttonsPerRow && j < len(options); j++ {
+		for j := i; j < i+2 && j < len(options); j++ {
 			row = append(
 				row,
-				tgbotapi.NewInlineKeyboardButtonData(
+				answerButton(
 					options[j],
-					fmt.Sprintf(
-						formatQuestionAnswer,
-						sessionID,
-						questionID,
-						j,
-					),
+					j,
 				),
 			)
 		}
@@ -400,7 +441,7 @@ func buildMCQKeyboard(
 			row,
 		)
 	}
-	return &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
+	return "", &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
 // sendListeningAudio delivers a listening question's clip as a Telegram voice

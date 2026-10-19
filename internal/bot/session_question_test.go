@@ -220,28 +220,58 @@ func TestQuestionNavigation(t *testing.T) {
 	)
 }
 
-func TestBuildMCQKeyboardLayout(t *testing.T) {
+// TestBuildMCQLayout pins the picker layout: short options stay on two-column
+// buttons; any too-wide option moves every option into the message text and
+// leaves one row of number buttons, since Telegram truncates button labels.
+func TestBuildMCQLayout(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name    string
-		options []string
-		widths  []int
+		name           string
+		options        []string
+		widths         []int
+		wantLabels     []string
+		wantOptionList string
 	}{
-		{"short options", []string{"A", "B", "C", "D"}, []int{2, 2}},
-		{"two-column boundary", []string{"あいうえおかきく", "B", "C", "D"}, []int{2, 2}},
-		{"long Japanese option", []string{"あいうえおかきくけ", "B", "C", "D"}, []int{1, 1, 1, 1}},
-		{"long ASCII option", []string{"A", "12345678901234567", "C", "D"}, []int{1, 1, 1, 1}},
-		{"odd option count", []string{"A", "B", "C"}, []int{2, 1}},
+		{"short options", []string{"A", "B", "C", "D"}, []int{2, 2}, []string{"A", "B", "C", "D"}, ""},
+		{
+			"two-column boundary",
+			[]string{"あいうえおかきく", "B", "C", "D"},
+			[]int{2, 2},
+			[]string{"あいうえおかきく", "B", "C", "D"},
+			"",
+		},
+		{
+			"long Japanese option",
+			[]string{"あいうえおかきくけ", "B", "C", "D"},
+			[]int{4},
+			[]string{"1", "2", "3", "4"},
+			"\n\n1. あいうえおかきくけ\n2. B\n3. C\n4. D",
+		},
+		{
+			"long option is HTML-escaped",
+			[]string{"A", "1 < 2 && 3 > 2 is true", "C"},
+			[]int{3},
+			[]string{"1", "2", "3"},
+			"\n\n1. A\n2. 1 &lt; 2 &amp;&amp; 3 &gt; 2 is true\n3. C",
+		},
+		{"odd option count", []string{"A", "B", "C"}, []int{2, 1}, []string{"A", "B", "C"}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(
 			tt.name,
 			func(t *testing.T) {
-				keyboard := buildMCQKeyboard(
+				optionList, keyboard := buildMCQ(
 					10,
 					20,
 					tt.options,
 				)
+				if optionList != tt.wantOptionList {
+					t.Errorf(
+						"optionList = %q, want %q",
+						optionList,
+						tt.wantOptionList,
+					)
+				}
 				if len(keyboard.InlineKeyboard) != len(tt.widths) {
 					t.Fatalf(
 						"rows = %d, want %d",
@@ -260,12 +290,12 @@ func TestBuildMCQKeyboardLayout(t *testing.T) {
 						)
 					}
 					for _, button := range row {
-						if button.Text != tt.options[index] {
+						if button.Text != tt.wantLabels[index] {
 							t.Errorf(
 								"button %d text = %q, want %q",
 								index,
 								button.Text,
-								tt.options[index],
+								tt.wantLabels[index],
 							)
 						}
 						wantData := fmt.Sprintf(

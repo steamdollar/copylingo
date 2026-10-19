@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -503,10 +504,12 @@ func (sf *StudyFlow) showMaterial(
 		isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
 	)
 	// The kanji button exists only when the payload carries notes, so cards
-	// without notes keep their previous keyboard (ADR-073).
+	// without notes keep their previous keyboard (ADR-073). It goes right
+	// below the navigation row (index 0), above the ask-LLM row.
 	if len(vocabularyKanjiNotes(item.Material)) > 0 {
-		keyboard.InlineKeyboard = append(
+		keyboard.InlineKeyboard = slices.Insert(
 			keyboard.InlineKeyboard,
+			1,
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(
 					messages.kanjiNotesButton,
