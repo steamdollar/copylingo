@@ -284,12 +284,142 @@ func kanjiNoteProblem(note model.KanjiNote) string {
 	} else if sound != nil {
 		return "only phono_semantic may have a sound part"
 	}
-	for _, kanji := range note.Series {
-		if sound == nil || sound.On == "" || kanji.On != sound.On || utf8.RuneCountInString(kanji.Char) != 1 {
-			return "series needs a sound part with on, and each entry must share that on"
+	return ""
+}
+
+// TestKanjiReadings checks the optional vocabulary "kanji_readings"
+// (ADR-074). Entries decode strictly and follow the word's kanji in order, and
+// each kanji lists the same on'yomi in every word, so the "이 한자의 음독" line
+// never changes between cards.
+func TestKanjiReadings(t *testing.T) {
+	t.Parallel()
+
+	materials, _, err := loadRecords(japanese)
+	if err != nil {
+		t.Fatalf(
+			"loadRecords: %v",
+			err,
+		)
+	}
+	onByChar := make(map[string]string)
+	keyByChar := make(map[string]string)
+	for _, material := range materials {
+		if material.Category != model.MaterialCategoryVocabulary {
+			continue
+		}
+		var payload struct {
+			Kanji         string           `json:"kanji"`
+			KanjiReadings *json.RawMessage `json:"kanji_readings"`
+		}
+		if err := json.Unmarshal(
+			material.Payload,
+			&payload,
+		); err != nil {
+			t.Fatalf(
+				"material %q payload: %v",
+				material.MaterialKey,
+				err,
+			)
+		}
+		if payload.KanjiReadings == nil {
+			continue
+		}
+		var readings []model.KanjiReading
+		decoder := json.NewDecoder(bytes.NewReader(*payload.KanjiReadings))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&readings); err != nil || len(readings) == 0 {
+			t.Fatalf(
+				"material %q kanji_readings must be a non-empty list: %v",
+				material.MaterialKey,
+				err,
+			)
+		}
+		rest := payload.Kanji
+		for _, reading := range readings {
+			at := strings.Index(
+				rest,
+				reading.Text,
+			)
+			if at < 0 {
+				t.Fatalf(
+					"material %q: reading text %q is not next in %q",
+					material.MaterialKey,
+					reading.Text,
+					payload.Kanji,
+				)
+			}
+			rest = rest[at+len(reading.Text):]
+			if problem := kanjiReadingProblem(reading); problem != "" {
+				t.Fatalf(
+					"material %q reading %q: %s",
+					material.MaterialKey,
+					reading.Text,
+					problem,
+				)
+			}
+			if reading.Type == model.KanjiReadingJukuji {
+				continue
+			}
+			on := strings.Join(
+				reading.On,
+				"·",
+			)
+			if previous, ok := onByChar[reading.Text]; ok && previous != on {
+				t.Fatalf(
+					"kanji %q lists on'yomi %q in %q but %q in %q",
+					reading.Text,
+					previous,
+					keyByChar[reading.Text],
+					on,
+					material.MaterialKey,
+				)
+			}
+			onByChar[reading.Text] = on
+			keyByChar[reading.Text] = material.MaterialKey
+		}
+	}
+}
+
+// kanjiReadingProblem returns why a reading breaks the schema rules, or "".
+func kanjiReadingProblem(reading model.KanjiReading) string {
+	if !reading.Type.Valid() || reading.Reading == "" || strings.TrimFunc(
+		reading.Reading,
+		isHiragana,
+	) != "" {
+		return "needs a valid type and a hiragana reading"
+	}
+	for _, on := range reading.On {
+		if on == "" || strings.TrimFunc(
+			on,
+			isKatakana,
+		) != "" {
+			return "each on'yomi must be katakana"
+		}
+	}
+	single := utf8.RuneCountInString(reading.Text) == 1
+	switch reading.Type {
+	case model.KanjiReadingJukuji:
+		if single || len(reading.On) > 0 {
+			return "a jukuji group spans several characters and has no on'yomi"
+		}
+	case model.KanjiReadingOn:
+		if !single || len(reading.On) == 0 {
+			return "an on reading is one kanji that lists its on'yomi"
+		}
+	default:
+		if !single {
+			return "a kun reading is one kanji"
 		}
 	}
 	return ""
+}
+
+func isHiragana(r rune) bool {
+	return r >= 'ぁ' && r <= 'ゖ'
+}
+
+func isKatakana(r rune) bool {
+	return r >= 'ァ' && r <= 'ヶ'
 }
 
 func assertQuestionRecord(

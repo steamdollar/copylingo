@@ -44,8 +44,12 @@ type botMessages struct {
 	kanjiPartGlossFormat               string
 	kanjiSoundPartFormat               string
 	kanjiSoundPartNoOnFormat           string
-	kanjiSeriesFormat                  string
-	kanjiStudiedSeriesFormat           string
+	kanjiTitleFormat                   string
+	kanjiReadingInWordFormat           string
+	kanjiReadingOn                     string
+	kanjiReadingKun                    string
+	kanjiReadingJukuji                 string
+	kanjiOnReadingsFormat              string
 	activationUnavailable              string
 	modeActivated                      string
 	cancelButton                       string
@@ -258,8 +262,12 @@ var botMessagesByLocale = map[string]botMessages{
 		kanjiPartGlossFormat:               "%s(%s)",
 		kanjiSoundPartFormat:               "%s(%s · 발음)",
 		kanjiSoundPartNoOnFormat:           "%s(발음)",
-		kanjiSeriesFormat:                  "같은 발음 요소: %s",
-		kanjiStudiedSeriesFormat:           "%s 계열로 배운 단어: %s",
+		kanjiTitleFormat:                   "<b>%s</b>",
+		kanjiReadingInWordFormat:           "이 단어에선: %s (%s)",
+		kanjiReadingOn:                     "음독",
+		kanjiReadingKun:                    "훈독",
+		kanjiReadingJukuji:                 "단어 전체 읽기",
+		kanjiOnReadingsFormat:              "이 한자의 음독: %s",
 		activationUnavailable:              "❌ LLM mode를 활성화할 수 없습니다.",
 		modeActivated:                      "🤖 <b>LLM mode 활성화</b>\n질문을 입력해 주세요. 다음 메시지 1개를 AI에게 보냅니다.",
 		cancelButton:                       "❌ 취소",

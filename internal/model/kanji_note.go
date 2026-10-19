@@ -42,11 +42,10 @@ func (r KanjiPartRole) Valid() bool {
 // KanjiNote is one kanji's structure note in a vocabulary payload's optional
 // "kanji_notes" list. Every word that uses the kanji carries the same note.
 type KanjiNote struct {
-	Char          string             `json:"char"`
-	Type          KanjiNoteType      `json:"type"`
-	Parts         []KanjiPart        `json:"parts"`
-	ExplanationKo string             `json:"explanation_ko"`
-	Series        []KanjiSeriesKanji `json:"series,omitempty"`
+	Char          string        `json:"char"`
+	Type          KanjiNoteType `json:"type"`
+	Parts         []KanjiPart   `json:"parts"`
+	ExplanationKo string        `json:"explanation_ko"`
 }
 
 // KanjiPart is one visible component. GlossKo explains meaning and form
@@ -59,25 +58,34 @@ type KanjiPart struct {
 	On      string        `json:"on,omitempty"`
 }
 
-// KanjiSeriesKanji is another kanji with the same sound part and on'yomi.
-type KanjiSeriesKanji struct {
-	Char string `json:"char"`
-	On   string `json:"on"`
-}
+// KanjiReadingType says how a word reads one of its kanji (ADR-074).
+type KanjiReadingType string
 
-// SoundPart returns the note's sound component, if it has one.
-func (n KanjiNote) SoundPart() (KanjiPart, bool) {
-	for _, part := range n.Parts {
-		if part.Role == KanjiPartSound {
-			return part, true
-		}
+const (
+	KanjiReadingOn  KanjiReadingType = "on"  // 音読み
+	KanjiReadingKun KanjiReadingType = "kun" // 訓読み
+	// KanjiReadingJukuji is a reading that belongs to a kanji group as a
+	// whole, such as 今日 きょう, so no single kanji owns a part of it.
+	KanjiReadingJukuji KanjiReadingType = "jukuji"
+)
+
+func (t KanjiReadingType) Valid() bool {
+	switch t {
+	case KanjiReadingOn, KanjiReadingKun, KanjiReadingJukuji:
+		return true
+	default:
+		return false
 	}
-	return KanjiPart{}, false
 }
 
-// StudiedSeriesWord is a word the user has studied whose kanji shares
-// SoundPart with a kanji on the current card.
-type StudiedSeriesWord struct {
-	SoundPart string `db:"sound_part"`
-	Word      string `db:"word"`
+// KanjiReading is one entry of a vocabulary payload's optional
+// "kanji_readings" list, in word order: Text is one kanji, or the whole group
+// for jukuji, and Reading is the hiragana it takes in this word. On lists the
+// kanji's on'yomi used in common words, most used first; like a note it is
+// the same in every word, and a jukuji group has none.
+type KanjiReading struct {
+	Text    string           `json:"text"`
+	Reading string           `json:"reading"`
+	Type    KanjiReadingType `json:"type"`
+	On      []string         `json:"on,omitempty"`
 }

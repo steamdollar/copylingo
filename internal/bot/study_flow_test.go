@@ -3,7 +3,6 @@ package bot
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -934,33 +933,18 @@ func rowCallbackData(
 	return datas
 }
 
-// seiketsuPayload is a vocabulary payload whose 清 carries a kanji note.
+// seiketsuPayload is a vocabulary payload whose 清 carries a kanji note and
+// whose both kanji carry readings; 潔 has no note.
 const seiketsuPayload = `{"kana":"せいけつ","kanji":"清潔","meaning_ko":"청결함","part_of_speech":"noun",` +
+	`"kanji_readings":[{"text":"清","reading":"せい","type":"on","on":["セイ","ショウ"]},` +
+	`{"text":"潔","reading":"けつ","type":"on","on":["ケツ"]}],` +
 	`"kanji_notes":[{"char":"清","type":"phono_semantic",` +
 	`"parts":[{"part":"氵","role":"meaning","gloss_ko":"물"},{"part":"青","role":"sound","on":"セイ"}],` +
-	`"explanation_ko":"물(氵)처럼 맑다는 뜻에 青이 음 セイ를 더한다.",` +
-	`"series":[{"char":"晴","on":"セイ"},{"char":"精","on":"セイ"}]}]}`
+	`"explanation_ko":"물(氵)처럼 맑다는 뜻에 青이 음 セイ를 더한다."}]}`
 
-// botKanjiSeriesWords returns canned studied words and records the lookup.
-type botKanjiSeriesWords struct {
-	words []model.StudiedSeriesWord
-	err   error
-	notes []model.KanjiNote
-}
-
-func (k *botKanjiSeriesWords) StudiedSeriesWords(
-	ctx context.Context,
-	userID int64,
-	material model.Material,
-	notes []model.KanjiNote,
-) ([]model.StudiedSeriesWord, error) {
-	k.notes = notes
-	return k.words, k.err
-}
-
-// TestVocabularyKanjiNotesDecidesButton pins the button rule: only a
-// vocabulary payload with at least one note has notes.
-func TestVocabularyKanjiNotesDecidesButton(t *testing.T) {
+// TestHasKanjiDetailDecidesButton pins the button rule: only a vocabulary
+// payload with at least one note or reading gets the button.
+func TestHasKanjiDetailDecidesButton(t *testing.T) {
 	t.Parallel()
 
 	base := `"kana":"せいけつ","kanji":"清潔","meaning_ko":"청결함","part_of_speech":"noun"`
@@ -968,25 +952,41 @@ func TestVocabularyKanjiNotesDecidesButton(t *testing.T) {
 		name     string
 		category model.MaterialCategory
 		payload  string
-		want     int
+		want     bool
 	}{
-		{name: "notes", category: model.MaterialCategoryVocabulary, payload: seiketsuPayload, want: 1},
-		{name: "absent", category: model.MaterialCategoryVocabulary, payload: "{" + base + "}", want: 0},
-		{name: "null", category: model.MaterialCategoryVocabulary, payload: "{" + base + `,"kanji_notes":null}`, want: 0},
-		{name: "empty", category: model.MaterialCategoryVocabulary, payload: "{" + base + `,"kanji_notes":[]}`, want: 0},
-		{name: "not vocabulary", category: model.MaterialCategoryGrammar, payload: seiketsuPayload, want: 0},
+		{name: "notes and readings", category: model.MaterialCategoryVocabulary, payload: seiketsuPayload, want: true},
+		{
+			name:     "readings only",
+			category: model.MaterialCategoryVocabulary,
+			payload:  "{" + base + `,"kanji_readings":[{"text":"清","reading":"せい","type":"on"}]}`,
+			want:     true,
+		},
+		{name: "absent", category: model.MaterialCategoryVocabulary, payload: "{" + base + "}", want: false},
+		{
+			name:     "null",
+			category: model.MaterialCategoryVocabulary,
+			payload:  "{" + base + `,"kanji_notes":null,"kanji_readings":null}`,
+			want:     false,
+		},
+		{
+			name:     "empty",
+			category: model.MaterialCategoryVocabulary,
+			payload:  "{" + base + `,"kanji_notes":[],"kanji_readings":[]}`,
+			want:     false,
+		},
+		{name: "not vocabulary", category: model.MaterialCategoryGrammar, payload: seiketsuPayload, want: false},
 	} {
 		t.Run(
 			tc.name,
 			func(t *testing.T) {
-				got := vocabularyKanjiNotes(model.Material{
+				got := hasKanjiDetail(model.Material{
 					Category: tc.category,
 					Payload:  json.RawMessage(tc.payload),
 				})
-				if len(got) != tc.want {
+				if got != tc.want {
 					t.Errorf(
-						"notes = %d, want %d",
-						len(got),
+						"hasKanjiDetail = %v, want %v",
+						got,
 						tc.want,
 					)
 				}
@@ -1026,65 +1026,111 @@ func TestRenderStudyMaterialIgnoresKanjiNotes(t *testing.T) {
 	}
 }
 
+// TestRenderKanjiNotes pins each block: a noted kanji gets its note then the
+// reading lines, a kanji without a note gets a bare title, a jukuji group has
+// no on'yomi line, and a note without a reading entry still shows.
 func TestRenderKanjiNotes(t *testing.T) {
 	t.Parallel()
 
-	vocab := vocabularyStudyPayload{
-		Kana:  "まつ",
-		Kanji: "待つ",
-		KanjiNotes: []model.KanjiNote{
-			{
-				Char: "待",
-				Type: model.KanjiNotePhonoSemantic,
-				Parts: []model.KanjiPart{
-					{Part: "彳", Role: model.KanjiPartMeaning, GlossKo: "길을 감"},
-					{Part: "寺", Role: model.KanjiPartSound},
+	for _, tc := range []struct {
+		name    string
+		vocab   vocabularyStudyPayload
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "kun reading below the note",
+			vocab: vocabularyStudyPayload{
+				Kana:  "まつ",
+				Kanji: "待つ",
+				KanjiReadings: []model.KanjiReading{
+					{Text: "待", Reading: "ま", Type: model.KanjiReadingKun, On: []string{"タイ"}},
 				},
-				ExplanationKo: "寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.",
+				KanjiNotes: []model.KanjiNote{
+					{
+						Char: "待",
+						Type: model.KanjiNotePhonoSemantic,
+						Parts: []model.KanjiPart{
+							{Part: "彳", Role: model.KanjiPartMeaning, GlossKo: "길을 감"},
+							{Part: "寺", Role: model.KanjiPartSound},
+						},
+						ExplanationKo: "寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.",
+					},
+					{
+						Char: "読",
+						Type: model.KanjiNotePhonoSemantic,
+						Parts: []model.KanjiPart{
+							{Part: "言", Role: model.KanjiPartMeaning, GlossKo: "말"},
+							{Part: "売", Role: model.KanjiPartForm, GlossKo: "간략화된 <모양>"},
+						},
+						ExplanationKo: "구자체 讀.",
+					},
+				},
 			},
-			{
-				Char: "読",
-				Type: model.KanjiNotePhonoSemantic,
-				Parts: []model.KanjiPart{
-					{Part: "言", Role: model.KanjiPartMeaning, GlossKo: "말"},
-					{Part: "売", Role: model.KanjiPartForm, GlossKo: "간략화된 <모양>"},
-				},
-				ExplanationKo: "구자체 讀.",
+			want: []string{
+				"<b>待つ</b> (まつ)",
+				"<b>待</b> · 형성문자\n彳(길을 감) + 寺(발음)\n寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.\n" +
+					"이 단어에선: ま (훈독)\n이 한자의 음독: タイ",
+				"<b>読</b> · 형성문자\n言(말) + 売(간략화된 &lt;모양&gt;)\n구자체 讀.",
 			},
 		},
-	}
-	studied := []model.StudiedSeriesWord{
-		{SoundPart: "寺", Word: "時計"},
-		{SoundPart: "寺", Word: "持つ"},
-		{SoundPart: "青", Word: "晴れ"},
-	}
-	got := renderKanjiNotes(
-		vocab,
-		studied,
-	)
-	for _, want := range []string{
-		"<b>待つ</b> (まつ)",
-		"<b>待</b> · 형성문자\n彳(길을 감) + 寺(발음)\n寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.\n寺 계열로 배운 단어: 時計 · 持つ",
-		"言(말) + 売(간략화된 &lt;모양&gt;)",
+		{
+			name: "kanji without a note",
+			vocab: vocabularyStudyPayload{
+				Kana:  "じこ",
+				Kanji: "事故",
+				KanjiReadings: []model.KanjiReading{
+					{Text: "事", Reading: "じ", Type: model.KanjiReadingOn, On: []string{"ジ", "ズ"}},
+					{Text: "故", Reading: "こ", Type: model.KanjiReadingOn, On: []string{"コ"}},
+				},
+			},
+			want: []string{
+				"<b>事</b>\n이 단어에선: じ (음독)\n이 한자의 음독: ジ · ズ",
+				"<b>故</b>\n이 단어에선: こ (음독)\n이 한자의 음독: コ",
+			},
+		},
+		{
+			name: "jukuji group",
+			vocab: vocabularyStudyPayload{
+				Kana:  "きょう",
+				Kanji: "今日",
+				KanjiReadings: []model.KanjiReading{
+					{Text: "今日", Reading: "きょう", Type: model.KanjiReadingJukuji},
+				},
+			},
+			want:    []string{"<b>今日</b>\n이 단어에선: きょう (단어 전체 읽기)"},
+			notWant: []string{"이 한자의 음독"},
+		},
 	} {
-		if !strings.Contains(
-			got,
-			want,
-		) {
-			t.Errorf(
-				"kanji notes missing %q:\n%s",
-				want,
-				got,
-			)
-		}
-	}
-	if strings.Contains(
-		got,
-		"晴れ",
-	) {
-		t.Errorf(
-			"studied word of an unrelated sound part was shown:\n%s",
-			got,
+		t.Run(
+			tc.name,
+			func(t *testing.T) {
+				got := renderKanjiNotes(tc.vocab)
+				for _, want := range tc.want {
+					if !strings.Contains(
+						got,
+						want,
+					) {
+						t.Errorf(
+							"kanji notes missing %q:\n%s",
+							want,
+							got,
+						)
+					}
+				}
+				for _, notWant := range tc.notWant {
+					if strings.Contains(
+						got,
+						notWant,
+					) {
+						t.Errorf(
+							"kanji notes has %q:\n%s",
+							notWant,
+							got,
+						)
+					}
+				}
+			},
 		)
 	}
 }
@@ -1139,19 +1185,10 @@ func TestStudyFlowKanjiNotes(t *testing.T) {
 			DB: botTestDB,
 		},
 	)
-	series := &botKanjiSeriesWords{
-		words: []model.StudiedSeriesWord{
-			{SoundPart: "青", Word: "晴れ"},
-			{SoundPart: "青", Word: "精神"},
-		},
-	}
 	flow := newTestStudyFlow(
 		api,
 		nil,
-		StudyFlowDeps{
-			Session:   session,
-			KanjiNote: series,
-		},
+		StudyFlowDeps{Session: session},
 	)
 	kanjiCallback := func(materialID int) *tgbotapi.CallbackQuery {
 		return &tgbotapi.CallbackQuery{
@@ -1218,10 +1255,9 @@ func TestStudyFlowKanjiNotes(t *testing.T) {
 		api,
 	)
 	for _, want := range []string{
-		"<b>清</b> · 형성문자",
-		"氵(물) + 青(セイ · 발음)",
-		"같은 발음 요소: 晴(セイ) · 精(セイ)",
-		"青 계열로 배운 단어: 晴れ · 精神",
+		"<b>清</b> · 형성문자\n氵(물) + 青(セイ · 발음)",
+		"이 단어에선: せい (음독)\n이 한자의 음독: セイ · ショウ",
+		"<b>潔</b>\n이 단어에선: けつ (음독)\n이 한자의 음독: ケツ",
 	} {
 		if !strings.Contains(
 			notes.Text,
@@ -1242,35 +1278,6 @@ func TestStudyFlowKanjiNotes(t *testing.T) {
 		t.Errorf(
 			"notes keyboard = %v, want only the back-to-card button",
 			got,
-		)
-	}
-	if len(series.notes) != 1 || series.notes[0].Char != "清" {
-		t.Errorf(
-			"series lookup notes = %+v, want the 清 note",
-			series.notes,
-		)
-	}
-
-	// A failed series lookup still shows the notes, without the studied line.
-	series.err = errors.New("db down")
-	flow.HandleCallback(
-		ctx,
-		kanjiCallback(10),
-	)
-	degraded := lastEditMessage(
-		t,
-		api,
-	).Text
-	if !strings.Contains(
-		degraded,
-		"氵(물) + 青(セイ · 발음)",
-	) || strings.Contains(
-		degraded,
-		"배운 단어",
-	) {
-		t.Errorf(
-			"degraded notes view = %q",
-			degraded,
 		)
 	}
 

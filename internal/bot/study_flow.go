@@ -60,24 +60,12 @@ type studyInputStore interface {
 	) error
 }
 
-// kanjiSeriesWords finds the words the user already studied whose kanji
-// share a sound part with the current card's kanji notes.
-type kanjiSeriesWords interface {
-	StudiedSeriesWords(
-		ctx context.Context,
-		userID int64,
-		material model.Material,
-		notes []model.KanjiNote,
-	) ([]model.StudiedSeriesWord, error)
-}
-
 // StudyFlowDeps wires StudyFlow; every dependency is required.
 type StudyFlowDeps struct {
 	Telegram           *TelegramClient
 	Session            studySession
 	MaterialPreference materialPreferences
 	Input              studyInputStore
-	KanjiNote          kanjiSeriesWords
 }
 
 // StudyFlow handles material-based study sessions.
@@ -86,7 +74,6 @@ type StudyFlow struct {
 	session            studySession
 	materialPreference materialPreferences
 	input              studyInputStore
-	kanjiNote          kanjiSeriesWords
 }
 
 func NewStudyFlow(deps StudyFlowDeps) *StudyFlow {
@@ -95,7 +82,6 @@ func NewStudyFlow(deps StudyFlowDeps) *StudyFlow {
 		session:            deps.Session,
 		materialPreference: deps.MaterialPreference,
 		input:              deps.Input,
-		kanjiNote:          deps.KanjiNote,
 	}
 }
 
@@ -503,10 +489,11 @@ func (sf *StudyFlow) showMaterial(
 		idx == len(items)-1,
 		isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
 	)
-	// The kanji button exists only when the payload carries notes, so cards
-	// without notes keep their previous keyboard (ADR-073). It goes right
-	// below the navigation row (index 0), above the ask-LLM row.
-	if len(vocabularyKanjiNotes(item.Material)) > 0 {
+	// The kanji button exists only when the payload carries notes or
+	// readings, so other cards keep their previous keyboard (ADR-073,
+	// ADR-074). It goes right below the navigation row (index 0), above the
+	// ask-LLM row.
+	if hasKanjiDetail(item.Material) {
 		keyboard.InlineKeyboard = slices.Insert(
 			keyboard.InlineKeyboard,
 			1,
@@ -765,36 +752,12 @@ func (sf *StudyFlow) showKanjiNotes(
 	if err := json.Unmarshal(
 		item.Material.Payload,
 		&vocab,
-	); err != nil || len(vocab.KanjiNotes) == 0 {
+	); err != nil || len(vocab.KanjiNotes)+len(vocab.KanjiReadings) == 0 {
 		sf.telegram.AnswerCallbackAlert(
 			cb.ID,
 			messages.kanjiNotesUnavailable,
 		)
 		return
-	}
-
-	// The studied-series line is an extra; on a lookup failure the notes are
-	// still shown without it.
-	studied, err := sf.kanjiNote.StudiedSeriesWords(
-		ctx,
-		cb.From.ID,
-		item.Material,
-		vocab.KanjiNotes,
-	)
-	if err != nil {
-		studied = nil
-		slog.WarnContext(
-			ctx,
-			"Failed to load studied kanji series words",
-			"event",
-			"telegram.study.kanji_series_failed",
-			"session_id",
-			sessionID,
-			"material_id",
-			materialID,
-			"error",
-			err,
-		)
 	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -811,10 +774,7 @@ func (sf *StudyFlow) showKanjiNotes(
 	sf.telegram.EditMessage(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
-		renderKanjiNotes(
-			vocab,
-			studied,
-		),
+		renderKanjiNotes(vocab),
 		&keyboard,
 	)
 }
@@ -840,11 +800,12 @@ func nextUnstudiedMaterialOrder(state *model.StudyActiveSessionState) int {
 }
 
 type vocabularyStudyPayload struct {
-	Kana         string            `json:"kana"`
-	Kanji        string            `json:"kanji"`
-	MeaningKo    string            `json:"meaning_ko"`
-	PartOfSpeech string            `json:"part_of_speech"`
-	KanjiNotes   []model.KanjiNote `json:"kanji_notes"`
+	Kana          string               `json:"kana"`
+	Kanji         string               `json:"kanji"`
+	MeaningKo     string               `json:"meaning_ko"`
+	PartOfSpeech  string               `json:"part_of_speech"`
+	KanjiNotes    []model.KanjiNote    `json:"kanji_notes"`
+	KanjiReadings []model.KanjiReading `json:"kanji_readings"`
 }
 
 func renderStudyMaterial(
@@ -935,42 +896,41 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 	)
 }
 
-// vocabularyKanjiNotes returns the optional kanji notes of a vocabulary card;
-// other categories and payloads without notes have none.
-func vocabularyKanjiNotes(material model.Material) []model.KanjiNote {
+// hasKanjiDetail reports whether a vocabulary card has kanji notes or
+// readings to show behind the kanji button; other categories have none.
+func hasKanjiDetail(material model.Material) bool {
 	if material.Category != model.MaterialCategoryVocabulary {
-		return nil
+		return false
 	}
 	var vocab vocabularyStudyPayload
 	if err := json.Unmarshal(
 		material.Payload,
 		&vocab,
 	); err != nil {
-		return nil
+		return false
 	}
-	return vocab.KanjiNotes
+	return len(vocab.KanjiNotes)+len(vocab.KanjiReadings) > 0
 }
 
-// renderKanjiNotes shows each kanji's type, parts, one-line explanation, the
-// kanji sharing its sound part, and the user's studied words in that series.
-// Studied words appear without readings, so the line works as recall practice.
-func renderKanjiNotes(
-	vocab vocabularyStudyPayload,
-	studied []model.StudiedSeriesWord,
-) string {
+// renderKanjiNotes shows one block per kanji in word order: its structure
+// note when it has one, then how this word reads it and the kanji's common
+// on'yomi, so an on'yomi seen here carries over to other words (ADR-074). A
+// note whose kanji has no reading entry, such as one inside a jukuji group,
+// follows the others without reading lines.
+func renderKanjiNotes(vocab vocabularyStudyPayload) string {
 	messages := botMessagesByLocale[botDefaultLocale]
-	studiedByPart := make(map[string][]string)
-	for _, word := range studied {
-		studiedByPart[word.SoundPart] = append(
-			studiedByPart[word.SoundPart],
-			escapeHTML(word.Word),
-		)
+	unrenderedNotes := make(
+		map[string]model.KanjiNote,
+		len(vocab.KanjiNotes),
+	)
+	for _, note := range vocab.KanjiNotes {
+		unrenderedNotes[note.Char] = note
 	}
 
 	blocks := make(
 		[]string,
 		0,
-		len(vocab.KanjiNotes)+1,
+		len(vocab.KanjiReadings)+len(vocab.KanjiNotes)+1,
 	)
 	blocks = append(
 		blocks,
@@ -980,92 +940,124 @@ func renderKanjiNotes(
 			escapeHTML(vocab.Kana),
 		),
 	)
-	for _, note := range vocab.KanjiNotes {
+	for _, reading := range vocab.KanjiReadings {
 		lines := []string{
 			fmt.Sprintf(
-				messages.kanjiNoteTitleFormat,
-				escapeHTML(note.Char),
-				kanjiNoteTypeLabel(note.Type),
+				messages.kanjiTitleFormat,
+				escapeHTML(reading.Text),
 			),
 		}
-		parts := make(
-			[]string,
-			0,
-			len(note.Parts),
-		)
-		for _, part := range note.Parts {
-			parts = append(
-				parts,
-				renderKanjiPart(part),
-			)
-		}
-		if len(parts) > 0 {
-			lines = append(
-				lines,
-				strings.Join(
-					parts,
-					" + ",
-				),
-			)
-		}
-		if strings.TrimSpace(note.ExplanationKo) != "" {
-			lines = append(
-				lines,
-				escapeHTML(note.ExplanationKo),
-			)
-		}
-		if len(note.Series) > 0 {
-			series := make(
-				[]string,
-				0,
-				len(note.Series),
-			)
-			for _, kanji := range note.Series {
-				series = append(
-					series,
-					fmt.Sprintf(
-						messages.kanjiPartGlossFormat,
-						escapeHTML(kanji.Char),
-						escapeHTML(kanji.On),
-					),
-				)
-			}
-			lines = append(
-				lines,
-				fmt.Sprintf(
-					messages.kanjiSeriesFormat,
-					strings.Join(
-						series,
-						" · ",
-					),
-				),
-			)
-		}
-		if sound, ok := note.SoundPart(); ok && len(studiedByPart[sound.Part]) > 0 {
-			lines = append(
-				lines,
-				fmt.Sprintf(
-					messages.kanjiStudiedSeriesFormat,
-					escapeHTML(sound.Part),
-					strings.Join(
-						studiedByPart[sound.Part],
-						" · ",
-					),
-				),
+		if note, ok := unrenderedNotes[reading.Text]; ok {
+			lines = kanjiNoteLines(note)
+			delete(
+				unrenderedNotes,
+				reading.Text,
 			)
 		}
 		blocks = append(
 			blocks,
 			strings.Join(
-				lines,
+				append(
+					lines,
+					kanjiReadingLines(reading)...,
+				),
 				"\n",
 			),
 		)
+	}
+	for _, note := range vocab.KanjiNotes {
+		if _, ok := unrenderedNotes[note.Char]; ok {
+			blocks = append(
+				blocks,
+				strings.Join(
+					kanjiNoteLines(note),
+					"\n",
+				),
+			)
+		}
 	}
 	return strings.Join(
 		blocks,
 		"\n\n",
 	)
+}
+
+// kanjiNoteLines writes a note's title with its type, its parts and its
+// one-line explanation.
+func kanjiNoteLines(note model.KanjiNote) []string {
+	messages := botMessagesByLocale[botDefaultLocale]
+	lines := []string{
+		fmt.Sprintf(
+			messages.kanjiNoteTitleFormat,
+			escapeHTML(note.Char),
+			kanjiNoteTypeLabel(note.Type),
+		),
+	}
+	parts := make(
+		[]string,
+		0,
+		len(note.Parts),
+	)
+	for _, part := range note.Parts {
+		parts = append(
+			parts,
+			renderKanjiPart(part),
+		)
+	}
+	if len(parts) > 0 {
+		lines = append(
+			lines,
+			strings.Join(
+				parts,
+				" + ",
+			),
+		)
+	}
+	if strings.TrimSpace(note.ExplanationKo) != "" {
+		lines = append(
+			lines,
+			escapeHTML(note.ExplanationKo),
+		)
+	}
+	return lines
+}
+
+// kanjiReadingLines writes how this word reads the kanji, as 이 단어에선: の
+// (훈독), and the kanji's common on'yomi, which a jukuji group has none of.
+func kanjiReadingLines(reading model.KanjiReading) []string {
+	messages := botMessagesByLocale[botDefaultLocale]
+	lines := []string{
+		fmt.Sprintf(
+			messages.kanjiReadingInWordFormat,
+			escapeHTML(reading.Reading),
+			kanjiReadingTypeLabel(reading.Type),
+		),
+	}
+	if len(reading.On) > 0 {
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				messages.kanjiOnReadingsFormat,
+				escapeHTML(strings.Join(
+					reading.On,
+					" · ",
+				)),
+			),
+		)
+	}
+	return lines
+}
+
+func kanjiReadingTypeLabel(readingType model.KanjiReadingType) string {
+	messages := botMessagesByLocale[botDefaultLocale]
+	switch readingType {
+	case model.KanjiReadingOn:
+		return messages.kanjiReadingOn
+	case model.KanjiReadingKun:
+		return messages.kanjiReadingKun
+	default:
+		return messages.kanjiReadingJukuji
+	}
 }
 
 // renderKanjiPart writes 氵(물) for meaning/form parts, 青(セイ · 발음) for a

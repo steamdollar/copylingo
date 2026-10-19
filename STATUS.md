@@ -38,6 +38,7 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-10-19 | 한자 해설을 단어 읽기 기준으로 변경: 단어별 한자 읽기 `kanji_readings`(음독·훈독·熟字訓 + 그 한자의 일반 음독)를 어휘 2,961개에 자동 생성(`scripts/gen_kanji_readings.py`, JmdictFurigana·KANJIDIC2·JMdict, `NOTICE`에 출처), 해설 화면에 `이 단어에선`·`이 한자의 음독` 줄 추가와 note 없는 한자도 표시, `같은 발음 요소`·`계열로 배운 단어` 줄과 관련 service·repository 삭제 (ADR-074) | [2610192358](docs/workthrough/2610/2610192358_kanji_readings.md) |
 | 2026-10-19 | 복수 정답 2차: 전수 검사가 안 됐던 선택형(vocab_context·vocab_usage·vocab_paraphrase·청해·N5 문법 의미형)과 남은 문법 후보를 검사해 84문항 수정(문법 19, vocab_context 32, vocab_usage 32는 오답 3개 재작성, 청해 1)하고 해설도 새 문항에 맞춰 다시 쓴 뒤 DB 반영. 어순 배열 38개·한자 읽기 입력형 약 13개는 처리 방식 결정 대기 | - |
 | 2026-10-19 | N3·N4·N5 seed의 일본어 문장 1,948개를 비문 검수해 비문·부자연 17개, 정답 오류 6개(독해 정답 key가 본문과 모순·정답 선택지 없음 5, paraphrase 오답 정답 1)를 고치고 DB 반영. 복수 정답 의심 문항은 미처리 | - |
 | 2026-10-19 | 빈약했던 N4·N5 문장형 Quiz 해설 704개(vocab_context·grammar_form·grammar_text·sentence_composition)를 `문장`(한자 뒤 괄호 히라가나 읽기)·`해석`·`해설`·`오답`(선택지별 읽기·뜻·이유) 형식으로 다시 쓰고 DB 반영. 배열형은 `정답`·`순서`·`해설` 형식. N3·청해·독해·단어 단독 문항은 그대로 | - |

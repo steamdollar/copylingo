@@ -19,7 +19,6 @@ type services struct {
 	user               *service.UserService
 	session            *service.SessionService
 	materialPreference *service.MaterialPreferenceService
-	kanjiNote          *service.KanjiNoteService
 	analyzer           *service.AnalyzerService
 	tip                *service.TipService
 	llmQuestion        *service.LLMQuestionService
@@ -78,7 +77,6 @@ func newServices(
 		user:               service.NewUserService(repos.User),
 		session:            session,
 		materialPreference: service.NewMaterialPreferenceService(repos.MaterialPreference),
-		kanjiNote:          service.NewKanjiNoteService(repos.Material),
 		analyzer: service.NewAnalyzerService(
 			repos.User,
 			repos.SessionQuestion,

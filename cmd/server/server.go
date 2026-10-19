@@ -34,7 +34,6 @@ func initBot(
 		Session:            svc.session,
 		MaterialPreference: svc.materialPreference,
 		Input:              interactions,
-		KanjiNote:          svc.kanjiNote,
 	})
 	sessionDeps := bot.SessionFlowDeps{
 		Telegram:           telegram,
