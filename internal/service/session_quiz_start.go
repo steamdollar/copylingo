@@ -11,7 +11,7 @@ import (
 )
 
 // maxReviewQuizQuestions caps an on-demand review Quiz regardless of the due backlog.
-const maxReviewQuizQuestions = 15
+const maxReviewQuizQuestions = 10
 
 var (
 	// ErrNoDueReviews means an on-demand review Quiz has nothing to review.

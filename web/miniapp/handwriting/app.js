@@ -16,10 +16,6 @@ const padScrollControl = document.getElementById("padScrollControl");
 const overviewPanel = document.getElementById("overviewPanel");
 const padScroll = document.getElementById("padScroll");
 const loadingPanel = document.getElementById("loadingPanel");
-const loadingHeader = document.getElementById("loadingHeader");
-const tipCard = document.getElementById("tipCard");
-const tipEyebrow = document.getElementById("tipEyebrow");
-const tipBody = document.getElementById("tipBody");
 const params = new URLSearchParams(window.location.search);
 
 // 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
@@ -33,32 +29,12 @@ const PAD_MAX_CELLS = 8;
 // 지우개 hit-test 반경(캔버스 좌표). 선 두께(10*PAD_SCALE)보다 약간 넉넉하게 잡아 손가락 오차를 흡수한다.
 const ERASER_HIT_PX = 14 * PAD_SCALE;
 
-const TIP_INTERVAL_MS = 15000;
-const TIP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const TIP_CACHE_PREFIX = "copylingo:handwriting:tips:";
-const TIP_CATEGORY_DISPLAY = {
-	kana_youon: "요음",
-	kana_sokuon: "촉음",
-	kana_dakuten: "탁점/반탁점",
-	kana_chouon: "장음",
-	kana_shape: "비슷한 모양",
-	kana_stroke: "획순",
-	kana_hira_vs_kata: "히라가나/가타카나",
-};
-
 const state = {
 	drawing: false,
 	currentStroke: null,
 	strokes: [],
 	eraserMode: false,
 	erasingActive: false,
-};
-
-const tipState = {
-	pool: [], // shuffled, in display order
-	idx: 0,
-	intervalId: null,
-	loadingActive: false,
 };
 
 tg?.ready();
@@ -69,7 +45,6 @@ if (tg?.isVersionAtLeast?.("7.7")) {
 configurePad();
 renderQuestionPrompt();
 updatePadScrollRange();
-loadTips();
 setupDebugExport();
 
 // 답안 글자 수만큼 캔버스 폭(=셀 개수, 셀당 4:5 비율)을 잡고 격자를 글자 단위로 맞춘다.
@@ -122,119 +97,13 @@ function updatePadScrollRange() {
 	overviewPanel.hidden = maxScroll === 0;
 }
 
-async function loadTips() {
-	const language = params.get("language");
-	const level = params.get("level");
-	if (!language || !level) return;
-
-	const cacheKey = `${TIP_CACHE_PREFIX}${language}:${level}`;
-	const cachedTips = readTipCache(cacheKey);
-	if (cachedTips) {
-		applyTips(cachedTips);
-		return;
-	}
-
-	try {
-		const res = await fetch(`/api/miniapp/tips?language=${encodeURIComponent(language)}&level=${encodeURIComponent(level)}&limit=30`);
-		if (!res.ok) return;
-		const tips = await res.json();
-		if (!Array.isArray(tips)) {
-			return;
-		}
-		writeTipCache(cacheKey, tips);
-		applyTips(tips);
-	} catch (_) {
-		// graceful — tip 없이 spinner 만
-	}
-}
-
-function readTipCache(cacheKey) {
-	try {
-		const raw = window.localStorage?.getItem(cacheKey);
-		if (!raw) return null;
-		const cached = JSON.parse(raw);
-		if (!cached || Date.now() > cached.expires_at || !Array.isArray(cached.tips)) {
-			window.localStorage?.removeItem(cacheKey);
-			return null;
-		}
-		return cached.tips;
-	} catch (_) {
-		return null;
-	}
-}
-
-function writeTipCache(cacheKey, tips) {
-	try {
-		window.localStorage?.setItem(cacheKey, JSON.stringify({
-			expires_at: Date.now() + TIP_CACHE_TTL_MS,
-			tips,
-		}));
-	} catch (_) {
-		// cache best-effort
-	}
-}
-
-function applyTips(tips) {
-	tipState.pool = shuffle(tips);
-	if (tipState.loadingActive) {
-		startTipRotation();
-	}
-}
-
-function shuffle(arr) {
-	const a = arr.slice();
-	for (let i = a.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[a[i], a[j]] = [a[j], a[i]];
-	}
-	return a;
-}
-
+// 채점 대기 동안 spinner 를 보여 준다.
 function startLoading() {
-	tipState.loadingActive = true;
 	loadingPanel.hidden = false;
-	loadingHeader.hidden = false;
-	startTipRotation();
 }
 
-function startTipRotation() {
-	if (tipState.pool.length === 0) {
-		tipCard.hidden = true;
-		return;
-	}
-	if (tipState.intervalId) {
-		return;
-	}
-	tipState.idx = 0;
-	renderCurrentTip();
-	tipCard.hidden = false;
-	tipState.intervalId = setInterval(() => {
-		tipState.idx = (tipState.idx + 1) % tipState.pool.length;
-		renderCurrentTip();
-	}, TIP_INTERVAL_MS);
-}
-
-function renderCurrentTip() {
-	const t = tipState.pool[tipState.idx];
-	if (!t) return;
-	tipCard.style.opacity = "0";
-	requestAnimationFrame(() => {
-		tipEyebrow.textContent = TIP_CATEGORY_DISPLAY[t.category] || t.category;
-		tipBody.textContent = t.body;
-		tipCard.style.opacity = "1";
-	});
-}
-
-function stopLoading({ keepTip = false } = {}) {
-	tipState.loadingActive = false;
-	if (tipState.intervalId) {
-		clearInterval(tipState.intervalId);
-		tipState.intervalId = null;
-	}
-	loadingHeader.hidden = true;
-	if (!keepTip || tipCard.hidden) {
-		loadingPanel.hidden = true;
-	}
+function stopLoading() {
+	loadingPanel.hidden = true;
 }
 
 function setStatus(message) {
@@ -434,7 +303,7 @@ async function submitAnswer() {
     setStatus(error.message);
     setToolsDisabled(false);
   } finally {
-    stopLoading({ keepTip: true });
+    stopLoading();
   }
 }
 

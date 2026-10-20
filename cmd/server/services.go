@@ -20,7 +20,6 @@ type services struct {
 	session            *service.SessionService
 	materialPreference *service.MaterialPreferenceService
 	analyzer           *service.AnalyzerService
-	tip                *service.TipService
 	llmQuestion        *service.LLMQuestionService
 	audio              *service.AudioService // nil without an LLM API key
 }
@@ -34,17 +33,12 @@ func newServices(
 ) services {
 	repos := repository.NewRepositories(db)
 
-	// One LLM client serves Quiz grading, learner questions and tip generation.
+	// One LLM client serves Quiz grading and learner questions.
 	llm := external.NewLLMClient(external.LLMOptions{
 		APIKey:  cfg.LLM.APIKey,
 		BaseURL: cfg.LLM.BaseURL,
 		Model:   cfg.LLM.Model,
 	})
-	tip := service.NewTipService(
-		repos.Tip,
-		llm,
-		cfg.LLM.Model,
-	)
 
 	// Listening audio is available whenever the shared API key is configured.
 	// With no key, audio stays nil; SessionFlow and the scheduler skip it.
@@ -82,10 +76,9 @@ func newServices(
 			repos.SessionQuestion,
 			repos.Material,
 		),
-		tip: tip,
 		llmQuestion: service.NewLLMQuestionService(
 			llm,
-			tip,
+			repos.Tip,
 			cfg.LLM.Model,
 		),
 		audio: audio,

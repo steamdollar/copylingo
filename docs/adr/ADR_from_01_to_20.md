@@ -214,7 +214,7 @@
 ## ADR-015: 학습 팁(Tips) 시스템 도입 — LLM 채점 대기 시간 활용
 
 - **날짜**: 2026-05-11
-- **상태**: 채택됨 (스키마/모델/repository/API/Mini App 연동 완료, scheduler 생성은 TODO로 분리)
+- **상태**: 폐기됨 (2026-10-20, [ADR-075](ADR_from_61_to_80.md)) — 이전: 채택됨 (스키마/모델/repository/API/Mini App 연동 완료, scheduler 생성은 TODO로 분리)
 - **맥락**:
   - 손글씨 Mini App 의 LLM 채점은 수 초 단위 latency. 사용자가 채점 결과만 기다리는 dead time 이 발생.
   - 단순 spinner 보다, 대기 시간을 짧은 학습 팁(요음 규칙, 비슷한 가나 구분, 획순 등)으로 채우면 UX 개선 + 학습량 누적이 동시에 달성됨.

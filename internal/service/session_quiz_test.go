@@ -302,7 +302,7 @@ func TestSessionServiceBuildReviewQuiz(t *testing.T) {
 		{
 			name:      "backlog is capped",
 			dueCount:  40,
-			wantLimit: maxReviewQuizQuestions,
+			wantLimit: 10,
 		},
 		{
 			name:      "small backlog uses its size",

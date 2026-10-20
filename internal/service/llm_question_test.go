@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -156,27 +155,4 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 			}
 		},
 	)
-}
-
-// Without a tip-capable LLM client, top-up reports AI unavailability and
-// never touches the repository.
-func TestTipServiceTopUpWithoutGeneratorLLM(t *testing.T) {
-	svc := NewTipService(
-		nil,
-		nil,
-		"",
-	)
-	if err := svc.TopUpBucket(
-		context.Background(),
-		"ja",
-		"N5",
-	); !errors.Is(
-		err,
-		external.ErrAIConfigMissing,
-	) {
-		t.Fatalf(
-			"error = %v, want ErrAIConfigMissing",
-			err,
-		)
-	}
 }

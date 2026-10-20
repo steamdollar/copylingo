@@ -5,14 +5,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/lsj/copylingo/internal/config"
-	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -37,29 +34,18 @@ type handwritingScreen interface {
 	)
 }
 
-type tipService interface {
-	ListActive(
-		ctx context.Context,
-		language,
-		level string,
-		limit int,
-	) ([]model.Tip, error)
-}
-
 type verifier interface {
 	Verify(initData string) (*TelegramUser, error)
 }
 
 type Handler struct {
 	session           quizSession
-	tip               tipService
 	verifier          verifier
 	handwritingScreen handwritingScreen
 }
 
 type HandlerDeps struct {
 	Session           quizSession
-	Tip               tipService
 	Verifier          verifier
 	HandwritingScreen handwritingScreen
 }
@@ -74,7 +60,6 @@ type handwritingSubmitRequest struct {
 func NewHandler(deps HandlerDeps) *Handler {
 	return &Handler{
 		session:           deps.Session,
-		tip:               deps.Tip,
 		verifier:          deps.Verifier,
 		handwritingScreen: deps.HandwritingScreen,
 	}
@@ -99,74 +84,6 @@ func RegisterRoutes(
 	r.POST(
 		config.PathHandwritingSubmit,
 		handler.SubmitHandwriting,
-	)
-	r.GET(
-		config.PathMiniAppTips,
-		handler.ListTips,
-	)
-}
-
-func (h *Handler) ListTips(c *gin.Context) {
-	ctx := observability.WithAttrs(
-		c.Request.Context(),
-		slog.String(
-			"source",
-			"miniapp.tips",
-		),
-	)
-	language := strings.TrimSpace(c.Query("language"))
-	level := strings.TrimSpace(c.Query("level"))
-	if language == "" || level == "" {
-		c.JSON(
-			http.StatusBadRequest,
-			gin.H{"error": "language and level required"},
-		)
-		return
-	}
-
-	limit := 30
-	if raw := c.Query("limit"); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
-			if n > 50 {
-				n = 50
-			}
-			limit = n
-		}
-	}
-
-	tips, err := h.tip.ListActive(
-		ctx,
-		language,
-		level,
-		limit,
-	)
-	if err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to list tips",
-			"event",
-			"miniapp.tips.list_failed",
-			"language",
-			language,
-			"level",
-			level,
-			"error",
-			err,
-		)
-		c.JSON(
-			http.StatusInternalServerError,
-			gin.H{"error": "failed to load tips"},
-		)
-		return
-	}
-	if tips == nil {
-		tips = []model.Tip{}
-	}
-
-	// model.Tip 의 json 태그가 source_* / is_active / created_at 를 "-" 로 두었으므로 그대로 직렬화하면 public 필드만 나간다.
-	c.JSON(
-		http.StatusOK,
-		tips,
 	)
 }
 

@@ -208,52 +208,6 @@ func TestGetUserStats_ZeroDivision(t *testing.T) {
 	}
 }
 
-func TestGetWeakAreas_FiltersBelow60(t *testing.T) {
-	ctx := context.Background()
-
-	sRepo := &mockSessionStatRepo{
-		getCategoryAccuracyFn: func(
-			ctx context.Context,
-			userID int64,
-		) (map[string]float64, error) {
-			return map[string]float64{
-				"vocabulary": 59.9,
-				"grammar":    60.0,
-				"kanji":      75.0,
-			}, nil
-		},
-	}
-
-	analyzer := NewAnalyzerService(
-		nil,
-		sRepo,
-		nil,
-	)
-	weakAreas, err := analyzer.GetWeakAreas(
-		ctx,
-		123,
-	)
-
-	if err != nil {
-		t.Fatalf(
-			"GetWeakAreas failed: %v",
-			err,
-		)
-	}
-	if len(weakAreas) != 1 {
-		t.Errorf(
-			"expected 1 weak area, got %d",
-			len(weakAreas),
-		)
-	}
-	if weakAreas[0].Category != "vocabulary" {
-		t.Errorf(
-			"expected vocabulary to be weak, got %s",
-			weakAreas[0].Category,
-		)
-	}
-}
-
 func TestGetUserStats_UserNotFound(t *testing.T) {
 	ctx := context.Background()
 	uRepo := &mockAnalyzerUserRepo{

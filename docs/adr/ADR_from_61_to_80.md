@@ -286,3 +286,21 @@
   - seed JSON이 약 21.2만 줄에서 25.0만 줄로 늘었다(읽기 추가, `series` 제거).
   - EDRDG 데이터(CC BY-SA 4.0)에서 나온 값을 저장하므로 `NOTICE`에 출처를 둔다.
   - 판정 정확도는 JmdictFurigana 정렬과 KANJIDIC2 음독 목록 수준이다. 훈독이 음독 형태와 우연히 같으면 음독으로 판정될 수 있다. 발견하면 `TYPE_OVERRIDE`에 넣는다.
+
+## ADR-075: 학습 팁(Tips) 기능을 폐기하고 LLM 질문 기록 저장만 남긴다
+
+- 날짜: 2026-10-20
+- 상태: 승인됨 (ADR-015 폐기)
+- 배경:
+  - ADR-015는 손글씨 채점을 기다리는 몇 초 동안 Mini App에 팁을 15초 간격으로 보여 주려고 도입했다. 사용자가 원래 원한 것은 대기 시간에 한자 파츠 분석을 보며 익히는 것이었다.
+  - 실제로 쌓인 팁 102개는 모두 가나 범주(촉음·탁점·장음·획순 등)다. N4 팁 51개도 가나 이야기라서 N4 단어·문법을 공부하는 현재 사용자에게 맞지 않는다. 같은 내용을 문장만 바꾼 것이 많다(N5 촉음 18개가 거의 "1박자 멈춤"). 틀린 문제와도 무관한 무작위 노출이다.
+  - 마지막 팁 생성은 2026-09-10이다. 이후 scheduler는 매일 "bucket full"만 기록했다. 마지막 팁 조회는 2026-09-27이다. 손글씨 문제가 N5에만 있고 하위 레벨 due가 뽑히지 않는 문제([quiz_lower_level_due_starvation](../todos/quiz_lower_level_due_starvation.md)) 때문에 9-28 이후 손글씨가 출제되지 않았다.
+  - 한자 파츠 학습은 ADR-073·074의 한자 구성 해설이 단어 단위로 맡고 있다.
+- 결정:
+  - 팁 표시와 생성을 삭제한다. `TipService`·`tipGenerator`, `GenerateTips`, scheduler 팁 top-up, `GET /api/miniapp/tips`, Mini App 팁 카드, `model.Tip`·`TipCategory`가 대상이다. Mini App은 채점 중 spinner만 보여 준다.
+  - `/llm` 질문·답변 저장(`tip_candidates`, ADR-028)은 유지한다. 최근 2주에도 37건이 쌓였고, 문제 오류 신고처럼 콘텐츠 점검에 쓸 수 있는 기록이며, 지우면 복구할 수 없다. `LLMQuestionService`는 `TipRepository.CreateCandidate`를 직접 받는다.
+  - `tips` 테이블과 데이터는 남긴다. 코드가 읽지 않으므로 동작에 영향이 없고, DROP migration은 필요해질 때 따로 한다.
+- 결과:
+  - 채점 대기 화면이 가나 팁 대신 spinner만 보여 준다. 팁 생성 LLM 호출 경로가 사라진다.
+  - `tip_candidates`·`TipCandidate`·`TipRepository` 이름은 폐기된 기능을 가리키지만 바꾸지 않는다. 이름 변경은 migration이 필요하므로 별도 작업으로 둔다.
+  - 대기 시간 학습 콘텐츠가 다시 필요하면 한자 구성 해설(ADR-073)을 채점 대기 화면에 재사용하는 방향으로 다시 결정한다.

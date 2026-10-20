@@ -168,10 +168,8 @@ func (s *commandStudySessionStore) CreateSessionMaterialsInTx(
 
 var botTestDB = testutil.TransactionDB()
 
-// llmTipCandidateStore records tip candidates; the embedded nil TipRepo
-// makes any other tips-table call panic.
+// llmTipCandidateStore records the learner Q&A pairs saved as tip candidates.
 type llmTipCandidateStore struct {
-	service.TipRepo
 	created []*model.TipCandidate
 	err     error
 }
@@ -188,15 +186,6 @@ func (s *llmTipCandidateStore) CreateCandidate(
 		candidate,
 	)
 	return nil
-}
-
-func (s *llmTipCandidateStore) ListActive(
-	ctx context.Context,
-	language,
-	level string,
-	limit int,
-) ([]model.Tip, error) {
-	return nil, nil
 }
 
 func TestLanguageDisplayName(t *testing.T) {
@@ -555,11 +544,7 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 						return "honoo는 불꽃이고 <tag>는 escape 대상입니다.", nil
 					},
 				},
-				service.NewTipService(
-					tipStore,
-					nil,
-					"",
-				),
+				tipStore,
 				"test-model",
 			),
 		},
@@ -655,11 +640,7 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 						return "", errors.New("provider failed")
 					},
 				},
-				service.NewTipService(
-					&llmTipCandidateStore{},
-					nil,
-					"",
-				),
+				&llmTipCandidateStore{},
 				"test-model",
 			),
 		},

@@ -147,32 +147,3 @@ func (a *AnalyzerService) GetLevelProgress(
 	}
 	return progress, nil
 }
-
-// GetWeakAreas returns the user's weakest categories for targeted practice.
-func (a *AnalyzerService) GetWeakAreas(
-	ctx context.Context,
-	userID int64,
-) ([]model.WeakArea, error) {
-	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(
-		ctx,
-		userID,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	var weakAreas []model.WeakArea
-	for cat, acc := range categoryAcc {
-		if acc < 60 { // Below 60% is considered weak
-			weakAreas = append(
-				weakAreas,
-				model.WeakArea{
-					Category: model.QuestionCategory(cat),
-					Accuracy: acc,
-				},
-			)
-		}
-	}
-
-	return weakAreas, nil
-}

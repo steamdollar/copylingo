@@ -50,7 +50,6 @@ sequenceDiagram
 - `GET /miniapp/handwriting`
 - `GET /miniapp/handwriting/assets/*`
 - `POST /api/miniapp/handwriting/submit`
-- `GET /api/miniapp/tips`
 
 Mini App은 제출 시 아래 JSON을 서버로 보낸다.
 
@@ -129,7 +128,7 @@ Cloudflare Tunnel은 OS/router에서 inbound port를 직접 열지 않아도 되
 - tunnel 대상은 필요한 HTTP 서버 하나로 제한한다. CopyLingo 기준 대상은 `http://localhost:8080`이다.
 - PostgreSQL `5432`, Redis `6379`, MinIO `9000`/`9001`을 tunnel 대상으로 잡지 않는다.
 - Telegram token, LLM API key, DB password를 URL query, client JS, 로그에 노출하지 않는다.
-- Mini App 제출 요청은 반드시 Telegram `init_data`를 검증한 뒤 처리한다. 단 `GET /api/miniapp/tips`는 검증하지 않는다 (아래 미조치 참고).
+- Mini App 제출 요청은 반드시 Telegram `init_data`를 검증한 뒤 처리한다.
 - 클라이언트가 보낸 `user_id`, `session_id`, `question_id`, `is_correct`를 신뢰하지 않는다.
 - `trycloudflare.com` 임시 URL은 공유 범위를 제한하고, 테스트가 끝나면 tunnel 프로세스를 종료한다.
 - 운영 배포에서는 임시 URL 대신 고정 도메인, HTTPS reverse proxy 또는 Cloudflare named tunnel을 사용한다.
@@ -153,7 +152,6 @@ Cloudflare Tunnel은 OS/router에서 inbound port를 직접 열지 않아도 되
 현재 미조치 또는 운영 전 보완 필요:
 
 - `docker-compose.yml`은 현재 PostgreSQL `5432`, Redis `6379`, MinIO `9000`/`9001`, app `8080`을 host port로 publish한다. MinIO 기본 계정은 `minioadmin/minioadmin`이다. 로컬 개발에는 편하지만 public 서버에서는 DB/Redis/MinIO를 외부 interface에 노출하지 않도록 바인딩을 제한하거나 ports를 제거하고 계정을 바꿔야 한다.
-- `GET /api/miniapp/tips`는 `init_data`를 검증하지 않는다 (`internal/miniapp/handler.go`). tunnel이 열려 있으면 누구나 호출할 수 있다.
 - HTTP server에는 별도 rate limit middleware가 없다. tunnel URL이 외부에 노출되는 운영성 테스트에서는 submit endpoint rate limit을 추가하는 것이 안전하다.
 - 임시 `trycloudflare.com` URL은 재시작 시 바뀔 수 있다. 반복 테스트 또는 운영에는 named tunnel 또는 고정 도메인이 필요하다.
 

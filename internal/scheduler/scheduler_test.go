@@ -157,7 +157,8 @@ type recordingTopUp struct {
 	buckets []string
 }
 
-func (r *recordingTopUp) record(
+func (r *recordingTopUp) TopUpAudio(
+	_ context.Context,
 	language,
 	level string,
 ) error {
@@ -168,29 +169,7 @@ func (r *recordingTopUp) record(
 	return nil
 }
 
-func (r *recordingTopUp) TopUpBucket(
-	_ context.Context,
-	language,
-	level string,
-) error {
-	return r.record(
-		language,
-		level,
-	)
-}
-
-func (r *recordingTopUp) TopUpAudio(
-	_ context.Context,
-	language,
-	level string,
-) error {
-	return r.record(
-		language,
-		level,
-	)
-}
-
-func TestTopUpFillsEachDistinctBucketAndSkipsUnsetAudio(t *testing.T) {
+func TestAudioTopUpFillsEachDistinctBucketAndSkipsWhenUnset(t *testing.T) {
 	users := []model.User{
 		{ID: 1, Language: "ja", ProficiencyLevel: "N5"},
 		{ID: 2, Language: "ja", ProficiencyLevel: "N5"},
@@ -198,31 +177,15 @@ func TestTopUpFillsEachDistinctBucketAndSkipsUnsetAudio(t *testing.T) {
 	}
 	want := "ja/N5,ja/N4"
 
-	tips := &recordingTopUp{}
 	audio := &recordingTopUp{}
 	withAudio := New(Deps{
-		Tip:   tips,
 		Audio: audio,
 		Cron:  cron.New(),
 	})
-	withAudio.topUpTips(
-		context.Background(),
-		users,
-	)
 	withAudio.topUpAudio(
 		context.Background(),
 		users,
 	)
-	if got := strings.Join(
-		tips.buckets,
-		",",
-	); got != want {
-		t.Fatalf(
-			"tip buckets = %s, want %s",
-			got,
-			want,
-		)
-	}
 	if got := strings.Join(
 		audio.buckets,
 		",",
@@ -236,7 +199,6 @@ func TestTopUpFillsEachDistinctBucketAndSkipsUnsetAudio(t *testing.T) {
 
 	// Without a TTS key cmd/server leaves Audio unset; the top-up is a no-op.
 	withoutAudio := New(Deps{
-		Tip:  &recordingTopUp{},
 		Cron: cron.New(),
 	})
 	withoutAudio.topUpAudio(

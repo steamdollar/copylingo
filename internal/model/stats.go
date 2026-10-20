@@ -23,14 +23,6 @@ type UserStats struct {
 	TodayCorrect   int `json:"today_correct"`
 }
 
-// WeakArea represents a category/level combination the user struggles with.
-type WeakArea struct {
-	Category         QuestionCategory `json:"category"`
-	ProficiencyLevel string           `json:"proficiency_level"`
-	Accuracy         float64          `json:"accuracy"`
-	Total            int              `json:"total"`
-}
-
 // LevelProgress is how many of one level's materials a user has studied at
 // least once in Study.
 type LevelProgress struct {

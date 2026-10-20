@@ -271,9 +271,7 @@ button:disabled {
   margin-top: 16px;
 }
 
-.loading-panel[hidden],
-.loading-header[hidden],
-.tip-card[hidden] {
+.loading-panel[hidden] {
   display: none;
 }
 
@@ -302,28 +300,4 @@ button:disabled {
 .loading-title {
   color: var(--ink);
   font-weight: 600;
-}
-
-.tip-card {
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(31, 122, 82, 0.08);
-  transition: opacity 0.22s;
-}
-
-.tip-eyebrow {
-  display: block;
-  color: var(--accent-dark);
-  font-family: "Trebuchet MS", sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.tip-body {
-  margin: 6px 0 0;
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.5;
 }

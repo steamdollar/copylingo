@@ -18,7 +18,7 @@ Main capabilities:
 - Covers vocabulary, script recognition, reading, handwriting, and listening questions
 - Delivers Study cards and Quiz questions through a Telegram bot with inline interactions
 - Supports Telegram Mini App based handwriting submissions
-- Answer/handwriting grading, learning Q&A, and tip generation via an OpenAI-compatible endpoint (Gemini)
+- Answer/handwriting grading and learning Q&A via an OpenAI-compatible endpoint (Gemini)
 - Listening audio: Gemini native TTS, raw PCM transcoded to OGG/Opus with ffmpeg, cached in S3-compatible storage (content-addressed), Telegram file IDs reused
 - Stores materials, questions, sessions, and review state in PostgreSQL; session/runtime state in Redis
 - Produces structured application logs with interaction IDs for debugging
@@ -51,7 +51,7 @@ That means the project intentionally focuses on backend concerns such as data mo
           ├── PostgreSQL :5432
           ├── Redis :6379
           ├── Gemini API
-          │     ├── grading, Q&A, tips
+          │     ├── grading, Q&A
           │     └── native TTS
           ├── ffmpeg (PCM → OGG/Opus)
           └── MinIO / S3-compatible object storage
@@ -70,7 +70,7 @@ The Go server owns Telegram interaction handling, grading, review scheduling, an
 | Cache/runtime state | Redis 7 | Session/cache handling and runtime state |
 | Configuration | Viper | YAML + environment variable override |
 | Scheduler | robfig/cron/v3 | Batch jobs and scheduled learning flows |
-| LLM runtime | Gemini | Grading, learning Q&A, and tips through an OpenAI-compatible chat endpoint |
+| LLM runtime | Gemini | Grading and learning Q&A through an OpenAI-compatible chat endpoint |
 | TTS | Gemini native TTS + ffmpeg | Pre-generated speech transcoded to OGG/Opus for Telegram |
 | Object storage | MinIO / S3-compatible storage | Content-addressed speech audio cache |
 | Infrastructure | Docker + Docker Compose | PostgreSQL, Redis, MinIO, and app runtime |
@@ -118,8 +118,8 @@ Core variables:
 | Variable | Purpose |
 |---|---|
 | `COPYLINGO_TELEGRAM_TOKEN` | Telegram bot token |
-| `COPYLINGO_LLM_API_KEY` | Gemini API key used for grading, tips, and native TTS |
-| `COPYLINGO_LLM_MODEL` | Chat model override (grading, tips) |
+| `COPYLINGO_LLM_API_KEY` | Gemini API key used for grading, learning Q&A, and native TTS |
+| `COPYLINGO_LLM_MODEL` | Chat model override (grading, Q&A) |
 | `COPYLINGO_SERVER_PUBLIC_BASE_URL` | Public HTTPS base URL required for Telegram Mini App flows |
 
 Object storage can use the local MinIO defaults from `config.yaml` or be overridden for another S3-compatible service:

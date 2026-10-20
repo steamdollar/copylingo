@@ -145,8 +145,8 @@ llm:cancel                        → LLM 입력 취소
 | `sessions` | SERIAL | Quiz·Study 세션 상태 (mode: quiz 또는 study) |
 | `session_materials` | SERIAL | Study 세션별 자료 순서와 학습 시각 |
 | `session_questions` | SERIAL | Session별 문항 순서와 답안 |
-| `tips` | SERIAL | 손글씨 채점 대기 중 노출할 학습 팁 |
-| `tip_candidates` | SERIAL | 사용자 LLM 질문·답변 쌍. 이후 팁 후보 |
+| `tips` | SERIAL | 미사용 (ADR-075로 기능 폐기, 데이터만 보존) |
+| `tip_candidates` | SERIAL | 사용자 LLM 질문·답변 기록 |
 
 자료 설정은 학습 이력과 독립적이다. 설정 행이 없으면 일반 학습이며, 유지 복습의
 `next_check_at` 이전 또는 제외 상태에서는 새 Study·연결 Quiz 후보에서 제거한다.

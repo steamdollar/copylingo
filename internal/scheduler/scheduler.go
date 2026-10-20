@@ -19,7 +19,6 @@ const userPushCron = "*/30 * * * *"
 type Scheduler struct {
 	user       slotUsers
 	session    slotSessions
-	tip        tipTopUp
 	audio      audioTopUp
 	cron       *cron.Cron
 	dispatcher *sessionDispatcher
@@ -44,15 +43,6 @@ type slotSessions interface {
 		userIDs []int64,
 	) (map[int64]int, error)
 	dispatchSessions
-}
-
-// tipTopUp fills a (language, level) tip bucket.
-type tipTopUp interface {
-	TopUpBucket(
-		ctx context.Context,
-		language,
-		level string,
-	) error
 }
 
 // audioTopUp fills a (language, level) bucket's missing listening clips.
@@ -97,7 +87,6 @@ type pushClaims interface {
 type Deps struct {
 	User        slotUsers
 	Session     slotSessions
-	Tip         tipTopUp
 	Audio       audioTopUp
 	QuizPusher  quizPusher
 	StudyPusher studyPusher
@@ -109,7 +98,6 @@ func New(deps Deps) *Scheduler {
 	s := &Scheduler{
 		user:    deps.User,
 		session: deps.Session,
-		tip:     deps.Tip,
 		audio:   deps.Audio,
 		cron:    deps.Cron,
 	}
@@ -360,10 +348,6 @@ func (s *Scheduler) tick(ctx context.Context) error {
 	}
 
 	if len(allUsers) > 0 {
-		s.topUpTips(
-			ctx,
-			allUsers,
-		)
 		s.topUpAudio(
 			ctx,
 			allUsers,
@@ -409,34 +393,6 @@ func distinctLangLevelPairs(users []model.User) []langLevelPair {
 		)
 	}
 	return pairs
-}
-
-// topUpTips fills each distinct (language, level) tip bucket toward the target.
-func (s *Scheduler) topUpTips(
-	ctx context.Context,
-	users []model.User,
-) {
-	for _, p := range distinctLangLevelPairs(users) {
-		if err := s.tip.TopUpBucket(
-			ctx,
-			p.Language,
-			p.Level,
-		); err != nil {
-			slog.WarnContext(
-				ctx,
-				"Tip top-up failed",
-				"event",
-				"scheduler.tip.topup_failed",
-				"language",
-				p.Language,
-				"level",
-				p.Level,
-				"error",
-				err,
-			)
-			continue
-		}
-	}
 }
 
 // topUpAudio fills each distinct (language, level) bucket's missing listening clips.

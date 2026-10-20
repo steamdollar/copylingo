@@ -91,7 +91,6 @@ func initApp(cfg *config.Config) (_ *app, err error) {
 	schedDeps := scheduler.Deps{
 		User:        svc.user,
 		Session:     svc.session,
-		Tip:         svc.tip,
 		QuizPusher:  components.sessionFlow,
 		StudyPusher: components.studyFlow,
 		Cron:        cron.New(),
@@ -108,7 +107,6 @@ func initApp(cfg *config.Config) (_ *app, err error) {
 	// refreshes the Telegram message.
 	miniappHandler := miniapp.NewHandler(miniapp.HandlerDeps{
 		Session: svc.session,
-		Tip:     svc.tip,
 		Verifier: miniapp.NewInitDataVerifier(
 			cfg.Telegram.Token,
 			miniapp.InitDataMaxAge,
