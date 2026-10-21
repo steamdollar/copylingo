@@ -140,11 +140,6 @@ CREATE TABLE IF NOT EXISTS questions (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Idempotent backfill of the listening-audio columns for databases created
--- before ADR-031/032 (the CREATE TABLE above only applies on a fresh install).
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS audio_script  TEXT;
-ALTER TABLE questions ADD COLUMN IF NOT EXISTS audio_file_id TEXT;
-
 CREATE INDEX IF NOT EXISTS idx_questions_next_review ON questions(next_review_at)
     WHERE next_review_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_questions_language_level ON questions(language, proficiency_level);

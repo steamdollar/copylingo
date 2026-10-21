@@ -234,7 +234,7 @@ func TestGetUserStats_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestGetLevelProgress_OrdersJapaneseLevelsFromN5(t *testing.T) {
+func TestGetLevelProgress_OrdersJapaneseLevelsFromNZ(t *testing.T) {
 	uRepo := &mockAnalyzerUserRepo{
 		getByIDFn: func(
 			ctx context.Context,
@@ -256,11 +256,12 @@ func TestGetLevelProgress_OrdersJapaneseLevelsFromN5(t *testing.T) {
 					language,
 				)
 			}
-			// Repository returns lexical order: N1 < N4 < N5.
+			// Repository returns lexical order: N1 < N4 < N5 < NZ.
 			return []model.LevelProgress{
 				{Level: "N1", TotalMaterials: 10},
 				{Level: "N4", TotalMaterials: 20, StudiedMaterials: 5},
 				{Level: "N5", TotalMaterials: 30, StudiedMaterials: 30},
+				{Level: "NZ", TotalMaterials: 40, StudiedMaterials: 40},
 			}, nil
 		},
 	}
@@ -289,9 +290,9 @@ func TestGetLevelProgress_OrdersJapaneseLevelsFromN5(t *testing.T) {
 	if strings.Join(
 		gotLevels,
 		",",
-	) != "N5,N4,N1" {
+	) != "NZ,N5,N4,N1" {
 		t.Fatalf(
-			"levels = %v, want [N5 N4 N1]",
+			"levels = %v, want [NZ N5 N4 N1]",
 			gotLevels,
 		)
 	}

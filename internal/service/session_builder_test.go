@@ -471,9 +471,9 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 					gotUserID,
 				)
 			}
-			if limit != 14 {
+			if limit != 19 {
 				t.Fatalf(
-					"expected bounded due pool limit 14, got %d",
+					"expected bounded due pool limit 19, got %d",
 					limit,
 				)
 			}
@@ -485,9 +485,15 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 				{ID: 5, ProficiencyLevel: "N5"},
 				{ID: 6, ProficiencyLevel: "N5"},
 				{ID: 7, ProficiencyLevel: "N5"},
+				{ID: 8, ProficiencyLevel: "N5"},
+				{ID: 9, ProficiencyLevel: "N5"},
+				{ID: 10, ProficiencyLevel: "N5"},
 			}, nil
 		},
 	}
+	// The first listening call is the reservation; later relay calls find no
+	// more listening supply.
+	listeningCalls := 0
 	qFetcher := &mockQuestionFetcher{
 		getNewQuestionsFn: func(
 			ctx context.Context,
@@ -511,14 +517,14 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 				if !slices.Contains(
 					excludeIDs,
 					101,
-				) && limit != 4 {
+				) && limit != 6 {
 					t.Fatalf(
-						"expected 4 reserved vocabulary slots, got %d",
+						"expected 6 reserved vocabulary slots, got %d",
 						limit,
 					)
 				}
 				var result []model.Question
-				for id := 101; id <= 104 && len(result) < limit; id++ {
+				for id := 101; id <= 106 && len(result) < limit; id++ {
 					if !slices.Contains(
 						excludeIDs,
 						id,
@@ -531,13 +537,17 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 				}
 				return result, nil
 			case string(model.CategoryListening):
+				listeningCalls++
+				if listeningCalls > 1 {
+					return nil, nil
+				}
 				if limit != 1 {
 					t.Fatalf(
 						"expected 1 reserved listening slot, got %d",
 						limit,
 					)
 				}
-				return []model.Question{{ID: 105, ProficiencyLevel: "N5", Category: model.CategoryListening}}, nil
+				return []model.Question{{ID: 150, ProficiencyLevel: "N5", Category: model.CategoryListening}}, nil
 			case string(model.CategoryReading):
 				return nil, nil
 			default:
@@ -550,9 +560,9 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 			ctx context.Context,
 			s *model.Session,
 		) error {
-			if s.TotalQuestions != 12 {
+			if s.TotalQuestions != 17 {
 				t.Fatalf(
-					"expected total 12, got %d",
+					"expected total 17, got %d",
 					s.TotalQuestions,
 				)
 			}
@@ -565,13 +575,13 @@ func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
 			ctx context.Context,
 			sqs []model.SessionQuestion,
 		) error {
-			if len(sqs) != 12 {
+			if len(sqs) != 17 {
 				t.Fatalf(
-					"expected 12 session questions, got %d",
+					"expected 17 session questions, got %d",
 					len(sqs),
 				)
 			}
-			for _, wantID := range []int{101, 102, 103, 104, 105} {
+			for _, wantID := range []int{101, 102, 103, 104, 105, 106, 150} {
 				found := slices.ContainsFunc(
 					sqs,
 					func(sq model.SessionQuestion) bool {
@@ -1747,9 +1757,9 @@ func TestBuildEveningSession_UsesN3CurrentScopeBeforeAdjacentFallback(t *testing
 		ctx context.Context,
 		session *model.Session,
 	) error {
-		if session.TotalQuestions != 12 {
+		if session.TotalQuestions != 17 {
 			t.Fatalf(
-				"TotalQuestions = %d, want 12",
+				"TotalQuestions = %d, want 17",
 				session.TotalQuestions,
 			)
 		}
@@ -1795,9 +1805,9 @@ func TestBuildEveningSession_UsesN3CurrentScopeBeforeAdjacentFallback(t *testing
 			adjacentFetches,
 		)
 	}
-	if len(sessionQuestions) != 12 {
+	if len(sessionQuestions) != 17 {
 		t.Fatalf(
-			"session question count = %d, want 12",
+			"session question count = %d, want 17",
 			len(sessionQuestions),
 		)
 	}
@@ -1896,9 +1906,9 @@ func TestBuildEveningSession_FallsBackToAdjacentWhenCurrentSupplyIsShort(t *test
 			"BuildEveningSession failed: %v",
 			err,
 		)
-	} else if session == nil || session.TotalQuestions != 12 {
+	} else if session == nil || session.TotalQuestions != 17 {
 		t.Fatalf(
-			"session = %+v, want 12 questions",
+			"session = %+v, want 17 questions",
 			session,
 		)
 	}

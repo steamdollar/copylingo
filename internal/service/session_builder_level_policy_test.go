@@ -102,7 +102,7 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 			name  string
 			total int
 			floor int
-		}{{"morning", 17, 14}, {"evening", 12, 10}} {
+		}{{"morning", 17, 14}, {"evening", 17, 14}} {
 			t.Run(
 				tt.name+"/"+profile.name,
 				func(t *testing.T) {

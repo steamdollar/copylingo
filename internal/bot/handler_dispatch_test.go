@@ -732,7 +732,7 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	if materialStore.userID != 123 || materialStore.language != "ja" ||
 		!slices.Equal(
 			materialStore.levels,
-			[]string{"N5", "N4"},
+			[]string{"NZ", "N5", "N4"},
 		) || materialStore.limit != service.DefaultStudySessionMaterialCount {
 		t.Fatalf(
 			"GetMaterialsByPlan args = (%d, %s, %v, %d), want user/language/levels and default limit %d",

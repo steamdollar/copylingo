@@ -189,7 +189,7 @@ func TestSRSService_GetDueReviewsForwardsUserScope(t *testing.T) {
 		) ([]model.Question, error) {
 			if userID != 42 || language != "ja" || currentLevel != "N5" || !reflect.DeepEqual(
 				levels,
-				[]string{"N5", "N4"},
+				[]string{"NZ", "N5", "N4"},
 			) || limit != 10 ||
 				kanjiRecallLimit != 3 ||
 				!reflect.DeepEqual(
@@ -324,7 +324,7 @@ func TestSRSService_GetDueCountForwardsUserScope(t *testing.T) {
 		) (int, error) {
 			if userID != 42 || language != "ja" || !reflect.DeepEqual(
 				levels,
-				[]string{"N5", "N4"},
+				[]string{"NZ", "N5", "N4"},
 			) {
 				t.Fatalf(
 					"unexpected scope: %d %s %v",

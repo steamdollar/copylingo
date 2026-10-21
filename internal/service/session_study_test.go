@@ -192,9 +192,9 @@ func TestSessionServiceBuildForSlot(t *testing.T) {
 	}{
 		{slot: model.SessionSlotMorningStudy, wantPlanTotal: morningStudyTotal},
 		{slot: model.SessionSlotEveningStudy, wantPlanTotal: eveningStudyTotal},
-		// General due pool is fetched with total+2 rows (17 morning, 12 evening).
+		// General due pool is fetched with total+2 rows (17 morning, 17 evening).
 		{slot: model.SessionSlotMorningQuiz, wantDueLimitIn: 19},
-		{slot: model.SessionSlotEveningQuiz, wantDueLimitIn: 14},
+		{slot: model.SessionSlotEveningQuiz, wantDueLimitIn: 19},
 	}
 	for _, tt := range tests {
 		t.Run(

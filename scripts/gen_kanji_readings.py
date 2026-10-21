@@ -11,15 +11,18 @@ Sources (EDRDG licence, CC BY-SA 4.0; see NOTICE):
 
 Every vocabulary payload with kanji gets "kanji_readings" right before
 "kanji_notes" (or last), replacing any previous value:
-  [{"text", "reading", "type": "on"|"kun"|"jukuji", "on": [...]}] in word order
+  [{"text", "reading", "type": "on"|"kun"|"jukuji", "on": [...], "hun_eum"}] in word order
   - text/reading: JmdictFurigana's alignment of the word's reading to its kanji
   - type: "on" when the reading is one of the kanji's KANJIDIC2 on'yomi
     (rendaku and sokuon allowed), "jukuji" when one reading covers a group
   - on: the kanji's on'yomi used in common JMdict words (news1/ichi1/spec1/
     spec2/gai1), most used first, at most three plus the word's own
-Without --write it only prints counts and the words it cannot align; add
-those to MANUAL. The output is deterministic, so a rerun on unchanged inputs
-leaves the files byte-identical.
+  - hun_eum: the kanji's Korean 훈음 from scripts/kanji_hun_eum.tsv
+    (ADR-076); a jukuji group joins its kanji's, as "今 이제 금 · 日 날 일"
+Without --write it only prints counts, the words it cannot align and the
+kanji missing from kanji_hun_eum.tsv; add those to MANUAL or the TSV. The
+output is deterministic, so a rerun on unchanged inputs leaves the files
+byte-identical.
 """
 import gzip
 import json
@@ -31,7 +34,9 @@ from collections import Counter, defaultdict
 
 KANJIDIC_PATH, JMDICT_PATH, FURIGANA_PATH = sys.argv[1:4]
 WRITE = "--write" in sys.argv[4:]
-SEED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "cmd/seeding/data/ja")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SEED_DIR = os.path.join(SCRIPT_DIR, "..", "cmd/seeding/data/ja")
+HUN_EUM_PATH = os.path.join(SCRIPT_DIR, "kanji_hun_eum.tsv")
 COMMON_TAGS = {"news1", "ichi1", "spec1", "spec2", "gai1"}
 KANJI = re.compile(r"[一-鿿]")
 MAX_COMMON_ON = 3
@@ -114,7 +119,32 @@ def load_common_pairs():
     return pairs
 
 
+def load_hun_eum():
+    """Korean 훈음 per kanji: one "kanji<TAB>훈음" line each, # for comments."""
+    hun_eum = {}
+    with open(HUN_EUM_PATH, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            kanji, value = line.rstrip("\n").split("\t")
+            hun_eum[kanji] = value
+    return hun_eum
+
+
 kanjidic_on = load_kanjidic_on()
+hun_eum_by_kanji = load_hun_eum()
+missing_hun_eum = set()
+
+
+def hun_eum_for(text):
+    """One kanji's 훈음, or a jukuji group's kanji each with its own."""
+    chars = KANJI.findall(text)
+    missing_hun_eum.update(c for c in chars if c not in hun_eum_by_kanji)
+    if len(chars) == 1:
+        return hun_eum_by_kanji.get(chars[0])
+    if all(c in hun_eum_by_kanji for c in chars):
+        return " · ".join(f"{c} {hun_eum_by_kanji[c]}" for c in chars)
+    return None
 
 
 def matched_on(kanji, reading):
@@ -173,6 +203,9 @@ def kanji_entry(word, kanji, reading):
         ons.append(on)
     if ons:
         entry["on"] = ons
+    hun_eum = hun_eum_for(kanji)
+    if hun_eum:
+        entry["hun_eum"] = hun_eum
     return entry
 
 
@@ -191,7 +224,11 @@ def readings_for(word, kana):
             # 人々 ひとびと: the repeat mark doubles the kanji's reading.
             readings.append(kanji_entry(word, text[0], reading[: len(reading) // 2]))
         else:
-            readings.append({"text": text, "reading": reading, "type": "jukuji"})
+            entry = {"text": text, "reading": reading, "type": "jukuji"}
+            hun_eum = hun_eum_for(text)
+            if hun_eum:
+                entry["hun_eum"] = hun_eum
+            readings.append(entry)
     return readings
 
 
@@ -221,3 +258,4 @@ for level in ("n3", "n4", "n5"):
 
 print(dict(counts))
 print(f"unaligned {len(unaligned)}: " + " / ".join(unaligned))
+print(f"missing hun_eum {len(missing_hun_eum)}: " + "".join(sorted(missing_hun_eum)))

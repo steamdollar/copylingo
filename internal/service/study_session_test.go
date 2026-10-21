@@ -92,7 +92,7 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 			levels []string,
 			plan model.StudySessionPlan,
 		) ([]model.Material, error) {
-			want := []string{"N5", "N4"}
+			want := []string{"NZ", "N5", "N4"}
 			if gotUserID != userID || language != "ja" || level != "N5" || !reflect.DeepEqual(
 				levels,
 				want,
@@ -301,7 +301,7 @@ func TestBuildStudySessionUsesRequestedLimit(t *testing.T) {
 			levels []string,
 			plan model.StudySessionPlan,
 		) ([]model.Material, error) {
-			want := []string{"N5", "N4"}
+			want := []string{"NZ", "N5", "N4"}
 			if gotUserID != userID || language != "ja" || level != "N5" || !reflect.DeepEqual(
 				levels,
 				want,

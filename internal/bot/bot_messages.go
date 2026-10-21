@@ -36,7 +36,8 @@ type botMessages struct {
 	kanjiNotesButton                   string
 	kanjiNotesUnavailable              string
 	kanjiNotesHeadingFormat            string
-	kanjiNoteTitleFormat               string
+	kanjiTitleHunEumFormat             string
+	kanjiTitleTypeFormat               string
 	kanjiTypePhonoSemantic             string
 	kanjiTypeCompound                  string
 	kanjiTypeIndicative                string
@@ -254,7 +255,8 @@ var botMessagesByLocale = map[string]botMessages{
 		kanjiNotesButton:                   "🈁 한자 해설",
 		kanjiNotesUnavailable:              "❌ 한자 해설을 불러오지 못했습니다.",
 		kanjiNotesHeadingFormat:            "🈁 <b>한자 해설</b>\n\n<b>%s</b> (%s)",
-		kanjiNoteTitleFormat:               "<b>%s</b> · %s",
+		kanjiTitleHunEumFormat:             "%s %s",
+		kanjiTitleTypeFormat:               "%s · %s",
 		kanjiTypePhonoSemantic:             "형성문자",
 		kanjiTypeCompound:                  "회의문자",
 		kanjiTypeIndicative:                "지사문자",

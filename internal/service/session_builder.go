@@ -95,15 +95,16 @@ func (s *sessionBuilderService) BuildMorningSession(
 	)
 }
 
-// BuildEveningSession creates an evening session with vocabulary and listening reservations, total 12 questions.
+// BuildEveningSession creates an evening session with vocabulary and listening reservations, total 17 questions.
+// It matches the morning size so new quiz questions keep pace with daily Study (ADR-078).
 func (s *sessionBuilderService) BuildEveningSession(
 	ctx context.Context,
 	userID int64,
 	language,
 	level string,
 ) (*model.Session, error) {
-	const totalQuestions = 12
-	const reviewCount = 8 // Clamped below to leave room for vocabulary, listening, and reading.
+	const totalQuestions = 17
+	const reviewCount = 6
 
 	return s.buildSession(
 		ctx,

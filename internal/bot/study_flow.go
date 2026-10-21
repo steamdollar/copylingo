@@ -912,11 +912,12 @@ func hasKanjiDetail(material model.Material) bool {
 	return len(vocab.KanjiNotes)+len(vocab.KanjiReadings) > 0
 }
 
-// renderKanjiNotes shows one block per kanji in word order: its structure
-// note when it has one, then how this word reads it and the kanji's common
-// on'yomi, so an on'yomi seen here carries over to other words (ADR-074). A
-// note whose kanji has no reading entry, such as one inside a jukuji group,
-// follows the others without reading lines.
+// renderKanjiNotes shows one block per kanji in word order: its title with
+// its 훈음, its structure note when it has one, then how this word reads it
+// and the kanji's common on'yomi, so an on'yomi seen here carries over to
+// other words (ADR-074, ADR-076). A note whose kanji has no reading entry,
+// such as one inside a jukuji group, follows the others without 훈음 or
+// reading lines.
 func renderKanjiNotes(vocab vocabularyStudyPayload) string {
 	messages := botMessagesByLocale[botDefaultLocale]
 	unrenderedNotes := make(
@@ -942,13 +943,17 @@ func renderKanjiNotes(vocab vocabularyStudyPayload) string {
 	)
 	for _, reading := range vocab.KanjiReadings {
 		lines := []string{
-			fmt.Sprintf(
-				messages.kanjiTitleFormat,
-				escapeHTML(reading.Text),
+			kanjiTitle(
+				reading.Text,
+				reading.HunEum,
+				"",
 			),
 		}
 		if note, ok := unrenderedNotes[reading.Text]; ok {
-			lines = kanjiNoteLines(note)
+			lines = kanjiNoteLines(
+				note,
+				reading.HunEum,
+			)
 			delete(
 				unrenderedNotes,
 				reading.Text,
@@ -970,7 +975,10 @@ func renderKanjiNotes(vocab vocabularyStudyPayload) string {
 			blocks = append(
 				blocks,
 				strings.Join(
-					kanjiNoteLines(note),
+					kanjiNoteLines(
+						note,
+						"",
+					),
 					"\n",
 				),
 			)
@@ -982,15 +990,48 @@ func renderKanjiNotes(vocab vocabularyStudyPayload) string {
 	)
 }
 
-// kanjiNoteLines writes a note's title with its type, its parts and its
-// one-line explanation.
-func kanjiNoteLines(note model.KanjiNote) []string {
+// kanjiTitle names a block's kanji, then its 훈음 so the reader knows what
+// the kanji is before its parts (ADR-076), then the note's type when it has
+// one: <b>伸</b> 펼 신 · 형성문자. Empty hunEum or noteType is left out.
+func kanjiTitle(
+	text,
+	hunEum string,
+	noteType model.KanjiNoteType,
+) string {
 	messages := botMessagesByLocale[botDefaultLocale]
+	title := fmt.Sprintf(
+		messages.kanjiTitleFormat,
+		escapeHTML(text),
+	)
+	if hunEum != "" {
+		title = fmt.Sprintf(
+			messages.kanjiTitleHunEumFormat,
+			title,
+			escapeHTML(hunEum),
+		)
+	}
+	if noteType != "" {
+		title = fmt.Sprintf(
+			messages.kanjiTitleTypeFormat,
+			title,
+			kanjiNoteTypeLabel(noteType),
+		)
+	}
+	return title
+}
+
+// kanjiNoteLines writes a note's title with its 훈음 and type, its parts and
+// its one-line explanation. hunEum comes from the kanji's reading entry and
+// is empty for a note that has none.
+func kanjiNoteLines(
+	note model.KanjiNote,
+	hunEum string,
+) []string {
 	lines := []string{
-		fmt.Sprintf(
-			messages.kanjiNoteTitleFormat,
-			escapeHTML(note.Char),
-			kanjiNoteTypeLabel(note.Type),
+		kanjiTitle(
+			note.Char,
+			hunEum,
+			note.Type,
 		),
 	}
 	parts := make(

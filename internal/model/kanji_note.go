@@ -82,10 +82,13 @@ func (t KanjiReadingType) Valid() bool {
 // "kanji_readings" list, in word order: Text is one kanji, or the whole group
 // for jukuji, and Reading is the hiragana it takes in this word. On lists the
 // kanji's on'yomi used in common words, most used first; like a note it is
-// the same in every word, and a jukuji group has none.
+// the same in every word, and a jukuji group has none. HunEum is the kanji's
+// Korean 훈음 such as 펼 신 (ADR-076), also the same in every word; a jukuji
+// group joins its kanji's, as 今 이제 금 · 日 날 일.
 type KanjiReading struct {
 	Text    string           `json:"text"`
 	Reading string           `json:"reading"`
 	Type    KanjiReadingType `json:"type"`
 	On      []string         `json:"on,omitempty"`
+	HunEum  string           `json:"hun_eum,omitempty"`
 }

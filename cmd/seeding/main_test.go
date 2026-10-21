@@ -289,8 +289,8 @@ func kanjiNoteProblem(note model.KanjiNote) string {
 
 // TestKanjiReadings checks the optional vocabulary "kanji_readings"
 // (ADR-074). Entries decode strictly and follow the word's kanji in order, and
-// each kanji lists the same on'yomi in every word, so the "이 한자의 음독" line
-// never changes between cards.
+// each kanji lists the same on'yomi and 훈음 (ADR-076) in every word, so its
+// title and "이 한자의 음독" line never change between cards.
 func TestKanjiReadings(t *testing.T) {
 	t.Parallel()
 
@@ -301,7 +301,7 @@ func TestKanjiReadings(t *testing.T) {
 			err,
 		)
 	}
-	onByChar := make(map[string]string)
+	kanjiLevelByChar := make(map[string]string)
 	keyByChar := make(map[string]string)
 	for _, material := range materials {
 		if material.Category != model.MaterialCategoryVocabulary {
@@ -360,21 +360,21 @@ func TestKanjiReadings(t *testing.T) {
 			if reading.Type == model.KanjiReadingJukuji {
 				continue
 			}
-			on := strings.Join(
+			kanjiLevel := strings.Join(
 				reading.On,
 				"·",
-			)
-			if previous, ok := onByChar[reading.Text]; ok && previous != on {
+			) + " / " + reading.HunEum
+			if previous, ok := kanjiLevelByChar[reading.Text]; ok && previous != kanjiLevel {
 				t.Fatalf(
-					"kanji %q lists on'yomi %q in %q but %q in %q",
+					"kanji %q lists on'yomi / 훈음 %q in %q but %q in %q",
 					reading.Text,
 					previous,
 					keyByChar[reading.Text],
-					on,
+					kanjiLevel,
 					material.MaterialKey,
 				)
 			}
-			onByChar[reading.Text] = on
+			kanjiLevelByChar[reading.Text] = kanjiLevel
 			keyByChar[reading.Text] = material.MaterialKey
 		}
 	}
@@ -387,6 +387,9 @@ func kanjiReadingProblem(reading model.KanjiReading) string {
 		isHiragana,
 	) != "" {
 		return "needs a valid type and a hiragana reading"
+	}
+	if strings.TrimSpace(reading.HunEum) == "" {
+		return "needs a 훈음"
 	}
 	for _, on := range reading.On {
 		if on == "" || strings.TrimFunc(

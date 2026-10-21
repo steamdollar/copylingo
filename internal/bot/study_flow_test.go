@@ -1026,9 +1026,10 @@ func TestRenderStudyMaterialIgnoresKanjiNotes(t *testing.T) {
 	}
 }
 
-// TestRenderKanjiNotes pins each block: a noted kanji gets its note then the
-// reading lines, a kanji without a note gets a bare title, a jukuji group has
-// no on'yomi line, and a note without a reading entry still shows.
+// TestRenderKanjiNotes pins each block: the title carries the 훈음 when the
+// reading has one, a noted kanji gets its note then the reading lines, a kanji
+// without a note gets a title alone, a jukuji group has no on'yomi line, and a
+// note without a reading entry still shows without a 훈음.
 func TestRenderKanjiNotes(t *testing.T) {
 	t.Parallel()
 
@@ -1044,7 +1045,7 @@ func TestRenderKanjiNotes(t *testing.T) {
 				Kana:  "まつ",
 				Kanji: "待つ",
 				KanjiReadings: []model.KanjiReading{
-					{Text: "待", Reading: "ま", Type: model.KanjiReadingKun, On: []string{"タイ"}},
+					{Text: "待", Reading: "ま", Type: model.KanjiReadingKun, On: []string{"タイ"}, HunEum: "기다릴 대"},
 				},
 				KanjiNotes: []model.KanjiNote{
 					{
@@ -1069,7 +1070,7 @@ func TestRenderKanjiNotes(t *testing.T) {
 			},
 			want: []string{
 				"<b>待つ</b> (まつ)",
-				"<b>待</b> · 형성문자\n彳(길을 감) + 寺(발음)\n寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.\n" +
+				"<b>待</b> 기다릴 대 · 형성문자\n彳(길을 감) + 寺(발음)\n寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.\n" +
 					"이 단어에선: ま (훈독)\n이 한자의 음독: タイ",
 				"<b>読</b> · 형성문자\n言(말) + 売(간략화된 &lt;모양&gt;)\n구자체 讀.",
 			},
@@ -1080,12 +1081,12 @@ func TestRenderKanjiNotes(t *testing.T) {
 				Kana:  "じこ",
 				Kanji: "事故",
 				KanjiReadings: []model.KanjiReading{
-					{Text: "事", Reading: "じ", Type: model.KanjiReadingOn, On: []string{"ジ", "ズ"}},
+					{Text: "事", Reading: "じ", Type: model.KanjiReadingOn, On: []string{"ジ", "ズ"}, HunEum: "일 사"},
 					{Text: "故", Reading: "こ", Type: model.KanjiReadingOn, On: []string{"コ"}},
 				},
 			},
 			want: []string{
-				"<b>事</b>\n이 단어에선: じ (음독)\n이 한자의 음독: ジ · ズ",
+				"<b>事</b> 일 사\n이 단어에선: じ (음독)\n이 한자의 음독: ジ · ズ",
 				"<b>故</b>\n이 단어에선: こ (음독)\n이 한자의 음독: コ",
 			},
 		},
@@ -1095,10 +1096,10 @@ func TestRenderKanjiNotes(t *testing.T) {
 				Kana:  "きょう",
 				Kanji: "今日",
 				KanjiReadings: []model.KanjiReading{
-					{Text: "今日", Reading: "きょう", Type: model.KanjiReadingJukuji},
+					{Text: "今日", Reading: "きょう", Type: model.KanjiReadingJukuji, HunEum: "今 이제 금 · 日 날 일"},
 				},
 			},
-			want:    []string{"<b>今日</b>\n이 단어에선: きょう (단어 전체 읽기)"},
+			want:    []string{"<b>今日</b> 今 이제 금 · 日 날 일\n이 단어에선: きょう (단어 전체 읽기)"},
 			notWant: []string{"이 한자의 음독"},
 		},
 	} {

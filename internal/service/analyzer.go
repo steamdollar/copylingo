@@ -104,7 +104,7 @@ func (a *AnalyzerService) GetUserStats(
 }
 
 // GetLevelProgress returns, for each level of the user's language, the share
-// of materials studied at least once. Japanese levels run N5 → N1; other
+// of materials studied at least once. Japanese levels run NZ → N1; other
 // languages keep the repository's lexical order.
 func (a *AnalyzerService) GetLevelProgress(
 	ctx context.Context,

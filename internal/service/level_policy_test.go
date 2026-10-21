@@ -10,7 +10,8 @@ func TestSessionLevelsForJapaneseJLPT(t *testing.T) {
 		target string
 		want   []string
 	}{
-		{target: "N5", want: []string{"N5", "N4"}},
+		{target: "NZ", want: []string{"NZ", "N5"}},
+		{target: "N5", want: []string{"NZ", "N5", "N4"}},
 		{target: "N4", want: []string{"N5", "N4", "N3"}},
 		{target: "N3", want: []string{"N4", "N3", "N2"}},
 		{target: "N2", want: []string{"N3", "N2", "N1"}},
@@ -18,11 +19,25 @@ func TestSessionLevelsForJapaneseJLPT(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.target, func(t *testing.T) {
-			if got := sessionLevelsFor("ja", tt.target); !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("sessionLevelsFor(ja, %s) = %v, want %v", tt.target, got, tt.want)
-			}
-		})
+		t.Run(
+			tt.target,
+			func(t *testing.T) {
+				if got := sessionLevelsFor(
+					"ja",
+					tt.target,
+				); !reflect.DeepEqual(
+					got,
+					tt.want,
+				) {
+					t.Fatalf(
+						"sessionLevelsFor(ja, %s) = %v, want %v",
+						tt.target,
+						got,
+						tt.want,
+					)
+				}
+			},
+		)
 	}
 }
 
@@ -37,20 +52,51 @@ func TestSessionLevelsForUsesExactFallbackOutsideKnownJapaneseJLPT(t *testing.T)
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.language+"/"+tt.target, func(t *testing.T) {
-			want := []string{tt.target}
-			if got := sessionLevelsFor(tt.language, tt.target); !reflect.DeepEqual(got, want) {
-				t.Fatalf("sessionLevelsFor(%s, %s) = %v, want %v", tt.language, tt.target, got, want)
-			}
-		})
+		t.Run(
+			tt.language+"/"+tt.target,
+			func(t *testing.T) {
+				want := []string{tt.target}
+				if got := sessionLevelsFor(
+					tt.language,
+					tt.target,
+				); !reflect.DeepEqual(
+					got,
+					want,
+				) {
+					t.Fatalf(
+						"sessionLevelsFor(%s, %s) = %v, want %v",
+						tt.language,
+						tt.target,
+						got,
+						want,
+					)
+				}
+			},
+		)
 	}
 }
 
 func TestSessionLevelsForReturnsIndependentScope(t *testing.T) {
-	got := sessionLevelsFor("ja", "N4")
+	got := sessionLevelsFor(
+		"ja",
+		"N4",
+	)
 	got[0] = "N1"
 
-	if want := []string{"N5", "N4", "N3"}; !reflect.DeepEqual(sessionLevelsFor("ja", "N4"), want) {
-		t.Fatalf("sessionLevelsFor returned mutable shared scope: got %v, want %v", sessionLevelsFor("ja", "N4"), want)
+	if want := []string{"N5", "N4", "N3"}; !reflect.DeepEqual(
+		sessionLevelsFor(
+			"ja",
+			"N4",
+		),
+		want,
+	) {
+		t.Fatalf(
+			"sessionLevelsFor returned mutable shared scope: got %v, want %v",
+			sessionLevelsFor(
+				"ja",
+				"N4",
+			),
+			want,
+		)
 	}
 }

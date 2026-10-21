@@ -5,6 +5,7 @@
 현재 Quiz 세션(morning/evening)은 서버의 단일 정책으로 문제 조합을 결정한다.
 `internal/service/session_builder.go`는 Vocabulary `ceil(total/3)`, Listening 1개, Reading 상한 1개를 예약하고
 현재 레벨 문제를 약 4/5로 맞춘 뒤 나머지를 채운다(ADR-041/046/050).
+Kana/Handwriting 문항은 레벨 `NZ`라서 NZ·N5 사용자 범위에만 들어간다(ADR-077). N4 이상에서 preset으로 고르려면 레벨 범위와 따로 조회해야 한다.
 
 사용자가 학습 목적에 따라 Vocabulary, Kana, Handwriting 비율을 선택할 수 있도록 preset 기반 설정을 추가한다.
 임의 숫자 입력보다 preset을 우선하여 유효성 검증과 운영 복잡도를 제한한다.
