@@ -77,13 +77,6 @@ func TestRecordIntegrity(t *testing.T) {
 				t,
 				question,
 			)
-			if question.Category == model.CategoryListening {
-				t.Fatalf(
-					"listening question %q must not belong to material %q",
-					*question.QuestionKey,
-					material.MaterialKey,
-				)
-			}
 			checkQuestionKey(question)
 		}
 	}

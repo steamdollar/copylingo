@@ -78,7 +78,7 @@
   - 데이터 형식을 DB 테이블 row 모양 두 가지로 통일한다. seeder는 문항 유형을 몰라도 된다.
     - level 디렉토리 `data/<language>/<level>/`의 모든 JSON 파일은 `{materials, questions}` 한 가지 모양이다.
     - `materials[]`: `{material_key, category, title, difficulty, payload, questions[]}`. 그 material에 연결되는 문항을 `questions[]` 안에 넣는다. DB의 `questions.material_id` 1:N 외래키와 같은 구조라서, 없는 material을 가리키는 문항이 구조상 생길 수 없다. material 하나에 문항 수 제한은 없다. payload는 seeder가 해석하지 않고, category와 bot Study 화면 렌더러 사이의 계약이다.
-    - 최상위 `questions[]`: material이 없는 문항(청해)만 둔다. 문항 필드는 `{question_key, item_type, type, category, prompt, options, correct_answer, explanation, audio_script?, difficulty}`이다.
+    - 최상위 `questions[]`: material이 없는 문항(청해)만 둔다. (→ 2026-10-22 ADR-079: material에 연결된 청해도 `materials[].questions[]`에 둘 수 있다.) 문항 필드는 `{question_key, item_type, type, category, prompt, options, correct_answer, explanation, audio_script?, difficulty}`이다.
     - language와 level은 디렉토리에서 정한다. 로더는 디렉토리 안의 `*.json`을 이름순으로 합친다. 그래서 지금은 level당 파일 하나(N4 `records.json`, 약 1.8MB)로 두고, 커지면 데이터만 개수 기준으로 나누면 된다. 코드는 바꿀 필요가 없다. → ADR-067에서 level 디렉토리를 없애고 `data/<language>/<level>.json` 파일 하나로 바꿨다.
     - (같은 날 보강) 처음에는 `materials/`와 `questions/`를 별도 파일로 두고 `material_key`로 연결했다. 위의 이유로 중첩 구조로 바꿨다.
   - `question_key`와 `material_key`는 모든 record에 명시한다(K1). DB upsert는 `ON CONFLICT (question_key)`로 기존 row를 찾고, 학습 진도는 `question_id`에 붙어 있다. 그래서 전환된 문항은 예전 builder가 만들던 key를 그대로 가진다(예: `ja:listening:n4:…`, `ja:reading:…:question:1`, `ja:question:n4:…`). key 형식이 여러 가지로 남지만 데이터의 차이일 뿐 코드에 분기는 없다.
@@ -371,3 +371,25 @@
   - 하루 Quiz 풀이량이 약 5문항 늘어난다(복습 포함 약 65~95문항).
   - 현재 레벨 최소 비중은 `ceil(17×4/5)` = 14문항으로 자동 계산된다(ADR-050).
   - 2주 뒤 "학습 후 Quiz로 확인된 비율"을 다시 보고 추가 조정을 판단한다.
+
+## ADR-079: N3 청해는 기존 Study 자료에 연결하고, 음성은 Study·Quiz 범위 전체 레벨에 미리 만든다
+
+- 날짜: 2026-10-22
+- 상태: 승인됨
+- 배경:
+  - N3 청해 문항이 0개였다. N4(80개)·N5(50개) 청해는 모두 material 없는 단독 문항이다.
+  - 청해 음성은 scheduler가 사용자 push 시각(하루 4 slot)의 tick에서 그 사용자의 **현재 레벨**만 채웠다(ADR-031, 레벨당 cycle 5개). Quiz는 인접 레벨(N4 사용자는 N5·N4·N3)도 내는데, 음성 없는 청해는 선택 쿼리에서 빠진다. 그래서 N4 사용자에게는 N3 청해를 넣어도 출제될 수 없었다.
+- 결정:
+  - N3 청해 20문항을 **기존 N3 문법 material**에 연결한다(`materials[].questions[]`). 대본이 그 문법을 쓰고, 문항은 그 문법을 알아들어야 풀린다. 이미 학습한 문법 16개를 먼저 고르고, 다음 순번 4개(0002~0005)를 더했다. 유형은 실제 N3 청해 비율에 가깝게 과제이해 5, 포인트이해 5, 개요이해 3, 발화표현 2, 즉시응답 5다.
+  - 난이도는 N3에 맞춘다. 대화는 5~7턴, 독백은 200자 이상으로 쓴다. 오답 선택지는 대부분 음성에 나오는 내용으로 만들고, 계획 변경(처음 계획이 뒤집힘) 같은 함정을 둔다. 정답은 대본 표현을 그대로 쓰지 않고 바꿔 말한다. 즉시응답·발화표현의 오답은 같은 단어를 다른 뜻으로 알아듣는 함정(別に↔別の, はじめて↔初めて, 上に↔上の階)과 문법 호응 오류(決して·とても + 긍정)를 쓴다. 첫 초안(대본 중앙값 68자, 최대 3턴, 음성에 안 나온 오답)은 N4 수준이라 다시 썼다(중앙값 178자).
+  - 청해 전용 material(새 category·Study 카드에서 음성 재생)은 만들지 않는다.
+  - scheduler는 사용자 현재 레벨마다 `AudioService.TopUpSessionAudio`를 부른다. 이 메서드가 `sessionLevelsFor`로 Study·Quiz 범위의 레벨마다 `TopUpAudio`를 부른다. 레벨마다 cycle 5개 예산을 따로 쓰고, 한 레벨이 실패해도 나머지 레벨은 계속한다. 음성은 그대로 미리 만든다(ADR-031).
+- 버린 대안:
+  - 청해 전용 material(`listening` category): Study 카드에 음성 전송이 새로 필요하다. 또 Study에서 대본을 먼저 보면 Quiz가 듣기가 아니라 읽기가 된다.
+  - 출제할 때 바로 합성: ADR-031을 뒤집어야 한다. TTS rate-limit에 걸리면 그 문항이 세션에서 빠진다.
+  - 전체 레벨 음성을 한 번에 5개 예산으로 묶기(repo가 level 목록을 받도록 변경): top-up은 push slot tick에서만 돌아 하루 몇 번뿐이라, 레벨별 5개(최대 15개)도 rate-limit에 문제가 없다. admin 도구와 repo 시그니처를 바꿀 이유가 없다.
+- 결과:
+  - 이 N3 청해 문항은 연결된 문법 자료의 우선순위·설정(ADR-036 학습 자료 우선, ADR-051 자료별 복습 설정)을 따른다. 단독 청해와 달리 자료 설정 버튼도 보인다.
+  - seed 검사에서 "material 안의 청해 금지" 규칙을 지웠다. "최상위 문항은 청해만" 규칙은 유지한다.
+  - N4 사용자 기준으로 N3 음성 20개는 push slot 4번(약 하루)이면 다 만들어진다. 바로 필요하면 `cmd/admin/generate_listening_audio`로 미리 채운다.
+  - 듣기용 선택지를 음성으로만 내는 형식(즉시응답·발화표현·개요이해)과 일본어 질문 내레이션은 bot 렌더와 TTS 화자 분리를 바꿔야 해서 이번 범위에서 뺐다.

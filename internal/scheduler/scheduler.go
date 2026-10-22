@@ -45,12 +45,13 @@ type slotSessions interface {
 	dispatchSessions
 }
 
-// audioTopUp fills a (language, level) bucket's missing listening clips.
+// audioTopUp fills the missing listening clips of every level a learner at
+// currentLevel can be quizzed on.
 type audioTopUp interface {
-	TopUpAudio(
+	TopUpSessionAudio(
 		ctx context.Context,
 		language,
-		level string,
+		currentLevel string,
 	) error
 }
 
@@ -395,7 +396,8 @@ func distinctLangLevelPairs(users []model.User) []langLevelPair {
 	return pairs
 }
 
-// topUpAudio fills each distinct (language, level) bucket's missing listening clips.
+// topUpAudio fills missing listening clips once per distinct (language, current
+// level) bucket; the audio service expands each bucket to its session levels.
 func (s *Scheduler) topUpAudio(
 	ctx context.Context,
 	users []model.User,
@@ -404,7 +406,7 @@ func (s *Scheduler) topUpAudio(
 		return
 	}
 	for _, p := range distinctLangLevelPairs(users) {
-		if err := s.audio.TopUpAudio(
+		if err := s.audio.TopUpSessionAudio(
 			ctx,
 			p.Language,
 			p.Level,

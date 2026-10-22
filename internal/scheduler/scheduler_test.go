@@ -152,19 +152,19 @@ func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
 	}
 }
 
-// recordingTopUp records each (language, level) bucket it was asked to fill.
+// recordingTopUp records each (language, current level) bucket it was asked to fill.
 type recordingTopUp struct {
 	buckets []string
 }
 
-func (r *recordingTopUp) TopUpAudio(
+func (r *recordingTopUp) TopUpSessionAudio(
 	_ context.Context,
 	language,
-	level string,
+	currentLevel string,
 ) error {
 	r.buckets = append(
 		r.buckets,
-		language+"/"+level,
+		language+"/"+currentLevel,
 	)
 	return nil
 }
