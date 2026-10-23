@@ -41,6 +41,8 @@ func (r KanjiPartRole) Valid() bool {
 
 // KanjiNote is one kanji's structure note in a vocabulary payload's optional
 // "kanji_notes" list. Every word that uses the kanji carries the same note.
+// ExplanationKo links the parts' meanings to the kanji's in one sentence and
+// is empty when that link would need its history (ADR-080).
 type KanjiNote struct {
 	Char          string        `json:"char"`
 	Type          KanjiNoteType `json:"type"`
@@ -48,13 +50,17 @@ type KanjiNote struct {
 	ExplanationKo string        `json:"explanation_ko"`
 }
 
-// KanjiPart is one visible component. GlossKo explains meaning and form
-// parts; On is the on'yomi a sound part shares with the kanji, empty when the
-// Japanese readings diverged.
+// KanjiPart is one visible component. GlossKo is what a meaning or form part
+// means in this kanji, and Base the kanji a radical variant stands for, as
+// 手 for 扌 (ADR-080). A sound part has no gloss: HunEum is its own 훈음,
+// so the reader knows the part when it recurs, and On the on'yomi it shares
+// with the kanji, empty when the Japanese readings diverged.
 type KanjiPart struct {
 	Part    string        `json:"part"`
 	Role    KanjiPartRole `json:"role"`
 	GlossKo string        `json:"gloss_ko,omitempty"`
+	Base    string        `json:"base,omitempty"`
+	HunEum  string        `json:"hun_eum,omitempty"`
 	On      string        `json:"on,omitempty"`
 }
 

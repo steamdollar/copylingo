@@ -11,10 +11,6 @@ import (
 )
 
 const (
-	// AudioGeneratePerCycle bounds how many listening clips one TopUpAudio call
-	// synthesizes. The Gemini preview TTS has a tight rate-limit, and audio is
-	// pre-generated (ADR-031), so a small per-cycle batch fills the backlog over
-	// several scheduler runs without bursting the quota.
 	AudioGeneratePerCycle = 5
 )
 

@@ -1101,27 +1101,45 @@ func kanjiReadingTypeLabel(readingType model.KanjiReadingType) string {
 	}
 }
 
-// renderKanjiPart writes 氵(물) for meaning/form parts, 青(セイ · 발음) for a
-// sound part with a shared on'yomi, and 寺(발음) when the readings diverged.
+// renderKanjiPart writes a part with what it gives its kanji in brackets
+// (ADR-080): a meaning or form part its gloss, after the kanji a radical
+// variant stands for, as 扌(手 · 손) or 木(나무); a sound part its own 훈음
+// and the on'yomi it shares with the kanji, then 발음, as
+// 交(사귈 교 · コウ · 발음) or 寺(절 사 · 발음) when the readings diverged.
+// Empty values are left out.
 func renderKanjiPart(part model.KanjiPart) string {
 	messages := botMessagesByLocale[botDefaultLocale]
+	values := []string{
+		part.Base,
+		part.GlossKo,
+	}
 	if part.Role == model.KanjiPartSound {
-		if part.On == "" {
-			return fmt.Sprintf(
-				messages.kanjiSoundPartNoOnFormat,
-				escapeHTML(part.Part),
+		values = []string{
+			part.HunEum,
+			part.On,
+			messages.kanjiSoundPartLabel,
+		}
+	}
+	shown := make(
+		[]string,
+		0,
+		len(values),
+	)
+	for _, value := range values {
+		if value != "" {
+			shown = append(
+				shown,
+				escapeHTML(value),
 			)
 		}
-		return fmt.Sprintf(
-			messages.kanjiSoundPartFormat,
-			escapeHTML(part.Part),
-			escapeHTML(part.On),
-		)
 	}
 	return fmt.Sprintf(
-		messages.kanjiPartGlossFormat,
+		messages.kanjiPartFormat,
 		escapeHTML(part.Part),
-		escapeHTML(part.GlossKo),
+		strings.Join(
+			shown,
+			" · ",
+		),
 	)
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -248,8 +249,10 @@ func TestKanjiNotes(t *testing.T) {
 
 // kanjiNoteProblem returns why a note breaks the schema rules, or "".
 func kanjiNoteProblem(note model.KanjiNote) string {
-	if !note.Type.Valid() || strings.TrimSpace(note.ExplanationKo) == "" {
-		return "needs a valid type and explanation_ko"
+	// A note may leave explanation_ko empty when its parts line says all
+	// there is (ADR-080); a standalone kanji has nothing else to show.
+	if !note.Type.Valid() || len(note.Parts) == 0 && strings.TrimSpace(note.ExplanationKo) == "" {
+		return "needs a valid type, and explanation_ko when it has no parts"
 	}
 	var sound *model.KanjiPart
 	hasForm := false
@@ -259,23 +262,75 @@ func kanjiNoteProblem(note model.KanjiNote) string {
 		}
 		switch part.Role {
 		case model.KanjiPartSound:
-			if sound != nil || part.GlossKo != "" {
-				return "at most one sound part, without gloss_ko"
+			if sound != nil || part.GlossKo != "" || part.Base != "" {
+				return "at most one sound part, without gloss_ko or base"
 			}
 			sound = &note.Parts[i]
 		default:
-			if part.GlossKo == "" || part.On != "" {
-				return "meaning and form parts need gloss_ko and no on"
+			if part.GlossKo == "" || part.On != "" || part.HunEum != "" {
+				return "meaning and form parts need gloss_ko and no on or hun_eum"
+			}
+			if problem := radicalBaseProblem(part); problem != "" {
+				return problem
 			}
 			hasForm = hasForm || part.Role == model.KanjiPartForm
 		}
 	}
 	if note.Type == model.KanjiNotePhonoSemantic {
-		if sound == nil && !hasForm {
-			return "phono_semantic needs a sound part, or a form part when simplified"
+		// A sound part outside the phone-safe ranges is left out of parts,
+		// so the explanation has to say where it is (ADR-080).
+		if sound == nil && !hasForm && strings.TrimSpace(note.ExplanationKo) == "" {
+			return "phono_semantic needs a sound or form part, or an explanation of the sound part it cannot show"
 		}
 	} else if sound != nil {
 		return "only phono_semantic may have a sound part"
+	}
+	return ""
+}
+
+// radicalBases lists the kanji each radical variant may stand for as a
+// part's base (ADR-080). A meaning part always names it, except 月 and 王,
+// which also write the moon and the king.
+var radicalBases = map[string][]string{
+	"扌": {"手"},
+	"氵": {"水"},
+	"忄": {"心"},
+	"亻": {"人"},
+	"刂": {"刀"},
+	"阝": {"阜", "邑"},
+	"礻": {"示"},
+	"衤": {"衣"},
+	"灬": {"火"},
+	"犭": {"犬"},
+	"冫": {"氷"},
+	"飠": {"食"},
+	"釒": {"金"},
+	"糹": {"糸"},
+	"爫": {"爪"},
+	"耂": {"老"},
+	"月": {"肉"},
+	"王": {"玉"},
+}
+
+// radicalBaseProblem returns why a part's base breaks radicalBases, or "".
+func radicalBaseProblem(part model.KanjiPart) string {
+	bases, isVariant := radicalBases[part.Part]
+	switch {
+	case !isVariant && part.Base != "":
+		return "only a radical variant may have a base"
+	case !isVariant:
+		return ""
+	// A form part only looks like the variant, as 扌 in 折 is cut grass.
+	case part.Base == "" && part.Role == model.KanjiPartMeaning && part.Part != "月" && part.Part != "王":
+		return "radical variant " + part.Part + " needs its base"
+	case part.Base != "" && !slices.Contains(
+		bases,
+		part.Base,
+	):
+		return "radical variant " + part.Part + " has base " + part.Base + ", want one of " + strings.Join(
+			bases,
+			"/",
+		)
 	}
 	return ""
 }

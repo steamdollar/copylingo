@@ -1053,7 +1053,7 @@ func TestRenderKanjiNotes(t *testing.T) {
 						Type: model.KanjiNotePhonoSemantic,
 						Parts: []model.KanjiPart{
 							{Part: "彳", Role: model.KanjiPartMeaning, GlossKo: "길을 감"},
-							{Part: "寺", Role: model.KanjiPartSound},
+							{Part: "寺", Role: model.KanjiPartSound, HunEum: "절 사"},
 						},
 						ExplanationKo: "寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.",
 					},
@@ -1070,10 +1070,32 @@ func TestRenderKanjiNotes(t *testing.T) {
 			},
 			want: []string{
 				"<b>待つ</b> (まつ)",
-				"<b>待</b> 기다릴 대 · 형성문자\n彳(길을 감) + 寺(발음)\n寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.\n" +
+				"<b>待</b> 기다릴 대 · 형성문자\n彳(길을 감) + 寺(절 사 · 발음)\n寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.\n" +
 					"이 단어에선: ま (훈독)\n이 한자의 음독: タイ",
 				"<b>読</b> · 형성문자\n言(말) + 売(간략화된 &lt;모양&gt;)\n구자체 讀.",
 			},
+		},
+		{
+			name: "radical base and sound part with on'yomi",
+			vocab: vocabularyStudyPayload{
+				Kana:  "ゆび",
+				Kanji: "指",
+				KanjiReadings: []model.KanjiReading{
+					{Text: "指", Reading: "ゆび", Type: model.KanjiReadingKun, On: []string{"シ"}, HunEum: "가리킬 지"},
+				},
+				KanjiNotes: []model.KanjiNote{
+					{
+						Char: "指",
+						Type: model.KanjiNotePhonoSemantic,
+						Parts: []model.KanjiPart{
+							{Part: "扌", Role: model.KanjiPartMeaning, GlossKo: "손", Base: "手"},
+							{Part: "旨", Role: model.KanjiPartSound, HunEum: "뜻 지", On: "シ"},
+						},
+						ExplanationKo: "손(扌)으로 가리킨다는 뜻이다.",
+					},
+				},
+			},
+			want: []string{"扌(手 · 손) + 旨(뜻 지 · シ · 발음)"},
 		},
 		{
 			name: "kanji without a note",

@@ -42,9 +42,8 @@ type botMessages struct {
 	kanjiTypeCompound                  string
 	kanjiTypeIndicative                string
 	kanjiTypePictograph                string
-	kanjiPartGlossFormat               string
-	kanjiSoundPartFormat               string
-	kanjiSoundPartNoOnFormat           string
+	kanjiPartFormat                    string
+	kanjiSoundPartLabel                string
 	kanjiTitleFormat                   string
 	kanjiReadingInWordFormat           string
 	kanjiReadingOn                     string
@@ -261,9 +260,8 @@ var botMessagesByLocale = map[string]botMessages{
 		kanjiTypeCompound:                  "회의문자",
 		kanjiTypeIndicative:                "지사문자",
 		kanjiTypePictograph:                "상형문자",
-		kanjiPartGlossFormat:               "%s(%s)",
-		kanjiSoundPartFormat:               "%s(%s · 발음)",
-		kanjiSoundPartNoOnFormat:           "%s(발음)",
+		kanjiPartFormat:                    "%s(%s)",
+		kanjiSoundPartLabel:                "발음",
 		kanjiTitleFormat:                   "<b>%s</b>",
 		kanjiReadingInWordFormat:           "이 단어에선: %s (%s)",
 		kanjiReadingOn:                     "음독",
