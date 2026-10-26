@@ -813,10 +813,20 @@ func renderStudyMaterial(
 	idx,
 	total int,
 ) string {
+	// Study sessions mix adjacent levels like quiz sessions (ADR-046), so the
+	// header names each material's level; materials without one omit the marker.
+	levelTag := ""
+	if material.ProficiencyLevel != "" {
+		levelTag = fmt.Sprintf(
+			botMessagesByLocale[botDefaultLocale].questionLevelMarkerFormat,
+			escapeHTML(material.ProficiencyLevel),
+		)
+	}
 	header := fmt.Sprintf(
-		"📚 <b>Study Session</b>\n\n<b>%d/%d · %s</b>\n\n",
+		"📚 <b>Study Session</b>\n\n<b>%d/%d%s · %s</b>\n\n",
 		idx+1,
 		total,
+		levelTag,
 		escapeHTML(materialCategoryLabel(material.Category)),
 	)
 	title := fmt.Sprintf(

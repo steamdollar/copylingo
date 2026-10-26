@@ -131,19 +131,25 @@ func (a *AnalyzerService) GetLevelProgress(
 		return nil, err
 	}
 
-	if user.Language == "ja" {
-		slices.SortStableFunc(
-			progress,
-			func(
-				left,
-				right model.LevelProgress,
-			) int {
-				return cmp.Compare(
-					jlptLevelRank(left.Level),
-					jlptLevelRank(right.Level),
-				)
-			},
-		)
-	}
+	// Languages without a known level order rank every level equally, so the
+	// stable sort keeps the repository order.
+	slices.SortStableFunc(
+		progress,
+		func(
+			left,
+			right model.LevelProgress,
+		) int {
+			return cmp.Compare(
+				levelRank(
+					user.Language,
+					left.Level,
+				),
+				levelRank(
+					user.Language,
+					right.Level,
+				),
+			)
+		},
+	)
 	return progress, nil
 }

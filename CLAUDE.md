@@ -1,20 +1,4 @@
 # Claude Code — CopyLingo Overlay
 
-> This file is a **thin overlay** auto-loaded by Claude Code.
-> All shared rules live in [`AGENTS.md`](AGENTS.md), so **read it first before you start.**
-> AGENTS.md is the SSOT for all agents; this file holds only the Claude Code-specific items layered on top.
-
----
-
-## New session start procedure
-
-1. Read [`AGENTS.md`](AGENTS.md) thoroughly — entry rules / role matrix / Case 0·A·B·C work protocol / decision criteria / coding rules
-2. Check [`STATUS.md`](STATUS.md) — assess how the current "🔨 진행 중" items relate to the user's request
-3. Classify the user's request per the **Case classification in AGENTS.md §3** (default **Case 0**; escalate explicitly to A/B/C), then start the corresponding procedure
-
----
-
-## Claude Code-specific items
-
-- Claude Code and Codex are currently **equal main agents** (AGENTS.md §2). **There are no Claude-only procedures or exceptions** — follow AGENTS.md as-is.
-- Accumulate **Claude-specific usage patterns** in this file as they are identified. Capability differences that both main agents should know about belong in AGENTS.md §2, not here.
+> Thin overlay auto-loaded by Claude Code. **Read [`AGENTS.md`](AGENTS.md) first and follow it as-is** — it is the SSOT for all agents.
+> Add Claude-specific usage patterns here only as they are identified (none yet).

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/model"
@@ -311,7 +312,18 @@ func TestBuildMorningSession_ReservesListeningAndBuildsSeventeenQuestions(t *tes
 			limit,
 			kanjiRecallLimit int,
 		) ([]model.Question, error) {
-			if !slices.Equal(
+			// Reserved listening/reading slots may fall back to one adjacent level
+			// at a time once the current level has no new supply (ADR-079).
+			reservedFallback := (category == string(model.CategoryReading) ||
+				category == string(model.CategoryListening)) &&
+				(slices.Equal(
+					levels,
+					[]string{"N4"},
+				) || slices.Equal(
+					levels,
+					[]string{"NZ"},
+				))
+			if !reservedFallback && !slices.Equal(
 				levels,
 				[]string{"N5"},
 			) && !slices.Equal(
@@ -319,20 +331,7 @@ func TestBuildMorningSession_ReservesListeningAndBuildsSeventeenQuestions(t *tes
 				[]string{"N5", "N4"},
 			) {
 				t.Fatalf(
-					"levels = %v, want [N5]",
-					levels,
-				)
-			}
-			if category == string(model.CategoryReading) && !slices.Equal(
-				levels,
-				[]string{"N5"},
-			) &&
-				!slices.Equal(
-					levels,
-					[]string{"N5", "N4"},
-				) {
-				t.Fatalf(
-					"reading levels = %v, want [N5] or adjacent fallback",
+					"levels = %v, want [N5] or reserved adjacent fallback",
 					levels,
 				)
 			}
@@ -1598,7 +1597,10 @@ func TestBuildMorningSession_PrioritizesCurrentDueListeningAndReading(t *testing
 			limit,
 			kanjiRecallLimit int,
 		) ([]model.Question, error) {
-			if !slices.Equal(
+			// The new-listening reservation still runs after a due listening item
+			// and may probe single adjacent levels; other new queries stay current-only.
+			listeningFallback := category == string(model.CategoryListening) && len(levels) == 1
+			if !listeningFallback && !slices.Equal(
 				levels,
 				[]string{currentLevel},
 			) {
@@ -1849,6 +1851,14 @@ func TestBuildEveningSession_FallsBackToAdjacentWhenCurrentSupplyIsShort(t *test
 				[]string{"N4", "N3", "N2"},
 			):
 				adjacentFetches++
+			// Reserved listening/reading slots probe one adjacent level at a time.
+			case slices.Equal(
+				levels,
+				[]string{"N2"},
+			) || slices.Equal(
+				levels,
+				[]string{"N4"},
+			):
 			default:
 				t.Fatalf(
 					"unexpected level scope %v",
@@ -1917,6 +1927,156 @@ func TestBuildEveningSession_FallsBackToAdjacentWhenCurrentSupplyIsShort(t *test
 			"fetches current=%d adjacent=%d, want both",
 			currentFetches,
 			adjacentFetches,
+		)
+	}
+}
+
+func TestBuildMorningSession_ReservedListeningFallsBackToHigherAdjacentFirst(t *testing.T) {
+	const (
+		currentLevel      = "N4"
+		higherListeningID = 500
+		lowerListeningID  = 600
+	)
+	tests := []struct {
+		name        string
+		higherEmpty bool
+		wantID      int
+		wantProbes  string
+	}{
+		{name: "higher level has new listening", wantID: higherListeningID, wantProbes: "N4;N3"},
+		{name: "higher level exhausted", higherEmpty: true, wantID: lowerListeningID, wantProbes: "N4;N3;N5"},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				// The current level has no new listening left; grammar keeps the
+				// rest of the session at the current level.
+				var listeningProbes []string
+				nextID := 100
+				qFetcher := &mockQuestionFetcher{getNewQuestionsFn: func(
+					ctx context.Context,
+					userID int64,
+					language string,
+					levels []string,
+					category string,
+					excludeIDs []int,
+					limit,
+					kanjiRecallLimit int,
+				) ([]model.Question, error) {
+					scope := strings.Join(
+						levels,
+						",",
+					)
+					if category == string(model.CategoryListening) {
+						listeningProbes = append(
+							listeningProbes,
+							scope,
+						)
+						switch {
+						case scope == "N3" && !tt.higherEmpty:
+							return []model.Question{
+								{ID: higherListeningID, ProficiencyLevel: "N3", Category: model.CategoryListening},
+							}, nil
+						case scope == "N5":
+							return []model.Question{
+								{ID: lowerListeningID, ProficiencyLevel: "N5", Category: model.CategoryListening},
+							}, nil
+						}
+						return nil, nil
+					}
+					if scope != currentLevel || category != string(model.CategoryGrammar) {
+						return nil, nil
+					}
+					questions := make(
+						[]model.Question,
+						0,
+						limit,
+					)
+					for i := 0; i < limit; i++ {
+						questions = append(
+							questions,
+							model.Question{ID: nextID, ProficiencyLevel: currentLevel, Category: model.CategoryGrammar},
+						)
+						nextID++
+					}
+					return questions, nil
+				}}
+				srsMock := &mockSRS{getDueReviewsFn: func(
+					context.Context,
+					int64,
+					int,
+					int,
+				) ([]model.Question, error) {
+					return nil, nil
+				}}
+				var sessionQuestions []model.SessionQuestion
+				sStore := &mockSessionStore{createSessionFn: func(
+					ctx context.Context,
+					session *model.Session,
+				) error {
+					session.ID = 10
+					return nil
+				}}
+				sqStore := &mockSessionQuestionStore{createSessionQuestionsFn: func(
+					ctx context.Context,
+					questions []model.SessionQuestion,
+				) error {
+					sessionQuestions = questions
+					return nil
+				}}
+
+				builder := newSessionBuilderService(
+					qFetcher,
+					sStore,
+					sqStore,
+					srsMock,
+				)
+				if _, err := builder.BuildMorningSession(
+					context.Background(),
+					123,
+					"ja",
+					currentLevel,
+				); err != nil {
+					t.Fatalf(
+						"BuildMorningSession failed: %v",
+						err,
+					)
+				}
+
+				// The reservation probes adjacent levels one at a time, highest
+				// first, and stops as soon as the slot is filled.
+				if got := strings.Join(
+					listeningProbes,
+					";",
+				); got != tt.wantProbes {
+					t.Fatalf(
+						"listening probes = %s, want %s",
+						got,
+						tt.wantProbes,
+					)
+				}
+				var gotIDs []int
+				for _, sq := range sessionQuestions {
+					if sq.QuestionID == higherListeningID || sq.QuestionID == lowerListeningID {
+						gotIDs = append(
+							gotIDs,
+							sq.QuestionID,
+						)
+					}
+				}
+				if !slices.Equal(
+					gotIDs,
+					[]int{tt.wantID},
+				) {
+					t.Fatalf(
+						"adjacent listening = %v, want [%d]",
+						gotIDs,
+						tt.wantID,
+					)
+				}
+			},
 		)
 	}
 }

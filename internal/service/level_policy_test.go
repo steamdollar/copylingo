@@ -100,3 +100,41 @@ func TestSessionLevelsForReturnsIndependentScope(t *testing.T) {
 		)
 	}
 }
+
+func TestNeighborLevels(t *testing.T) {
+	tests := []struct {
+		language  string
+		target    string
+		wantLower string
+		wantUpper string
+	}{
+		{language: "ja", target: "NZ", wantUpper: "N5"},
+		{language: "ja", target: "N4", wantLower: "N5", wantUpper: "N3"},
+		{language: "ja", target: "N1", wantLower: "N2"},
+		{language: "ja", target: "N0"},
+		{language: "en", target: "B1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.language+"/"+tt.target,
+			func(t *testing.T) {
+				lower, upper := neighborLevels(
+					tt.language,
+					tt.target,
+				)
+				if lower != tt.wantLower || upper != tt.wantUpper {
+					t.Fatalf(
+						"neighborLevels(%s, %s) = (%q, %q), want (%q, %q)",
+						tt.language,
+						tt.target,
+						lower,
+						upper,
+						tt.wantLower,
+						tt.wantUpper,
+					)
+				}
+			},
+		)
+	}
+}

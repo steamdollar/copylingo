@@ -4,6 +4,19 @@
 
 ---
 
+## Learning-language neutrality
+
+Logic code (service, bot, scheduler, repository, miniapp) treats every learning language the same way ([ADR-081](adr/ADR_from_81_to_100.md#adr-081-학습-로직에-언어별-분기를-두지-않는다)).
+
+1. **No language or level branches**: no `if language == "ja"`, no `case "N5"`, no helpers named after one language's system (e.g. `jlptLevelRank`). Take `language` as a parameter and look the fact up. A code → value lookup that every language passes through the same way (e.g. `languageDisplayName`) is data, not a branch.
+2. **Language facts live in language-keyed data**, one owner per fact:
+   - level order: `proficiencyLevels` in `internal/service/level_policy.go`. Rank, neighbors, and session scope come from it (`levelRank`, `neighborLevels`, `sessionLevelsFor`); don't hardcode level names or adjacency anywhere else.
+   - study content: `cmd/seeding/data/<language>/<level>.json`
+3. **Unknown language or level → neutral default**, not an error or a special case: exact level scope, rank last, repository order kept.
+4. **Language-only features are gated by data, not by language code**: question type (e.g. `QuestionKanaHandwriting`) or field presence (e.g. `hasKanjiDetail`). Text specific to such a feature (e.g. the kana handwriting grading prompt) stays with that feature.
+5. **Tests**: level/language logic tests include a language and a level missing from the data (e.g. `en`/`B1` and `ja`/`N0` in `TestNeighborLevels`).
+6. **Allowed**: facts about a single-language external source inside its adapter (e.g. `internal/pipeline/fetcher_nhk.go`) and CLI flag defaults — neither is a branch in logic.
+
 ## Go code
 
 1. **Package structure**: split by responsibility under `internal/`. Allowed imports between packages are pinned by `internal/import_boundary_test.go` (see [ARCHITECTURE.md](ARCHITECTURE.md)).

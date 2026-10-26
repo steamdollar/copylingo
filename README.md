@@ -210,7 +210,7 @@ See the target manifest in the `Makefile` header comment.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture and data flow
 - [`docs/adr/`](docs/adr/) — architecture decision records
 - [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) — coding conventions
-- [`AGENTS.md`](AGENTS.md) — project context and coding rules for agent-assisted development
+- [`AGENTS.md`](AGENTS.md) — shared contract for coding agents: roles, work protocol, design criteria
 - [`STATUS.md`](STATUS.md) — current work state and recently completed work
 
 ## Agent-assisted development workflow

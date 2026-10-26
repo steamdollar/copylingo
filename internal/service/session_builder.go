@@ -305,11 +305,13 @@ func (s *sessionBuilderService) buildSession(
 		)
 
 		exhausted := make(map[string]bool)
+		// fetchNew appends up to count new questions from scope and reports how
+		// many it actually added.
 		fetchNew := func(
 			scope []string,
 			category model.QuestionCategory,
 			count int,
-		) {
+		) int {
 			count = min(
 				count,
 				totalQuestions-len(sessionQuestions),
@@ -325,7 +327,7 @@ func (s *sessionBuilderService) buildSession(
 				",",
 			) + ":" + string(category)
 			if count <= 0 || exhausted[key] {
-				return
+				return 0
 			}
 			questions, err := s.questionRepo.GetNewQuestions(
 				ctx,
@@ -343,7 +345,7 @@ func (s *sessionBuilderService) buildSession(
 					category,
 					err,
 				)
-				return
+				return 0
 			}
 			// Exclusions only grow during a build; do not query an exhausted
 			// category again during current/adjacent shortage handling.
@@ -360,6 +362,34 @@ func (s *sessionBuilderService) buildSession(
 					added++
 				}
 			}
+			return added
+		}
+		// reserveNew fills a reserved category from the current level first. Once
+		// the current level has no new supply, the remaining slots borrow from the
+		// harder neighbor, then the easier one, instead of waiting until every
+		// current category runs dry (ADR-079).
+		lowerLevel, upperLevel := neighborLevels(
+			language,
+			level,
+		)
+		reserveNew := func(
+			category model.QuestionCategory,
+			count int,
+		) {
+			added := fetchNew(
+				currentLevels,
+				category,
+				count,
+			)
+			for _, neighbor := range []string{upperLevel, lowerLevel} {
+				if neighbor != "" && added < count {
+					added += fetchNew(
+						[]string{neighbor},
+						category,
+						count-added,
+					)
+				}
+			}
 		}
 		fetchNew(
 			currentLevels,
@@ -368,14 +398,12 @@ func (s *sessionBuilderService) buildSession(
 		)
 		// Preserve the existing new-listening reservation even when a due
 		// listening item was selected. Reading still has a one-item total cap.
-		fetchNew(
-			currentLevels,
+		reserveNew(
 			model.CategoryListening,
 			minListeningPerDailySession,
 		)
 		if currentCategories[model.CategoryReading] == 0 {
-			fetchNew(
-				currentLevels,
+			reserveNew(
 				model.CategoryReading,
 				1,
 			)

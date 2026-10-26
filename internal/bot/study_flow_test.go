@@ -1026,6 +1026,62 @@ func TestRenderStudyMaterialIgnoresKanjiNotes(t *testing.T) {
 	}
 }
 
+// TestRenderStudyMaterialLevelMarker shows the material's level in the header
+// like quiz questions, and omits the marker when the level is empty.
+func TestRenderStudyMaterialLevelMarker(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name  string
+		level string
+		want  string
+	}{
+		{
+			name:  "with level",
+			level: "N4",
+			want:  "<b>1/3 · N4 · Vocabulary</b>",
+		},
+		{
+			name:  "without level",
+			level: "",
+			want:  "<b>1/3 · Vocabulary</b>",
+		},
+	} {
+		t.Run(
+			tc.name,
+			func(t *testing.T) {
+				t.Parallel()
+
+				got := renderStudyMaterial(
+					model.Material{
+						Category:         model.MaterialCategoryVocabulary,
+						ProficiencyLevel: tc.level,
+						Title:            "みず",
+						Payload: vocabularyPayload(
+							"みず",
+							"水",
+							"물",
+							"noun",
+						),
+					},
+					0,
+					3,
+				)
+				if !strings.Contains(
+					got,
+					tc.want,
+				) {
+					t.Errorf(
+						"card = %q, want header %q",
+						got,
+						tc.want,
+					)
+				}
+			},
+		)
+	}
+}
+
 // TestRenderKanjiNotes pins each block: the title carries the 훈음 when the
 // reading has one, a noted kanji gets its note then the reading lines, a kanji
 // without a note gets a title alone, a jukuji group has no on'yomi line, and a

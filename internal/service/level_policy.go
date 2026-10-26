@@ -2,51 +2,81 @@ package service
 
 import "slices"
 
-// japaneseProficiencyLevels defines Japanese level order once. NZ holds the
-// kana (hiragana/katakana) foundation below N5, so it follows the same
-// adjacency as JLPT levels. Session adjacency is derived from the learner's
-// index instead of being duplicated per level.
-var japaneseProficiencyLevels = []string{"NZ", "N5", "N4", "N3", "N2", "N1"}
+// proficiencyLevels lists each language's levels in difficulty order, easiest
+// first. Every level relation (rank, neighbors, session scope) is read from
+// this map; a language or level missing here keeps an exact scope. Japanese NZ
+// holds the kana (hiragana/katakana) foundation below N5.
+var proficiencyLevels = map[string][]string{
+	"ja": {"NZ", "N5", "N4", "N3", "N2", "N1"},
+}
 
-// jlptLevelRank orders Japanese levels from NZ to N1 and puts unknown levels last.
-func jlptLevelRank(level string) int {
+// levelRank returns level's position in its language's order and puts
+// unknown levels last.
+func levelRank(
+	language,
+	level string,
+) int {
+	levels := proficiencyLevels[language]
 	if rank := slices.Index(
-		japaneseProficiencyLevels,
+		levels,
 		level,
 	); rank >= 0 {
 		return rank
 	}
-	return len(japaneseProficiencyLevels)
+	return len(levels)
+}
+
+// neighborLevels returns the levels one step easier and one step harder than
+// level. Either is "" at the ends of the order, and both are "" when the
+// language or level has no known order.
+func neighborLevels(
+	language,
+	level string,
+) (lower, upper string) {
+	levels := proficiencyLevels[language]
+	i := slices.Index(
+		levels,
+		level,
+	)
+	if i < 0 {
+		return "", ""
+	}
+	if i > 0 {
+		lower = levels[i-1]
+	}
+	if i+1 < len(levels) {
+		upper = levels[i+1]
+	}
+	return lower, upper
 }
 
 // sessionLevelsFor returns the Study and Quiz scope for a user's current
-// level. Only Japanese levels have a known adjacency; all other scopes
-// remain exact until their ordering is explicitly defined.
+// level: the level and its neighbors, easiest first. Levels without a known
+// order keep an exact scope.
 func sessionLevelsFor(
 	language,
 	currentLevel string,
 ) []string {
-	if language != "ja" {
-		return []string{currentLevel}
-	}
-
-	for i, level := range japaneseProficiencyLevels {
-		if level != currentLevel {
-			continue
-		}
-		start := max(
-			0,
-			i-1,
-		)
-		end := min(
-			len(japaneseProficiencyLevels),
-			i+2,
-		)
-		return append(
-			[]string(nil),
-			japaneseProficiencyLevels[start:end]...,
+	lower, upper := neighborLevels(
+		language,
+		currentLevel,
+	)
+	var scope []string
+	if lower != "" {
+		scope = append(
+			scope,
+			lower,
 		)
 	}
-
-	return []string{currentLevel}
+	scope = append(
+		scope,
+		currentLevel,
+	)
+	if upper != "" {
+		scope = append(
+			scope,
+			upper,
+		)
+	}
+	return scope
 }
