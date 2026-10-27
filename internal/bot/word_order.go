@@ -58,9 +58,6 @@ func (sf *SessionFlow) getWordOrderDraft(
 	questionID,
 	optionCount int,
 ) ([]int, error) {
-	if sf.drafts == nil {
-		return nil, nil
-	}
 	selection, err := sf.drafts.GetWordOrderDraft(
 		ctx,
 		sessionID,
@@ -90,9 +87,6 @@ func (sf *SessionFlow) setWordOrderDraft(
 	questionID int,
 	selection []int,
 ) error {
-	if sf.drafts == nil {
-		return fmt.Errorf("word order draft redis is unavailable")
-	}
 	return sf.drafts.SetWordOrderDraft(
 		ctx,
 		sessionID,
@@ -106,13 +100,11 @@ func (sf *SessionFlow) deleteWordOrderDraft(
 	sessionID,
 	questionID int,
 ) {
-	if sf.drafts != nil {
-		_ = sf.drafts.DeleteWordOrderDraft(
-			ctx,
-			sessionID,
-			questionID,
-		)
-	}
+	_ = sf.drafts.DeleteWordOrderDraft(
+		ctx,
+		sessionID,
+		questionID,
+	)
 }
 
 func wordOrderDisplayText(

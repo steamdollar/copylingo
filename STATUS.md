@@ -28,6 +28,8 @@
 
 - [ ] 구조 검토 후속: service·bot 파일 prefix rename·테스트 재배치(U3) → 책임 이동(U4, SRS 단일화 등 일부 Case A 선결) + callback 이중 응답(실기기 확인 대기). 하위 패키지 분리는 하지 않음 see [docs/todos/structure_review_followups.md](docs/todos/structure_review_followups.md)
 
+- [ ] 과잉 추상화·테스트 가치 검토 후속(E~I, A~D 완료): service Tier2 하위 interface·nil 분기 제거, 가치 낮은 테스트 삭제, scheduler·restart recovery 테스트 공백. **(D는 ADR-059 §8.7 수정, G는 ADR-057 재논의 선결)** see [docs/todos/abstraction_review_followups.md](docs/todos/abstraction_review_followups.md)
+
 - [ ] 사용자 선택형 세션 문제 조합 preset — Daily Session 생성 전에 Vocabulary/Kana/Handwriting 비율 preset을 선택할 수 있도록 설계 및 구현. **(Case A 선결: preset 비율/변경 UX/SRS 충돌 우선순위/vocab fallback 미결)** see [docs/todos/user_selectable_session_mix_presets.md](docs/todos/user_selectable_session_mix_presets.md)
 
 - [ ] 정규 Quiz 하위 레벨 due 복습 starvation 버그 — 현재 레벨 due가 세션 크기+2개를 넘으면 N5 due가 한 문제도 안 나옴(9/29 이후 0개, N5 due 512개 적체). 하위 레벨 전용 due 조회로 수정 see [docs/todos/quiz_lower_level_due_starvation.md](docs/todos/quiz_lower_level_due_starvation.md)
@@ -38,6 +40,14 @@
 
 | 날짜 | 작업 | workthrough |
 |------|------|-------------|
+| 2026-10-27 | 조립부가 채우는 의존의 nil 방어 분기 37곳(service·bot·scheduler·Mini App·청해 음성)과 `Err{Quiz,Study}ActiveSessionDependencyMissing` 삭제, 테스트는 not-found fake로 대체 (ADR-084, 검토 TODO D) | - |
+| 2026-10-27 | session builder 테스트 정리: 8인자 closure fake 4종을 in-memory `builderPool`·`builderStores`로 합쳐 3파일 2,669줄 → 1,479줄, 시나리오 유지 (검토 TODO B 완료) | - |
+| 2026-10-27 | builder·study session 생성자가 `SessionRepo`를 직접 받음: 좁힌 재선언 interface `sessionStore`·`studySessionStore`와 builder fake의 죽은 메서드 3개 삭제 (검토 TODO B 일부) | - |
+| 2026-10-27 | `srsService` 삭제: SM-2는 순수 함수 `scheduleAnswer`, 복습 문제·개수는 builder와 `SessionService`가 `QuestionRepo`를 직접 조회. `srsScheduler`·`questionQuerier`·`questionFetcher` interface 삭제 (검토 TODO B 일부) | - |
+| 2026-10-27 | 손글씨 PNG 렌더러를 service에서 miniapp handler로 이동: `StrokeRenderer` interface와 렌더러 구조체를 상수 기반 함수 `RenderStrokesPNG` 하나로 축소, service는 stroke 대신 렌더링된 이미지만 받음. 렌더링이 소유권 검사보다 앞으로 옴(수 ms, LLM 호출은 여전히 검사 후) (검토 TODO B 일부) | - |
+| 2026-10-27 | grader 계층 삭제: `graderService`와 그 interface를 지우고, 채점은 제출 메서드에서 하며 `RecordAnswer`는 `SessionService`가 직접 호출 (검토 TODO C, U4 grader 항목) | - |
+| 2026-10-27 | LLM API key 필수화: key가 없으면 서버가 시작하지 않음. 동작하지 않던 key guard·`ErrAIConfigMissing`/`ErrAIUnavailable` 체인과, 문항이 0건이던 subjective 타입(LLM 의미 채점·오답 fallback·AI 피드백)을 삭제 (ADR-083, 검토 TODO A) | - |
+| 2026-10-26 | 청해 음성 생성(TTS)을 서버에서 제거: scheduler의 30분 음성 top-up을 지우고 `cmd/admin/generate_listening_audio`(이제 `-level` 없이 언어 전체 레벨 처리)만 TTS를 호출. `AudioService`는 클립 읽기·file_id 저장만 남기고 생성은 `AudioGenerator`로 분리. 서버 음성 전송이 LLM key와 무관해짐. 새 청해 seed 후 도구 실행 필요(README). 음성을 새로 만들 때 Telegram `audio_file_id`도 지워, 대본이 바뀐 문항에 옛 음성이 재전송되던 버그 수정 (ADR-082) | - |
 | 2026-10-26 | Quiz 청해·독해 예약 칸이 현재 레벨 신규가 없으면 인접 레벨 신규로 채워지게 변경(위 레벨 먼저, 레벨 이름 없이 `sessionLevelsFor`로 계산). N3 청해가 음성 생성 후에도 0번 출제되던 문제 해결 — N4 청해를 다 푼 뒤 남은 N4 문법·어휘 신규가 세션을 채워 위 레벨이 들어올 틈이 없었음 (ADR-079 정정) | - |
 | 2026-10-23 | 한자 해설을 "각 부품이 그 한자에서 무슨 뜻·발음으로 쓰이는지" 기준으로 다시 생성: 부수 변형에 원래 글자(`扌(手 · 손)`), 발음 부품에 훈음(`合(합할 합 · 발음)`) 표시, 어원·음 변화 설명 제거, 신자체로 줄어든 글자까지 포함해 note 900 → 1,135자(어휘 2,066 → 2,503개). 원본을 `scripts/kanji_notes.json` + `gen_kanji_notes.py`로 이동, opus 생성 + codex·Gemini 독립 리뷰 + Claude 판정 (ADR-080) | [2610231400](docs/workthrough/2610/2610231400_kanji_notes_parts_rework.md) |
 | 2026-10-22 | N3 청해 20문항 추가: 새 자료를 만들지 않고 기존 N3 문법 material 20개(학습한 16 + 다음 4)에 연결해 대본이 그 문법을 쓰게 함. N3 난이도(5~7턴 대화·200자 이상 독백, 음성 속 오답, 계획 변경 함정)로 작성. scheduler 음성 top-up을 현재 레벨에서 Study·Quiz 범위 전체(N4 사용자는 N5·N4·N3)로 넓혀, 인접 레벨 청해가 음성 없이 영영 출제되지 않던 문제 해결. seed DB 반영 (ADR-079) | - |
@@ -80,4 +90,3 @@
 | 2026-09-26 | 신규 청해 대화 음성에 A/B 두 화자 적용, 기존 음성 유지 (ADR-056) | - |
 | 2026-09-26 | 미사용 설정·환경변수 및 설정 파일 정리, TTS 활성화 설정 제거·LLM 설정 통합 | - |
 | 2026-09-26 | 사용자별 30분 cron만 유지, 전역 발송·자동 수집 cron과 상한 설정 제거, 미완료 세션 3개 재알림 규칙 유지 (ADR-052·053) | - |
-| 2026-09-25 | Study·Quiz 자료 유지 복습·제외 메뉴와 목록/복원, 공통 기한·자료별 유지 문제 제한·결과별 간격 전환, 소유권 검증과 기존 세션 보존 (ADR-051) | - |

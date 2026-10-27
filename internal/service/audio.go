@@ -2,31 +2,10 @@ package service
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"log/slog"
-
-	"github.com/lsj/copylingo/internal/external"
-	"github.com/lsj/copylingo/internal/model"
 )
 
-const (
-	AudioGeneratePerCycle = 5
-)
-
-// audioServiceRepo is the narrow question-repository contract AudioService needs.
-type audioServiceRepo interface {
-	GetListeningNeedingAudio(
-		ctx context.Context,
-		language,
-		level string,
-		limit int,
-	) ([]model.Question, error)
-	SetAudioPath(
-		ctx context.Context,
-		id int,
-		audioPath string,
-	) error
+// audioFileIDStore records the Telegram file_id of an uploaded listening clip.
+type audioFileIDStore interface {
 	SetAudioFileID(
 		ctx context.Context,
 		id int,
@@ -34,241 +13,27 @@ type audioServiceRepo interface {
 	) error
 }
 
-// audioSynthesizer turns text into Telegram-ready OGG/Opus bytes.
-type audioSynthesizer interface {
-	Synthesize(
-		ctx context.Context,
-		text string,
-	) ([]byte, error)
-}
-
-// audioObjectStore is the object-store contract AudioService depends on.
-type audioObjectStore interface {
-	Exists(
-		ctx context.Context,
-		key string,
-	) (bool, error)
-	Put(
-		ctx context.Context,
-		key string,
-		body []byte,
-		contentType string,
-	) error
+// audioClipReader reads a stored listening clip from the object store.
+type audioClipReader interface {
 	Get(
 		ctx context.Context,
 		key string,
 	) ([]byte, error)
 }
 
-// AudioService owns the listening-audio lifecycle: pre-generation into the object
-// store (push model, ADR-031) and serve-time retrieval for Telegram. It holds no
-// transaction with session building — a generation failure never blocks a push.
+// AudioService serves pre-generated listening clips to Telegram (ADR-032).
+// Clips are generated outside the server by AudioGenerator (ADR-082).
 type AudioService struct {
-	questions audioServiceRepo
-	tts       audioSynthesizer
-	store     audioObjectStore
-	voiceKey  string // both configured voices identify newly generated audio
+	questions audioFileIDStore
+	store     audioClipReader
 }
 
-// NewAudioService wires the service with its repo, TTS client, object store, and
-// configured voices. The second voice changes the key for future clips only.
+// NewAudioService wires the service with the question repo and object store.
 func NewAudioService(
-	questions audioServiceRepo,
-	tts audioSynthesizer,
-	store audioObjectStore,
-	voiceA,
-	voiceB string,
+	questions audioFileIDStore,
+	store audioClipReader,
 ) *AudioService {
-	return &AudioService{questions: questions, tts: tts, store: store, voiceKey: voiceA + "-" + voiceB}
-}
-
-// TopUpAudio synthesizes audio for up to AudioGeneratePerCycle listening questions
-// in the (language, level) bucket that still lack it. Content-addressing dedups
-// identical scripts to one object; a per-question failure is logged and skipped.
-func (s *AudioService) TopUpAudio(
-	ctx context.Context,
-	language,
-	level string,
-) error {
-	if s.tts == nil || s.store == nil {
-		return external.ErrTTSConfigMissing
-	}
-
-	pending, err := s.questions.GetListeningNeedingAudio(
-		ctx,
-		language,
-		level,
-		AudioGeneratePerCycle,
-	)
-	if err != nil {
-		return err
-	}
-	if len(pending) == 0 {
-		return nil
-	}
-
-	var generated, reused, failed int
-	for _, q := range pending {
-		if q.AudioScript == nil || *q.AudioScript == "" {
-			continue
-		}
-		script := *q.AudioScript
-		key := external.AudioKey(
-			q.Language,
-			s.voiceKey,
-			script,
-		)
-
-		exists, err := s.store.Exists(
-			ctx,
-			key,
-		)
-		if err != nil {
-			failed++
-			slog.WarnContext(
-				ctx,
-				"Audio dedup check failed",
-				"event",
-				"audiogen.exists_failed",
-				"source",
-				"service.audio",
-				"question_id",
-				q.ID,
-				"key",
-				key,
-				"error",
-				err,
-			)
-			continue
-		}
-
-		if !exists {
-			ogg, err := s.tts.Synthesize(
-				ctx,
-				script,
-			)
-			if err != nil {
-				failed++
-				slog.WarnContext(
-					ctx,
-					"Audio synthesis failed",
-					"event",
-					"audiogen.synthesize_failed",
-					"source",
-					"service.audio",
-					"question_id",
-					q.ID,
-					"error",
-					err,
-				)
-				continue
-			}
-			if err := s.store.Put(
-				ctx,
-				key,
-				ogg,
-				external.AudioContentType,
-			); err != nil {
-				failed++
-				slog.WarnContext(
-					ctx,
-					"Audio store put failed",
-					"event",
-					"audiogen.put_failed",
-					"source",
-					"service.audio",
-					"question_id",
-					q.ID,
-					"key",
-					key,
-					"error",
-					err,
-				)
-				continue
-			}
-			generated++
-		} else {
-			reused++
-		}
-
-		if err := s.questions.SetAudioPath(
-			ctx,
-			q.ID,
-			key,
-		); err != nil {
-			failed++
-			slog.WarnContext(
-				ctx,
-				"Audio path persist failed",
-				"event",
-				"audiogen.set_path_failed",
-				"source",
-				"service.audio",
-				"question_id",
-				q.ID,
-				"key",
-				key,
-				"error",
-				err,
-			)
-			continue
-		}
-	}
-
-	slog.InfoContext(
-		ctx,
-		"Listening audio topped up",
-		"event",
-		"audiogen.topped_up",
-		"source",
-		"service.audio",
-		"language",
-		language,
-		"level",
-		level,
-		"pending",
-		len(pending),
-		"generated",
-		generated,
-		"reused",
-		reused,
-		"failed",
-		failed,
-	)
-	return nil
-}
-
-// TopUpSessionAudio tops up every level a learner at currentLevel can be quizzed
-// on (sessionLevelsFor), not just currentLevel. Listening questions without audio
-// are never selected, so adjacent-level clips must exist before the learner
-// reaches that level. Each level keeps its own AudioGeneratePerCycle budget; a
-// failing level does not stop the others.
-func (s *AudioService) TopUpSessionAudio(
-	ctx context.Context,
-	language,
-	currentLevel string,
-) error {
-	var errs []error
-	for _, level := range sessionLevelsFor(
-		language,
-		currentLevel,
-	) {
-		if err := s.TopUpAudio(
-			ctx,
-			language,
-			level,
-		); err != nil {
-			errs = append(
-				errs,
-				fmt.Errorf(
-					"AudioService.TopUpSessionAudio level=%s: %w",
-					level,
-					err,
-				),
-			)
-		}
-	}
-	return errors.Join(errs...)
+	return &AudioService{questions: questions, store: store}
 }
 
 // GetClip fetches the stored OGG bytes for an object key (serve-time fallback used
@@ -277,9 +42,6 @@ func (s *AudioService) GetClip(
 	ctx context.Context,
 	key string,
 ) ([]byte, error) {
-	if s.store == nil {
-		return nil, external.ErrTTSConfigMissing
-	}
 	return s.store.Get(
 		ctx,
 		key,

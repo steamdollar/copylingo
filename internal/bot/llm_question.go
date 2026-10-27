@@ -102,13 +102,6 @@ func (lf *LLMQuestionFlow) handleLLM(
 		)
 		return
 	}
-	if lf.input == nil {
-		lf.telegram.SendMessage(
-			msg.Chat.ID,
-			messages.activationUnavailable,
-		)
-		return
-	}
 
 	if err := lf.input.SetLLMPending(
 		ctx,
@@ -158,14 +151,6 @@ func (lf *LLMQuestionFlow) handleLLMCancel(
 	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
 		return
 	}
-	if lf.input == nil {
-		lf.telegram.SendMessage(
-			cb.Message.Chat.ID,
-			messages.cancelUnavailable,
-		)
-		return
-	}
-
 	if err := lf.input.DeleteLLMPending(
 		ctx,
 		cb.From.ID,
@@ -197,7 +182,7 @@ func (lf *LLMQuestionFlow) handleLLMQuestion(
 	msg *tgbotapi.Message,
 ) bool {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if msg.From == nil || lf.input == nil {
+	if msg.From == nil {
 		return false
 	}
 	pendingInput, found, err := lf.input.TakeLLMPending(

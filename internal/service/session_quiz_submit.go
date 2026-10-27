@@ -23,14 +23,10 @@ var (
 type QuizAnswerResult struct {
 	Question model.Question
 	// Answer is the answer as graded (text answers trimmed, fill-blank lowercased).
-	Answer    string
-	IsCorrect bool
-	Feedback  string
-	// GradingUnavailable means AI grading failed and the answer was recorded
-	// as wrong instead (subjective failure policy).
-	GradingUnavailable bool
-	QuestionIndex      int
-	TotalQuestions     int
+	Answer         string
+	IsCorrect      bool
+	QuestionIndex  int
+	TotalQuestions int
 }
 
 // QuizTextAnswer is a typed answer to the question at QuestionIndex.
@@ -40,9 +36,6 @@ type QuizTextAnswer struct {
 	SessionID     int
 	QuestionIndex int
 	Text          string
-	// OnAIGrading, when set, runs once right before a slow AI grading call
-	// (subjective questions), e.g. to show a typing indicator.
-	OnAIGrading func()
 }
 
 // SubmitQuizOption grades the chosen option of the current question.
@@ -86,7 +79,6 @@ func (s *SessionService) SubmitQuizOption(
 		item,
 		idx,
 		options[optionIdx],
-		nil,
 	)
 }
 
@@ -139,7 +131,6 @@ func (s *SessionService) SubmitQuizWordOrder(
 		item,
 		idx,
 		answer.String(),
-		nil,
 	)
 }
 
@@ -180,7 +171,6 @@ func (s *SessionService) SubmitQuizText(
 		item,
 		idx,
 		strings.TrimSpace(answer.Text),
-		answer.OnAIGrading,
 	)
 }
 
@@ -268,9 +258,7 @@ func isOptionPermutation(
 	return true
 }
 
-// gradeQuizAnswer grades and records one answer. When AI grading is
-// unavailable, the attempt is recorded as wrong so the Quiz can continue
-// (subjective failure policy; handwriting returns the error instead).
+// gradeQuizAnswer grades and records one answer.
 func (s *SessionService) gradeQuizAnswer(
 	ctx context.Context,
 	sessionID int,
@@ -278,81 +266,44 @@ func (s *SessionService) gradeQuizAnswer(
 	item *model.QuizActiveSessionQuestion,
 	idx int,
 	answer string,
-	onAIGrading func(),
 ) (*QuizAnswerResult, error) {
 	question := item.Question
-	switch question.Type {
-	case model.QuestionFillBlank:
+	if question.Type == model.QuestionFillBlank {
 		answer = strings.ToLower(answer) // Kana fill-in-the-blank is case-insensitive.
-	case model.QuestionSubjective:
-		if onAIGrading != nil {
-			onAIGrading()
-		}
-	}
-	result := &QuizAnswerResult{
-		Question:       question,
-		Answer:         answer,
-		QuestionIndex:  idx,
-		TotalQuestions: len(state.Items),
 	}
 
-	isCorrect, feedback, err := s.grader.GradeAnswerWithQuestion(
+	// Text and option answers are exact-match; only handwriting uses the LLM.
+	isCorrect := answer == question.CorrectAnswer
+	err := s.quizProgress.RecordAnswer(
 		ctx,
 		sessionID,
 		question.ID,
-		&question,
 		answer,
+		isCorrect,
 	)
-	switch {
-	case err == nil:
-		result.IsCorrect = isCorrect
-		result.Feedback = feedback
-		return result, nil
-	case errors.Is(
+	if errors.Is(
 		err,
 		ErrQuizActiveSessionAlreadyAnswered,
-	):
+	) {
 		return nil, fmt.Errorf(
 			"%w: %w",
 			ErrQuizAnswerStale,
 			err,
 		)
-	case !errors.Is(
-		err,
-		ErrAIUnavailable,
-	):
+	}
+	if err != nil {
 		return nil, fmt.Errorf(
-			"grade quiz answer session_id=%d question_id=%d: %w",
+			"record quiz answer session_id=%d question_id=%d: %w",
 			sessionID,
 			question.ID,
 			err,
 		)
 	}
-
-	if err := s.quizProgress.RecordAnswer(
-		ctx,
-		sessionID,
-		question.ID,
-		answer,
-		false,
-	); err != nil {
-		if errors.Is(
-			err,
-			ErrQuizActiveSessionAlreadyAnswered,
-		) {
-			return nil, fmt.Errorf(
-				"%w: %w",
-				ErrQuizAnswerStale,
-				err,
-			)
-		}
-		return nil, fmt.Errorf(
-			"record fallback wrong answer session_id=%d question_id=%d: %w",
-			sessionID,
-			question.ID,
-			err,
-		)
-	}
-	result.GradingUnavailable = true
-	return result, nil
+	return &QuizAnswerResult{
+		Question:       question,
+		Answer:         answer,
+		IsCorrect:      isCorrect,
+		QuestionIndex:  idx,
+		TotalQuestions: len(state.Items),
+	}, nil
 }

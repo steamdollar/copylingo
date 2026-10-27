@@ -43,7 +43,10 @@ func (m *mockStudyMaterialStore) GetMaterialsByPlan(
 	)
 }
 
+// mockStudySessionStore implements the transactional session inserts. The
+// embedded nil interface makes any other SessionRepo call panic.
 type mockStudySessionStore struct {
+	SessionRepo
 	createSessionFn   func(session *model.Session) (int, error)
 	createMaterialsFn func(
 		sessionID int,

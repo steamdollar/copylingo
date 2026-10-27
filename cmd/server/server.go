@@ -35,7 +35,7 @@ func initBot(
 		MaterialPreference: svc.materialPreference,
 		Input:              interactions,
 	})
-	sessionDeps := bot.SessionFlowDeps{
+	sessionFlow := bot.NewSessionFlow(bot.SessionFlowDeps{
 		Telegram:           telegram,
 		Session:            svc.session,
 		User:               svc.user,
@@ -45,14 +45,9 @@ func initBot(
 		Messages:           interactions,
 		Recovery:           interactions,
 		Study:              studyFlow,
+		Audio:              svc.audio,
 		PublicBaseURL:      cfg.Server.PublicBaseURL,
-	}
-	// Audio is nil without a TTS key; assigning a nil *AudioService would make
-	// a non-nil interface and bypass SessionFlow's "audio unavailable" path.
-	if svc.audio != nil {
-		sessionDeps.Audio = svc.audio
-	}
-	sessionFlow := bot.NewSessionFlow(sessionDeps)
+	})
 
 	router := bot.NewBot(bot.BotDeps{
 		Telegram:    telegram,

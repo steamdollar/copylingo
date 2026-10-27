@@ -21,7 +21,7 @@ type services struct {
 	materialPreference *service.MaterialPreferenceService
 	analyzer           *service.AnalyzerService
 	llmQuestion        *service.LLMQuestionService
-	audio              *service.AudioService // nil without an LLM API key
+	audio              *service.AudioService
 }
 
 // newServices creates the repositories and external clients, then the Tier1
@@ -39,16 +39,6 @@ func newServices(
 		BaseURL: cfg.LLM.BaseURL,
 		Model:   cfg.LLM.Model,
 	})
-
-	// Listening audio is available whenever the shared API key is configured.
-	// With no key, audio stays nil; SessionFlow and the scheduler skip it.
-	var audio *service.AudioService
-	if cfg.LLM.APIKey != "" {
-		audio = bootstrap.NewAudioService(
-			cfg,
-			repos.Question,
-		)
-	}
 
 	// Only the storage implementations know Redis commands and serialized keys.
 	session := service.NewSessionService(service.SessionDeps{
@@ -81,6 +71,11 @@ func newServices(
 			repos.Tip,
 			cfg.LLM.Model,
 		),
-		audio: audio,
+		// Serves pre-generated listening clips; generation runs in
+		// cmd/admin/generate_listening_audio (ADR-082).
+		audio: service.NewAudioService(
+			repos.Question,
+			bootstrap.NewAudioStore(cfg.Storage),
+		),
 	}
 }

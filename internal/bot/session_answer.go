@@ -66,9 +66,6 @@ func (sf *SessionFlow) HandleTextInput(
 	ctx context.Context,
 	msg *tgbotapi.Message,
 ) bool {
-	if sf.input == nil {
-		return false
-	}
 	activeQuestion, err := sf.input.GetActiveQuestion(
 		ctx,
 		msg.Chat.ID,
@@ -96,13 +93,6 @@ func (sf *SessionFlow) HandleTextInput(
 			SessionID:     sessionID,
 			QuestionIndex: activeQuestion.QuestionIndex,
 			Text:          msg.Text,
-			// Show typing status while AI grades a subjective answer.
-			OnAIGrading: func() {
-				sf.telegram.SendChatAction(
-					msg.Chat.ID,
-					tgbotapi.ChatTyping,
-				)
-			},
 		},
 	)
 	if errors.Is(
@@ -307,12 +297,6 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 	result *service.QuizAnswerResult,
 	editMessageID *int,
 ) {
-	if result.GradingUnavailable {
-		sf.telegram.SendMessage(
-			chatID,
-			botMessagesByLocale[botDefaultLocale].subjectiveGradingUnavailable,
-		)
-	}
 	question := result.Question
 	questionID := question.ID
 	currentIdx := result.QuestionIndex
@@ -335,13 +319,6 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 			result.Answer,
 			question.CorrectAnswer,
 			question.Explanation,
-		)
-	}
-
-	if result.Feedback != "" {
-		text += fmt.Sprintf(
-			messages.aiFeedbackFormat,
-			result.Feedback,
 		)
 	}
 

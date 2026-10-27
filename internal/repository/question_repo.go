@@ -203,14 +203,14 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(
 	questionCatalogColumns,
 )
 
-// GetListeningNeedingAudio returns listening questions that have a script but no
-// generated audio yet, oldest first, so the pre-generation pipeline can fill them
-// in bounded batches (ADR-031 push model). audio_file_id is ignored here — the
-// gate is audio_path (the object-store SSOT pointer).
+// GetListeningNeedingAudio returns a language's listening questions, at every
+// level, that have a script but no generated audio yet, oldest first, so the
+// pre-generation tool can fill them in bounded batches (ADR-031, ADR-082).
+// audio_file_id is ignored here — the gate is audio_path (the object-store SSOT
+// pointer).
 func (r *QuestionRepository) GetListeningNeedingAudio(
 	ctx context.Context,
-	language,
-	level string,
+	language string,
 	limit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
@@ -221,22 +221,23 @@ func (r *QuestionRepository) GetListeningNeedingAudio(
 			`
 		SELECT %s FROM questions q
 		WHERE category = 'listening'
-		  AND language = $1 AND proficiency_level = $2
+		  AND language = $1
 		  AND audio_script IS NOT NULL AND audio_script <> ''
 		  AND audio_path IS NULL
 		ORDER BY created_at ASC
-		LIMIT $3
+		LIMIT $2
 	`,
 			questionCatalogColumns,
 		),
 		language,
-		level,
 		limit,
 	)
 	return questions, err
 }
 
-// SetAudioPath stores the object-store key produced for a question's audio.
+// SetAudioPath stores the object-store key produced for a question's audio. A
+// new key means a new clip, so it also clears the Telegram file_id cached for
+// the previous clip; otherwise the bot would keep re-sending the old voice.
 func (r *QuestionRepository) SetAudioPath(
 	ctx context.Context,
 	id int,
@@ -244,7 +245,7 @@ func (r *QuestionRepository) SetAudioPath(
 ) error {
 	_, err := r.db.ExecContext(
 		ctx,
-		`UPDATE questions SET audio_path = $2 WHERE id = $1`,
+		`UPDATE questions SET audio_path = $2, audio_file_id = NULL WHERE id = $1`,
 		id,
 		audioPath,
 	)

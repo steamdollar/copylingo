@@ -50,7 +50,7 @@ N5 due 512개 ──────────────────────
 ## 수정 방향 (결정됨)
 
 - 하위 레벨 due pass는 **하위 인접 레벨로 범위를 좁힌 별도 조회**로 후보를 가져온다. 한 번 가져온 `due` 목록을 재사용하지 않는다.
-  - 예: `srsService`/`srsScheduler`에 level 범위를 받는 조회를 추가하거나, 기존 `GetDueReviews`에 범위를 넘길 수 있게 한다. Repository SQL은 이미 `levels []string`(`$3`)을 받으므로 SQL 변경은 필요 없다.
+  - 예: builder가 `QuestionRepo.GetDueReviews`를 직접 호출하므로, 그 `levels` 인자에 하위 인접 레벨만 넘기는 조회를 추가한다. Repository SQL은 이미 `levels []string`(`$3`)을 받으므로 SQL 변경은 필요 없다.
   - 하위 인접 레벨 목록은 `sessionLevelsFor`의 순서를 따른다(`isLowerAdjacentQuestion`과 같은 기준).
 - `LIMIT`만 늘리는 방식은 쓰지 않는다. 현재 레벨 due가 그보다 많으면 같은 문제가 다시 생긴다.
 - 80% 목표, reserved listening/reading, kanji recall 상한 등 ADR-050의 나머지 규칙은 바꾸지 않는다.

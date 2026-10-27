@@ -8,7 +8,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -551,56 +550,6 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 	}
 }
 
-func TestShowQuestion_SubjectivePrompt(t *testing.T) {
-	ctx := context.Background()
-	stateStores := newTestInteractionStores()
-	sf, mAPI := botWithActive(
-		stateStores,
-		&activeRepoStub{},
-		&streakRepoStub{},
-	)
-
-	sessionID := 32
-	state := &model.QuizActiveSessionState{
-		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID, UserID: 1},
-		Items: []model.QuizActiveSessionQuestion{
-			{
-				SessionQuestion: model.SessionQuestion{QuestionID: 1},
-				Question:        model.Question{ID: 1, Type: model.QuestionSubjective, Prompt: "Translate"},
-			},
-		},
-	}
-	storeActiveState(
-		t,
-		stateStores,
-		sessionID,
-		state,
-	)
-
-	sf.showQuestion(
-		ctx,
-		123,
-		nil,
-		sessionID,
-		0,
-	)
-
-	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(
-		text,
-		"텍스트로 입력",
-	) {
-		t.Errorf(
-			"expected subjective input prompt, got %q",
-			text,
-		)
-	}
-	if _, ok := stateStores.active[123]; !ok {
-		t.Error("expected active question to be stored for subjective question")
-	}
-}
-
 // --- processAnswerText: wrong answer & AI unavailable ----------------------
 
 func TestProcessAnswerText_Wrong(t *testing.T) {
@@ -661,77 +610,6 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 	) {
 		t.Errorf(
 			"expected correct answer shown, got %q",
-			text,
-		)
-	}
-}
-
-func TestProcessAnswerText_SubjectiveAIUnavailable(t *testing.T) {
-	stateStores := newTestInteractionStores()
-	mAPI := &mockBotAPI{}
-	// LLM returns AI-unavailable error
-	llm := &mockLLM{
-		gradeFn: func(
-			ctx context.Context,
-			prompt,
-			correctAnswer,
-			userAnswer string,
-		) (external.GradeResult, error) {
-			return external.GradeResult{}, service.ErrAIUnavailable
-		},
-	}
-	sf := newTestSessionFlow(
-		mAPI,
-		stateStores,
-		SessionFlowDeps{
-			Session: newTestSessionService(
-				stateStores,
-				service.SessionDeps{LLM: llm, QuizActiveSessionRepo: &activeRepoStub{}},
-			),
-		},
-	)
-
-	sessionID, questionID := 41, 1
-	state := &model.QuizActiveSessionState{
-		Version: model.QuizActiveSessionStateVersion,
-		Session: model.Session{ID: sessionID, UserID: 1},
-		Items: []model.QuizActiveSessionQuestion{
-			{
-				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
-				Question: model.Question{
-					ID:            questionID,
-					Type:          model.QuestionSubjective,
-					Prompt:        "Translate",
-					CorrectAnswer: "x",
-				},
-			},
-		},
-	}
-	storeActiveState(
-		t,
-		stateStores,
-		sessionID,
-		state,
-	)
-
-	answerByText(
-		t,
-		sf,
-		stateStores,
-		123,
-		&tgbotapi.User{ID: 1},
-		sessionID,
-		0,
-		"answer",
-	)
-
-	text := collectText(mAPI.sentMessages)
-	if !strings.Contains(
-		text,
-		"AI 주관식 채점이 불가능",
-	) {
-		t.Errorf(
-			"expected AI-unavailable notice, got %q",
 			text,
 		)
 	}

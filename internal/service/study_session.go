@@ -158,30 +158,16 @@ func scaleStudyNewCount(
 	return newCount
 }
 
-type studySessionStore interface {
-	CreateSessionInTx(
-		ctx context.Context,
-		tx *sqlx.Tx,
-		session *model.Session,
-	) (int, error)
-	CreateSessionMaterialsInTx(
-		ctx context.Context,
-		tx *sqlx.Tx,
-		sessionID int,
-		materialIDs []int,
-	) error
-}
-
 // studySessionService creates material-based study sessions.
 type studySessionService struct {
 	materialRepo MaterialRepo
-	sessionRepo  studySessionStore
+	sessionRepo  SessionRepo
 	db           *sqlx.DB
 }
 
 func newStudySessionService(
 	materialRepo MaterialRepo,
-	sessionRepo studySessionStore,
+	sessionRepo SessionRepo,
 	db *sqlx.DB,
 ) *studySessionService {
 	return &studySessionService{

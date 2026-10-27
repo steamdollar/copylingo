@@ -1,5 +1,5 @@
 // Command handwriting_renderer rebuilds a stroke JSON into the server-side PNG
-// so client Canvas output and server RenderPNG() can be compared for parity.
+// so client Canvas output and server RenderStrokesPNG() can be compared for parity.
 //
 // Dev-only tool for false negatives in handwriting grading. Open the Mini App
 // with ?debug=1, draw a sample and export strokes.json and client.png, then
@@ -20,7 +20,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/lsj/copylingo/internal/service"
+	"github.com/lsj/copylingo/internal/miniapp"
 )
 
 // parityInput mirrors the JSON exported by the Mini App debug block. Only
@@ -30,7 +30,7 @@ type parityInput struct {
 	CanvasWidth  int              `json:"canvas_width,omitempty"`
 	CanvasHeight int              `json:"canvas_height,omitempty"`
 	LineWidth    int              `json:"line_width,omitempty"`
-	Strokes      []service.Stroke `json:"strokes"`
+	Strokes      []miniapp.Stroke `json:"strokes"`
 }
 
 func main() {
@@ -91,7 +91,7 @@ func run(
 		)
 	}
 
-	pngBytes, err := service.NewDefaultPNGStrokeRenderer().RenderPNG(in.Strokes)
+	pngBytes, err := miniapp.RenderStrokesPNG(in.Strokes)
 	if err != nil {
 		return fmt.Errorf(
 			"render PNG: %w",

@@ -3,28 +3,12 @@ package service
 import (
 	"context"
 	"slices"
-	"sort"
 	"testing"
 
 	"github.com/lsj/copylingo/internal/model"
 )
 
 func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
-	questions := func(
-		start,
-		count int,
-		level string,
-		category model.QuestionCategory,
-	) []model.Question {
-		rows := make(
-			[]model.Question,
-			count,
-		)
-		for i := range rows {
-			rows[i] = model.Question{ID: start + i, ProficiencyLevel: level, Category: category}
-		}
-		return rows
-	}
 	for _, tt := range []struct {
 		name        string
 		level       string
@@ -33,26 +17,26 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 		wantReading bool
 		wantAudio   bool
 	}{
-		{"current due alone meets the target", "N4", questions(
+		{"current due alone meets the target", "N4", makeQuestions(
 			1,
 			30,
 			"N4",
 			model.CategoryVocabulary,
 		), nil, false, false},
-		{"current grammar precedes adjacent new vocabulary", "N4", questions(
+		{"current grammar precedes adjacent new vocabulary", "N4", makeQuestions(
 			1,
 			30,
 			"N5",
 			model.CategoryVocabulary,
 		),
 			append(
-				questions(
+				makeQuestions(
 					101,
 					30,
 					"N4",
 					model.CategoryGrammar,
 				),
-				questions(
+				makeQuestions(
 					201,
 					30,
 					"N5",
@@ -61,13 +45,13 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 			), false, false},
 		{"reading cap cannot hide current grammar", "N4", nil,
 			append(
-				questions(
+				makeQuestions(
 					101,
 					30,
 					"N4",
 					model.CategoryReading,
 				),
-				questions(
+				makeQuestions(
 					201,
 					30,
 					"N4",
@@ -76,7 +60,7 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 			), true, false},
 		{"reserved due beyond the general pool remains reachable", "N4",
 			append(
-				questions(
+				makeQuestions(
 					1,
 					30,
 					"N4",
@@ -85,13 +69,13 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 				model.Question{ID: 50, ProficiencyLevel: "N4", Category: model.CategoryReading},
 				model.Question{ID: 51, ProficiencyLevel: "N4", Category: model.CategoryListening},
 			), nil, true, true},
-		{"upper due cannot take N3 slots", "N3", questions(
+		{"upper due cannot take N3 slots", "N3", makeQuestions(
 			1,
 			30,
 			"N2",
 			model.CategoryVocabulary,
 		),
-			questions(
+			makeQuestions(
 				101,
 				30,
 				"N3",
@@ -106,6 +90,45 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 			t.Run(
 				tt.name+"/"+profile.name,
 				func(t *testing.T) {
+					pool := &builderPool{due: tt.due, new: tt.new}
+					builder, stores := newTestBuilder(pool)
+					build := builder.BuildMorningSession
+					if profile.name == "evening" {
+						build = builder.BuildEveningSession
+					}
+					session, err := build(
+						context.Background(),
+						42,
+						"ja",
+						tt.level,
+					)
+					if err != nil || session == nil || session.TotalQuestions != profile.total ||
+						len(stores.rows) != profile.total {
+						t.Fatalf(
+							"session = %+v, selected = %d, error = %v",
+							session,
+							len(stores.rows),
+							err,
+						)
+					}
+					// Every query stays bounded by the session size.
+					for _, query := range pool.dueQueries {
+						if query.limit > profile.total+2 {
+							t.Fatalf(
+								"unbounded due query: %d",
+								query.limit,
+							)
+						}
+					}
+					for _, query := range pool.newQueries {
+						if query.limit > profile.total {
+							t.Fatalf(
+								"unbounded new query: %d",
+								query.limit,
+							)
+						}
+					}
+
 					byID := make(map[int]model.Question)
 					for _, q := range append(
 						slices.Clone(tt.due),
@@ -113,162 +136,9 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 					) {
 						byID[q.ID] = q
 					}
-					// Fake the repository contract: level-first due ordering and caps
-					// apply before LIMIT, with category filtering before selection.
-					getDue := func(
-						_ context.Context,
-						_ int64,
-						limit,
-						recall int,
-						categories ...model.QuestionCategory,
-					) ([]model.Question, error) {
-						if limit > profile.total+2 {
-							t.Fatalf(
-								"unbounded due query: %d",
-								limit,
-							)
-						}
-						pool := slices.Clone(tt.due)
-						sort.SliceStable(
-							pool,
-							func(
-								i,
-								j int,
-							) bool {
-								return pool[i].ProficiencyLevel == tt.level && pool[j].ProficiencyLevel != tt.level
-							},
-						)
-						var result []model.Question
-						reading := 0
-						for _, q := range pool {
-							if len(categories) > 0 && !slices.Contains(
-								categories,
-								q.Category,
-							) {
-								continue
-							}
-							if q.Category == model.CategoryReading {
-								if reading == 1 {
-									continue
-								}
-								reading++
-							}
-							result = append(
-								result,
-								q,
-							)
-							if len(result) == limit {
-								break
-							}
-						}
-						return result, nil
-					}
-					srs := &mockSRS{
-						getDueReviewsFn: func(
-							ctx context.Context,
-							userID int64,
-							limit,
-							recall int,
-						) ([]model.Question, error) {
-							return getDue(
-								ctx,
-								userID,
-								limit,
-								recall,
-							)
-						},
-						getDueReviewsForCategoriesFn: getDue,
-					}
-					fetcher := &mockQuestionFetcher{getNewQuestionsFn: func(
-						_ context.Context,
-						_ int64,
-						_ string,
-						levels []string,
-						category string,
-						exclude []int,
-						limit,
-						recall int,
-					) ([]model.Question, error) {
-						if limit > profile.total {
-							t.Fatalf(
-								"unbounded new query: %d",
-								limit,
-							)
-						}
-						var result []model.Question
-						for _, q := range tt.new {
-							if !slices.Contains(
-								levels,
-								q.ProficiencyLevel,
-							) || slices.Contains(
-								exclude,
-								q.ID,
-							) ||
-								(category != "" && string(q.Category) != category) {
-								continue
-							}
-							result = append(
-								result,
-								q,
-							)
-							if len(result) == limit {
-								break
-							}
-						}
-						return result, nil
-					}}
-					var selected []model.SessionQuestion
-					builder := newSessionBuilderService(
-						fetcher,
-						&mockSessionStore{
-							createSessionFn: func(
-								_ context.Context,
-								s *model.Session,
-							) error {
-								s.ID = 99
-								return nil
-							},
-						},
-						&mockSessionQuestionStore{
-							createSessionQuestionsFn: func(
-								_ context.Context,
-								rows []model.SessionQuestion,
-							) error {
-								selected = rows
-								return nil
-							},
-						},
-						srs,
-					)
-					var session *model.Session
-					var err error
-					if profile.name == "morning" {
-						session, err = builder.BuildMorningSession(
-							context.Background(),
-							42,
-							"ja",
-							tt.level,
-						)
-					} else {
-						session, err = builder.BuildEveningSession(
-							context.Background(),
-							42,
-							"ja",
-							tt.level,
-						)
-					}
-					if err != nil || session == nil || session.TotalQuestions != profile.total ||
-						len(selected) != profile.total {
-						t.Fatalf(
-							"session = %+v, selected = %d, error = %v",
-							session,
-							len(selected),
-							err,
-						)
-					}
 					current, reading, audio := 0, 0, 0
 					seen := make(map[int]bool)
-					for _, row := range selected {
+					for _, row := range stores.rows {
 						q := byID[row.QuestionID]
 						if seen[q.ID] {
 							t.Fatalf(

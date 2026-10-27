@@ -55,13 +55,11 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 			return
 		}
 		// Skip if fingerprint unchanged
-		if sf.recovery != nil {
-			if last, _ := sf.recovery.GetMiniAppFingerprint(
-				ctx,
-				s.ID,
-			); last == currentFp {
-				continue
-			}
+		if last, _ := sf.recovery.GetMiniAppFingerprint(
+			ctx,
+			s.ID,
+		); last == currentFp {
+			continue
 		}
 
 		state, err := sf.session.QuizProgress(
@@ -93,17 +91,15 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 		}
 
 		// Best-effort: edit the old message to strip its stale buttons.
-		if sf.messages != nil {
-			if ref, err := sf.messages.GetHandwritingMessage(
-				ctx,
-				s.ID,
-				q.ID,
-			); err == nil && ref != nil {
-				_ = sf.telegram.ClearInlineKeyboard(
-					ref.ChatID,
-					ref.MessageID,
-				)
-			}
+		if ref, err := sf.messages.GetHandwritingMessage(
+			ctx,
+			s.ID,
+			q.ID,
+		); err == nil && ref != nil {
+			_ = sf.telegram.ClearInlineKeyboard(
+				ref.ChatID,
+				ref.MessageID,
+			)
 		}
 
 		// (b) re-send the question with fresh URL
@@ -129,12 +125,10 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 			idx,
 		)
 
-		if sf.recovery != nil {
-			_ = sf.recovery.SetMiniAppFingerprint(
-				ctx,
-				s.ID,
-				currentFp,
-			)
-		}
+		_ = sf.recovery.SetMiniAppFingerprint(
+			ctx,
+			s.ID,
+			currentFp,
+		)
 	}
 }

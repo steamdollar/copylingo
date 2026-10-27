@@ -90,7 +90,11 @@ make infra
 # Records live in cmd/seeding/data/<language>/<level>.json; ja is the only language today.
 go run ./cmd/seeding ja
 
-# 4. Run the Go server
+# 4. Generate missing listening audio (TTS). The server never calls TTS;
+#    listening questions without audio are not selected until this runs.
+go run ./cmd/admin/generate_listening_audio -language ja
+
+# 5. Run the Go server
 go run ./cmd/server
 ```
 
@@ -118,7 +122,7 @@ Core variables:
 | Variable | Purpose |
 |---|---|
 | `COPYLINGO_TELEGRAM_TOKEN` | Telegram bot token |
-| `COPYLINGO_LLM_API_KEY` | Gemini API key used for grading, learning Q&A, and native TTS |
+| `COPYLINGO_LLM_API_KEY` | **Required** (startup fails without it). Gemini API key used for handwriting grading, learning Q&A, and native TTS |
 | `COPYLINGO_LLM_MODEL` | Chat model override (grading, Q&A) |
 | `COPYLINGO_SERVER_PUBLIC_BASE_URL` | Public HTTPS base URL required for Telegram Mini App flows |
 
@@ -158,6 +162,7 @@ docker compose up -d
 
 # Seed content from the host (the image builds only ./cmd/server)
 go run ./cmd/seeding ja   # connects to localhost:5432
+go run ./cmd/admin/generate_listening_audio -language ja   # TTS for new listening questions
 ```
 
 Compose startup is guarded by health checks for the stateful dependencies, and a one-shot MinIO job creates the audio bucket:

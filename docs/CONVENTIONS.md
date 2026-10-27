@@ -17,6 +17,15 @@ Logic code (service, bot, scheduler, repository, miniapp) treats every learning 
 5. **Tests**: level/language logic tests include a language and a level missing from the data (e.g. `en`/`B1` and `ja`/`N0` in `TestNeighborLevels`).
 6. **Allowed**: facts about a single-language external source inside its adapter (e.g. `internal/pipeline/fetcher_nhk.go`) and CLI flag defaults — neither is a branch in logic.
 
+## Realistic cases only
+
+Validation, error branches, and tests cover cases that can actually happen in operation, judged at the [`AGENTS.md`](../AGENTS.md) §4 scale. That scale makes concurrency and outages realistic; it doesn't justify guards for impossible states.
+
+1. **Handle** failures from outside the code: network/API calls (Telegram, LLM, TTS, storage), user input, Telegram updates that arrive twice or late (double taps, old buttons), concurrent sessions, Redis/DB outages.
+2. **Don't guard** states the code or its own data already rules out — e.g. a DB-generated ID being 0, an embedded file failing to read, an enum value our code never produces.
+3. **Tests** cover the changed behavior and its realistic failure paths. No tests for impossible states, no extra cases that exercise the same path, no tests that pin fixed copy with no logic behind it (prompt or doc text), no padding for coverage numbers.
+4. **When unsure**, name where the case comes from (an external input, a race, a past incident). If you can't, leave it out.
+
 ## Go code
 
 1. **Package structure**: split by responsibility under `internal/`. Allowed imports between packages are pinned by `internal/import_boundary_test.go` (see [ARCHITECTURE.md](ARCHITECTURE.md)).

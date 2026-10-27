@@ -29,11 +29,11 @@ sequenceDiagram
     M->>C: POST /api/miniapp/handwriting/submit
     C->>S: HTTPS 요청을 local :8080으로 전달
     S->>S: Telegram init_data 검증
+    S->>S: stroke data를 PNG로 렌더링 (miniapp handler)
     S->>R: session/question 검증 (working set 조회)
     opt working set 캐시 미스
         S->>DB: working set 복구
     end
-    S->>S: stroke data를 PNG로 렌더링
     S->>L: 정답 문자 기준 Binary Grading 요청
     L-->>S: is_correct, feedback 반환
     S->>R: 답변, 정오답 기록 (RecordAnswer)
@@ -71,11 +71,11 @@ Mini App은 제출 시 아래 JSON을 서버로 보낸다.
 서버 처리 순서는 보수적으로 구성한다.
 
 1. `init_data` 검증: Telegram이 발급한 Web App init data인지 HMAC 기반으로 확인한다.
-2. 사용자 소유권 확인: `session.user_id`와 `init_data`에서 나온 Telegram user id가 일치해야 한다.
-3. 문항 검증: `question_id`가 해당 세션에 포함되어 있어야 한다.
-4. 타입 검증: 문항 타입은 `kana_handwriting`이어야 한다.
-5. 중복 제출 방지: 이미 답변된 문항이면 `409 Conflict`를 반환한다.
-6. stroke 렌더링: 클라이언트가 보낸 좌표를 서버에서 PNG로 렌더링한다.
+2. stroke 렌더링: miniapp handler가 클라이언트가 보낸 좌표를 PNG로 렌더링한다. 빈 stroke는 `400`이다. 렌더링은 수 ms라 아래 검사보다 먼저 해도 비용이 작고, service는 stroke 형식을 모르고 이미지만 받는다.
+3. 사용자 소유권 확인: `session.user_id`와 `init_data`에서 나온 Telegram user id가 일치해야 한다.
+4. 문항 검증: `question_id`가 해당 세션에 포함되어 있어야 한다.
+5. 타입 검증: 문항 타입은 `kana_handwriting`이어야 한다.
+6. 중복 제출 방지: 이미 답변된 문항이면 `409 Conflict`를 반환한다.
 7. Binary Grading: LLM에게 open-ended OCR을 시키지 않고, "이 손글씨가 정답 문자 X로 볼 수 있는가"만 판단하게 한다.
 8. 결과 기록: 정오답을 Redis working set에 기록한다. 통계와 SRS는 세션 완료 flush 때 DB에 반영된다.
 

@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
 
@@ -116,15 +117,33 @@ func cloneTestState[T any](state *T) (*T, error) {
 	return &clone, nil
 }
 
+// missingQuizSessionRepo is a DB without sessions: reloading a Quiz working
+// set fails like the real repository does for an unknown session. Any other
+// call panics on the nil embedded interface.
+type missingQuizSessionRepo struct {
+	service.QuizActiveSessionRepo
+}
+
+func (missingQuizSessionRepo) LoadQuestionSessionWithStateBySessionID(
+	context.Context,
+	int,
+) (*model.QuizActiveSessionState, error) {
+	return nil, sql.ErrNoRows
+}
+
 // newTestSessionService wires SessionService over test fakes. When stores is
-// non-nil, its Quiz/Study working-set stores back the service; deps left
-// unset stay nil so an unexpected call fails loudly.
+// non-nil, its Quiz/Study working-set stores back the service. An unset Quiz
+// repo is a DB without sessions; other deps left unset stay nil so an
+// unexpected call fails loudly.
 func newTestSessionService(
 	stores *testInteractionStores,
 	deps service.SessionDeps,
 ) *service.SessionService {
 	if stores != nil {
 		deps.Stores = service.SessionStores{Quiz: stores.quiz, Study: stores.study}
+	}
+	if deps.QuizActiveSessionRepo == nil {
+		deps.QuizActiveSessionRepo = missingQuizSessionRepo{}
 	}
 	return service.NewSessionService(deps)
 }
@@ -526,33 +545,10 @@ func (s *testInteractionStores) SetMiniAppFingerprint(
 }
 
 type mockLLM struct {
-	gradeFn func(
-		ctx context.Context,
-		prompt,
-		correctAnswer,
-		userAnswer string,
-	) (external.GradeResult, error)
 	answerFn func(
 		ctx context.Context,
 		question string,
 	) (string, error)
-}
-
-func (m *mockLLM) GradeAnswer(
-	ctx context.Context,
-	prompt,
-	correctAnswer,
-	userAnswer string,
-) (external.GradeResult, error) {
-	if m.gradeFn != nil {
-		return m.gradeFn(
-			ctx,
-			prompt,
-			correctAnswer,
-			userAnswer,
-		)
-	}
-	return external.GradeResult{IsCorrect: true}, nil
 }
 
 func (m *mockLLM) GradeHandwriting(

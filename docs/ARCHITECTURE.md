@@ -19,14 +19,14 @@ cmd/
 └── dev/                     ← 개발 도구 (goparams, handwriting_renderer)
 internal/
 ├── config/                  ← 설정 관리 (Viper)
-├── bootstrap/               ← cmd 바이너리 공통 셋업 (DB 연결, audio 조립)
+├── bootstrap/               ← cmd 바이너리 공통 셋업 (DB 연결, audio store 조립)
 ├── model/                   ← 도메인 모델 (구조체 정의)
 ├── repository/              ← 데이터 접근 계층 (PostgreSQL)
 ├── redisstore/              ← Redis 키·직렬화·TTL·원자적 명령
 ├── service/                 ← 비즈니스 로직
 │   ├── srs.go               ← SM-2 간격 반복
 │   ├── session_builder.go   ← 세션 생성
-│   ├── grader.go            ← 채점
+│   ├── session_quiz_submit.go ← 답안 제출·채점
 │   └── analyzer.go          ← 통계/분석
 ├── bot/                     ← 텔레그램 봇 핸들러
 ├── callback/                ← callback data 형식 공용 정의
@@ -106,10 +106,10 @@ Bot은 세션 진행을 유지하고, Mini App은 canvas stroke data를 HTTP로 
   → web_app button: /miniapp/handwriting?session_id=...&question_id=...&prompt=...
      (language, level, cells도 query로 전달: internal/bot/session_question.go)
 [Mini App] → POST /api/miniapp/handwriting/submit
-[Go Server] init_data·소유권 검증 → PNG 렌더링 → LLM 채점 → Redis working set 기록
+[Go Server] init_data 검증 → PNG 렌더링(miniapp) → 소유권 검증(service) → LLM 채점 → Redis working set 기록
 ```
 
-`grader.go` → `quiz_active_session.go`의 `RecordAnswer`가 Redis working set에 답을 저장한다. DB(`session_questions`, `user_question_progress`)는 세션 완료 시 `Flush`가 기록한다.
+제출 메서드(`session_quiz_submit.go`, `session_quiz_handwriting.go`)가 채점한 뒤 `quiz_active_session.go`의 `RecordAnswer`가 Redis working set에 답을 저장한다. DB(`session_questions`, `user_question_progress`)는 세션 완료 시 `Flush`가 기록한다.
 endpoint, 제출 순서, tunnel 설정, 보안은 [`HANDWRITING_MINIAPP_INGRESS.md`](HANDWRITING_MINIAPP_INGRESS.md)를 기준으로 한다.
 
 ## Callback Data 규약

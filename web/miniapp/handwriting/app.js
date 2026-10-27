@@ -314,7 +314,7 @@ function setToolsDisabled(disabled) {
   eraserButton.disabled = disabled;
 }
 
-// ?debug=1 일 때만: 서버 RenderPNG()와 정합성을 비교하기 위한 개발용 export 버튼을 단다.
+// ?debug=1 일 때만: 서버 RenderStrokesPNG()와 정합성을 비교하기 위한 개발용 export 버튼을 단다.
 // client.png(현재 canvas) + strokes.json(서버 입력과 동일한 stroke 배열)을 내보낸다.
 // 운영 UI에는 노출하지 않는다. 비교 절차는 cmd/dev/handwriting_renderer 주석 참고.
 function setupDebugExport() {
@@ -345,7 +345,7 @@ function exportClientPNG() {
 }
 
 function exportStrokesJSON() {
-  // 서버 RenderPNG()에 들어가는 stroke 배열을 그대로 직렬화한다.
+  // 서버 RenderStrokesPNG()에 들어가는 stroke 배열을 그대로 직렬화한다.
   // canvas_width/height/line_width 는 사람이 정합성 맥락을 읽기 위한 메타데이터.
   const payload = {
     canvas_width: canvas.width,

@@ -1,63 +1,17 @@
 package service
 
 import (
-	"context"
 	"time"
 
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type questionQuerier interface {
-	GetDueReviews(
-		ctx context.Context,
-		userID int64,
-		language,
-		currentLevel string,
-		levels []string,
-		limit,
-		kanjiRecallLimit int,
-		categories ...model.QuestionCategory,
-	) ([]model.Question, error)
-	GetDueReviewCount(
-		ctx context.Context,
-		userID int64,
-		language string,
-		levels []string,
-	) (int, error)
-}
+// srs: Spaced Repetition System. Only the SM-2 scheduling lives here; due
+// reviews are read straight from QuestionRepo with the session level scope.
 
-// srs: Spaced Repetition System
-// srsScheduler는 graderService와 sessionBuilderService가 srsService에 의존할 때 쓰는 계약.
-// *srsService가 암묵적으로 만족한다.
-type srsScheduler interface {
-	GetDueReviews(
-		ctx context.Context,
-		userID int64,
-		language,
-		level string,
-		limit,
-		kanjiRecallLimit int,
-		categories ...model.QuestionCategory,
-	) ([]model.Question, error)
-	GetDueCount(
-		ctx context.Context,
-		userID int64,
-		language,
-		level string,
-	) (int, error)
-}
-
-// srsService implements the SM-2 Spaced Repetition algorithm for per-user progress.
-type srsService struct {
-	questionRepo questionQuerier
-}
-
-func newSRSService(questionRepo questionQuerier) *srsService {
-	return &srsService{questionRepo: questionRepo}
-}
-
-// ScheduleAnswer applies SRS changes in memory without writing to the DB.
-func (s *srsService) ScheduleAnswer(
+// scheduleAnswer applies one answer to progress in memory. The Quiz flush
+// writes it to the DB when the session completes.
+func scheduleAnswer(
 	progress *model.UserQuestionProgress,
 	isCorrect bool,
 ) {
@@ -65,15 +19,14 @@ func (s *srsService) ScheduleAnswer(
 	if isCorrect {
 		quality = 4 // correct with some hesitation
 	}
-
-	s.updateSchedule(
+	updateSchedule(
 		progress,
 		quality,
 	)
 }
 
 // updateSchedule applies the SM-2 algorithm to update the user's Question progress.
-func (s *srsService) updateSchedule(
+func updateSchedule(
 	q *model.UserQuestionProgress,
 	quality int,
 ) {
@@ -110,47 +63,4 @@ func (s *srsService) updateSchedule(
 		q.IntervalDays,
 	)
 	q.NextReviewAt = &nextReview
-}
-
-// GetDueReviews returns questions due for review.
-func (s *srsService) GetDueReviews(
-	ctx context.Context,
-	userID int64,
-	language,
-	level string,
-	limit,
-	kanjiRecallLimit int,
-	categories ...model.QuestionCategory,
-) ([]model.Question, error) {
-	return s.questionRepo.GetDueReviews(
-		ctx,
-		userID,
-		language,
-		level,
-		sessionLevelsFor(
-			language,
-			level,
-		),
-		limit,
-		kanjiRecallLimit,
-		categories...,
-	)
-}
-
-// GetDueCount returns the number of questions due for review.
-func (s *srsService) GetDueCount(
-	ctx context.Context,
-	userID int64,
-	language,
-	level string,
-) (int, error) {
-	return s.questionRepo.GetDueReviewCount(
-		ctx,
-		userID,
-		language,
-		sessionLevelsFor(
-			language,
-			level,
-		),
-	)
 }

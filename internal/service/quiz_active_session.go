@@ -10,11 +10,10 @@ import (
 )
 
 var (
-	ErrQuizActiveSessionQuestionNotFound  = errors.New("active session question not found")
-	ErrQuizActiveSessionAlreadyAnswered   = errors.New("active session question already answered")
-	ErrQuizActiveSessionIncomplete        = errors.New("active session is not fully answered")
-	ErrQuizActiveSessionUserMismatch      = errors.New("active session user mismatch")
-	ErrQuizActiveSessionDependencyMissing = errors.New("active session dependency missing")
+	ErrQuizActiveSessionQuestionNotFound = errors.New("active session question not found")
+	ErrQuizActiveSessionAlreadyAnswered  = errors.New("active session question already answered")
+	ErrQuizActiveSessionIncomplete       = errors.New("active session is not fully answered")
+	ErrQuizActiveSessionUserMismatch     = errors.New("active session user mismatch")
 )
 
 type QuizSessionStore interface {
@@ -50,18 +49,15 @@ type QuizSessionResult struct {
 type quizActiveSessionService struct {
 	repo  QuizActiveSessionRepo
 	store QuizSessionStore
-	srs   *srsService
 }
 
 func newQuizActiveSessionService(
 	repo QuizActiveSessionRepo,
 	store QuizSessionStore,
-	srs *srsService,
 ) *quizActiveSessionService {
 	return &quizActiveSessionService{
 		repo:  repo,
 		store: store,
-		srs:   srs,
 	}
 }
 
@@ -69,10 +65,6 @@ func (s *quizActiveSessionService) CreateFromDB(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	if s.repo == nil {
-		return nil, ErrQuizActiveSessionDependencyMissing
-	}
-
 	// retrieve target session from db (session - sessionQuestions - questions)
 	state, err := s.repo.LoadQuestionSessionWithStateBySessionID(
 		ctx,
@@ -120,9 +112,6 @@ func (s *quizActiveSessionService) Get(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	if s.store == nil {
-		return nil, ErrQuizActiveSessionDependencyMissing
-	}
 	state, err := s.store.Load(
 		ctx,
 		sessionID,
@@ -194,10 +183,7 @@ func (s *quizActiveSessionService) RecordAnswer(
 	if isCorrect {
 		state.Items[idx].Progress.TimesCorrect++
 	}
-	if s.srs == nil {
-		return ErrQuizActiveSessionDependencyMissing
-	}
-	s.srs.ScheduleAnswer(
+	scheduleAnswer(
 		&state.Items[idx].Progress,
 		isCorrect,
 	)
@@ -239,10 +225,6 @@ func (s *quizActiveSessionService) Flush(
 			sessionID,
 		)
 	}
-	if s.repo == nil {
-		return nil, ErrQuizActiveSessionDependencyMissing
-	}
-
 	state.Session.CorrectCount = state.CorrectCount()
 	if err := s.repo.FlushQuizActiveSession(
 		ctx,
@@ -262,9 +244,6 @@ func (s *quizActiveSessionService) Delete(
 	ctx context.Context,
 	sessionID int,
 ) error {
-	if s.store == nil {
-		return ErrQuizActiveSessionDependencyMissing
-	}
 	if err := s.store.Delete(
 		ctx,
 		sessionID,
@@ -282,9 +261,6 @@ func (s *quizActiveSessionService) save(
 	ctx context.Context,
 	state *model.QuizActiveSessionState,
 ) error {
-	if s.store == nil {
-		return ErrQuizActiveSessionDependencyMissing
-	}
 	if err := s.store.Save(
 		ctx,
 		state.Session.ID,

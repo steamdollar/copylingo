@@ -870,13 +870,11 @@ func (b *Bot) handleExit(
 	if msg.From != nil {
 		userID = &msg.From.ID
 	}
-	if b.input != nil {
-		_ = b.input.ClearInput(
-			ctx,
-			msg.Chat.ID,
-			userID,
-		)
-	}
+	_ = b.input.ClearInput(
+		ctx,
+		msg.Chat.ID,
+		userID,
+	)
 	b.telegram.SendMessage(
 		msg.Chat.ID,
 		botMessagesByLocale[botDefaultLocale].exitMessage,

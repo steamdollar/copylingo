@@ -48,11 +48,8 @@ type app struct {
 	closers   []io.Closer // closed in order by Close
 }
 
-// initApp connects everything once, in this order: DB·Redis → repositories
-// and external clients → Tier1 services → Telegram flows, scheduler and Mini
-// App handler → HTTP router. A failure after the connections are open closes
-// them before returning.
 func initApp(cfg *config.Config) (_ *app, err error) {
+	// db, redis setup
 	db, rdb, err := initInfra(cfg)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -88,20 +85,14 @@ func initApp(cfg *config.Config) (_ *app, err error) {
 	a.refresher = components.sessionFlow
 
 	// Content collection has no scheduled job (ADR-057).
-	schedDeps := scheduler.Deps{
+	a.scheduler = scheduler.New(scheduler.Deps{
 		User:        svc.user,
 		Session:     svc.session,
 		QuizPusher:  components.sessionFlow,
 		StudyPusher: components.studyFlow,
 		Cron:        cron.New(),
 		Claims:      redisstore.NewPushClaims(rdb),
-	}
-	// Same typed-nil guard as SessionFlowDeps.Audio: without a TTS key the
-	// scheduler must see a nil interface and skip the audio top-up.
-	if svc.audio != nil {
-		schedDeps.Audio = svc.audio
-	}
-	a.scheduler = scheduler.New(schedDeps)
+	})
 
 	// The Mini App only reports a graded handwriting answer; SessionFlow
 	// refreshes the Telegram message.

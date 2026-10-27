@@ -10,793 +10,492 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type mockQuestionFetcher struct {
-	getNewQuestionsFn func(
-		ctx context.Context,
-		userID int64,
-		language string,
-		levels []string,
-		category string,
-		excludeIDs []int,
-		limit,
-		kanjiRecallLimit int,
-	) ([]model.Question, error)
+// newQuery and dueQuery record the arguments of one QuestionRepo call.
+type newQuery struct {
+	levels           []string
+	category         string
+	limit            int
+	kanjiRecallLimit int
 }
 
-func (m *mockQuestionFetcher) GetNewQuestions(
-	ctx context.Context,
+type dueQuery struct {
+	userID           int64
+	language         string
+	currentLevel     string
+	levels           []string
+	limit            int
+	kanjiRecallLimit int
+	categories       []model.QuestionCategory
+}
+
+// builderPool is an in-memory QuestionRepo for the session builder. Due rows
+// are filtered by category and LIMIT; new rows by level scope, category,
+// exclusions and LIMIT, so a selected question is never offered twice. newFn
+// replaces the new-row lookup for tests that need a misbehaving repository.
+// Every call is recorded so tests can assert on the arguments after the build.
+type builderPool struct {
+	QuestionRepo
+	due        []model.Question
+	new        []model.Question
+	newFn      func(newQuery) []model.Question
+	dueQueries []dueQuery
+	newQueries []newQuery
+}
+
+func (p *builderPool) GetDueReviews(
+	_ context.Context,
 	userID int64,
-	lang string,
+	language,
+	currentLevel string,
 	levels []string,
-	cat string,
+	limit,
+	kanjiRecallLimit int,
+	categories ...model.QuestionCategory,
+) ([]model.Question, error) {
+	p.dueQueries = append(
+		p.dueQueries,
+		dueQuery{
+			userID:           userID,
+			language:         language,
+			currentLevel:     currentLevel,
+			levels:           levels,
+			limit:            limit,
+			kanjiRecallLimit: kanjiRecallLimit,
+			categories:       categories,
+		},
+	)
+	var rows []model.Question
+	for _, q := range p.due {
+		if len(rows) == limit {
+			break
+		}
+		if len(categories) == 0 || slices.Contains(
+			categories,
+			q.Category,
+		) {
+			rows = append(
+				rows,
+				q,
+			)
+		}
+	}
+	return rows, nil
+}
+
+func (p *builderPool) GetNewQuestions(
+	_ context.Context,
+	_ int64,
+	_ string,
+	levels []string,
+	category string,
 	excludeIDs []int,
 	limit,
 	kanjiRecallLimit int,
 ) ([]model.Question, error) {
-	return m.getNewQuestionsFn(
-		ctx,
-		userID,
-		lang,
-		levels,
-		cat,
-		excludeIDs,
-		limit,
-		kanjiRecallLimit,
+	query := newQuery{levels: levels, category: category, limit: limit, kanjiRecallLimit: kanjiRecallLimit}
+	p.newQueries = append(
+		p.newQueries,
+		query,
 	)
-}
-
-type mockSessionStore struct {
-	createSessionFn func(
-		ctx context.Context,
-		s *model.Session,
-	) error
-	getSessionsByStatusFn func(
-		ctx context.Context,
-		userID int64,
-		status model.SessionStatus,
-	) ([]model.Session, error)
-	listInProgressFn func(ctx context.Context) ([]model.Session, error)
-	startFn          func(
-		ctx context.Context,
-		id int,
-	) error
-}
-
-func (m *mockSessionStore) CreateSession(
-	ctx context.Context,
-	s *model.Session,
-) error {
-	return m.createSessionFn(
-		ctx,
-		s,
-	)
-}
-
-func (m *mockSessionStore) GetSessionsByStatus(
-	ctx context.Context,
-	userID int64,
-	status model.SessionStatus,
-) ([]model.Session, error) {
-	return m.getSessionsByStatusFn(
-		ctx,
-		userID,
-		status,
-	)
-}
-func (m *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
-	if m.listInProgressFn != nil {
-		return m.listInProgressFn(ctx)
+	if p.newFn != nil {
+		return p.newFn(query), nil
 	}
-	return nil, nil
-}
-func (m *mockSessionStore) Start(
-	ctx context.Context,
-	id int,
-) error {
-	return m.startFn(
-		ctx,
-		id,
-	)
+	var rows []model.Question
+	for _, q := range p.new {
+		if len(rows) == limit {
+			break
+		}
+		if slices.Contains(
+			levels,
+			q.ProficiencyLevel,
+		) && string(q.Category) == category && !slices.Contains(
+			excludeIDs,
+			q.ID,
+		) {
+			rows = append(
+				rows,
+				q,
+			)
+		}
+	}
+	return rows, nil
 }
 
-type mockSessionQuestionStore struct {
-	createSessionQuestionsFn func(
-		ctx context.Context,
-		sqs []model.SessionQuestion,
-	) error
+// generalDueQuery returns the uncategorized due query every build issues once.
+func (p *builderPool) generalDueQuery(t *testing.T) dueQuery {
+	t.Helper()
+	for _, query := range p.dueQueries {
+		if len(query.categories) == 0 {
+			return query
+		}
+	}
+	t.Fatal("no general due query")
+	return dueQuery{}
 }
 
-func (m *mockSessionQuestionStore) CreateSessionQuestions(
-	ctx context.Context,
-	sqs []model.SessionQuestion,
+// builderStores captures what the builder persists. CreateSession assigns ID
+// 10 unless createErr is set; CreateSessionQuestions returns rowsErr.
+type builderStores struct {
+	SessionRepo
+	createErr error
+	rowsErr   error
+	session   *model.Session
+	rows      []model.SessionQuestion
+}
+
+func (s *builderStores) CreateSession(
+	_ context.Context,
+	session *model.Session,
 ) error {
-	return m.createSessionQuestionsFn(
-		ctx,
-		sqs,
+	if s.createErr != nil {
+		return s.createErr
+	}
+	session.ID = 10
+	s.session = session
+	return nil
+}
+
+func (s *builderStores) CreateSessionQuestions(
+	_ context.Context,
+	rows []model.SessionQuestion,
+) error {
+	s.rows = rows
+	return s.rowsErr
+}
+
+func newTestBuilder(pool *builderPool) (*sessionBuilderService, *builderStores) {
+	stores := &builderStores{}
+	return newSessionBuilderService(
+		pool,
+		stores,
+		stores,
+	), stores
+}
+
+// makeQuestions returns count questions with consecutive IDs from start.
+func makeQuestions(
+	start,
+	count int,
+	level string,
+	category model.QuestionCategory,
+) []model.Question {
+	questions := make(
+		[]model.Question,
+		count,
 	)
+	for i := range questions {
+		questions[i] = model.Question{ID: start + i, ProficiencyLevel: level, Category: category}
+	}
+	return questions
+}
+
+// rowIDs returns the selected question IDs in session order.
+func rowIDs(rows []model.SessionQuestion) []int {
+	ids := make(
+		[]int,
+		len(rows),
+	)
+	for i, row := range rows {
+		ids[i] = row.QuestionID
+	}
+	return ids
 }
 
 func TestBuildMorningSession_MixesReviewAndNew(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if gotUserID != userID {
-				t.Fatalf(
-					"expected userID %d, got %d",
-					userID,
-					gotUserID,
-				)
-			}
-			if limit != 19 {
-				t.Errorf(
-					"expected bounded due pool limit 19, got %d",
-					limit,
-				)
-			}
-			return []model.Question{
-				{ID: 1, ProficiencyLevel: "N5"},
-				{ID: 2, ProficiencyLevel: "N5"},
-				{ID: 3, ProficiencyLevel: "N5"},
-				{ID: 4, ProficiencyLevel: "N5"},
-			}, nil // only 4 available
-		},
+	pool := &builderPool{
+		due: makeQuestions(
+			1,
+			4,
+			"N5",
+			"",
+		),
+		new: makeQuestions(
+			1000,
+			9,
+			"N5",
+			model.CategoryGrammar,
+		),
 	}
-
-	collectedNewCount := 0
-	getNewQuestionsCalls := 0
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			lang string,
-			levels []string,
-			cat string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if gotUserID != userID {
-				t.Fatalf(
-					"expected userID %d, got %d",
-					userID,
-					gotUserID,
-				)
-			}
-			if getNewQuestionsCalls == 0 {
-				if cat != string(model.CategoryVocabulary) {
-					t.Fatalf(
-						"expected first category %q, got %q",
-						model.CategoryVocabulary,
-						cat,
-					)
-				}
-				if limit != 6 {
-					t.Fatalf(
-						"expected 6 reserved vocabulary slots, got %d",
-						limit,
-					)
-				}
-			}
-			getNewQuestionsCalls++
-
-			// Random Slot Relay will call this multiple times for different categories.
-			// Each call should have a reasonable limit.
-			if limit < 0 {
-				t.Errorf(
-					"unexpected negative limit %d",
-					limit,
-				)
-			}
-
-			// We simulate returning a few questions for some categories to test relay.
-			// If cat is empty (final fallback), we return some to fill the gap.
-			var qs []model.Question
-			if cat == string(model.CategoryGrammar) {
-				// Fill up to 9 new questions (since we already have 4 reviews, total goal 15, need 11 new)
-				// But we'll return 9 to match the original test's 13 total.
-				need := min(
-					9-collectedNewCount,
-					limit,
-				)
-				if need > 0 {
-					for i := 0; i < need; i++ {
-						qs = append(
-							qs,
-							model.Question{
-								ID:               1000 + collectedNewCount + i,
-								ProficiencyLevel: "N5",
-								Category:         model.CategoryGrammar,
-							},
-						)
-					}
-				}
-			}
-			collectedNewCount += len(qs)
-			return qs, nil
-		},
-	}
-
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			// 4 reviews + 9 new = 13 total
-			if s.TotalQuestions != 13 {
-				t.Errorf(
-					"expected total 13, got %d",
-					s.TotalQuestions,
-				)
-			}
-			s.ID = 10
-			return nil
-		},
-	}
-
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			sqs []model.SessionQuestion,
-		) error {
-			if len(sqs) != 13 {
-				t.Errorf(
-					"expected 13 sqs, got %d",
-					len(sqs),
-				)
-			}
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	session, err := builder.BuildMorningSession(
-		ctx,
-		userID,
-		"jp",
-		"n5",
-	)
-
-	if err != nil {
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildMorningSession(
+		context.Background(),
+		123,
+		"ja",
+		"N5",
+	); err != nil {
 		t.Fatalf(
 			"BuildMorningSession failed: %v",
 			err,
 		)
 	}
-	if session == nil {
-		t.Fatal("expected session to be created")
+
+	// The vocabulary reservation runs first and the general due pool is bounded.
+	if first := pool.newQueries[0]; first.category != string(model.CategoryVocabulary) || first.limit != 6 {
+		t.Fatalf(
+			"first new query = %+v, want 6 reserved vocabulary slots",
+			first,
+		)
+	}
+	if limit := pool.generalDueQuery(t).limit; limit != 19 {
+		t.Fatalf(
+			"general due limit = %d, want 19",
+			limit,
+		)
+	}
+	// 4 reviews + 9 new grammar questions.
+	if stores.session.TotalQuestions != 13 || len(stores.rows) != 13 {
+		t.Fatalf(
+			"total = %d, rows = %d, want 13",
+			stores.session.TotalQuestions,
+			len(stores.rows),
+		)
 	}
 }
 
 func TestBuildMorningSession_ReservesListeningAndBuildsSeventeenQuestions(t *testing.T) {
-	ctx := context.Background()
-	const userID int64 = 123
-	listeningFetches := 0
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			context.Context,
-			int64,
-			int,
-			int,
-		) ([]model.Question, error) {
-			questions := make(
-				[]model.Question,
+	pool := &builderPool{
+		due: makeQuestions(
+			1,
+			6,
+			"N5",
+			"",
+		),
+		new: slices.Concat(
+			makeQuestions(
+				101,
 				6,
-			)
-			for i := range questions {
-				questions[i] = model.Question{ID: i + 1, ProficiencyLevel: "N5"}
-			}
-			return questions, nil
-		},
+				"N5",
+				model.CategoryVocabulary,
+			),
+			makeQuestions(
+				201,
+				1,
+				"N5",
+				model.CategoryListening,
+			),
+			makeQuestions(
+				301,
+				20,
+				"N5",
+				model.CategoryGrammar,
+			),
+		),
 	}
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			language string,
-			levels []string,
-			category string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			// Reserved listening/reading slots may fall back to one adjacent level
-			// at a time once the current level has no new supply (ADR-079).
-			reservedFallback := (category == string(model.CategoryReading) ||
-				category == string(model.CategoryListening)) &&
-				(slices.Equal(
-					levels,
-					[]string{"N4"},
-				) || slices.Equal(
-					levels,
-					[]string{"NZ"},
-				))
-			if !reservedFallback && !slices.Equal(
-				levels,
-				[]string{"N5"},
-			) && !slices.Equal(
-				levels,
-				[]string{"N5", "N4"},
-			) {
-				t.Fatalf(
-					"levels = %v, want [N5] or reserved adjacent fallback",
-					levels,
-				)
-			}
-			switch category {
-			case string(model.CategoryVocabulary):
-				if limit == 6 {
-					questions := make(
-						[]model.Question,
-						6,
-					)
-					for i := range questions {
-						questions[i] = model.Question{
-							ID:               101 + i,
-							ProficiencyLevel: "N5",
-							Category:         model.CategoryVocabulary,
-						}
-					}
-					return questions, nil
-				}
-				return nil, nil
-			case string(model.CategoryListening):
-				listeningFetches++
-				if listeningFetches == 1 {
-					if limit != 1 {
-						t.Fatalf(
-							"reserved listening limit = %d, want 1",
-							limit,
-						)
-					}
-					return []model.Question{{ID: 201, ProficiencyLevel: "N5", Category: model.CategoryListening}}, nil
-				}
-				return nil, nil
-			case string(model.CategoryGrammar):
-				questions := make(
-					[]model.Question,
-					0,
-					limit,
-				)
-				for id := 301; len(questions) < limit; id++ {
-					if !slices.Contains(
-						excludeIDs,
-						id,
-					) {
-						questions = append(
-							questions,
-							model.Question{ID: id, ProficiencyLevel: "N5", Category: model.CategoryGrammar},
-						)
-					}
-				}
-				return questions, nil
-			default:
-				return nil, nil
-			}
-		},
-	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			session *model.Session,
-		) error {
-			if session.TotalQuestions != 17 {
-				t.Fatalf(
-					"TotalQuestions = %d, want 17",
-					session.TotalQuestions,
-				)
-			}
-			session.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			questions []model.SessionQuestion,
-		) error {
-			if len(questions) != 17 {
-				t.Fatalf(
-					"len(questions) = %d, want 17",
-					len(questions),
-				)
-			}
-			listeningCount := 0
-			for _, question := range questions {
-				if question.QuestionID == 201 {
-					listeningCount++
-				}
-			}
-			if listeningCount != 1 {
-				t.Fatalf(
-					"listeningCount = %d, want 1",
-					listeningCount,
-				)
-			}
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	session, err := builder.BuildMorningSession(
-		ctx,
-		userID,
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildMorningSession(
+		context.Background(),
+		123,
 		"ja",
 		"N5",
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf(
 			"BuildMorningSession failed: %v",
 			err,
 		)
 	}
-	if session == nil {
-		t.Fatal("expected session")
+
+	for _, query := range pool.newQueries {
+		// Reserved listening/reading slots may probe one adjacent level once the
+		// current level has no new supply (ADR-079); everything else stays current.
+		reservedProbe := len(query.levels) == 1 &&
+			(query.category == string(model.CategoryListening) || query.category == string(model.CategoryReading))
+		if !reservedProbe && !slices.Equal(
+			query.levels,
+			[]string{"N5"},
+		) {
+			t.Fatalf(
+				"new query levels = %v, want [N5] or a reserved adjacent probe",
+				query.levels,
+			)
+		}
+	}
+	listening := slices.IndexFunc(
+		pool.newQueries,
+		func(q newQuery) bool { return q.category == string(model.CategoryListening) },
+	)
+	if listening < 0 || pool.newQueries[listening].limit != 1 {
+		t.Fatalf(
+			"reserved listening query index = %d, want limit 1",
+			listening,
+		)
+	}
+	if stores.session.TotalQuestions != 17 || !slices.Contains(
+		rowIDs(stores.rows),
+		201,
+	) {
+		t.Fatalf(
+			"total = %d, rows = %v, want 17 with listening 201",
+			stores.session.TotalQuestions,
+			rowIDs(stores.rows),
+		)
 	}
 }
 
 func TestBuildEveningSession_ReservesOneThirdForVocabulary(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if gotUserID != userID {
-				t.Fatalf(
-					"expected userID %d, got %d",
-					userID,
-					gotUserID,
-				)
-			}
-			if limit != 19 {
-				t.Fatalf(
-					"expected bounded due pool limit 19, got %d",
-					limit,
-				)
-			}
-			return []model.Question{
-				{ID: 1, ProficiencyLevel: "N5"},
-				{ID: 2, ProficiencyLevel: "N5"},
-				{ID: 3, ProficiencyLevel: "N5"},
-				{ID: 4, ProficiencyLevel: "N5"},
-				{ID: 5, ProficiencyLevel: "N5"},
-				{ID: 6, ProficiencyLevel: "N5"},
-				{ID: 7, ProficiencyLevel: "N5"},
-				{ID: 8, ProficiencyLevel: "N5"},
-				{ID: 9, ProficiencyLevel: "N5"},
-				{ID: 10, ProficiencyLevel: "N5"},
-			}, nil
-		},
+	pool := &builderPool{
+		due: makeQuestions(
+			1,
+			10,
+			"N5",
+			"",
+		),
+		new: slices.Concat(
+			makeQuestions(
+				101,
+				6,
+				"N5",
+				model.CategoryVocabulary,
+			),
+			makeQuestions(
+				150,
+				1,
+				"N5",
+				model.CategoryListening,
+			),
+		),
 	}
-	// The first listening call is the reservation; later relay calls find no
-	// more listening supply.
-	listeningCalls := 0
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			lang string,
-			levels []string,
-			cat string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if gotUserID != userID {
-				t.Fatalf(
-					"expected userID %d, got %d",
-					userID,
-					gotUserID,
-				)
-			}
-			switch cat {
-			case string(model.CategoryVocabulary):
-				if !slices.Contains(
-					excludeIDs,
-					101,
-				) && limit != 6 {
-					t.Fatalf(
-						"expected 6 reserved vocabulary slots, got %d",
-						limit,
-					)
-				}
-				var result []model.Question
-				for id := 101; id <= 106 && len(result) < limit; id++ {
-					if !slices.Contains(
-						excludeIDs,
-						id,
-					) {
-						result = append(
-							result,
-							model.Question{ID: id, ProficiencyLevel: "N5", Category: model.CategoryVocabulary},
-						)
-					}
-				}
-				return result, nil
-			case string(model.CategoryListening):
-				listeningCalls++
-				if listeningCalls > 1 {
-					return nil, nil
-				}
-				if limit != 1 {
-					t.Fatalf(
-						"expected 1 reserved listening slot, got %d",
-						limit,
-					)
-				}
-				return []model.Question{{ID: 150, ProficiencyLevel: "N5", Category: model.CategoryListening}}, nil
-			case string(model.CategoryReading):
-				return nil, nil
-			default:
-				return nil, nil
-			}
-		},
-	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			if s.TotalQuestions != 17 {
-				t.Fatalf(
-					"expected total 17, got %d",
-					s.TotalQuestions,
-				)
-			}
-			s.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			sqs []model.SessionQuestion,
-		) error {
-			if len(sqs) != 17 {
-				t.Fatalf(
-					"expected 17 session questions, got %d",
-					len(sqs),
-				)
-			}
-			for _, wantID := range []int{101, 102, 103, 104, 105, 106, 150} {
-				found := slices.ContainsFunc(
-					sqs,
-					func(sq model.SessionQuestion) bool {
-						return sq.QuestionID == wantID && !sq.IsReview
-					},
-				)
-				if !found {
-					t.Fatalf(
-						"reserved new question %d missing",
-						wantID,
-					)
-				}
-			}
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	session, err := builder.BuildEveningSession(
-		ctx,
-		userID,
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildEveningSession(
+		context.Background(),
+		123,
 		"ja",
 		"N5",
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf(
 			"BuildEveningSession failed: %v",
 			err,
 		)
 	}
-	if session == nil {
-		t.Fatal("expected session")
+
+	if first := pool.newQueries[0]; first.category != string(model.CategoryVocabulary) || first.limit != 6 {
+		t.Fatalf(
+			"first new query = %+v, want 6 reserved vocabulary slots",
+			first,
+		)
+	}
+	if limit := pool.generalDueQuery(t).limit; limit != 19 {
+		t.Fatalf(
+			"general due limit = %d, want 19",
+			limit,
+		)
+	}
+	if stores.session.TotalQuestions != 17 || len(stores.rows) != 17 {
+		t.Fatalf(
+			"total = %d, rows = %d, want 17",
+			stores.session.TotalQuestions,
+			len(stores.rows),
+		)
+	}
+	// Reserved vocabulary and listening enter as new questions despite the
+	// due backlog.
+	for _, wantID := range []int{101, 102, 103, 104, 105, 106, 150} {
+		if !slices.ContainsFunc(
+			stores.rows,
+			func(row model.SessionQuestion) bool {
+				return row.QuestionID == wantID && !row.IsReview
+			},
+		) {
+			t.Fatalf(
+				"reserved new question %d missing",
+				wantID,
+			)
+		}
 	}
 }
 
 func TestBuildEveningSession_FillsVocabularyShortageWithRelay(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-	vocabularyCalls := 0
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			return []model.Question{
-				{ID: 1, ProficiencyLevel: "N5"},
-				{ID: 2, ProficiencyLevel: "N5"},
-				{ID: 3, ProficiencyLevel: "N5"},
-				{ID: 4, ProficiencyLevel: "N5"},
-				{ID: 5, ProficiencyLevel: "N5"},
-				{ID: 6, ProficiencyLevel: "N5"},
-			}, nil
-		},
+	pool := &builderPool{
+		due: makeQuestions(
+			1,
+			6,
+			"N5",
+			"",
+		),
+		new: slices.Concat(
+			makeQuestions(
+				101,
+				2,
+				"N5",
+				model.CategoryVocabulary,
+			),
+			makeQuestions(
+				201,
+				4,
+				"N5",
+				model.CategoryGrammar,
+			),
+		),
 	}
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			lang string,
-			levels []string,
-			cat string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if cat == string(model.CategoryVocabulary) {
-				vocabularyCalls++
-				if vocabularyCalls == 1 {
-					return []model.Question{{ID: 101, ProficiencyLevel: "N5"}, {ID: 102, ProficiencyLevel: "N5"}}, nil
-				}
-			}
-			if cat == string(model.CategoryGrammar) {
-				return []model.Question{
-					{ID: 201, ProficiencyLevel: "N5"},
-					{ID: 202, ProficiencyLevel: "N5"},
-					{ID: 203, ProficiencyLevel: "N5"},
-					{ID: 204, ProficiencyLevel: "N5"},
-				}, nil
-			}
-			return nil, nil
-		},
-	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			if s.TotalQuestions != 12 {
-				t.Fatalf(
-					"expected total 12, got %d",
-					s.TotalQuestions,
-				)
-			}
-			s.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			sqs []model.SessionQuestion,
-		) error {
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	session, err := builder.BuildEveningSession(
-		ctx,
-		userID,
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildEveningSession(
+		context.Background(),
+		123,
 		"ja",
 		"N5",
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf(
 			"BuildEveningSession failed: %v",
 			err,
 		)
 	}
-	if session == nil {
-		t.Fatal("expected session")
+
+	// 6 reviews + 2 vocabulary; the relay fills the shortage with 4 grammar.
+	if stores.session.TotalQuestions != 12 {
+		t.Fatalf(
+			"total = %d, want 12",
+			stores.session.TotalQuestions,
+		)
 	}
 }
 
 func TestBuildReviewSession_OnlySRS(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if gotUserID != userID {
-				t.Fatalf(
-					"expected userID %d, got %d",
-					userID,
-					gotUserID,
-				)
-			}
-			return []model.Question{{ID: 1}, {ID: 2}}, nil
-		},
-	}
-
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			return nil
-		},
-	}
-
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			sqs []model.SessionQuestion,
-		) error {
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		nil,
-		sStore,
-		sqStore,
-		srsMock,
-	)
+	pool := &builderPool{due: makeQuestions(
+		1,
+		2,
+		"",
+		"",
+	)}
+	builder, _ := newTestBuilder(pool)
 	session, err := builder.BuildReviewSession(
-		ctx,
-		userID,
+		context.Background(),
+		123,
 		"ja",
 		"N5",
 		5,
 	)
-
 	if err != nil {
 		t.Fatalf(
 			"BuildReviewSession failed: %v",
 			err,
 		)
 	}
-	if session.TotalQuestions != 2 {
-		t.Errorf(
-			"expected 2 questions, got %d",
+
+	if session.TotalQuestions != 2 || len(pool.newQueries) != 0 {
+		t.Fatalf(
+			"total = %d, new queries = %d, want 2 due only",
 			session.TotalQuestions,
+			len(pool.newQueries),
 		)
 	}
-	if srsMock.gotLanguage != "ja" || srsMock.gotLevel != "N5" {
+	// Due reviews span the same level scope as new questions.
+	query := pool.dueQueries[0]
+	if query.userID != 123 || query.language != "ja" || query.currentLevel != "N5" || !slices.Equal(
+		query.levels,
+		sessionLevelsFor(
+			"ja",
+			"N5",
+		),
+	) {
 		t.Fatalf(
-			"due scope = %s/%s, want ja/N5",
-			srsMock.gotLanguage,
-			srsMock.gotLevel,
+			"due query = %+v, want user 123 ja/N5 with session levels",
+			query,
 		)
 	}
 }
 
 func TestBuildReviewSession_CapsKanjiRecallAdmissionAtThree(t *testing.T) {
-	ctx := context.Background()
 	kanjiSkill := model.SkillVocabKanjiRecall
-	due := []model.Question{
+	pool := &builderPool{due: []model.Question{
 		{ID: 1, Skill: &kanjiSkill},
 		{ID: 2, Skill: &kanjiSkill},
 		{ID: 3, Skill: &kanjiSkill},
@@ -804,174 +503,100 @@ func TestBuildReviewSession_CapsKanjiRecallAdmissionAtThree(t *testing.T) {
 		{ID: 5, Skill: &kanjiSkill},
 		{ID: 6},
 		{ID: 7},
-	}
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			userID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if limit != 10 || kanjiRecallLimit != maxKanjiRecallPerSession {
-				t.Fatalf(
-					"GetDueReviews limit=%d kanjiRecallLimit=%d, want 10,%d",
-					limit,
-					kanjiRecallLimit,
-					maxKanjiRecallPerSession,
-				)
-			}
-			return due, nil
-		},
-	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			session *model.Session,
-		) error {
-			session.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			questions []model.SessionQuestion,
-		) error {
-			wantIDs := []int{1, 2, 3, 6, 7}
-			if len(questions) != len(wantIDs) {
-				t.Fatalf(
-					"len(questions) = %d, want %d",
-					len(questions),
-					len(wantIDs),
-				)
-			}
-			for i, wantID := range wantIDs {
-				if questions[i].QuestionID != wantID {
-					t.Fatalf(
-						"questions[%d].QuestionID = %d, want %d",
-						i,
-						questions[i].QuestionID,
-						wantID,
-					)
-				}
-			}
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		nil,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	session, err := builder.BuildReviewSession(
-		ctx,
+	}}
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildReviewSession(
+		context.Background(),
 		123,
 		"ja",
 		"N5",
 		10,
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf(
 			"BuildReviewSession failed: %v",
 			err,
 		)
 	}
-	if session.TotalQuestions != 5 {
+
+	if query := pool.dueQueries[0]; query.limit != 10 || query.kanjiRecallLimit != maxKanjiRecallPerSession {
 		t.Fatalf(
-			"TotalQuestions = %d, want 5",
-			session.TotalQuestions,
+			"due query limit = %d, kanjiRecallLimit = %d, want 10, %d",
+			query.limit,
+			query.kanjiRecallLimit,
+			maxKanjiRecallPerSession,
+		)
+	}
+	// The repository returned five kanji-recall rows; the builder admits three.
+	if got := rowIDs(stores.rows); !slices.Equal(
+		got,
+		[]int{1, 2, 3, 6, 7},
+	) || stores.session.TotalQuestions != 5 {
+		t.Fatalf(
+			"selected = %v, total = %d, want [1 2 3 6 7]",
+			got,
+			stores.session.TotalQuestions,
 		)
 	}
 }
 
 func TestBuildMorningSession_PassesRemainingKanjiRecallBudgetToNewFetches(t *testing.T) {
-	ctx := context.Background()
 	kanjiSkill := model.SkillVocabKanjiRecall
-	newFetchCalls := 0
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			userID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			return []model.Question{
-				{ID: 1, ProficiencyLevel: "N5", Skill: &kanjiSkill},
-				{ID: 2, ProficiencyLevel: "N5", Skill: &kanjiSkill},
-				{ID: 3, ProficiencyLevel: "N5"},
-				{ID: 4, ProficiencyLevel: "N5"},
-				{ID: 5, ProficiencyLevel: "N5"},
-				{ID: 6, ProficiencyLevel: "N5"},
-			}, nil
-		},
-	}
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			userID int64,
-			language string,
-			levels []string,
-			category string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			newFetchCalls++
-			if newFetchCalls == 1 {
-				if category != string(model.CategoryVocabulary) || kanjiRecallLimit != 1 {
-					t.Fatalf(
-						"first new fetch category=%q kanjiRecallLimit=%d, want vocabulary,1",
-						category,
-						kanjiRecallLimit,
-					)
-				}
-				return []model.Question{
-					{ID: 101, ProficiencyLevel: "N5", Skill: &kanjiSkill},
-					{ID: 102, ProficiencyLevel: "N5"},
-					{ID: 103, ProficiencyLevel: "N5"},
-					{ID: 104, ProficiencyLevel: "N5"},
-					{ID: 105, ProficiencyLevel: "N5"},
-				}, nil
-			}
-			if kanjiRecallLimit != 0 {
-				t.Fatalf(
-					"later new fetch kanjiRecallLimit = %d, want 0",
-					kanjiRecallLimit,
-				)
-			}
-			return nil, nil
-		},
-	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			session *model.Session,
-		) error {
-			session.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			questions []model.SessionQuestion,
-		) error {
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
+	due := makeQuestions(
+		1,
+		6,
+		"N5",
+		"",
 	)
+	due[0].Skill, due[1].Skill = &kanjiSkill, &kanjiSkill
+	fresh := makeQuestions(
+		101,
+		5,
+		"N5",
+		model.CategoryVocabulary,
+	)
+	fresh[0].Skill = &kanjiSkill
+	pool := &builderPool{due: due, new: fresh}
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildMorningSession(
+		context.Background(),
+		123,
+		"ja",
+		"N5",
+	); err != nil {
+		t.Fatalf(
+			"BuildMorningSession failed: %v",
+			err,
+		)
+	}
+
+	// Two due kanji-recall reviews leave one slot for the first new fetch; the
+	// new kanji-recall question then exhausts the budget for later fetches.
+	if first := pool.newQueries[0]; first.category != string(model.CategoryVocabulary) || first.kanjiRecallLimit != 1 {
+		t.Fatalf(
+			"first new query = %+v, want vocabulary with kanjiRecallLimit 1",
+			first,
+		)
+	}
+	for _, query := range pool.newQueries[1:] {
+		if query.kanjiRecallLimit != 0 {
+			t.Fatalf(
+				"later new query = %+v, want kanjiRecallLimit 0",
+				query,
+			)
+		}
+	}
+	if stores.session.TotalQuestions != 11 {
+		t.Fatalf(
+			"total = %d, want 11",
+			stores.session.TotalQuestions,
+		)
+	}
+}
+
+func TestBuildSession_NoQuestions(t *testing.T) {
+	builder, stores := newTestBuilder(&builderPool{})
 	session, err := builder.BuildMorningSession(
-		ctx,
+		context.Background(),
 		123,
 		"ja",
 		"N5",
@@ -982,515 +607,235 @@ func TestBuildMorningSession_PassesRemainingKanjiRecallBudgetToNewFetches(t *tes
 			err,
 		)
 	}
-	if session == nil || session.TotalQuestions != 11 {
+	if session != nil || stores.session != nil {
 		t.Fatalf(
-			"session = %+v, want 11 questions",
+			"session = %+v, want nothing created when no questions are found",
 			session,
 		)
 	}
 }
 
-func TestBuildSession_NoQuestions(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			return nil, nil
-		},
-	}
-
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			lang string,
-			levels []string,
-			cat string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			return nil, nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		nil,
-		nil,
-		srsMock,
-	)
-	session, err := builder.BuildMorningSession(
-		ctx,
-		userID,
-		"jp",
-		"n5",
-	)
-
-	if err != nil {
-		t.Fatalf(
-			"BuildMorningSession failed: %v",
-			err,
-		)
-	}
-	if session != nil {
-		t.Error("expected nil session when no questions found")
-	}
-}
-
 func TestBuildSession_CreateFails(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			return []model.Question{{ID: 1}}, nil
-		},
-	}
-
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			return errors.New("db error")
-		},
-	}
-
-	builder := newSessionBuilderService(
-		nil,
-		sStore,
-		nil,
-		srsMock,
-	)
+	builder, stores := newTestBuilder(&builderPool{due: makeQuestions(
+		1,
+		1,
+		"",
+		"",
+	)})
+	stores.createErr = errors.New("db error")
 	_, err := builder.BuildReviewSession(
-		ctx,
-		userID,
+		context.Background(),
+		123,
 		"ja",
 		"N5",
 		5,
 	)
-
-	if err == nil {
-		t.Error("expected error when session creation fails")
+	if !errors.Is(
+		err,
+		stores.createErr,
+	) || stores.rows != nil {
+		t.Fatalf(
+			"error = %v, rows = %v, want CreateSession error and no rows",
+			err,
+			stores.rows,
+		)
 	}
 }
 
 func TestBuildSession_CreateSessionQuestionsFails(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-	expectedErr := errors.New("create session questions failed")
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			return []model.Question{{ID: 1}, {ID: 2}}, nil
-		},
-	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			s.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			sqs []model.SessionQuestion,
-		) error {
-			if len(sqs) != 2 {
-				t.Errorf(
-					"expected 2 session questions, got %d",
-					len(sqs),
-				)
-			}
-			for _, sq := range sqs {
-				if sq.SessionID != 10 {
-					t.Errorf(
-						"expected SessionID 10, got %d",
-						sq.SessionID,
-					)
-				}
-			}
-			return expectedErr
-		},
-	}
-
-	builder := newSessionBuilderService(
-		nil,
-		sStore,
-		sqStore,
-		srsMock,
-	)
+	builder, stores := newTestBuilder(&builderPool{due: makeQuestions(
+		1,
+		2,
+		"",
+		"",
+	)})
+	stores.rowsErr = errors.New("create session questions failed")
 	_, err := builder.BuildReviewSession(
-		ctx,
-		userID,
+		context.Background(),
+		123,
 		"ja",
 		"N5",
 		5,
 	)
-
 	if !errors.Is(
 		err,
-		expectedErr,
+		stores.rowsErr,
 	) {
 		t.Fatalf(
-			"expected CreateSessionQuestions error %v, got %v",
-			expectedErr,
+			"error = %v, want %v",
 			err,
+			stores.rowsErr,
+		)
+	}
+	// Rows carry the new session's ID before they are stored.
+	if len(stores.rows) != 2 || stores.rows[0].SessionID != 10 || stores.rows[1].SessionID != 10 {
+		t.Fatalf(
+			"rows = %+v, want 2 rows of session 10",
+			stores.rows,
 		)
 	}
 }
 
 func TestBuildSession_DeduplicatesQuestionIDs(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			return []model.Question{{ID: 1, ProficiencyLevel: "N5"}, {ID: 1, ProficiencyLevel: "N5"}}, nil
-		},
-	}
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			lang string,
-			levels []string,
-			cat string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
+	pool := &builderPool{
+		due: []model.Question{{ID: 1, ProficiencyLevel: "N5"}, {ID: 1, ProficiencyLevel: "N5"}},
+		// This repository ignores exclusions, so the builder must drop repeated
+		// and already-selected IDs itself.
+		newFn: func(newQuery) []model.Question {
 			return []model.Question{
 				{ID: 1, ProficiencyLevel: "N5"},
 				{ID: 2, ProficiencyLevel: "N5"},
 				{ID: 2, ProficiencyLevel: "N5"},
-			}, nil
+			}
 		},
 	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			if s.TotalQuestions != 2 {
-				t.Fatalf(
-					"expected 2 unique questions, got %d",
-					s.TotalQuestions,
-				)
-			}
-			s.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			sqs []model.SessionQuestion,
-		) error {
-			if len(sqs) != 2 {
-				t.Fatalf(
-					"expected 2 unique session questions, got %d",
-					len(sqs),
-				)
-			}
-			if sqs[0].QuestionID != 1 || sqs[1].QuestionID != 2 {
-				t.Fatalf(
-					"unexpected question ids: %+v",
-					sqs,
-				)
-			}
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	session, err := builder.BuildMorningSession(
-		ctx,
-		userID,
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildMorningSession(
+		context.Background(),
+		123,
 		"ja",
 		"N5",
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf(
 			"BuildMorningSession failed: %v",
 			err,
 		)
 	}
-	if session == nil {
-		t.Fatal("expected session")
+	if got := rowIDs(stores.rows); !slices.Equal(
+		got,
+		[]int{1, 2},
+	) || stores.session.TotalQuestions != 2 {
+		t.Fatalf(
+			"selected = %v, total = %d, want [1 2]",
+			got,
+			stores.session.TotalQuestions,
+		)
 	}
 }
 
 // Reading is capped at one question per session across every admission path:
 // due reviews, the relay, and the final fallback (ADR-036).
 func TestBuildSession_CapsReadingAtOne(t *testing.T) {
-	ctx := context.Background()
-	userID := int64(123)
-
-	readingQuestion := func(id int) model.Question {
-		return model.Question{ID: id, ProficiencyLevel: "N5", Category: model.CategoryReading}
-	}
-	isReadingID := func(id int) bool {
-		return id == 1 || id == 2 || id == 100 || id == 101
-	}
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			// Two due reading reviews: only the first may enter the session.
-			return []model.Question{readingQuestion(1), readingQuestion(2)}, nil
+	pool := &builderPool{
+		// Two due reading reviews: only the first may enter the session.
+		due: makeQuestions(
+			1,
+			2,
+			"N5",
+			model.CategoryReading,
+		),
+		// A vocabulary query may still return reading rows; appendQuestion must
+		// reject them while admitting other categories.
+		newFn: func(query newQuery) []model.Question {
+			if query.category != string(model.CategoryVocabulary) {
+				return nil
+			}
+			return slices.Concat(
+				makeQuestions(
+					100,
+					2,
+					"N5",
+					model.CategoryReading,
+				),
+				makeQuestions(
+					200,
+					2,
+					"N5",
+					model.CategoryVocabulary,
+				),
+			)
 		},
 	}
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			lang string,
-			levels []string,
-			cat string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			switch cat {
-			case string(model.CategoryReading):
-				// The review already consumed the reading budget, so the relay
-				// must clamp the reading allocation to zero and never fetch.
-				t.Errorf(
-					"relay fetched reading questions with limit %d despite exhausted cap",
-					limit,
-				)
-				return nil, nil
-			case string(model.CategoryVocabulary):
-				// The generic fallback may still return reading rows; appendQuestion
-				// must reject them while admitting other categories.
-				return []model.Question{
-					readingQuestion(100),
-					readingQuestion(101),
-					{ID: 200, ProficiencyLevel: "N5", Category: model.CategoryVocabulary},
-					{ID: 201, ProficiencyLevel: "N5", Category: model.CategoryVocabulary},
-				}, nil
-			default:
-				return nil, nil
-			}
-		},
-	}
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			s *model.Session,
-		) error {
-			s.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			sqs []model.SessionQuestion,
-		) error {
-			readingCount := 0
-			for _, sq := range sqs {
-				if isReadingID(sq.QuestionID) {
-					readingCount++
-				}
-			}
-			if readingCount != 1 {
-				t.Fatalf(
-					"session admitted %d reading questions, want 1: %+v",
-					readingCount,
-					sqs,
-				)
-			}
-			if len(sqs) != 3 { // 1 reading review + 2 fallback vocabulary
-				t.Fatalf(
-					"expected 3 session questions, got %d: %+v",
-					len(sqs),
-					sqs,
-				)
-			}
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	session, err := builder.BuildMorningSession(
-		ctx,
-		userID,
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildMorningSession(
+		context.Background(),
+		123,
 		"ja",
 		"N5",
-	)
-	if err != nil {
+	); err != nil {
 		t.Fatalf(
 			"BuildMorningSession failed: %v",
 			err,
 		)
 	}
-	if session == nil {
-		t.Fatal("expected session")
+
+	// The review already consumed the reading budget, so the relay must clamp
+	// the reading allocation to zero and never fetch.
+	for _, query := range pool.newQueries {
+		if query.category == string(model.CategoryReading) {
+			t.Fatalf(
+				"fetched reading with limit %d despite exhausted cap",
+				query.limit,
+			)
+		}
+	}
+	readingCount := 0
+	for _, id := range rowIDs(stores.rows) {
+		if slices.Contains(
+			[]int{1, 2, 100, 101},
+			id,
+		) {
+			readingCount++
+		}
+	}
+	// 1 reading review + 2 fallback vocabulary.
+	if readingCount != 1 || len(stores.rows) != 3 {
+		t.Fatalf(
+			"reading = %d, rows = %v, want 1 reading in 3 rows",
+			readingCount,
+			rowIDs(stores.rows),
+		)
 	}
 }
 
 func TestBuildMorningSession_CurrentLevelMinimumAndLowerDueCap(t *testing.T) {
-	ctx := context.Background()
-	const userID int64 = 123
 	const currentLevel = "N3"
-
-	due := []model.Question{
-		{ID: 1, ProficiencyLevel: currentLevel, Category: model.CategoryVocabulary},
-		{ID: 2, ProficiencyLevel: currentLevel, Category: model.CategoryVocabulary},
-		{ID: 3, ProficiencyLevel: currentLevel, Category: model.CategoryVocabulary},
+	pool := &builderPool{
+		due: slices.Concat(
+			makeQuestions(
+				1,
+				3,
+				currentLevel,
+				model.CategoryVocabulary,
+			),
+			makeQuestions(
+				4,
+				7,
+				"N4",
+				model.CategoryVocabulary,
+			),
+		),
+		new: slices.Concat(
+			makeQuestions(
+				100,
+				20,
+				currentLevel,
+				model.CategoryVocabulary,
+			),
+			makeQuestions(
+				200,
+				20,
+				currentLevel,
+				model.CategoryGrammar,
+			),
+			makeQuestions(
+				300,
+				2,
+				currentLevel,
+				model.CategoryListening,
+			),
+			makeQuestions(
+				310,
+				2,
+				currentLevel,
+				model.CategoryReading,
+			),
+		),
 	}
-	for id := 4; id <= 10; id++ {
-		due = append(
-			due,
-			model.Question{ID: id, ProficiencyLevel: "N4", Category: model.CategoryVocabulary},
-		)
-	}
-
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if limit != 19 {
-				t.Fatalf(
-					"general due limit = %d, want 19",
-					limit,
-				)
-			}
-			return due, nil
-		},
-	}
-	nextID := 100
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			gotUserID int64,
-			language string,
-			levels []string,
-			category string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if !slices.Equal(
-				levels,
-				[]string{currentLevel},
-			) {
-				t.Fatalf(
-					"new levels = %v, want current-only [%s]",
-					levels,
-					currentLevel,
-				)
-			}
-			if category == string(model.CategoryListening) || category == string(model.CategoryReading) {
-				q := model.Question{
-					ID:               nextID,
-					ProficiencyLevel: currentLevel,
-					Category:         model.QuestionCategory(category),
-				}
-				nextID++
-				return []model.Question{q}, nil
-			}
-			questions := make(
-				[]model.Question,
-				0,
-				limit,
-			)
-			for i := 0; i < limit; i++ {
-				questions = append(
-					questions,
-					model.Question{
-						ID:               nextID,
-						ProficiencyLevel: currentLevel,
-						Category:         model.CategoryGrammar,
-					},
-				)
-				nextID++
-			}
-			return questions, nil
-		},
-	}
-	var sessionQuestions []model.SessionQuestion
-	sStore := &mockSessionStore{
-		createSessionFn: func(
-			ctx context.Context,
-			session *model.Session,
-		) error {
-			if session.TotalQuestions != 17 {
-				t.Fatalf(
-					"TotalQuestions = %d, want 17",
-					session.TotalQuestions,
-				)
-			}
-			session.ID = 10
-			return nil
-		},
-	}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			questions []model.SessionQuestion,
-		) error {
-			sessionQuestions = append(
-				[]model.SessionQuestion(nil),
-				questions...,
-			)
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
+	builder, stores := newTestBuilder(pool)
 	if _, err := builder.BuildMorningSession(
-		ctx,
-		userID,
+		context.Background(),
+		123,
 		"ja",
 		currentLevel,
 	); err != nil {
@@ -1499,164 +844,81 @@ func TestBuildMorningSession_CurrentLevelMinimumAndLowerDueCap(t *testing.T) {
 			err,
 		)
 	}
-	if len(sessionQuestions) != 17 {
+
+	if limit := pool.generalDueQuery(t).limit; limit != 19 {
 		t.Fatalf(
-			"session question count = %d, want 17",
-			len(sessionQuestions),
+			"general due limit = %d, want 19",
+			limit,
 		)
 	}
-	currentCount := 0
-	lowerDueCount := 0
-	for _, sq := range sessionQuestions {
-		if sq.QuestionID >= 1 && sq.QuestionID <= 3 || sq.QuestionID >= 100 {
-			currentCount++
+	for _, query := range pool.newQueries {
+		if !slices.Equal(
+			query.levels,
+			[]string{currentLevel},
+		) {
+			t.Fatalf(
+				"new query levels = %v, want current-only [%s]",
+				query.levels,
+				currentLevel,
+			)
 		}
-		if sq.QuestionID >= 4 && sq.QuestionID <= 10 {
+	}
+	if stores.session.TotalQuestions != 17 {
+		t.Fatalf(
+			"total = %d, want 17",
+			stores.session.TotalQuestions,
+		)
+	}
+	currentCount, lowerDueCount := 0, 0
+	for _, id := range rowIDs(stores.rows) {
+		if id <= 3 || id >= 100 {
+			currentCount++
+		} else {
 			lowerDueCount++
 		}
 	}
-	if currentCount < 14 {
+	if currentCount < 14 || lowerDueCount != 3 {
 		t.Fatalf(
-			"current-level questions = %d, want at least 14",
+			"current = %d, lower due = %d, want at least 14 and exactly 3",
 			currentCount,
-		)
-	}
-	if lowerDueCount != 3 {
-		t.Fatalf(
-			"lower-level due questions = %d, want 3",
 			lowerDueCount,
 		)
 	}
 }
 
 func TestBuildMorningSession_PrioritizesCurrentDueListeningAndReading(t *testing.T) {
-	ctx := context.Background()
 	const currentLevel = "N5"
-	due := make(
-		[]model.Question,
-		0,
-		12,
-	)
-	for id := 1; id <= 10; id++ {
-		due = append(
-			due,
-			model.Question{ID: id, ProficiencyLevel: currentLevel, Category: model.CategoryVocabulary},
-		)
+	pool := &builderPool{
+		due: slices.Concat(
+			makeQuestions(
+				1,
+				10,
+				currentLevel,
+				model.CategoryVocabulary,
+			),
+			makeQuestions(
+				11,
+				1,
+				currentLevel,
+				model.CategoryListening,
+			),
+			makeQuestions(
+				12,
+				1,
+				currentLevel,
+				model.CategoryReading,
+			),
+		),
+		new: makeQuestions(
+			100,
+			20,
+			currentLevel,
+			model.CategoryGrammar,
+		),
 	}
-	due = append(
-		due,
-		model.Question{ID: 11, ProficiencyLevel: currentLevel, Category: model.CategoryListening},
-		model.Question{ID: 12, ProficiencyLevel: currentLevel, Category: model.CategoryReading},
-	)
-	srsMock := &mockSRS{
-		getDueReviewsFn: func(
-			ctx context.Context,
-			userID int64,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			if limit != 19 {
-				t.Fatalf(
-					"general due limit = %d, want 19",
-					limit,
-				)
-			}
-			return due, nil
-		},
-		getDueReviewsForCategoriesFn: func(
-			ctx context.Context,
-			userID int64,
-			limit,
-			kanjiRecallLimit int,
-			categories ...model.QuestionCategory,
-		) ([]model.Question, error) {
-			if limit != 1 || len(categories) != 1 {
-				t.Fatalf(
-					"category due query limit/categories = %d/%v, want 1/one",
-					limit,
-					categories,
-				)
-			}
-			for _, q := range due {
-				if q.Category == categories[0] {
-					return []model.Question{q}, nil
-				}
-			}
-			return nil, nil
-		},
-	}
-	nextID := 100
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			userID int64,
-			language string,
-			levels []string,
-			category string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			// The new-listening reservation still runs after a due listening item
-			// and may probe single adjacent levels; other new queries stay current-only.
-			listeningFallback := category == string(model.CategoryListening) && len(levels) == 1
-			if !listeningFallback && !slices.Equal(
-				levels,
-				[]string{currentLevel},
-			) {
-				t.Fatalf(
-					"new levels = %v, want current-only [%s]",
-					levels,
-					currentLevel,
-				)
-			}
-			if category == string(model.CategoryReading) || category == string(model.CategoryListening) {
-				return nil, nil
-			}
-			questions := make(
-				[]model.Question,
-				0,
-				limit,
-			)
-			for i := 0; i < limit; i++ {
-				questions = append(
-					questions,
-					model.Question{ID: nextID, ProficiencyLevel: currentLevel, Category: model.CategoryGrammar},
-				)
-				nextID++
-			}
-			return questions, nil
-		},
-	}
-	var sessionQuestions []model.SessionQuestion
-	sStore := &mockSessionStore{createSessionFn: func(
-		ctx context.Context,
-		session *model.Session,
-	) error {
-		session.ID = 10
-		return nil
-	}}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			questions []model.SessionQuestion,
-		) error {
-			sessionQuestions = append(
-				[]model.SessionQuestion(nil),
-				questions...,
-			)
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
+	builder, stores := newTestBuilder(pool)
 	if _, err := builder.BuildMorningSession(
-		ctx,
+		context.Background(),
 		123,
 		"ja",
 		currentLevel,
@@ -1666,129 +928,84 @@ func TestBuildMorningSession_PrioritizesCurrentDueListeningAndReading(t *testing
 			err,
 		)
 	}
-	listeningCount := 0
-	readingCount := 0
-	for _, sq := range sessionQuestions {
-		if sq.QuestionID == 11 {
-			listeningCount++
-		}
-		if sq.QuestionID == 12 {
-			readingCount++
+
+	if limit := pool.generalDueQuery(t).limit; limit != 19 {
+		t.Fatalf(
+			"general due limit = %d, want 19",
+			limit,
+		)
+	}
+	for _, query := range pool.dueQueries {
+		if len(query.categories) > 0 && (query.limit != 1 || len(query.categories) != 1) {
+			t.Fatalf(
+				"category due query = %+v, want limit 1 with one category",
+				query,
+			)
 		}
 	}
-	if listeningCount != 1 || readingCount != 1 {
+	for _, query := range pool.newQueries {
+		// The new-listening reservation still runs after a due listening item
+		// and may probe single adjacent levels; other new queries stay current-only.
+		listeningProbe := query.category == string(model.CategoryListening) && len(query.levels) == 1
+		if !listeningProbe && !slices.Equal(
+			query.levels,
+			[]string{currentLevel},
+		) {
+			t.Fatalf(
+				"new query levels = %v, want current-only [%s]",
+				query.levels,
+				currentLevel,
+			)
+		}
+	}
+	// Due listening 11 and reading 12 sit behind ten vocabulary reviews, so
+	// only the reserved queries can bring them in.
+	ids := rowIDs(stores.rows)
+	if !slices.Contains(
+		ids,
+		11,
+	) || !slices.Contains(
+		ids,
+		12,
+	) {
 		t.Fatalf(
-			"reserved due listening/reading = %d/%d, want 1/1; questions=%+v",
-			listeningCount,
-			readingCount,
-			sessionQuestions,
+			"selected = %v, want reserved due listening 11 and reading 12",
+			ids,
 		)
 	}
 }
 
 func TestBuildEveningSession_UsesN3CurrentScopeBeforeAdjacentFallback(t *testing.T) {
-	ctx := context.Background()
 	const currentLevel = "N3"
-	var currentFetches, adjacentFetches int
-	nextID := 100
-	srsMock := &mockSRS{getDueReviewsFn: func(
-		context.Context,
-		int64,
-		int,
-		int,
-	) ([]model.Question, error) {
-		return nil, nil
-	}}
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			userID int64,
-			language string,
-			levels []string,
-			category string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			switch {
-			case slices.Equal(
-				levels,
-				[]string{currentLevel},
-			):
-				currentFetches++
-			case slices.Equal(
-				levels,
-				[]string{"N4", "N3", "N2"},
-			):
-				adjacentFetches++
-			default:
-				t.Fatalf(
-					"unexpected level scope %v",
-					levels,
-				)
-			}
-			if limit == 0 {
-				return nil, nil
-			}
-			if category == string(model.CategoryVocabulary) {
-				q := model.Question{ID: nextID, ProficiencyLevel: currentLevel, Category: model.CategoryVocabulary}
-				nextID++
-				return []model.Question{q}, nil
-			}
-			questionCategory := model.CategoryGrammar
-			if category == string(model.CategoryListening) || category == string(model.CategoryReading) {
-				questionCategory = model.QuestionCategory(category)
-			}
-			questions := make(
-				[]model.Question,
-				0,
-				limit,
-			)
-			for i := 0; i < limit; i++ {
-				questions = append(
-					questions,
-					model.Question{ID: nextID, ProficiencyLevel: currentLevel, Category: questionCategory},
-				)
-				nextID++
-			}
-			return questions, nil
-		},
-	}
-	var sessionQuestions []model.SessionQuestion
-	sStore := &mockSessionStore{createSessionFn: func(
-		ctx context.Context,
-		session *model.Session,
-	) error {
-		if session.TotalQuestions != 17 {
-			t.Fatalf(
-				"TotalQuestions = %d, want 17",
-				session.TotalQuestions,
-			)
-		}
-		session.ID = 10
-		return nil
-	}}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			ctx context.Context,
-			questions []model.SessionQuestion,
-		) error {
-			sessionQuestions = append(
-				[]model.SessionQuestion(nil),
-				questions...,
-			)
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
+	pool := &builderPool{new: slices.Concat(
+		makeQuestions(
+			100,
+			6,
+			currentLevel,
+			model.CategoryVocabulary,
+		),
+		makeQuestions(
+			200,
+			20,
+			currentLevel,
+			model.CategoryGrammar,
+		),
+		makeQuestions(
+			300,
+			1,
+			currentLevel,
+			model.CategoryListening,
+		),
+		makeQuestions(
+			310,
+			1,
+			currentLevel,
+			model.CategoryReading,
+		),
+	)}
+	builder, stores := newTestBuilder(pool)
 	if _, err := builder.BuildEveningSession(
-		ctx,
+		context.Background(),
 		123,
 		"ja",
 		currentLevel,
@@ -1798,135 +1015,93 @@ func TestBuildEveningSession_UsesN3CurrentScopeBeforeAdjacentFallback(t *testing
 			err,
 		)
 	}
-	if currentFetches == 0 {
-		t.Fatal("expected current-level fetches")
+
+	// Current supply fills the session, so no query reaches an adjacent level.
+	for _, query := range pool.newQueries {
+		if !slices.Equal(
+			query.levels,
+			[]string{currentLevel},
+		) {
+			t.Fatalf(
+				"new query levels = %v while current supply is available",
+				query.levels,
+			)
+		}
 	}
-	if adjacentFetches != 0 {
+	if len(pool.newQueries) == 0 || stores.session.TotalQuestions != 17 {
 		t.Fatalf(
-			"adjacent fetches = %d, want 0 while current supply is available",
-			adjacentFetches,
-		)
-	}
-	if len(sessionQuestions) != 17 {
-		t.Fatalf(
-			"session question count = %d, want 17",
-			len(sessionQuestions),
+			"new queries = %d, total = %d, want current fetches and 17",
+			len(pool.newQueries),
+			stores.session.TotalQuestions,
 		)
 	}
 }
 
 func TestBuildEveningSession_FallsBackToAdjacentWhenCurrentSupplyIsShort(t *testing.T) {
-	ctx := context.Background()
-	const currentLevel = "N3"
-	var currentFetches, adjacentFetches int
-	nextID := 200
-	srsMock := &mockSRS{getDueReviewsFn: func(
-		context.Context,
-		int64,
-		int,
-		int,
-	) ([]model.Question, error) {
-		return nil, nil
-	}}
-	qFetcher := &mockQuestionFetcher{
-		getNewQuestionsFn: func(
-			ctx context.Context,
-			userID int64,
-			language string,
-			levels []string,
-			category string,
-			excludeIDs []int,
-			limit,
-			kanjiRecallLimit int,
-		) ([]model.Question, error) {
-			switch {
-			case slices.Equal(
-				levels,
-				[]string{currentLevel},
-			):
-				currentFetches++
-				return nil, nil
-			case slices.Equal(
-				levels,
-				[]string{"N4", "N3", "N2"},
-			):
-				adjacentFetches++
-			// Reserved listening/reading slots probe one adjacent level at a time.
-			case slices.Equal(
-				levels,
-				[]string{"N2"},
-			) || slices.Equal(
-				levels,
-				[]string{"N4"},
-			):
-			default:
-				t.Fatalf(
-					"unexpected level scope %v",
-					levels,
-				)
-			}
-			questionCategory := model.CategoryGrammar
-			if category == string(model.CategoryListening) || category == string(model.CategoryReading) {
-				questionCategory = model.QuestionCategory(category)
-			}
-			questions := make(
-				[]model.Question,
-				0,
-				limit,
-			)
-			for i := 0; i < limit; i++ {
-				questions = append(
-					questions,
-					model.Question{ID: nextID, ProficiencyLevel: "N4", Category: questionCategory},
-				)
-				nextID++
-			}
-			return questions, nil
-		},
-	}
-	sStore := &mockSessionStore{createSessionFn: func(
-		ctx context.Context,
-		session *model.Session,
-	) error {
-		session.ID = 10
-		return nil
-	}}
-	sqStore := &mockSessionQuestionStore{
-		createSessionQuestionsFn: func(
-			context.Context,
-			[]model.SessionQuestion,
-		) error {
-			return nil
-		},
-	}
-
-	builder := newSessionBuilderService(
-		qFetcher,
-		sStore,
-		sqStore,
-		srsMock,
-	)
-	if session, err := builder.BuildEveningSession(
-		ctx,
+	// The current level N3 has no new supply at all.
+	pool := &builderPool{new: slices.Concat(
+		makeQuestions(
+			200,
+			20,
+			"N4",
+			model.CategoryGrammar,
+		),
+		makeQuestions(
+			300,
+			1,
+			"N4",
+			model.CategoryListening,
+		),
+		makeQuestions(
+			310,
+			1,
+			"N4",
+			model.CategoryReading,
+		),
+	)}
+	builder, stores := newTestBuilder(pool)
+	if _, err := builder.BuildEveningSession(
+		context.Background(),
 		123,
 		"ja",
-		currentLevel,
+		"N3",
 	); err != nil {
 		t.Fatalf(
 			"BuildEveningSession failed: %v",
 			err,
 		)
-	} else if session == nil || session.TotalQuestions != 17 {
+	}
+
+	if stores.session.TotalQuestions != 17 {
 		t.Fatalf(
-			"session = %+v, want 17 questions",
-			session,
+			"total = %d, want 17",
+			stores.session.TotalQuestions,
 		)
 	}
-	if currentFetches == 0 || adjacentFetches == 0 {
+	scopes := make(map[string]int)
+	for _, query := range pool.newQueries {
+		scopes[strings.Join(
+			query.levels,
+			",",
+		)]++
+	}
+	// Reserved listening/reading slots probe one adjacent level at a time; the
+	// general fallback uses the full adjacent scope.
+	for scope := range scopes {
+		if !slices.Contains(
+			[]string{"N3", "N4,N3,N2", "N2", "N4"},
+			scope,
+		) {
+			t.Fatalf(
+				"unexpected level scope %s",
+				scope,
+			)
+		}
+	}
+	if scopes["N3"] == 0 || scopes["N4,N3,N2"] == 0 {
 		t.Fatalf(
-			"fetches current=%d adjacent=%d, want both",
-			currentFetches,
-			adjacentFetches,
+			"queries by scope = %v, want current and adjacent",
+			scopes,
 		)
 	}
 }
@@ -1953,86 +1128,27 @@ func TestBuildMorningSession_ReservedListeningFallsBackToHigherAdjacentFirst(t *
 			func(t *testing.T) {
 				// The current level has no new listening left; grammar keeps the
 				// rest of the session at the current level.
-				var listeningProbes []string
-				nextID := 100
-				qFetcher := &mockQuestionFetcher{getNewQuestionsFn: func(
-					ctx context.Context,
-					userID int64,
-					language string,
-					levels []string,
-					category string,
-					excludeIDs []int,
-					limit,
-					kanjiRecallLimit int,
-				) ([]model.Question, error) {
-					scope := strings.Join(
-						levels,
-						",",
-					)
-					if category == string(model.CategoryListening) {
-						listeningProbes = append(
-							listeningProbes,
-							scope,
-						)
-						switch {
-						case scope == "N3" && !tt.higherEmpty:
-							return []model.Question{
-								{ID: higherListeningID, ProficiencyLevel: "N3", Category: model.CategoryListening},
-							}, nil
-						case scope == "N5":
-							return []model.Question{
-								{ID: lowerListeningID, ProficiencyLevel: "N5", Category: model.CategoryListening},
-							}, nil
-						}
-						return nil, nil
-					}
-					if scope != currentLevel || category != string(model.CategoryGrammar) {
-						return nil, nil
-					}
-					questions := make(
-						[]model.Question,
-						0,
-						limit,
-					)
-					for i := 0; i < limit; i++ {
-						questions = append(
-							questions,
-							model.Question{ID: nextID, ProficiencyLevel: currentLevel, Category: model.CategoryGrammar},
-						)
-						nextID++
-					}
-					return questions, nil
-				}}
-				srsMock := &mockSRS{getDueReviewsFn: func(
-					context.Context,
-					int64,
-					int,
-					int,
-				) ([]model.Question, error) {
-					return nil, nil
-				}}
-				var sessionQuestions []model.SessionQuestion
-				sStore := &mockSessionStore{createSessionFn: func(
-					ctx context.Context,
-					session *model.Session,
-				) error {
-					session.ID = 10
-					return nil
-				}}
-				sqStore := &mockSessionQuestionStore{createSessionQuestionsFn: func(
-					ctx context.Context,
-					questions []model.SessionQuestion,
-				) error {
-					sessionQuestions = questions
-					return nil
-				}}
-
-				builder := newSessionBuilderService(
-					qFetcher,
-					sStore,
-					sqStore,
-					srsMock,
+				fresh := append(
+					makeQuestions(
+						100,
+						20,
+						currentLevel,
+						model.CategoryGrammar,
+					),
+					model.Question{ID: lowerListeningID, ProficiencyLevel: "N5", Category: model.CategoryListening},
 				)
+				if !tt.higherEmpty {
+					fresh = append(
+						fresh,
+						model.Question{
+							ID:               higherListeningID,
+							ProficiencyLevel: "N3",
+							Category:         model.CategoryListening,
+						},
+					)
+				}
+				pool := &builderPool{new: fresh}
+				builder, stores := newTestBuilder(pool)
 				if _, err := builder.BuildMorningSession(
 					context.Background(),
 					123,
@@ -2047,8 +1163,20 @@ func TestBuildMorningSession_ReservedListeningFallsBackToHigherAdjacentFirst(t *
 
 				// The reservation probes adjacent levels one at a time, highest
 				// first, and stops as soon as the slot is filled.
+				var probes []string
+				for _, query := range pool.newQueries {
+					if query.category == string(model.CategoryListening) {
+						probes = append(
+							probes,
+							strings.Join(
+								query.levels,
+								",",
+							),
+						)
+					}
+				}
 				if got := strings.Join(
-					listeningProbes,
+					probes,
 					";",
 				); got != tt.wantProbes {
 					t.Fatalf(
@@ -2058,11 +1186,11 @@ func TestBuildMorningSession_ReservedListeningFallsBackToHigherAdjacentFirst(t *
 					)
 				}
 				var gotIDs []int
-				for _, sq := range sessionQuestions {
-					if sq.QuestionID == higherListeningID || sq.QuestionID == lowerListeningID {
+				for _, id := range rowIDs(stores.rows) {
+					if id == higherListeningID || id == lowerListeningID {
 						gotIDs = append(
 							gotIDs,
-							sq.QuestionID,
+							id,
 						)
 					}
 				}

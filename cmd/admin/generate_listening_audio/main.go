@@ -1,5 +1,7 @@
 // Command generate_listening_audio fills every missing listening-audio object
-// for one language/level bucket without creating or pushing learner sessions.
+// for one language, at every level. It is the only place that calls TTS: the
+// server only serves stored clips (ADR-082). Run it after seeding new
+// listening questions; until then they are never selected for a session.
 package main
 
 import (
@@ -10,6 +12,7 @@ import (
 
 	"github.com/lsj/copylingo/internal/bootstrap"
 	"github.com/lsj/copylingo/internal/config"
+	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/repository"
 	"github.com/lsj/copylingo/internal/service"
 )
@@ -38,11 +41,6 @@ func main() {
 		"ja",
 		"question language",
 	)
-	level := flag.String(
-		"level",
-		"N5",
-		"proficiency level",
-	)
 	timeout := flag.Duration(
 		"timeout",
 		10*time.Minute,
@@ -61,9 +59,6 @@ func main() {
 			"load config: %v",
 			err,
 		)
-	}
-	if cfg.LLM.APIKey == "" {
-		log.Fatal("listening TTS requires llm.api_key")
 	}
 
 	db, err := bootstrap.OpenDB(cfg.DB)
@@ -84,7 +79,6 @@ func main() {
 	pending, err := repos.Question.GetListeningNeedingAudio(
 		ctx,
 		*language,
-		*level,
 		1000,
 	)
 	if err != nil {
@@ -95,22 +89,29 @@ func main() {
 	}
 	if len(pending) == 0 {
 		log.Printf(
-			"listening audio already complete language=%s level=%s",
+			"listening audio already complete language=%s",
 			*language,
-			*level,
 		)
 		return
 	}
 
-	audio := bootstrap.NewAudioService(
-		cfg,
+	audio := service.NewAudioGenerator(
 		repos.Question,
+		external.NewTTSClient(external.TTSOptions{
+			APIKey:  cfg.LLM.APIKey,
+			BaseURL: cfg.LLM.BaseURL,
+			Model:   cfg.LLM.TTSModel,
+			Voice:   cfg.LLM.TTSVoiceName,
+			VoiceB:  cfg.LLM.TTSVoiceNameB,
+		}),
+		bootstrap.NewAudioStore(cfg.Storage),
+		cfg.LLM.TTSVoiceName,
+		cfg.LLM.TTSVoiceNameB,
 	)
 	cycles := (len(pending) + service.AudioGeneratePerCycle - 1) / service.AudioGeneratePerCycle
 	log.Printf(
-		"filling listening audio language=%s level=%s pending=%d cycles=%d",
+		"filling listening audio language=%s pending=%d cycles=%d",
 		*language,
-		*level,
 		len(pending),
 		cycles,
 	)
@@ -118,7 +119,6 @@ func main() {
 		if err := audio.TopUpAudio(
 			ctx,
 			*language,
-			*level,
 		); err != nil {
 			log.Fatalf(
 				"generate listening audio cycle=%d/%d: %v",
@@ -145,7 +145,6 @@ func main() {
 	remaining, err := repos.Question.GetListeningNeedingAudio(
 		ctx,
 		*language,
-		*level,
 		1000,
 	)
 	if err != nil {
@@ -156,16 +155,14 @@ func main() {
 	}
 	if len(remaining) > 0 {
 		log.Fatalf(
-			"listening audio incomplete language=%s level=%s remaining=%d",
+			"listening audio incomplete language=%s remaining=%d",
 			*language,
-			*level,
 			len(remaining),
 		)
 	}
 	log.Printf(
-		"listening audio complete language=%s level=%s generated_or_reused=%d",
+		"listening audio complete language=%s generated_or_reused=%d",
 		*language,
-		*level,
 		len(pending),
 	)
 }

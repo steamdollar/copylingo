@@ -9,37 +9,27 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type mockRenderer struct {
-	renderPNGFn func(strokes []Stroke) ([]byte, error)
+type mockLLM struct {
+	gradeHandwritingFn func(
+		ctx context.Context,
+		prompt,
+		correctAnswer string,
+		image []byte,
+	) (external.GradeResult, error)
 }
 
-func (m *mockRenderer) RenderPNG(strokes []Stroke) ([]byte, error) {
-	return m.renderPNGFn(strokes)
-}
-
-func fakeImageRenderer() *mockRenderer {
-	return &mockRenderer{renderPNGFn: func([]Stroke) ([]byte, error) {
-		return []byte("fake-image"), nil
-	}}
-}
-
-// newHandwritingTestSession is newQuizTestSession with a stroke renderer override.
-func newHandwritingTestSession(
-	t *testing.T,
-	state *model.QuizActiveSessionState,
-	llm QuizGradingLLM,
-	renderer StrokeRenderer,
-) (*SessionService, *fakeQuizSessionStore) {
-	t.Helper()
-	svc, store := newQuizTestSession(
-		t,
-		state,
-		llm,
+func (m *mockLLM) GradeHandwriting(
+	ctx context.Context,
+	prompt,
+	correctAnswer string,
+	image []byte,
+) (external.GradeResult, error) {
+	return m.gradeHandwritingFn(
+		ctx,
+		prompt,
+		correctAnswer,
+		image,
 	)
-	if renderer != nil {
-		svc.strokeRenderer = renderer
-	}
-	return svc, store
 }
 
 func handwritingGradeLLM(
@@ -77,7 +67,7 @@ func TestSubmitHandwriting_Success(t *testing.T) {
 		}
 		return external.GradeResult{IsCorrect: true, Feedback: "Correct!"}, nil
 	}}
-	svc, store := newHandwritingTestSession(
+	svc, store := newQuizTestSession(
 		t,
 		handwritingState(
 			userID,
@@ -91,7 +81,6 @@ func TestSubmitHandwriting_Success(t *testing.T) {
 			false,
 		),
 		llm,
-		fakeImageRenderer(),
 	)
 
 	res, err := svc.SubmitHandwriting(
@@ -100,7 +89,7 @@ func TestSubmitHandwriting_Success(t *testing.T) {
 			UserID:     userID,
 			SessionID:  sessionID,
 			QuestionID: questionID,
-			Strokes:    []Stroke{{Points: []StrokePoint{{X: 0, Y: 0}}}},
+			Image:      []byte("fake-image"),
 		},
 	)
 	if err != nil {
@@ -135,7 +124,7 @@ func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	svc, store := newHandwritingTestSession(
+	svc, store := newQuizTestSession(
 		t,
 		handwritingState(
 			userID,
@@ -151,7 +140,6 @@ func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 			external.GradeResult{IsCorrect: false, Feedback: "Try again"},
 			nil,
 		),
-		fakeImageRenderer(),
 	)
 
 	res, err := svc.SubmitHandwriting(
@@ -160,7 +148,7 @@ func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 			UserID:     userID,
 			SessionID:  sessionID,
 			QuestionID: questionID,
-			Strokes:    []Stroke{{Points: []StrokePoint{{X: 0, Y: 0}}}},
+			Image:      []byte("fake-image"),
 		},
 	)
 	if err != nil {
@@ -182,11 +170,12 @@ func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 
 // Handwriting failure policy: unlike subjective text answers, an AI grading
 // failure is returned and nothing is recorded, so the user can resubmit.
-func TestSubmitHandwriting_AIUnavailableReturnsErrorWithoutRecording(t *testing.T) {
+func TestSubmitHandwriting_LLMErrorReturnsErrorWithoutRecording(t *testing.T) {
 	ctx := context.Background()
+	llmErr := errors.New("llm unauthorized")
 	userID := int64(123)
 	sessionID := 10
-	svc, store := newHandwritingTestSession(
+	svc, store := newQuizTestSession(
 		t,
 		handwritingState(
 			userID,
@@ -196,9 +185,8 @@ func TestSubmitHandwriting_AIUnavailableReturnsErrorWithoutRecording(t *testing.
 		),
 		handwritingGradeLLM(
 			external.GradeResult{},
-			external.ErrAIConfigMissing,
+			llmErr,
 		),
-		fakeImageRenderer(),
 	)
 
 	_, err := svc.SubmitHandwriting(
@@ -207,10 +195,10 @@ func TestSubmitHandwriting_AIUnavailableReturnsErrorWithoutRecording(t *testing.
 	)
 	if !errors.Is(
 		err,
-		ErrAIUnavailable,
+		llmErr,
 	) {
 		t.Fatalf(
-			"error = %v, want ErrAIUnavailable",
+			"error = %v, want wrapped LLM error",
 			err,
 		)
 	}
@@ -254,8 +242,8 @@ func TestSubmitHandwriting_RejectsBeforeGrading(t *testing.T) {
 		t.Run(
 			tt.name,
 			func(t *testing.T) {
-				// A nil LLM and renderer make any grading attempt panic.
-				svc, _ := newHandwritingTestSession(
+				// A nil LLM makes any grading attempt panic.
+				svc, _ := newQuizTestSession(
 					t,
 					handwritingState(
 						tt.ownerID,
@@ -264,9 +252,7 @@ func TestSubmitHandwriting_RejectsBeforeGrading(t *testing.T) {
 						tt.answered,
 					),
 					nil,
-					nil,
 				)
-				svc.strokeRenderer = nil
 				_, err := svc.SubmitHandwriting(
 					context.Background(),
 					HandwritingSubmitRequest{UserID: 123, SessionID: 10, QuestionID: 1},
@@ -315,14 +301,13 @@ func TestSubmitHandwriting_UsesCurrentDuplicateOccurrence(t *testing.T) {
 	)
 	state.CurrentIndex = 1
 
-	svc, store := newHandwritingTestSession(
+	svc, store := newQuizTestSession(
 		t,
 		state,
 		handwritingGradeLLM(
 			external.GradeResult{IsCorrect: true},
 			nil,
 		),
-		fakeImageRenderer(),
 	)
 	if _, err := svc.SubmitHandwriting(
 		ctx,

@@ -77,8 +77,8 @@ type userReader interface {
 	) (*model.User, error)
 }
 
-// listeningAudio serves listening clips. It is optional: without a TTS key
-// the service is absent and listening questions degrade to text only.
+// listeningAudio serves pre-generated listening clips (ADR-082). When it is
+// nil, listening questions go out as text only.
 type listeningAudio interface {
 	GetClip(
 		ctx context.Context,
@@ -613,14 +613,6 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 	if err != nil {
 		return
 	}
-	if sf.input == nil {
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
-			botMessagesByLocale[botDefaultLocale].llmQuestionActivationFailed,
-		)
-		return
-	}
-
 	input := model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion, SessionID: sessionID, QuestionID: questionID}
 	if err := sf.input.SetLLMPending(
 		ctx,

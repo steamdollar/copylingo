@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -151,7 +152,6 @@ func TestQuizActiveSessionCreateFromDBAndGet(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		newSRSService(nil),
 	)
 
 	if _, err := svc.CreateFromDB(
@@ -211,7 +211,6 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		nil,
 	)
 
 	created, err := svc.CreateFromDB(
@@ -244,7 +243,6 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 	svc2 := newQuizActiveSessionService(
 		repo,
 		store2,
-		nil,
 	)
 	created2, err := svc2.CreateFromDB(
 		ctx,
@@ -275,7 +273,6 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 		svcN := newQuizActiveSessionService(
 			repo,
 			storeN,
-			nil,
 		)
 		createdN, err := svcN.CreateFromDB(
 			ctx,
@@ -316,7 +313,6 @@ func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		nil,
 	)
 
 	// Get should trigger auto-recovery because it's missing in Redis
@@ -356,10 +352,15 @@ func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 
 func TestQuizActiveSessionGetMissing(t *testing.T) {
 	ctx := context.Background()
+	// Neither Redis nor the DB has the session.
 	svc := newQuizActiveSessionService(
-		nil,
+		&fakeQuizActiveSessionRepo{loadFn: func(
+			context.Context,
+			int,
+		) (*model.QuizActiveSessionState, error) {
+			return nil, sql.ErrNoRows
+		}},
 		newFakeQuizSessionStore(),
-		nil,
 	)
 
 	_, err := svc.Get(
@@ -377,26 +378,6 @@ func TestQuizActiveSessionGetMissing(t *testing.T) {
 	}
 }
 
-func TestQuizActiveSessionMissingStoreDependency(t *testing.T) {
-	_, err := newQuizActiveSessionService(
-		nil,
-		nil,
-		nil,
-	).Get(
-		context.Background(),
-		10,
-	)
-	if !errors.Is(
-		err,
-		ErrQuizActiveSessionDependencyMissing,
-	) {
-		t.Fatalf(
-			"Get without store = %v, want ErrActiveSessionDependencyMissing",
-			err,
-		)
-	}
-}
-
 func TestQuizActiveSessionRecordAnswerUpdatesProgressAndSRS(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
@@ -404,7 +385,6 @@ func TestQuizActiveSessionRecordAnswerUpdatesProgressAndSRS(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -481,7 +461,6 @@ func TestQuizActiveSessionRecordAnswerRejectsDuplicate(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -522,7 +501,6 @@ func TestQuizActiveSessionRecordAnswerUsesCurrentDuplicateOccurrence(t *testing.
 	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		newSRSService(nil),
 	)
 
 	state := quizActiveSessionTestState(
@@ -594,7 +572,6 @@ func TestQuizActiveSessionRecordAnswerRejectsStaleDuplicateCallback(t *testing.T
 	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		newSRSService(nil),
 	)
 
 	state := quizActiveSessionTestState(
@@ -686,7 +663,6 @@ func TestQuizActiveSessionFlushSuccess(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -732,7 +708,6 @@ func TestQuizActiveSessionFlushRejectsIncomplete(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		&fakeQuizActiveSessionRepo{},
 		store,
-		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -771,7 +746,6 @@ func TestQuizActiveSessionFlushRejectsUserMismatch(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		&fakeQuizActiveSessionRepo{},
 		store,
-		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -804,47 +778,6 @@ func TestQuizActiveSessionFlushRejectsUserMismatch(t *testing.T) {
 	}
 }
 
-func TestQuizActiveSessionFlushRejectsNilRepo(t *testing.T) {
-	ctx := context.Background()
-	sessionID := 10
-	userID := int64(123)
-	store := newFakeQuizSessionStore()
-	// repo nil but state already in Redis (complete) — dependency missing at flush time.
-	svc := newQuizActiveSessionService(
-		nil,
-		store,
-		newSRSService(nil),
-	)
-	if err := svc.save(
-		ctx,
-		quizActiveSessionTestState(
-			sessionID,
-			userID,
-			true,
-		),
-	); err != nil {
-		t.Fatalf(
-			"save failed: %v",
-			err,
-		)
-	}
-
-	_, err := svc.Flush(
-		ctx,
-		sessionID,
-		userID,
-	)
-	if !errors.Is(
-		err,
-		ErrQuizActiveSessionDependencyMissing,
-	) {
-		t.Fatalf(
-			"Flush nil repo = %v, want ErrActiveSessionDependencyMissing",
-			err,
-		)
-	}
-}
-
 func TestQuizActiveSessionFlushRepoError(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
@@ -862,7 +795,6 @@ func TestQuizActiveSessionFlushRepoError(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		repo,
 		store,
-		newSRSService(nil),
 	)
 	if err := svc.save(
 		ctx,
@@ -906,7 +838,6 @@ func TestQuizActiveSessionDelete(t *testing.T) {
 			svc := newQuizActiveSessionService(
 				nil,
 				store,
-				newSRSService(nil),
 			)
 			if err := svc.save(
 				ctx,
@@ -948,7 +879,6 @@ func TestQuizActiveSessionDelete(t *testing.T) {
 			svc := newQuizActiveSessionService(
 				nil,
 				store,
-				newSRSService(nil),
 			)
 			err := svc.Delete(
 				ctx,
@@ -975,7 +905,6 @@ func TestQuizActiveSessionSaveError(t *testing.T) {
 	svc := newQuizActiveSessionService(
 		nil,
 		store,
-		newSRSService(nil),
 	)
 	state := quizActiveSessionTestState(
 		10,
@@ -1075,4 +1004,44 @@ func quizActiveSessionTestState(
 		1,
 	)
 	return state
+}
+
+// activeStateForQuestion builds a one-item quiz state for sessionID, optionally
+// already answered.
+func activeStateForQuestion(
+	sessionID int,
+	question model.Question,
+	answered bool,
+) *model.QuizActiveSessionState {
+	var userAnswer *string
+	var isCorrect *bool
+	if answered {
+		answer := "answered"
+		correct := true
+		userAnswer = &answer
+		isCorrect = &correct
+	}
+	return &model.QuizActiveSessionState{
+		Version: model.QuizActiveSessionStateVersion,
+		Session: model.Session{
+			ID:     sessionID,
+			UserID: 1,
+		},
+		Items: []model.QuizActiveSessionQuestion{
+			{
+				SessionQuestion: model.SessionQuestion{
+					ID:         100,
+					SessionID:  sessionID,
+					QuestionID: question.ID,
+					UserAnswer: userAnswer,
+					IsCorrect:  isCorrect,
+				},
+				Question: question,
+				Progress: model.NewUserQuestionProgress(
+					1,
+					question.ID,
+				),
+			},
+		},
+	}
 }

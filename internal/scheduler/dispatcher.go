@@ -94,10 +94,8 @@ func (d *sessionDispatcher) dispatchBatch(
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				if d.limiter != nil {
-					if err := d.limiter.Wait(ctx); err != nil {
-						return
-					}
+				if err := d.limiter.Wait(ctx); err != nil {
+					return
 				}
 
 				if err := d.dispatchUser(
@@ -137,40 +135,38 @@ func (d *sessionDispatcher) dispatchUser(
 	unfinishedCount int,
 ) error {
 	// Claim today's user/slot dispatch through the narrow scheduler storage contract.
-	if d.claims != nil {
-		today := time.Now().Format("2006-01-02")
-		acquired, err := d.claims.TryClaim(
+	today := time.Now().Format("2006-01-02")
+	acquired, err := d.claims.TryClaim(
+		ctx,
+		user.ID,
+		slot,
+		today,
+	)
+	if err != nil {
+		slog.WarnContext(
 			ctx,
+			"Redis idempotency lock check error; proceeding",
+			"event",
+			"scheduler.lock.error",
+			"user_id",
 			user.ID,
+			"slot",
 			slot,
-			today,
+			"error",
+			err,
 		)
-		if err != nil {
-			slog.WarnContext(
-				ctx,
-				"Redis idempotency lock check error; proceeding",
-				"event",
-				"scheduler.lock.error",
-				"user_id",
-				user.ID,
-				"slot",
-				slot,
-				"error",
-				err,
-			)
-		} else if !acquired {
-			slog.InfoContext(
-				ctx,
-				"Session already pushed today for user; skipping",
-				"event",
-				"scheduler.lock.skipped",
-				"user_id",
-				user.ID,
-				"slot",
-				slot,
-			)
-			return nil
-		}
+	} else if !acquired {
+		slog.InfoContext(
+			ctx,
+			"Session already pushed today for user; skipping",
+			"event",
+			"scheduler.lock.skipped",
+			"user_id",
+			user.ID,
+			"slot",
+			slot,
+		)
+		return nil
 	}
 
 	// Each user with three unfinished sessions gets a reminder before another session is built.
@@ -289,10 +285,6 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 	ctx context.Context,
 	userID int64,
 ) (bool, error) {
-	if d.quiz == nil || d.study == nil {
-		return false, fmt.Errorf("session pusher unavailable")
-	}
-
 	session, err := d.session.OldestUnfinished(
 		ctx,
 		userID,
@@ -373,17 +365,11 @@ type rateLimiter struct {
 }
 
 func newRateLimiter(ratePerSec int) *rateLimiter {
-	if ratePerSec <= 0 {
-		ratePerSec = 25
-	}
 	interval := time.Second / time.Duration(ratePerSec)
 	return &rateLimiter{ticker: time.NewTicker(interval)}
 }
 
 func (r *rateLimiter) Wait(ctx context.Context) error {
-	if r == nil || r.ticker == nil {
-		return nil
-	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -393,7 +379,5 @@ func (r *rateLimiter) Wait(ctx context.Context) error {
 }
 
 func (r *rateLimiter) Stop() {
-	if r != nil && r.ticker != nil {
-		r.ticker.Stop()
-	}
+	r.ticker.Stop()
 }

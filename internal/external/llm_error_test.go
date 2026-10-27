@@ -2,7 +2,6 @@ package external
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -62,27 +61,6 @@ func TestNewLLMClient(t *testing.T) {
 
 func TestAnswerLearningQuestion_Errors(t *testing.T) {
 	t.Parallel()
-
-	t.Run(
-		"missing config",
-		func(t *testing.T) {
-			t.Parallel()
-			client := &DefaultLLMClient{}
-			_, err := client.AnswerLearningQuestion(
-				context.Background(),
-				"q",
-			)
-			if !errors.Is(
-				err,
-				ErrAIConfigMissing,
-			) {
-				t.Fatalf(
-					"err = %v, want ErrAIConfigMissing",
-					err,
-				)
-			}
-		},
-	)
 
 	t.Run(
 		"HTTP 500 wraps request error",
@@ -147,29 +125,6 @@ func TestAnswerLearningQuestion_Errors(t *testing.T) {
 
 func TestGradeHandwriting_Errors(t *testing.T) {
 	t.Parallel()
-
-	t.Run(
-		"missing config",
-		func(t *testing.T) {
-			t.Parallel()
-			client := &DefaultLLMClient{}
-			_, err := client.GradeHandwriting(
-				context.Background(),
-				"p",
-				"オ",
-				[]byte("png"),
-			)
-			if !errors.Is(
-				err,
-				ErrAIConfigMissing,
-			) {
-				t.Fatalf(
-					"err = %v, want ErrAIConfigMissing",
-					err,
-				)
-			}
-		},
-	)
 
 	t.Run(
 		"HTTP 500 wraps request error",
@@ -268,36 +223,4 @@ func TestGradeHandwriting_Errors(t *testing.T) {
 			}
 		},
 	)
-}
-
-func TestGradeAnswer_EmptyChoices(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.HandlerFunc(func(
-		w http.ResponseWriter,
-		r *http.Request,
-	) {
-		w.Header().Set(
-			"Content-Type",
-			"application/json",
-		)
-		_, _ = w.Write([]byte(`{"choices": []}`))
-	}))
-	defer server.Close()
-
-	_, err := newTestLLMClient(server.URL).GradeAnswer(
-		context.Background(),
-		"p",
-		"a",
-		"u",
-	)
-	if err == nil || !strings.Contains(
-		err.Error(),
-		"empty llm response",
-	) {
-		t.Fatalf(
-			"err = %v, want empty llm response error",
-			err,
-		)
-	}
 }

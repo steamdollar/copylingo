@@ -32,7 +32,7 @@ type LLMOptions struct {
 	Model   string
 }
 
-// DefaultLLMClient serves every LLM call (Quiz grading and learner questions)
+// DefaultLLMClient serves every LLM call (handwriting grading and learner questions)
 // over one OpenAI-compatible client. Services depend on their
 // own narrow interfaces, so the client is returned as a concrete type.
 type DefaultLLMClient struct {
@@ -53,100 +53,11 @@ func NewLLMClient(opts LLMOptions) *DefaultLLMClient {
 	}
 }
 
-// GradeAnswer evaluates a QuestionSubjective free-text answer by semantic similarity.
-// Fill-blank and multiple-choice answers are graded by exact string matching in the service-layer grader.
-func (c *DefaultLLMClient) GradeAnswer(
-	ctx context.Context,
-	questionPrompt,
-	correctAnswer,
-	userAnswer string,
-) (GradeResult, error) {
-	if c.client == nil || c.model == "" {
-		return GradeResult{}, ErrAIConfigMissing
-	}
-
-	systemPrompt := `You are an expert language teacher grading a student's answer.
-You must return your evaluation in strict JSON format. Do not use markdown blocks.
-
-JSON schema:
-{
-  "is_correct": boolean,
-  "feedback": "string (Short Korean feedback explaining the result)"
-}
-
-Rules for grading:
-1. 'is_correct' should be true if the user's answer demonstrates the correct knowledge, even with minor typos, as long as it doesn't change the meaning.
-2. If it is completely wrong or conceptually incorrect, set 'is_correct' to false.
-3. The 'feedback' should be encouraging but direct in Korean.`
-
-	userPrompt := fmt.Sprintf(
-		`Question Context: %s
-Expected Correct Answer: %s
-User's Answer: %s
-
-Evaluate the User's Answer against the Expected Correct Answer and output JSON.`,
-		questionPrompt,
-		correctAnswer,
-		userAnswer,
-	)
-
-	resp, err := c.client.CreateChatCompletion(
-		ctx,
-		openai.ChatCompletionRequest{
-			Model: c.model,
-			Messages: []openai.ChatCompletionMessage{
-				{
-					Role:    openai.ChatMessageRoleSystem,
-					Content: systemPrompt,
-				},
-				{
-					Role:    openai.ChatMessageRoleUser,
-					Content: userPrompt,
-				},
-			},
-			ResponseFormat: &openai.ChatCompletionResponseFormat{
-				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
-			},
-		},
-	)
-
-	if err != nil {
-		return GradeResult{}, fmt.Errorf(
-			"llm grading request failed: %w",
-			err,
-		)
-	}
-
-	if len(resp.Choices) == 0 {
-		return GradeResult{}, fmt.Errorf("empty llm response")
-	}
-
-	rawContent := resp.Choices[0].Message.Content
-
-	var result GradeResult
-	if err := json.Unmarshal(
-		[]byte(rawContent),
-		&result,
-	); err != nil {
-		return GradeResult{}, fmt.Errorf(
-			"failed to parse llm output (%s): %w",
-			rawContent,
-			err,
-		)
-	}
-
-	return result, nil
-}
-
 // AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
 func (c *DefaultLLMClient) AnswerLearningQuestion(
 	ctx context.Context,
 	question string,
 ) (string, error) {
-	if c.client == nil || c.model == "" {
-		return "", ErrAIConfigMissing
-	}
-
 	resp, err := c.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
@@ -195,10 +106,6 @@ func (c *DefaultLLMClient) GradeHandwriting(
 			"external.llm",
 		),
 	)
-
-	if c.client == nil || c.model == "" {
-		return GradeResult{}, ErrAIConfigMissing
-	}
 
 	systemPrompt := buildHandwritingSystemPrompt()
 	userPrompt := buildHandwritingUserPrompt(

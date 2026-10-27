@@ -389,7 +389,7 @@ C단계 구현 기록(workthrough)은 정리했고 git 이력에 남는다. 계�
 | Deps 필드 타입 | bot 패키지가 정의한 unexported 인터페이스에 실제 호출 메서드만 넣는다. Flow 간 참조(`Bot`→Flow, `SessionFlow`→`StudyFlow`)는 concrete 포인터다. | Mini App `quizSession` 선례. Flow 간 참조는 같은 패키지 안이라 대역이 필요 없다. |
 | Mini App 손글씨 갱신 | Mini App은 `handwritingScreen.ShowHandwritingGraded(ctx, sessionID, questionID)`만 호출한다. 메시지 조회·`QuizProgress` 재조회·키보드·Edit는 `SessionFlow`가 한다. goroutine·15초 timeout·source 속성은 Mini App에 남긴다. | 봇이 Telegram 표현을 소유한다(§3). Mini App이 `tgbotapi`·`callback`을 import하지 않는다. 키보드 문구는 bot locale의 같은 문구 키(`nextQuestionButton`·`linkedMaterialSettingsButton`)를 쓴다. |
 | scheduler 계약 | `New(Deps)`로 받고 push 계약을 `quizPusher`(SessionFlow)·`studyPusher`(StudyFlow)로 나눈다. `Deps.Services`는 D단계까지 유지한다. | 한 타입이 두 push를 모두 구현할 필요가 없어진다. `Services` 제거는 D단계 범위다. |
-| nil 방어 | service 의존(Session·User·MaterialPreference·LLMQuestion)의 nil 분기는 제거하고 store nil 분기는 유지한다. Audio는 선택 의존으로 남기며 조립부가 `services.Audio != nil`일 때만 넣는다. | 생성자가 Deps를 채우므로 service nil은 조립 오류다. Audio는 TTS key가 없으면 production에서도 nil이고, nil 포인터를 인터페이스에 넣으면 non-nil이 된다. |
+| nil 방어 | service 의존(Session·User·MaterialPreference·LLMQuestion)의 nil 분기는 제거하고 store nil 분기는 유지한다(store 부분은 ADR-084로 대체: store nil 분기도 제거). Audio는 선택 의존으로 남기며 조립부가 `services.Audio != nil`일 때만 넣는다. | 생성자가 Deps를 채우므로 service nil은 조립 오류다. Audio는 TTS key가 없으면 production에서도 nil이고, nil 포인터를 인터페이스에 넣으면 non-nil이 된다. |
 | `StateStores` | `StateStores`·`InputStateStore`를 삭제한다. 각 Flow Deps가 필요한 store 계약만 받는다. | §8.1 마지막 항목. 다섯 필드가 모두 같은 `interactions`였다. |
 | 테스트 조립 | Flow별 헬퍼(`newTestSessionFlow`·`newTestStudyFlow`·`newTestSettingsFlow`·`newTestLLMQuestionFlow`)와 디스패치용 `newTestBot`을 쓴다. 공통 fixture struct는 만들지 않는다. | 테스트가 필요한 service 의존을 명시하고, 빠진 의존은 nil로 남아 호출 시 바로 실패한다. |
 

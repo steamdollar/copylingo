@@ -54,7 +54,7 @@ func (s *SessionService) BuildReviewQuiz(
 	ctx context.Context,
 	user model.User,
 ) (*model.Session, error) {
-	dueCount, err := s.srs.GetDueCount(
+	dueCount, err := s.DueReviewCount(
 		ctx,
 		user.ID,
 		user.Language,

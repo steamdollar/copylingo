@@ -11,8 +11,11 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
+// mockPushClaims grants each user/slot/date claim once. Workers call it
+// concurrently.
 type mockPushClaims struct {
-	claimed bool
+	mu      sync.Mutex
+	claimed map[pushClaimCall]bool
 	err     error
 	calls   []pushClaimCall
 }
@@ -29,17 +32,23 @@ func (m *mockPushClaims) TryClaim(
 	slot model.SessionSlot,
 	today string,
 ) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	call := pushClaimCall{userID: userID, slot: slot, today: today}
 	m.calls = append(
 		m.calls,
-		pushClaimCall{userID: userID, slot: slot, today: today},
+		call,
 	)
 	if m.err != nil {
 		return false, m.err
 	}
-	if m.claimed {
+	if m.claimed[call] {
 		return false, nil
 	}
-	m.claimed = true
+	if m.claimed == nil {
+		m.claimed = make(map[pushClaimCall]bool)
+	}
+	m.claimed[call] = true
 	return true, nil
 }
 
@@ -239,7 +248,7 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 		sessions,
 		pusher,
 		pusher.study(),
-		nil,
+		&mockPushClaims{},
 	)
 	user := model.User{ID: 2002, Language: "ja", ProficiencyLevel: "N5"}
 
@@ -294,7 +303,7 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 		sessions,
 		pusher,
 		pusher.study(),
-		nil,
+		&mockPushClaims{},
 	)
 	// Higher limiter rate for fast testing
 	d.limiter = newRateLimiter(500)

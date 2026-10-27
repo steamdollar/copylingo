@@ -426,10 +426,10 @@ func TestRenderByType(t *testing.T) {
 	)
 
 	t.Run(
-		"Subjective",
+		"FillBlank",
 		func(t *testing.T) {
 			q := model.Question{
-				Type:   model.QuestionSubjective,
+				Type:   model.QuestionFillBlank,
 				Prompt: "Write something",
 			}
 			_, kb, done := sf.renderByType(
@@ -446,7 +446,7 @@ func TestRenderByType(t *testing.T) {
 				t.Fatal("expected not done")
 			}
 			if kb != nil {
-				t.Error("expected no keyboard for subjective")
+				t.Error("expected no keyboard for fill-blank")
 			}
 			if got, ok := stateStores.active[123]; !ok ||
 				got != (model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 0}) {
@@ -496,21 +496,6 @@ type fakeAudioRepo struct {
 	setFileVal string
 }
 
-func (f *fakeAudioRepo) GetListeningNeedingAudio(
-	_ context.Context,
-	_,
-	_ string,
-	_ int,
-) ([]model.Question, error) {
-	return nil, nil
-}
-func (f *fakeAudioRepo) SetAudioPath(
-	_ context.Context,
-	_ int,
-	_ string,
-) error {
-	return nil
-}
 func (f *fakeAudioRepo) SetAudioFileID(
 	_ context.Context,
 	id int,
@@ -521,34 +506,11 @@ func (f *fakeAudioRepo) SetAudioFileID(
 	return nil
 }
 
-type fakeSynth struct{}
-
-func (fakeSynth) Synthesize(
-	_ context.Context,
-	_ string,
-) ([]byte, error) {
-	return []byte("ogg"), nil
-}
-
 type fakeStore struct {
 	getCalls int
 	bytes    []byte
 }
 
-func (f *fakeStore) Exists(
-	_ context.Context,
-	_ string,
-) (bool, error) {
-	return true, nil
-}
-func (f *fakeStore) Put(
-	_ context.Context,
-	_ string,
-	_ []byte,
-	_ string,
-) error {
-	return nil
-}
 func (f *fakeStore) Get(
 	_ context.Context,
 	_ string,
@@ -565,10 +527,7 @@ func TestRenderByType_Listening(t *testing.T) {
 	store := &fakeStore{bytes: []byte("ogg-bytes")}
 	audio := service.NewAudioService(
 		repo,
-		fakeSynth{},
 		store,
-		"Kore",
-		"Puck",
 	)
 
 	t.Run(

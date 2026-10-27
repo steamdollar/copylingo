@@ -32,45 +32,22 @@ var defaultCategoryOrder = []model.QuestionCategory{
 	model.CategoryReading,
 }
 
-type questionFetcher interface {
-	GetNewQuestions(
-		ctx context.Context,
-		userID int64,
-		language string,
-		levels []string,
-		category string,
-		excludeIDs []int,
-		limit,
-		kanjiRecallLimit int,
-	) ([]model.Question, error)
-}
-
-type sessionStore interface {
-	CreateSession(
-		ctx context.Context,
-		s *model.Session,
-	) error
-}
-
 // sessionBuilderService creates learning sessions with appropriate question mix.
 type sessionBuilderService struct {
-	questionRepo        questionFetcher
-	sessionRepo         sessionStore
+	questionRepo        QuestionRepo
+	sessionRepo         SessionRepo
 	sessionQuestionRepo SessionQuestionRepo
-	srs                 srsScheduler
 }
 
 func newSessionBuilderService(
-	questionRepo questionFetcher,
-	sessionRepo sessionStore,
+	questionRepo QuestionRepo,
+	sessionRepo SessionRepo,
 	sessionQuestionRepo SessionQuestionRepo,
-	srs srsScheduler,
 ) *sessionBuilderService {
 	return &sessionBuilderService{
 		questionRepo:        questionRepo,
 		sessionRepo:         sessionRepo,
 		sessionQuestionRepo: sessionQuestionRepo,
-		srs:                 srs,
 	}
 }
 
@@ -210,11 +187,12 @@ func (s *sessionBuilderService) buildSession(
 		limit int,
 		categories ...model.QuestionCategory,
 	) []model.Question {
-		questions, err := s.srs.GetDueReviews(
+		questions, err := s.questionRepo.GetDueReviews(
 			ctx,
 			userID,
 			language,
 			level,
+			levels,
 			limit,
 			maxKanjiRecallPerSession,
 			categories...,

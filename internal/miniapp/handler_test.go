@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,57 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/lsj/copylingo/internal/observability"
 	"github.com/lsj/copylingo/internal/service"
 )
-
-func TestRefreshHandwritingMessagePreservesParentCorrelation(t *testing.T) {
-	var output bytes.Buffer
-	previous := slog.Default()
-	slog.SetDefault(slog.New(observability.NewContextHandler(slog.NewJSONHandler(
-		&output,
-		nil,
-	))))
-	defer slog.SetDefault(previous)
-
-	ctx := observability.WithAttrs(
-		context.Background(),
-		slog.String(
-			"interaction_id",
-			"http-parent",
-		),
-	)
-	handler := NewHandler(HandlerDeps{})
-	handler.refreshHandwritingMessage(
-		context.WithoutCancel(ctx),
-		1,
-		2,
-	)
-
-	var entry map[string]any
-	if err := json.Unmarshal(
-		output.Bytes(),
-		&entry,
-	); err != nil {
-		t.Fatalf(
-			"json.Unmarshal(%q) error = %v",
-			output.Bytes(),
-			err,
-		)
-	}
-	if got := entry["interaction_id"]; got != "http-parent" {
-		t.Fatalf(
-			"entry[interaction_id] = %#v, want http-parent",
-			got,
-		)
-	}
-	if got := entry["event"]; got != "handwriting.cleanup.skipped" {
-		t.Fatalf(
-			"entry[event] = %#v, want handwriting.cleanup.skipped",
-			got,
-		)
-	}
-}
 
 // fakeHandwritingScreen records the graded question the Mini App reports.
 type fakeHandwritingScreen struct {
@@ -99,6 +49,10 @@ func TestRefreshHandwritingMessageReportsGradedQuestionWithTimeout(t *testing.T)
 		)
 	}
 }
+
+// oneStrokeSubmitBody is a submit request whose strokes render to a PNG.
+const oneStrokeSubmitBody = `{"init_data":"dummy","session_id":1,"question_id":1,` +
+	`"strokes":[{"points":[{"x":0,"y":0,"drawing":true},{"x":10,"y":10,"drawing":true}]}]}`
 
 // mockQuizSession fakes service.SessionService's Mini App surface.
 type mockQuizSession struct {
@@ -163,12 +117,6 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 			wantBody:   "손글씨 제출 정보를 확인할 수 없습니다.",
 		},
-		{
-			name:       "ai unavailable mapping",
-			serviceErr: service.ErrAIUnavailable,
-			wantStatus: http.StatusServiceUnavailable,
-			wantBody:   "현재 AI 채점 설정을 사용할 수 없습니다.",
-		},
 	}
 
 	for _, tt := range tests {
@@ -189,13 +137,14 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 					},
 				}
 				handler := NewHandler(HandlerDeps{
-					Session:  handwriting,
-					Verifier: verifier,
+					Session:           handwriting,
+					Verifier:          verifier,
+					HandwritingScreen: &fakeHandwritingScreen{},
 				})
 
 				w := httptest.NewRecorder()
 				c, _ := gin.CreateTestContext(w)
-				reqBody := `{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`
+				reqBody := oneStrokeSubmitBody
 				c.Request, _ = http.NewRequest(
 					"POST",
 					"/api/miniapp/handwriting/submit",
@@ -312,6 +261,15 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 					ctx context.Context,
 					req service.HandwritingSubmitRequest,
 				) (*service.HandwritingSubmitResult, error) {
+					if !bytes.HasPrefix(
+						req.Image,
+						[]byte("\x89PNG"),
+					) {
+						t.Errorf(
+							"service got %d bytes, want a rendered PNG",
+							len(req.Image),
+						)
+					}
 					return &service.HandwritingSubmitResult{IsCorrect: true}, nil
 				},
 			}
@@ -321,13 +279,14 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 				},
 			}
 			handler := NewHandler(HandlerDeps{
-				Session:  handwriting,
-				Verifier: verifier,
+				Session:           handwriting,
+				Verifier:          verifier,
+				HandwritingScreen: &fakeHandwritingScreen{},
 			})
 
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
-			reqBody := `{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`
+			reqBody := oneStrokeSubmitBody
 			c.Request, _ = http.NewRequest(
 				"POST",
 				"/submit",
@@ -357,4 +316,46 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 			}
 		},
 	)
+}
+
+// Empty strokes cannot be rendered, so the request is rejected before grading.
+func TestSubmitHandwriting_EmptyStrokesRejectedBeforeGrading(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewHandler(HandlerDeps{
+		Session: &mockQuizSession{
+			submitHandwritingFn: func(
+				context.Context,
+				service.HandwritingSubmitRequest,
+			) (*service.HandwritingSubmitResult, error) {
+				t.Fatal("service called with empty strokes")
+				return nil, nil
+			},
+		},
+		Verifier: &mockVerifier{
+			verifyFn: func(string) (*TelegramUser, error) {
+				return &TelegramUser{ID: 123}, nil
+			},
+		},
+	})
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request, _ = http.NewRequest(
+		"POST",
+		"/submit",
+		strings.NewReader(`{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`),
+	)
+	c.Request.Header.Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	handler.SubmitHandwriting(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf(
+			"status = %d, want 400",
+			w.Code,
+		)
+	}
 }

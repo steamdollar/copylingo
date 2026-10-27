@@ -255,27 +255,24 @@ func (sf *SessionFlow) renderByType(
 			)
 			return "", nil, true
 		}
-		if sf.messages != nil {
-			err := sf.messages.SaveHandwritingMessage(
+		if err := sf.messages.SaveHandwritingMessage(
+			ctx,
+			sessionID,
+			question.ID,
+			model.TelegramMessageRef{ChatID: chatID, MessageID: msgID},
+		); err != nil {
+			slog.ErrorContext(
 				ctx,
+				"Failed to cache handwriting message ID",
+				"event",
+				"telegram.question.handwriting_cache_failed",
+				"session_id",
 				sessionID,
+				"question_id",
 				question.ID,
-				model.TelegramMessageRef{ChatID: chatID, MessageID: msgID},
+				"error",
+				err,
 			)
-			if err != nil {
-				slog.ErrorContext(
-					ctx,
-					"Failed to cache handwriting message ID",
-					"event",
-					"telegram.question.handwriting_cache_failed",
-					"session_id",
-					sessionID,
-					"question_id",
-					question.ID,
-					"error",
-					err,
-				)
-			}
 		}
 		return "", nil, true
 
@@ -314,19 +311,13 @@ func (sf *SessionFlow) renderByType(
 		}
 		return text + "\n\n" + wordOrderText, keyboard, false
 
-	case model.QuestionFillBlank, model.QuestionSubjective:
-		if sf.input != nil {
-			_ = sf.input.SetActiveQuestion(
-				ctx,
-				chatID,
-				model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIdx},
-			)
-		}
-		if question.Type == model.QuestionSubjective {
-			text += messages.freeTextAnswerPrompt
-		} else {
-			text += messages.chatAnswerPrompt
-		}
+	case model.QuestionFillBlank:
+		_ = sf.input.SetActiveQuestion(
+			ctx,
+			chatID,
+			model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIdx},
+		)
+		text += messages.chatAnswerPrompt
 		return text, nil, false
 
 	default:
@@ -383,7 +374,10 @@ func buildMCQ(
 			break
 		}
 	}
-	answerButton := func(label string, optionIndex int) tgbotapi.InlineKeyboardButton {
+	answerButton := func(
+		label string,
+		optionIndex int,
+	) tgbotapi.InlineKeyboardButton {
 		return tgbotapi.NewInlineKeyboardButtonData(
 			label,
 			fmt.Sprintf(
@@ -453,8 +447,7 @@ func (sf *SessionFlow) sendListeningAudio(
 	chatID int64,
 	q *model.Question,
 ) bool {
-	audio := sf.audio
-	if audio == nil || q.AudioPath == nil || *q.AudioPath == "" {
+	if q.AudioPath == nil || *q.AudioPath == "" {
 		return false
 	}
 
@@ -477,7 +470,7 @@ func (sf *SessionFlow) sendListeningAudio(
 		)
 	}
 
-	clip, err := audio.GetClip(
+	clip, err := sf.audio.GetClip(
 		ctx,
 		*q.AudioPath,
 	)
@@ -516,7 +509,7 @@ func (sf *SessionFlow) sendListeningAudio(
 	}
 
 	if fileID != "" {
-		if err := audio.CacheFileID(
+		if err := sf.audio.CacheFileID(
 			ctx,
 			q.ID,
 			fileID,

@@ -16,14 +16,16 @@ type fakeQuestionRepo struct {
 	dueCount    int
 	dueCountErr error
 	dueLimit    int
+	dueLevels   []string
 }
 
 func (r *fakeQuestionRepo) GetDueReviewCount(
-	context.Context,
-	int64,
-	string,
-	[]string,
+	_ context.Context,
+	_ int64,
+	_ string,
+	levels []string,
 ) (int, error) {
+	r.dueLevels = levels
 	return r.dueCount, r.dueCountErr
 }
 
@@ -318,14 +320,9 @@ func TestSessionServiceBuildReviewQuiz(t *testing.T) {
 				questions := &fakeQuestionRepo{dueCount: tt.dueCount, dueCountErr: tt.dueCountErr}
 				sessions := &fakeSessionRepo{}
 				svc := NewSessionService(SessionDeps{
-					QuestionRepo: questions,
-					SessionRepo:  sessions,
-					SessionQuestionRepo: &mockSessionQuestionStore{createSessionQuestionsFn: func(
-						context.Context,
-						[]model.SessionQuestion,
-					) error {
-						return nil
-					}},
+					QuestionRepo:        questions,
+					SessionRepo:         sessions,
+					SessionQuestionRepo: &builderStores{},
 				})
 
 				session, err := svc.BuildReviewQuiz(
@@ -571,4 +568,34 @@ func TestSessionServiceCompleteQuiz(t *testing.T) {
 			}
 		},
 	)
+}
+
+// The due count covers the same adjacent-level scope the session draws from.
+func TestSessionServiceDueReviewCountUsesSessionLevels(t *testing.T) {
+	repo := &fakeQuestionRepo{dueCount: 2}
+	svc := NewSessionService(SessionDeps{QuestionRepo: repo})
+
+	got, err := svc.DueReviewCount(
+		context.Background(),
+		42,
+		"ja",
+		"N4",
+	)
+	if err != nil || got != 2 {
+		t.Fatalf(
+			"DueReviewCount() = %d, %v",
+			got,
+			err,
+		)
+	}
+	if want := []string{"N5", "N4", "N3"}; !slices.Equal(
+		repo.dueLevels,
+		want,
+	) {
+		t.Fatalf(
+			"levels = %v, want %v",
+			repo.dueLevels,
+			want,
+		)
+	}
 }

@@ -18,25 +18,13 @@ var (
 	ErrHandwritingInvalidQuestion  = errors.New("question is not a handwriting question")
 )
 
-// StrokePoint represents one sampled drawing point from the Mini App canvas.
-type StrokePoint struct {
-	X       float64 `json:"x"`
-	Y       float64 `json:"y"`
-	TimeMS  int64   `json:"time_ms,omitempty"`
-	Drawing bool    `json:"drawing"`
-}
-
-// Stroke represents one continuous pen-down path.
-type Stroke struct {
-	Points []StrokePoint `json:"points"`
-}
-
-// HandwritingSubmitRequest is the service-level request after HTTP auth is verified.
+// HandwritingSubmitRequest is the service-level request after HTTP auth is
+// verified. Image is the PNG the Mini App rendered from the learner's strokes.
 type HandwritingSubmitRequest struct {
-	UserID     int64    `json:"user_id"`
-	SessionID  int      `json:"session_id"`
-	QuestionID int      `json:"question_id"`
-	Strokes    []Stroke `json:"strokes"`
+	UserID     int64
+	SessionID  int
+	QuestionID int
+	Image      []byte
 }
 
 // HandwritingSubmitResult is returned to the Mini App after grading.
@@ -48,8 +36,8 @@ type HandwritingSubmitResult struct {
 }
 
 // SubmitHandwriting grades a Mini App handwriting submission for the current
-// question. Unlike subjective text answers, an AI grading failure is returned
-// as an error and nothing is recorded, so the user can resubmit.
+// question. An AI grading failure is returned as an error and nothing is
+// recorded, so the user can resubmit.
 func (s *SessionService) SubmitHandwriting(
 	ctx context.Context,
 	req HandwritingSubmitRequest,
@@ -101,23 +89,31 @@ func (s *SessionService) SubmitHandwriting(
 		return nil, ErrHandwritingAlreadyAnswered
 	}
 
-	renderedImage, err := s.strokeRenderer.RenderPNG(req.Strokes)
+	llmStartedAt := time.Now()
+	// An LLM failure returns before recording, so the learner can resubmit.
+	result, err := s.llm.GradeHandwriting(
+		ctx,
+		question.Prompt,
+		question.CorrectAnswer,
+		req.Image,
+	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"render handwriting strokes: %w",
+			"grade handwriting answer: %w",
 			err,
 		)
 	}
-	renderedAt := time.Now()
+	gradedAt := time.Now()
 
-	isCorrect, feedback, err := s.grader.GradeHandwritingWithQuestion(
+	// RecordAnswer re-reads the state, so an answer recorded while the LLM
+	// was grading is rejected here instead of overwritten.
+	if err := s.quizProgress.RecordAnswer(
 		ctx,
 		req.SessionID,
 		req.QuestionID,
-		question,
-		renderedImage,
-	)
-	if err != nil {
+		"handwriting:submitted",
+		result.IsCorrect,
+	); err != nil {
 		if errors.Is(
 			err,
 			ErrQuizActiveSessionAlreadyAnswered,
@@ -125,7 +121,7 @@ func (s *SessionService) SubmitHandwriting(
 			return nil, ErrHandwritingAlreadyAnswered
 		}
 		return nil, fmt.Errorf(
-			"grade handwriting answer: %w",
+			"record handwriting answer: %w",
 			err,
 		)
 	}
@@ -136,17 +132,19 @@ func (s *SessionService) SubmitHandwriting(
 		"handwriting.service.completed",
 		"duration_ms",
 		time.Since(startedAt).Milliseconds(),
-		"render_duration_ms",
-		renderedAt.Sub(startedAt).Milliseconds(),
-		"grade_duration_ms",
-		time.Since(renderedAt).Milliseconds(),
+		"llm_duration_ms",
+		gradedAt.Sub(llmStartedAt).Milliseconds(),
+		"record_duration_ms",
+		time.Since(gradedAt).Milliseconds(),
 		"image_bytes",
-		len(renderedImage),
+		len(req.Image),
+		"is_correct",
+		result.IsCorrect,
 	)
 
 	return &HandwritingSubmitResult{
-		IsCorrect:     isCorrect,
-		Feedback:      feedback,
+		IsCorrect:     result.IsCorrect,
+		Feedback:      result.Feedback,
 		CorrectAnswer: question.CorrectAnswer,
 		Explanation:   question.Explanation,
 	}, nil

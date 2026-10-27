@@ -19,7 +19,6 @@ const userPushCron = "*/30 * * * *"
 type Scheduler struct {
 	user       slotUsers
 	session    slotSessions
-	audio      audioTopUp
 	cron       *cron.Cron
 	dispatcher *sessionDispatcher
 }
@@ -43,16 +42,6 @@ type slotSessions interface {
 		userIDs []int64,
 	) (map[int64]int, error)
 	dispatchSessions
-}
-
-// audioTopUp fills the missing listening clips of every level a learner at
-// currentLevel can be quizzed on.
-type audioTopUp interface {
-	TopUpSessionAudio(
-		ctx context.Context,
-		language,
-		currentLevel string,
-	) error
 }
 
 // quizPusher sends the "Quiz session arrived" message (bot SessionFlow).
@@ -83,12 +72,10 @@ type pushClaims interface {
 	) (bool, error)
 }
 
-// Deps wires Scheduler with the service calls it makes. Audio is optional:
-// it stays nil without a TTS key and the audio top-up is skipped.
+// Deps wires Scheduler with the service calls it makes.
 type Deps struct {
 	User        slotUsers
 	Session     slotSessions
-	Audio       audioTopUp
 	QuizPusher  quizPusher
 	StudyPusher studyPusher
 	Cron        *cron.Cron
@@ -99,7 +86,6 @@ func New(deps Deps) *Scheduler {
 	s := &Scheduler{
 		user:    deps.User,
 		session: deps.Session,
-		audio:   deps.Audio,
 		cron:    deps.Cron,
 	}
 	s.dispatcher = newSessionDispatcher(
@@ -161,9 +147,7 @@ func (s *Scheduler) Start() {
 // Stop gracefully stops the scheduler.
 func (s *Scheduler) Stop() {
 	s.cron.Stop()
-	if s.dispatcher != nil && s.dispatcher.limiter != nil {
-		s.dispatcher.limiter.Stop()
-	}
+	s.dispatcher.limiter.Stop()
 	slog.Info(
 		"Scheduler stopped",
 		"event",
@@ -254,7 +238,6 @@ func (s *Scheduler) tick(ctx context.Context) error {
 		model.SessionSlotEveningQuiz,
 	}
 
-	var allUsers []model.User
 	var failures int
 
 	for _, tz := range timezones {
@@ -308,11 +291,6 @@ func (s *Scheduler) tick(ctx context.Context) error {
 				continue
 			}
 
-			allUsers = append(
-				allUsers,
-				users...,
-			)
-
 			userIDs := make(
 				[]int64,
 				len(users),
@@ -348,13 +326,6 @@ func (s *Scheduler) tick(ctx context.Context) error {
 		}
 	}
 
-	if len(allUsers) > 0 {
-		s.topUpAudio(
-			ctx,
-			allUsers,
-		)
-	}
-
 	if failures > 0 {
 		return fmt.Errorf(
 			"%d slot operations failed during tick",
@@ -362,68 +333,4 @@ func (s *Scheduler) tick(ctx context.Context) error {
 		)
 	}
 	return nil
-}
-
-// langLevelPair identifies a distinct (language, proficiency level) bucket.
-type langLevelPair struct {
-	Language string
-	Level    string
-}
-
-// distinctLangLevelPairs collapses the user slice into the unique set of
-// (language, level) pairs in a single pass.
-func distinctLangLevelPairs(users []model.User) []langLevelPair {
-	seen := make(
-		map[langLevelPair]struct{},
-		len(users),
-	)
-	pairs := make(
-		[]langLevelPair,
-		0,
-		len(users),
-	)
-	for _, user := range users {
-		p := langLevelPair{Language: user.Language, Level: user.ProficiencyLevel}
-		if _, ok := seen[p]; ok {
-			continue
-		}
-		seen[p] = struct{}{}
-		pairs = append(
-			pairs,
-			p,
-		)
-	}
-	return pairs
-}
-
-// topUpAudio fills missing listening clips once per distinct (language, current
-// level) bucket; the audio service expands each bucket to its session levels.
-func (s *Scheduler) topUpAudio(
-	ctx context.Context,
-	users []model.User,
-) {
-	if s.audio == nil {
-		return
-	}
-	for _, p := range distinctLangLevelPairs(users) {
-		if err := s.audio.TopUpSessionAudio(
-			ctx,
-			p.Language,
-			p.Level,
-		); err != nil {
-			slog.WarnContext(
-				ctx,
-				"Listening audio top-up failed",
-				"event",
-				"scheduler.audio.topup_failed",
-				"language",
-				p.Language,
-				"level",
-				p.Level,
-				"error",
-				err,
-			)
-			continue
-		}
-	}
 }

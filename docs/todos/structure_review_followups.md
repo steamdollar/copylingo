@@ -30,7 +30,6 @@
 |---|---|
 | `session_builder.go` (`sessionBuilderService`, `selection`) | `session_quiz_builder.go` (`quizBuilder`) — Quiz 전용임을 호출처로 확인 |
 | `quiz_active_session.go` (`quizActiveSessionService`, `quizProgress`) | `session_quiz_progress.go` (`quizProgress`) |
-| `grader.go` + `errors.go` (`graderService`) | `session_quiz_grader.go` (`quizGrader`) |
 | `srs.go` | `session_quiz_srs.go` — Quiz 전용 |
 | `handwriting_render.go` | `session_quiz_handwriting_render.go` |
 | `study_session.go` (`studySessionService`, `studyBuilder`) | `session_study_builder.go` (`studyBuilder`) |
@@ -38,7 +37,6 @@
 | `level_policy.go` | `session_level_policy.go` |
 
 테스트 파일도 같은 이름으로 바꾸고, 다음을 정리한다.
-- `mockSRS`를 `grader_test.go:52`에서 builder 테스트 쪽으로 옮긴다.
 - `TestSessionServiceBuildForSlot`(`session_study_test.go:183`)을 `session_dispatch_test.go`로 옮긴다.
 - `session_quiz_test.go`를 start/complete로 나눈다.
 - `session_builder_material_preference_test.go`는 실제로 maintenance cap을 테스트하므로 그에 맞게 이름을 바꾼다.
@@ -81,10 +79,8 @@
   - `model/session_store.go`(sentinel 2개)는 `model/session.go`로 흡수한다.
 - callback 주석: `callback/callback.go:10`의 "also created by the Mini App"은 stale이다. 현재 importer는 bot뿐이다.
 - stale 주석
-  - `service/srs.go:30`의 "graderService가 srsService에 의존"은 사실과 다르다.
   - `session_builder.go:62`와 `quiz_active_session.go:67`의 "learning sessions"는 Quiz를 가리킨다.
   - `bot/telegram_client.go:12`는 `*Bot` 경유를 설명한다.
-  - `bot/handler.go:81`의 "every dependency is required"는 `:732`의 nil 분기와 모순된다.
 - ADR-059:326의 `Repositories` 사용처는 "cmd/server"가 아니라 "cmd/*"다.
 
 ## U4. 책임 이동 (일부 동작 변화, 항목별 Case A 선결)
@@ -92,7 +88,7 @@
 | 항목 | 위치 | 제안 | 선결 |
 |---|---|---|---|
 | Study Tier1이 전달만 함 | `service/session_study.go`(6개 중 5개 forward), 흐름 조정은 `study_active_session.go:115,248-288`. DB fallback이 `:83-98`과 `:166-190`에 중복 | Start/Complete 흐름 조정을 Tier1로 올리고 Tier2를 load/save/delete/mark/flush로 축소해 Quiz와 같은 모양으로 맞춘다. `studyActiveSessionStarter` 제거 | ADR-059 §8.2 기준 위반이라 결정 불필요 |
-| grader 채점과 기록 분리 | 정상 기록은 `grader.go:121,206`, AI 실패 시 대체 기록은 `session_quiz_submit.go:312`. "현재 문항/이미 답함" 검증 4곳 | grader는 (question, answer) → (correct, feedback)만 계산하고, `RecordAnswer`는 Tier1에서 한 번만 호출 | 없음 |
+| ~~grader 채점과 기록 분리~~ | **완료**: `abstraction_review_followups.md` C에서 `graderService`를 지웠다. 채점은 제출 메서드 안에서 하고 `RecordAnswer`는 Tier1이 직접 호출한다 | - | - |
 | Quiz 소유자 검사 4가지 방식 | `session_quiz_start.go:116`(`!= 0` 생략, 도달 불가: `sessions.user_id` NOT NULL), `quiz_active_session.go:245`, `session_quiz_complete.go:32`, `session_quiz_handwriting.go:95` | `quizProgress.loadOwned` 하나로 통일. 제출 경로는 U1에서 처리 | 없음 |
 | SRS 정책 2벌·반올림 불일치 | Quiz는 Go `srs.go:83-93`(`int()` 절사), Study는 SQL `study_active_session_repo.go:420-437`(`ROUND`). interval 15·ease 2.5에서 37일 vs 38일 | 단일 구현 여부와 반올림 규칙(원본 SM-2는 올림)을 결정 | **ADR 필요** |
 | `*_active_session_repo` 이름이 실제 역할을 숨김 | `repository/quiz_active_session_repo.go:16`, `study_active_session_repo.go:15`: Postgres 스냅샷 적재와 4테이블 완료 커밋(자체 tx, ADR-061의 유일한 예외). 에러 prefix가 rename 전 이름 `ActiveSessionRepository.FlushActiveSession` 그대로 | `QuizCompletionRepository`·`LoadQuizSnapshot`·`CommitQuizCompletion` 식 rename, prefix 수정, 수동 tx를 `WithinTx`로 | rename 범위 확인 |

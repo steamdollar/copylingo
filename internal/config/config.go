@@ -35,7 +35,12 @@ type DBConfig struct {
 func (c DBConfig) DSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
+		c.Host,
+		c.Port,
+		c.User,
+		c.Password,
+		c.DBName,
+		c.SSLMode,
 	)
 }
 
@@ -85,7 +90,7 @@ func (c *Config) validate() error {
 		return fmt.Errorf("telegram.token is required")
 	}
 	if c.LLM.APIKey == "" {
-		log.Println("[WARN] llm.api_key is not set. AI features may be disabled.")
+		return fmt.Errorf("llm.api_key is required")
 	}
 	if strings.TrimSpace(c.Logging.Dir) == "" {
 		return fmt.Errorf("logging.dir is required")
@@ -100,7 +105,10 @@ func (c *Config) validate() error {
 		return fmt.Errorf("logging.retention_days must be positive")
 	}
 	if _, err := time.LoadLocation(c.Logging.Timezone); err != nil {
-		return fmt.Errorf("logging.timezone is invalid: %w", err)
+		return fmt.Errorf(
+			"logging.timezone is invalid: %w",
+			err,
+		)
 	}
 	return nil
 }

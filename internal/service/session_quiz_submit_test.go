@@ -2,11 +2,11 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"testing"
 
-	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/model"
 )
 
@@ -188,7 +188,16 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 	t.Run(
 		"missing working set is unavailable",
 		func(t *testing.T) {
-			svc := NewSessionService(SessionDeps{Stores: SessionStores{Quiz: newFakeQuizSessionStore()}})
+			// Neither Redis nor the DB has the session.
+			svc := NewSessionService(SessionDeps{
+				Stores: SessionStores{Quiz: newFakeQuizSessionStore()},
+				QuizActiveSessionRepo: &fakeQuizActiveSessionRepo{loadFn: func(
+					context.Context,
+					int,
+				) (*model.QuizActiveSessionState, error) {
+					return nil, sql.ErrNoRows
+				}},
+			})
 			_, err := svc.SubmitQuizOption(
 				context.Background(),
 				1,
@@ -210,8 +219,6 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 }
 
 func TestSessionServiceSubmitQuizText(t *testing.T) {
-	subjective := model.Question{ID: 1, Type: model.QuestionSubjective, Prompt: "p", CorrectAnswer: "I am"}
-
 	t.Run(
 		"fill-blank is trimmed and lowercased",
 		func(t *testing.T) {
@@ -243,113 +250,12 @@ func TestSessionServiceSubmitQuizText(t *testing.T) {
 		},
 	)
 
-	// Subjective failure policy: AI unavailability records a wrong answer.
-	t.Run(
-		"subjective AI unavailable records wrong answer",
-		func(t *testing.T) {
-			hookCalls := 0
-			llm := &mockLLM{gradeAnswerFn: func(
-				context.Context,
-				string,
-				string,
-				string,
-			) (external.GradeResult, error) {
-				if hookCalls != 1 {
-					t.Fatalf(
-						"OnAIGrading calls before grading = %d, want 1",
-						hookCalls,
-					)
-				}
-				return external.GradeResult{}, external.ErrAIConfigMissing
-			}}
-			svc, store := newQuizTestSession(
-				t,
-				submitTestState(subjective),
-				llm,
-			)
-			got, err := svc.SubmitQuizText(
-				context.Background(),
-				QuizTextAnswer{
-					UserID:        1,
-					SessionID:     10,
-					QuestionIndex: 0,
-					Text:          "I'm",
-					OnAIGrading:   func() { hookCalls++ },
-				},
-			)
-			if err != nil {
-				t.Fatalf(
-					"SubmitQuizText failed: %v",
-					err,
-				)
-			}
-			if !got.GradingUnavailable || got.IsCorrect {
-				t.Fatalf(
-					"result = %+v, want grading-unavailable wrong answer",
-					got,
-				)
-			}
-			if answer, correct := recordedAnswer(
-				t,
-				store,
-			); answer != "I'm" || correct == nil || *correct {
-				t.Fatalf(
-					"recorded %q/%v, want I'm/false",
-					answer,
-					correct,
-				)
-			}
-		},
-	)
-
-	t.Run(
-		"subjective other LLM error is not recorded",
-		func(t *testing.T) {
-			llmErr := errors.New("llm timeout")
-			llm := &mockLLM{gradeAnswerFn: func(
-				context.Context,
-				string,
-				string,
-				string,
-			) (external.GradeResult, error) {
-				return external.GradeResult{}, llmErr
-			}}
-			svc, store := newQuizTestSession(
-				t,
-				submitTestState(subjective),
-				llm,
-			)
-			_, err := svc.SubmitQuizText(
-				context.Background(),
-				QuizTextAnswer{UserID: 1, SessionID: 10, QuestionIndex: 0, Text: "x"},
-			)
-			if !errors.Is(
-				err,
-				llmErr,
-			) || errors.Is(
-				err,
-				ErrQuizAnswerStale,
-			) {
-				t.Fatalf(
-					"error = %v, want wrapped LLM error",
-					err,
-				)
-			}
-			if _, correct := recordedAnswer(
-				t,
-				store,
-			); correct != nil {
-				t.Fatal("non-availability LLM errors must not record an answer")
-			}
-		},
-	)
-
 	t.Run(
 		"index out of range is question not found",
 		func(t *testing.T) {
 			svc, _ := newQuizTestSession(
 				t,
-				submitTestState(subjective),
+				submitTestState(model.Question{ID: 1, Type: model.QuestionFillBlank, CorrectAnswer: "ka"}),
 				nil,
 			)
 			_, err := svc.SubmitQuizText(
@@ -514,6 +420,45 @@ func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
 					)
 				}
 			},
+		)
+	}
+}
+
+// A working-set save failure must surface to the caller, not report a result.
+func TestSessionServiceSubmitQuizOptionSaveFailure(t *testing.T) {
+	svc, store := newQuizTestSession(
+		t,
+		submitTestState(model.Question{
+			ID:            1,
+			Type:          model.QuestionMultipleChoice,
+			CorrectAnswer: "a",
+			Options:       json.RawMessage(`["a","b"]`),
+		}),
+		nil,
+	)
+	saveErr := errors.New("redis unavailable")
+	store.setErr = saveErr
+
+	result, err := svc.SubmitQuizOption(
+		context.Background(),
+		1,
+		10,
+		1,
+		0,
+	)
+	if !errors.Is(
+		err,
+		saveErr,
+	) {
+		t.Fatalf(
+			"error = %v, want save error",
+			err,
+		)
+	}
+	if result != nil {
+		t.Fatalf(
+			"result = %+v, want nil",
+			result,
 		)
 	}
 }

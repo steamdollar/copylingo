@@ -16,8 +16,6 @@ const (
 	QuestionMultipleChoice QuestionType = "multiple_choice"
 	// QuestionFillBlank - 빈칸 채우기
 	QuestionFillBlank QuestionType = "fill_blank"
-	// QuestionSubjective - 자유 입력 의미 채점 (LLM semantic grading; exact match 불가한 번역/의미 답변용)
-	QuestionSubjective QuestionType = "subjective"
 	// QuestionKanaHandwriting - 가나 손글씨 입력 (Mini App + AI binary grading)
 	QuestionKanaHandwriting QuestionType = "kana_handwriting"
 	// QuestionTranslation - 번역 문제
@@ -118,7 +116,10 @@ type Question struct {
 // GetOptions parses the JSONB options field into a string slice.
 func (q *Question) GetOptions() ([]string, error) {
 	var opts []string
-	if err := json.Unmarshal(q.Options, &opts); err != nil {
+	if err := json.Unmarshal(
+		q.Options,
+		&opts,
+	); err != nil {
 		return nil, err
 	}
 	return opts, nil
@@ -131,7 +132,10 @@ func (q *Question) ShuffleOptions(sessionID int) error {
 		return nil
 	}
 	var opts []string
-	if err := json.Unmarshal(q.Options, &opts); err != nil {
+	if err := json.Unmarshal(
+		q.Options,
+		&opts,
+	); err != nil {
 		return err
 	}
 	if len(opts) <= 1 {
@@ -139,11 +143,21 @@ func (q *Question) ShuffleOptions(sessionID int) error {
 	}
 
 	h := fnv.New64a()
-	_, _ = h.Write([]byte(fmt.Sprintf("%d:%d", sessionID, q.ID)))
+	_, _ = h.Write([]byte(fmt.Sprintf(
+		"%d:%d",
+		sessionID,
+		q.ID,
+	)))
 	rng := rand.New(rand.NewSource(int64(h.Sum64())))
-	rng.Shuffle(len(opts), func(i, j int) {
-		opts[i], opts[j] = opts[j], opts[i]
-	})
+	rng.Shuffle(
+		len(opts),
+		func(
+			i,
+			j int,
+		) {
+			opts[i], opts[j] = opts[j], opts[i]
+		},
+	)
 
 	shuffledJSON, err := json.Marshal(opts)
 	if err != nil {

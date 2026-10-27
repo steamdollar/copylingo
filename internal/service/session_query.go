@@ -56,11 +56,14 @@ func (s *SessionService) DueReviewCount(
 	language,
 	level string,
 ) (int, error) {
-	return s.srs.GetDueCount(
+	return s.questionRepo.GetDueReviewCount(
 		ctx,
 		userID,
 		language,
-		level,
+		sessionLevelsFor(
+			language,
+			level,
+		),
 	)
 }
 

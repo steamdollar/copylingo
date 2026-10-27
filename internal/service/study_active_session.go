@@ -10,11 +10,10 @@ import (
 )
 
 var (
-	ErrStudyActiveSessionMaterialNotFound  = errors.New("study active session material not found")
-	ErrStudyActiveSessionIncomplete        = errors.New("study active session is incomplete")
-	ErrStudyActiveSessionUserMismatch      = errors.New("study active session user mismatch")
-	ErrStudyActiveSessionModeMismatch      = errors.New("study active session mode mismatch")
-	ErrStudyActiveSessionDependencyMissing = errors.New("study active session dependency missing")
+	ErrStudyActiveSessionMaterialNotFound = errors.New("study active session material not found")
+	ErrStudyActiveSessionIncomplete       = errors.New("study active session is incomplete")
+	ErrStudyActiveSessionUserMismatch     = errors.New("study active session user mismatch")
+	ErrStudyActiveSessionModeMismatch     = errors.New("study active session mode mismatch")
 )
 
 type StudySessionStore interface {
@@ -66,9 +65,6 @@ func (s *studyActiveSessionService) Start(
 ) (*model.StudyActiveSessionState, error) {
 	// Resume from the Redis working set when present. Loading from DB here
 	// would discard materials marked studied since the session was started.
-	if s.store == nil {
-		return nil, ErrStudyActiveSessionDependencyMissing
-	}
 	state, err := s.store.Load(
 		ctx,
 		sessionID,
@@ -98,9 +94,6 @@ func (s *studyActiveSessionService) Start(
 	}
 	state.CurrentIndex = state.NextUnstudiedIndex()
 	if state.Session.Status == model.SessionPending {
-		if s.sessionRepo == nil {
-			return nil, ErrStudyActiveSessionDependencyMissing
-		}
 		if err := s.sessionRepo.Start(
 			ctx,
 			sessionID,
@@ -127,9 +120,6 @@ func (s *studyActiveSessionService) loadFromDB(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
-	if s.repo == nil {
-		return nil, ErrStudyActiveSessionDependencyMissing
-	}
 	state, err := s.repo.LoadStudySessionWithStateBySessionID(
 		ctx,
 		sessionID,
@@ -149,9 +139,6 @@ func (s *studyActiveSessionService) LoadOwnedStudySessionState(
 	sessionID int,
 	userID int64,
 ) (*model.StudyActiveSessionState, error) {
-	if s.store == nil {
-		return nil, ErrStudyActiveSessionDependencyMissing
-	}
 	state, err := s.store.Load(
 		ctx,
 		sessionID,
@@ -254,9 +241,6 @@ func (s *studyActiveSessionService) Complete(
 			sessionID,
 		)
 	}
-	if s.repo == nil {
-		return ErrStudyActiveSessionDependencyMissing
-	}
 	if err := s.repo.FlushStudyActiveSession(
 		ctx,
 		state,
@@ -280,9 +264,6 @@ func (s *studyActiveSessionService) Delete(
 	ctx context.Context,
 	sessionID int,
 ) error {
-	if s.store == nil {
-		return ErrStudyActiveSessionDependencyMissing
-	}
 	if err := s.store.Delete(
 		ctx,
 		sessionID,
@@ -301,9 +282,6 @@ func (s *studyActiveSessionService) save(
 	state *model.StudyActiveSessionState,
 ) error {
 	state.RecountStudied()
-	if s.store == nil {
-		return ErrStudyActiveSessionDependencyMissing
-	}
 	if err := s.store.Save(
 		ctx,
 		state.Session.ID,

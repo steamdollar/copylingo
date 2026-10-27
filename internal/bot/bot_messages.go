@@ -172,8 +172,6 @@ type botMessages struct {
 	questionAnswerPromptFormat          string
 	correctAnswerResultFormat           string
 	wrongAnswerResultFormat             string
-	aiFeedbackFormat                    string
-	subjectiveGradingUnavailable        string
 	nextQuestionButton                  string
 	resultsButton                       string
 	questionCompleted                   string
@@ -188,7 +186,6 @@ type botMessages struct {
 	handwritingSentNotice               string
 	listeningAudioUnavailable           string
 	listeningAnswerPrompt               string
-	freeTextAnswerPrompt                string
 	chatAnswerPrompt                    string
 	sessionCompletionWrongAnswerHeading string
 	sessionCompletionKanaAnswerFormat   string
@@ -450,8 +447,6 @@ JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
 		questionAnswerPromptFormat:          "📝 %s\n\n",
 		correctAnswerResultFormat:           "✅ <b>정답!</b>\n\n%s",
 		wrongAnswerResultFormat:             "❌ <b>오답</b>\n\n입력/선택: %s\n정답: <b>%s</b>\n\n%s",
-		aiFeedbackFormat:                    "\n\n🤖 <b>AI 피드백:</b>\n%s",
-		subjectiveGradingUnavailable:        "⚠️ 시스템 설정 문제로 현재 AI 주관식 채점이 불가능합니다. 임시로 오답 처리하고 넘어갑니다.",
 		nextQuestionButton:                  "다음 문제 →",
 		resultsButton:                       "📊 결과 보기",
 		questionCompleted:                   "✅ 모든 문제를 풀었습니다!",
@@ -466,7 +461,6 @@ JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
 		handwritingSentNotice:               "✍️ 손글씨 문항을 새 메시지로 보냈습니다.",
 		listeningAudioUnavailable:           "\n\n⚠️ 이 청해 문항의 음성을 준비하지 못했습니다.",
 		listeningAnswerPrompt:               "\n\n🎧 위 음성을 듣고 정답을 선택하세요.",
-		freeTextAnswerPrompt:                "\n\n⌨️ 정답을 자유롭게 텍스트로 입력해 주세요",
 		chatAnswerPrompt:                    "\n\n⌨️ 채팅창에 답안을 입력해 주세요",
 		sessionCompletionWrongAnswerHeading: "\n\n<b>틀린 문제:</b>\n",
 		sessionCompletionKanaAnswerFormat:   "❌ %s (정답: %s)\n",

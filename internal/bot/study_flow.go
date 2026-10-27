@@ -628,14 +628,6 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 	if err != nil {
 		return
 	}
-	if sf.input == nil {
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
-			messages.llmQuestionActivationFailed,
-		)
-		return
-	}
-
 	state, err := sf.session.StudyProgress(
 		ctx,
 		sessionID,

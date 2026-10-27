@@ -127,14 +127,8 @@ type MaterialRepo interface {
 	) ([]model.Material, error)
 }
 
-// QuizGradingLLM grades answers that need AI judgment (subjective text and handwriting).
+// QuizGradingLLM grades handwriting answers, which need AI judgment.
 type QuizGradingLLM interface {
-	GradeAnswer(
-		ctx context.Context,
-		questionPrompt,
-		correctAnswer,
-		userAnswer string,
-	) (external.GradeResult, error)
 	GradeHandwriting(
 		ctx context.Context,
 		questionPrompt,
@@ -167,26 +161,24 @@ type SessionDeps struct {
 }
 
 // SessionService is the Tier1 entry point for Quiz and Study sessions
-// (ADR-059 §8.6). Callers see only this type; selection, progress, SRS and
-// grading are internal collaborators built here.
+// (ADR-059 §8.6). Callers see only this type; selection and progress are
+// internal collaborators built here. Grading happens inline in the submit
+// methods: exact match for text/option answers, the LLM for handwriting.
 type SessionService struct {
-	sessionRepo    SessionRepo
-	userRepo       SessionUserRepo
-	selection      *sessionBuilderService
-	quizProgress   *quizActiveSessionService
-	srs            *srsService
-	grader         *graderService
-	strokeRenderer StrokeRenderer
-	studyBuilder   *studySessionService
-	studyProgress  *studyActiveSessionService
+	sessionRepo   SessionRepo
+	userRepo      SessionUserRepo
+	selection     *sessionBuilderService
+	quizProgress  *quizActiveSessionService
+	questionRepo  QuestionRepo
+	llm           QuizGradingLLM
+	studyBuilder  *studySessionService
+	studyProgress *studyActiveSessionService
 }
 
 func NewSessionService(deps SessionDeps) *SessionService {
-	srs := newSRSService(deps.QuestionRepo)
 	quizProgress := newQuizActiveSessionService(
 		deps.QuizActiveSessionRepo,
 		deps.Stores.Quiz,
-		srs,
 	)
 	return &SessionService{
 		sessionRepo: deps.SessionRepo,
@@ -195,15 +187,10 @@ func NewSessionService(deps SessionDeps) *SessionService {
 			deps.QuestionRepo,
 			deps.SessionRepo,
 			deps.SessionQuestionRepo,
-			srs,
 		),
 		quizProgress: quizProgress,
-		srs:          srs,
-		grader: newGraderService(
-			quizProgress,
-			deps.LLM,
-		),
-		strokeRenderer: NewDefaultPNGStrokeRenderer(),
+		questionRepo: deps.QuestionRepo,
+		llm:          deps.LLM,
 		studyBuilder: newStudySessionService(
 			deps.MaterialRepo,
 			deps.SessionRepo,

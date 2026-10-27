@@ -47,6 +47,7 @@ func run() error {
 	defer closeLogger()
 	slog.SetDefault(logger)
 
+	// init app
 	app, err := initApp(cfg)
 	if err != nil {
 		return fmt.Errorf(
@@ -56,8 +57,7 @@ func run() error {
 	}
 	defer app.Close()
 
-	// Signals are caught only once the app is assembled; until then the
-	// default handler still terminates a slow startup.
+	// stop
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGINT,

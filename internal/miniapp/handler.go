@@ -3,6 +3,7 @@ package miniapp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -51,10 +52,10 @@ type HandlerDeps struct {
 }
 
 type handwritingSubmitRequest struct {
-	InitData   string           `json:"init_data"   binding:"required"`
-	SessionID  int              `json:"session_id"  binding:"required"`
-	QuestionID int              `json:"question_id" binding:"required"`
-	Strokes    []service.Stroke `json:"strokes"     binding:"required"`
+	InitData   string   `json:"init_data"   binding:"required"`
+	SessionID  int      `json:"session_id"  binding:"required"`
+	QuestionID int      `json:"question_id" binding:"required"`
+	Strokes    []Stroke `json:"strokes"     binding:"required"`
 }
 
 func NewHandler(deps HandlerDeps) *Handler {
@@ -130,14 +131,10 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 		),
 	)
 
-	result, err := h.session.SubmitHandwriting(
+	result, err := h.renderAndSubmit(
 		ctx,
-		service.HandwritingSubmitRequest{
-			UserID:     user.ID,
-			SessionID:  req.SessionID,
-			QuestionID: req.QuestionID,
-			Strokes:    req.Strokes,
-		},
+		user.ID,
+		req,
 	)
 	if err != nil {
 		publicErr := handwritingPublicError(err)
@@ -182,6 +179,31 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 	)
 }
 
+// renderAndSubmit turns the strokes into the PNG the service grades. Strokes
+// are this Mini App's input format, so the service only ever sees the image.
+func (h *Handler) renderAndSubmit(
+	ctx context.Context,
+	userID int64,
+	req handwritingSubmitRequest,
+) (*service.HandwritingSubmitResult, error) {
+	image, err := RenderStrokesPNG(req.Strokes)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"render handwriting strokes: %w",
+			err,
+		)
+	}
+	return h.session.SubmitHandwriting(
+		ctx,
+		service.HandwritingSubmitRequest{
+			UserID:     userID,
+			SessionID:  req.SessionID,
+			QuestionID: req.QuestionID,
+			Image:      image,
+		},
+	)
+}
+
 type publicError struct {
 	status  int
 	message string
@@ -204,7 +226,7 @@ func handwritingPublicError(err error) publicError {
 		),
 		errors.Is(
 			err,
-			service.ErrEmptyStrokes,
+			ErrEmptyStrokes,
 		):
 		return publicError{status: http.StatusBadRequest, message: "손글씨 제출 정보를 확인할 수 없습니다."}
 	case errors.Is(
@@ -212,11 +234,6 @@ func handwritingPublicError(err error) publicError {
 		service.ErrHandwritingAlreadyAnswered,
 	):
 		return publicError{status: http.StatusConflict, message: "이미 채점된 문항입니다."}
-	case errors.Is(
-		err,
-		service.ErrAIUnavailable,
-	):
-		return publicError{status: http.StatusServiceUnavailable, message: "현재 AI 채점 설정을 사용할 수 없습니다."}
 	default:
 		return publicError{status: http.StatusServiceUnavailable, message: "현재 AI 채점이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."}
 	}
@@ -242,16 +259,6 @@ func (h *Handler) refreshHandwritingMessage(
 			questionID,
 		),
 	)
-	if h.handwritingScreen == nil {
-		slog.WarnContext(
-			parent,
-			"Handwriting cleanup skipped because dependency is missing",
-			"event",
-			"handwriting.cleanup.skipped",
-		)
-		return
-	}
-
 	ctx, cancel := context.WithTimeout(
 		parent,
 		15*time.Second,

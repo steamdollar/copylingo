@@ -12,8 +12,6 @@ import (
 
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
-	"github.com/lsj/copylingo/internal/repository"
-	"github.com/lsj/copylingo/internal/service"
 )
 
 // OpenDB connects to PostgreSQL. Pool tuning stays with the caller because
@@ -32,32 +30,15 @@ func OpenDB(cfg config.DBConfig) (*sqlx.DB, error) {
 	return db, nil
 }
 
-// NewAudioService builds listening audio generation over the TTS settings,
-// which share the LLM API key, and the object storage settings. Callers check
-// cfg.LLM.APIKey first: the server runs without audio, while the admin tool
-// refuses to start.
-func NewAudioService(
-	cfg *config.Config,
-	questions *repository.QuestionRepository,
-) *service.AudioService {
-	return service.NewAudioService(
-		questions,
-		external.NewTTSClient(external.TTSOptions{
-			APIKey:  cfg.LLM.APIKey,
-			BaseURL: cfg.LLM.BaseURL,
-			Model:   cfg.LLM.TTSModel,
-			Voice:   cfg.LLM.TTSVoiceName,
-			VoiceB:  cfg.LLM.TTSVoiceNameB,
-		}),
-		external.NewS3AudioStore(external.S3Options{
-			Endpoint:     cfg.Storage.Endpoint,
-			Region:       cfg.Storage.Region,
-			Bucket:       cfg.Storage.Bucket,
-			AccessKey:    cfg.Storage.AccessKey,
-			SecretKey:    cfg.Storage.SecretKey,
-			UsePathStyle: cfg.Storage.UsePathStyle,
-		}),
-		cfg.LLM.TTSVoiceName,
-		cfg.LLM.TTSVoiceNameB,
-	)
+// NewAudioStore builds the S3-compatible object store that holds listening
+// audio. The server reads clips from it; the admin tool writes them (ADR-082).
+func NewAudioStore(cfg config.StorageConfig) *external.S3AudioStore {
+	return external.NewS3AudioStore(external.S3Options{
+		Endpoint:     cfg.Endpoint,
+		Region:       cfg.Region,
+		Bucket:       cfg.Bucket,
+		AccessKey:    cfg.AccessKey,
+		SecretKey:    cfg.SecretKey,
+		UsePathStyle: cfg.UsePathStyle,
+	})
 }

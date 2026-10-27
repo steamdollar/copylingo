@@ -465,46 +465,6 @@ func TestStudyActiveSessionStartReturnsCompletedEarly(t *testing.T) {
 	}
 }
 
-func TestStudyActiveSessionStartPendingWithoutStarterFails(t *testing.T) {
-	ctx := context.Background()
-	sessionID := 77
-	userID := int64(123)
-	store := newFakeStudySessionStore()
-	repo := &fakeStudyActiveRepo{
-		loadFn: func(
-			ctx context.Context,
-			sid int,
-		) (*model.StudyActiveSessionState, error) {
-			return studyActiveState(
-				sessionID,
-				userID,
-				model.SessionPending,
-			), nil
-		},
-	}
-	// sessionRepo nil while session is pending -> dependency missing.
-	svc := newStudyActiveSessionService(
-		repo,
-		nil,
-		store,
-	)
-
-	_, err := svc.Start(
-		ctx,
-		sessionID,
-		userID,
-	)
-	if !errors.Is(
-		err,
-		ErrStudyActiveSessionDependencyMissing,
-	) {
-		t.Fatalf(
-			"Start pending without starter = %v, want ErrStudyActiveSessionDependencyMissing",
-			err,
-		)
-	}
-}
-
 func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
@@ -538,30 +498,6 @@ func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
 	) {
 		t.Fatalf(
 			"Start user mismatch = %v, want ErrStudyActiveSessionUserMismatch",
-			err,
-		)
-	}
-}
-
-func TestStudyActiveSessionStartDependencyMissingRepo(t *testing.T) {
-	ctx := context.Background()
-	// repo nil -> loadFromDB returns dependency missing.
-	svc := newStudyActiveSessionService(
-		nil,
-		nil,
-		newFakeStudySessionStore(),
-	)
-	_, err := svc.Start(
-		ctx,
-		77,
-		123,
-	)
-	if !errors.Is(
-		err,
-		ErrStudyActiveSessionDependencyMissing,
-	) {
-		t.Fatalf(
-			"Start nil repo = %v, want ErrStudyActiveSessionDependencyMissing",
 			err,
 		)
 	}
@@ -730,27 +666,6 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *test
 	) {
 		t.Fatalf(
 			"LoadOwnedStudySessionState mode mismatch = %v, want ErrStudyActiveSessionModeMismatch",
-			err,
-		)
-	}
-}
-
-func TestStudyActiveSessionMissingStoreDependency(t *testing.T) {
-	_, err := newStudyActiveSessionService(
-		nil,
-		nil,
-		nil,
-	).LoadOwnedStudySessionState(
-		context.Background(),
-		77,
-		123,
-	)
-	if !errors.Is(
-		err,
-		ErrStudyActiveSessionDependencyMissing,
-	) {
-		t.Fatalf(
-			"LoadOwnedStudySessionState without store = %v, want ErrStudyActiveSessionDependencyMissing",
 			err,
 		)
 	}

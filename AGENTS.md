@@ -115,6 +115,8 @@ A user request falls into one of these, and the deliverable and procedure differ
 
 When writing/changing code, migrations, or config, follow [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md).
 
+- **Realistic cases only** (also a review criterion) — add validation, error branches, and tests only for cases that can actually happen in operation at the §4 scale; never for states the code itself rules out. Details: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md#realistic-cases-only).
+
 ---
 
 ## 6. Reference docs
