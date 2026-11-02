@@ -1,4 +1,4 @@
-package service
+package main
 
 import (
 	"context"
@@ -110,7 +110,7 @@ func TestTopUpAudio_GeneratesMissing(t *testing.T) {
 	}}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioGenerator(
+	s := newAudioGenerator(
 		repo,
 		synth,
 		store,
@@ -168,7 +168,7 @@ func TestTopUpAudio_DedupSkipsSynthesis(t *testing.T) {
 	}}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{key: true}}
-	s := NewAudioGenerator(
+	s := newAudioGenerator(
 		repo,
 		synth,
 		store,
@@ -213,7 +213,7 @@ func TestTopUpAudio_PerQuestionFailureIsolated(t *testing.T) {
 	}}
 	synth := &mockSynth{synthErr: errors.New("tts down")}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioGenerator(
+	s := newAudioGenerator(
 		repo,
 		synth,
 		store,
@@ -252,7 +252,7 @@ func TestTopUpAudio_SkipsEmptyScript(t *testing.T) {
 	}}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioGenerator(
+	s := newAudioGenerator(
 		repo,
 		synth,
 		store,
@@ -282,7 +282,7 @@ func TestTopUpAudio_EmptyPending(t *testing.T) {
 	repo := &mockAudioRepo{pending: nil}
 	synth := &mockSynth{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := NewAudioGenerator(
+	s := newAudioGenerator(
 		repo,
 		synth,
 		store,

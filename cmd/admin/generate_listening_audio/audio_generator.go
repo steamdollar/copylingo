@@ -1,4 +1,4 @@
-package service
+package main
 
 import (
 	"context"
@@ -8,11 +8,11 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// AudioGeneratePerCycle bounds one TopUpAudio call so the caller can pace TTS
+// audioGeneratePerCycle bounds one TopUpAudio call so the caller can pace TTS
 // requests against provider rate limits.
-const AudioGeneratePerCycle = 5
+const audioGeneratePerCycle = 5
 
-// audioGeneratorRepo is the narrow question-repository contract AudioGenerator needs.
+// audioGeneratorRepo is the narrow question-repository contract audioGenerator needs.
 type audioGeneratorRepo interface {
 	GetListeningNeedingAudio(
 		ctx context.Context,
@@ -34,7 +34,7 @@ type audioSynthesizer interface {
 	) ([]byte, error)
 }
 
-// audioObjectStore is the object-store contract AudioGenerator writes through.
+// audioObjectStore is the object-store contract audioGenerator writes through.
 type audioObjectStore interface {
 	Exists(
 		ctx context.Context,
@@ -48,40 +48,40 @@ type audioObjectStore interface {
 	) error
 }
 
-// AudioGenerator pre-generates listening audio into the object store (ADR-031).
-// Only cmd/admin/generate_listening_audio runs it; the server never calls TTS
-// and only serves stored clips through AudioService (ADR-082).
-type AudioGenerator struct {
+// audioGenerator pre-generates listening audio into the object store (ADR-031).
+// It lives in this admin tool because nothing else runs it: the server never
+// calls TTS and only serves stored clips through service.AudioService (ADR-082).
+type audioGenerator struct {
 	questions audioGeneratorRepo
 	tts       audioSynthesizer
 	store     audioObjectStore
 	voiceKey  string // both configured voices identify newly generated audio
 }
 
-// NewAudioGenerator wires the generator with its repo, TTS client, object store,
+// newAudioGenerator wires the generator with its repo, TTS client, object store,
 // and configured voices. The second voice changes the key for future clips only.
-func NewAudioGenerator(
+func newAudioGenerator(
 	questions audioGeneratorRepo,
 	tts audioSynthesizer,
 	store audioObjectStore,
 	voiceA,
 	voiceB string,
-) *AudioGenerator {
-	return &AudioGenerator{questions: questions, tts: tts, store: store, voiceKey: voiceA + "-" + voiceB}
+) *audioGenerator {
+	return &audioGenerator{questions: questions, tts: tts, store: store, voiceKey: voiceA + "-" + voiceB}
 }
 
-// TopUpAudio synthesizes audio for up to AudioGeneratePerCycle listening questions
+// TopUpAudio synthesizes audio for up to audioGeneratePerCycle listening questions
 // of the language that still lack it, across every level. Content-addressing
 // dedups identical scripts to one object; a per-question failure is logged and
 // skipped.
-func (g *AudioGenerator) TopUpAudio(
+func (g *audioGenerator) TopUpAudio(
 	ctx context.Context,
 	language string,
 ) error {
 	pending, err := g.questions.GetListeningNeedingAudio(
 		ctx,
 		language,
-		AudioGeneratePerCycle,
+		audioGeneratePerCycle,
 	)
 	if err != nil {
 		return err

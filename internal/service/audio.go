@@ -22,7 +22,7 @@ type audioClipReader interface {
 }
 
 // AudioService serves pre-generated listening clips to Telegram (ADR-032).
-// Clips are generated outside the server by AudioGenerator (ADR-082).
+// Clips are generated outside the server by cmd/admin/generate_listening_audio (ADR-082).
 type AudioService struct {
 	questions audioFileIDStore
 	store     audioClipReader

@@ -14,7 +14,6 @@ import (
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/external"
 	"github.com/lsj/copylingo/internal/repository"
-	"github.com/lsj/copylingo/internal/service"
 )
 
 func waitForNextCycle(
@@ -95,7 +94,7 @@ func main() {
 		return
 	}
 
-	audio := service.NewAudioGenerator(
+	audio := newAudioGenerator(
 		repos.Question,
 		external.NewTTSClient(external.TTSOptions{
 			APIKey:  cfg.LLM.APIKey,
@@ -108,7 +107,7 @@ func main() {
 		cfg.LLM.TTSVoiceName,
 		cfg.LLM.TTSVoiceNameB,
 	)
-	cycles := (len(pending) + service.AudioGeneratePerCycle - 1) / service.AudioGeneratePerCycle
+	cycles := (len(pending) + audioGeneratePerCycle - 1) / audioGeneratePerCycle
 	log.Printf(
 		"filling listening audio language=%s pending=%d cycles=%d",
 		*language,
