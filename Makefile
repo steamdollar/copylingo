@@ -100,6 +100,14 @@ restart-app:
 		echo "[copylingo] tmux session 'copylingo' is not running. Start it with 'make tmux' first." >&2; \
 		exit 1; \
 	fi
+	@# Stop gracefully first: closing the pane sends SIGHUP and fuser -k sends
+	@# SIGKILL, both of which skip the server's shutdown. SIGTERM the :8080
+	@# server and wait (up to 15s, shutdownTimeout is 10s) until it has exited.
+	@pid=$$(fuser 8080/tcp 2>/dev/null | awk '{print $$1}'); \
+	if [ -n "$$pid" ]; then \
+		kill -TERM "$$pid" 2>/dev/null || true; \
+		for _ in $$(seq 1 30); do kill -0 "$$pid" 2>/dev/null || break; sleep 0.5; done; \
+	fi
 	@pane=$$(tmux list-panes -t copylingo -F '#{pane_id} #{pane_index} #{pane_current_command} #{pane_title}' | awk '$$4=="copylingo-app"{print $$1; exit}'); \
 	if [ -z "$$pane" ]; then \
 		pane=$$(tmux list-panes -t copylingo -F '#{pane_id} #{pane_index} #{pane_current_command}' | awk '$$2!="0" && $$3=="make"{print $$1; exit}'); \

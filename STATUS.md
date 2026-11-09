@@ -34,6 +34,8 @@
 
 - [ ] 정규 Quiz 하위 레벨 due 복습 starvation 버그 — 현재 레벨 due가 세션 크기+2개를 넘으면 N5 due가 한 문제도 안 나옴(9/29 이후 0개, N5 due 512개 적체). 하위 레벨 전용 due 조회로 수정 see [docs/todos/quiz_lower_level_due_starvation.md](docs/todos/quiz_lower_level_due_starvation.md)
 
+- [ ] scheduler 발송 복구 후보안: 끊기거나 놓친 slot 발송을 이어 보내는 방법. A(DB 상태 기록 + 재개 + admin, 무거움) / B(Redis claim 유지 + 실패 시 해제 + lookback, 경량) / C(현행 유지). **(Case A 선결: 안 채택 미결)** see [docs/todos/scheduler_dispatch_recovery.md](docs/todos/scheduler_dispatch_recovery.md)
+
 - [ ] Cloudflare Tunnel(cloudflared/trycloudflare) Korea-block 노출 대응 — 손글씨 Mini App ingress가 Cloudflare 의존이라 한국 재차단 시 통째 중단 위험(현시점 도달은 정상). **(Case A 선결: 자체 도메인+named tunnel vs 비-CF ingress vs accept+monitor 미결)** see [docs/todos/cloudflare_korea_tunnel_risk.md](docs/todos/cloudflare_korea_tunnel_risk.md)
 
 ## 📝 최근 완료

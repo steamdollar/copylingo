@@ -134,7 +134,7 @@ type SessionFlowDeps struct {
 | `service/user_test.go` | `TestGetUser`, `TestGetAllUsers` | 전달만 본다 | 삭제 |
 | `service/quiz_active_session_test.go` | `TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions`(약 110줄) | `model.TestQuestion_ShuffleOptions`와 중복 | 삭제 |
 | `scheduler/dispatcher_test.go:239` | `TestDispatcher_RateLimiter` | ticker가 nil을 반환하는지만 본다 | 삭제 |
-| `cmd/server/app_test.go:16-50,206-211` | 종료 순서 probe | TCP dial로 "scheduler stop 시점에 HTTP closed"를 고정한다. 이 순서의 근거가 ADR에 없다 | **owner 확인 후** 삭제. 시작 여부와 refresh ctx 취소 검사는 유지 |
+| `cmd/server/app_test.go:16-50,206-211` | 종료 순서 probe | TCP dial로 "scheduler stop 시점에 HTTP closed"를 고정한다. 이 순서의 근거가 ADR에 없다 | **완료(2026-11-09, ADR-085)**: 파일 전체와 interface 3개 삭제, 진행 중 작업 대기를 bot·scheduler 테스트로 대체 |
 
 - **고칠 것 (삭제 아님)**: `TestSessionServiceBuildForSlot`(`session_study_test.go:183`)은 아침·저녁 Quiz가 둘 다 due limit 19라서 둘을 구분하지 못한다. 서로 다른 값을 넣어 구분한다.
 - **유지**: `question_repo_test.go:259-330`의 SQL 문자열 고정 테스트. Postgres 테스트는 `COPYLINGO_TEST_DATABASE_URL`이 없으면 skip되므로 `make test` 기본 실행에서 남는 유일한 보호막이다.
@@ -188,7 +188,7 @@ type SessionFlowDeps struct {
 
 - service: `session.go`의 Tier1 interface 8개, `SessionDeps`·`SessionStores`, audio 외부 경계 3종, analyzer·user·materialPreference·LLM 소비자 interface, `sessionBuilderService`·`quizActiveSessionService`(실제 로직 있음), `testutil.TransactionDB`, `OnAIGrading`(운영 기능)
 - bot·miniapp: Flow별 interface(안 쓰는 메서드 0개), `TelegramClient`(전송 로그·HTML 정리를 한곳에서), `BotAPI`, miniapp `quizSession`·`verifier`·`handwritingScreen`, `webapp.go` struct(tgbotapi v5.5.1에 web_app 버튼 없음), `InitDataVerifier.now`
-- 인프라: scheduler interface 6개(import 경계상 필요), `cmd/server/app.go` interface 3개(포트 충돌 시 아무것도 시작하지 않는 동작 테스트), `observability.ContextHandler`·`DailyWriter`, external `*Options` struct(하위 계층의 config import 금지), TTS `transcode`, `SessionStore[T]`, `bootstrap`, `config/constants.go`
+- 인프라: scheduler interface 6개(import 경계상 필요), `observability.ContextHandler`·`DailyWriter`, external `*Options` struct(하위 계층의 config import 금지), TTS `transcode`, `SessionStore[T]`, `bootstrap`, `config/constants.go`
 - 테스트: `import_boundary_test`, `logging_test`(메시지 본문 노출 방지), `sanitize_test`(Telegram `<br>` 거부), `cloneTestState`, `cmd/seeding` 테스트
 
 ## 검증

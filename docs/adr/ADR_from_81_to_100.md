@@ -80,3 +80,26 @@
 - 결과:
   - 데이터 조건 검사(예: 청해 문항의 `AudioPath` 없음)는 의존 nil 검사가 아니므로 남긴다.
   - 선택 의존이 다시 생기면 nil 대신 no-op 구현을 넣는다.
+
+## ADR-085: graceful shutdown은 진행 중인 작업을 기다리고, 종료 순서 테스트용 interface를 지운다
+
+- 날짜: 2026-11-09
+- 상태: 승인됨 (ADR-059 §8.8 `app` 행의 종료 동작을 보강)
+- 배경:
+  - `app.shutdown`은 HTTP 요청만 기다렸다. `bot.Stop`은 polling만 멈추고 `go handleUpdate`로 띄운 handler를 기다리지 않았다. `scheduler.Stop`은 `cron.Stop()`이 돌려주는 완료 ctx를 버리고 바로 rate limiter를 껐다.
+  - 그 직후 `Close`가 DB·Redis를 닫는다. 처리 중인 handler는 연결이 닫힌 채 실패한다. 발송 job은 Redis에 당일 push claim을 먼저 잡고 세션을 만들어 보낸다. 그 사이에 재시작하면 claim만 남아 그날 그 slot의 세션이 다시 발송되지 않는다. limiter를 먼저 끄면 job이 ticker를 기다리며 그 자리에서 멈춘다.
+  - `cmd/server/app_test.go`는 fake로 Start/Stop 호출 순서와 "포트 충돌 시 아무것도 시작하지 않음"만 고정했다. 진행 중 작업을 기다리는지는 보지 않았다. 이 fake를 끼우려고 `updatePoller`·`jobScheduler`·`miniAppRefresher` interface 3개를 두었다. 운영 구현은 각각 하나였다.
+- 결정:
+  - `bot.Stop(ctx)`: polling을 멈추고 loop가 끝난 뒤 진행 중 handler(`sync.WaitGroup`)가 모두 끝날 때까지 기다린다. update channel이 닫히면 빈 update를 처리하지 않고 loop를 끝낸다.
+  - `scheduler.Stop(ctx)`: 새 tick을 막고 실행 중 job이 끝날 때까지 기다린 뒤 rate limiter를 끈다.
+  - `app.shutdown`: bot → HTTP → scheduler 순서는 그대로다. 세 단계가 `shutdownTimeout`(10초) 하나를 나눠 쓴다. 시간이 다 되면 오류를 log로 남기고 다음 단계로 넘어간다.
+  - `make restart-app`은 pane을 닫기 전에 :8080 서버에 SIGTERM을 보내고 프로세스가 끝날 때까지(최대 15초) 기다린다. 이전에는 pane 종료(SIGHUP)와 `fuser -k`(SIGKILL)로 죽어서 graceful shutdown이 아예 실행되지 않았다(2026-10-20 이후 "Shutting down" log 없음).
+  - interface 3개와 `app_test.go`를 지운다. `app`은 `*bot.Bot`·`*scheduler.Scheduler`·`*bot.SessionFlow`를 직접 갖는다. 대기 동작은 `bot`·`scheduler` 패키지 테스트(`TestStopWaitsForInFlightUpdateHandler`, `TestStopWaitsForRunningJob`)가 보호한다.
+- 버린 대안:
+  - interface와 순서 테스트 유지: 종료 순서는 어겨도 피해가 작고, 테스트 약 240줄이 검증 대상 약 65줄보다 크다. 정작 필요한 "진행 중 작업 대기"는 보호하지 않았다.
+  - 포트 충돌 보장을 구조로 강제(listener를 `initApp`에서 bind): `Run` 첫 줄의 `net.Listen` 순서로 이미 지켜진다. 옮기면 `Run`을 거치지 않은 listener를 닫는 처리가 더 필요하다. 순서는 `Run` 주석과 이 ADR이 기록한다.
+  - 단계별 timeout 분리: 사용자 규모에서 handler·job은 보통 수 초 안에 끝난다. 10초 하나로 충분하다.
+- 결과:
+  - 종료(Ctrl+C, `make restart-app`)가 진행 중 작업만큼 최대 10초 늦어질 수 있다.
+  - job이 10초를 넘기면 이전처럼 중간에 끊긴다(job 자체 한도는 10분).
+  - polling 버퍼에 들어왔지만 아직 꺼내지 않은 update는 여전히 처리되지 않는다. 단일 사용자 규모라 drain 처리는 두지 않는다.

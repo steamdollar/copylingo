@@ -11,39 +11,19 @@ import (
 
 	"github.com/robfig/cron/v3"
 
+	"github.com/lsj/copylingo/internal/bot"
 	"github.com/lsj/copylingo/internal/config"
 	"github.com/lsj/copylingo/internal/miniapp"
 	"github.com/lsj/copylingo/internal/redisstore"
 	"github.com/lsj/copylingo/internal/scheduler"
 )
 
-// shutdownTimeout bounds how long in-flight HTTP requests may finish.
 const shutdownTimeout = 10 * time.Second
 
-// updatePoller is the Telegram update loop: Start blocks until Stop.
-type updatePoller interface {
-	Start()
-	Stop()
-}
-
-// jobScheduler runs the periodic user-session dispatch.
-type jobScheduler interface {
-	Start()
-	Stop()
-}
-
-// miniAppRefresher re-renders Mini App messages a restart left stale.
-type miniAppRefresher interface {
-	RefreshStaleMiniAppMessages(ctx context.Context)
-}
-
-// app owns what initApp assembled: the workers, the HTTP server and the
-// shared connections. It only starts and stops them and is never handed to
-// a service (ADR-059 §4).
 type app struct {
-	bot       updatePoller
-	scheduler jobScheduler
-	refresher miniAppRefresher
+	bot       *bot.Bot
+	scheduler *scheduler.Scheduler
+	refresher *bot.SessionFlow
 	server    *http.Server
 	closers   []io.Closer // closed in order by Close
 }
@@ -124,8 +104,7 @@ func initApp(cfg *config.Config) (_ *app, err error) {
 // Run binds the HTTP port first so a port conflict starts nothing, then
 // starts the scheduler, Telegram polling, the stale Mini App refresh and the
 // HTTP server. It returns after ctx is cancelled or the HTTP server fails,
-// once every worker has stopped accepting work. Only HTTP requests are
-// drained; an in-flight scheduler tick or Telegram update is not awaited.
+// once shutdown has drained in-flight work.
 func (a *app) Run(ctx context.Context) error {
 	listener, err := net.Listen(
 		"tcp",
@@ -170,7 +149,9 @@ func (a *app) Run(ctx context.Context) error {
 }
 
 // shutdown stops taking Telegram updates, drains HTTP requests, then stops
-// the scheduler. Connections stay open until Close.
+// the scheduler. Each step waits for its in-flight work within one shared
+// shutdownTimeout, so Close does not close DB/Redis under a running handler
+// or job unless that timeout runs out. Connections stay open until Close.
 func (a *app) shutdown() {
 	log.Println("Shutting down...")
 
@@ -180,7 +161,12 @@ func (a *app) shutdown() {
 	)
 	defer cancel()
 
-	a.bot.Stop()
+	if err := a.bot.Stop(ctx); err != nil {
+		log.Printf(
+			"Telegram bot shutdown error: %v",
+			err,
+		)
+	}
 	if err := a.server.Shutdown(ctx); err != nil {
 		log.Printf(
 			"HTTP server shutdown error: %v",
@@ -189,7 +175,12 @@ func (a *app) shutdown() {
 	}
 	log.Println("Server stopped")
 
-	a.scheduler.Stop()
+	if err := a.scheduler.Stop(ctx); err != nil {
+		log.Printf(
+			"Scheduler shutdown error: %v",
+			err,
+		)
+	}
 }
 
 // Close closes the shared connections (DB, then Redis).

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -109,6 +110,11 @@ type Bot struct {
 	settingsFlow    *SettingsFlow
 	llmQuestionFlow *LLMQuestionFlow
 	stopCh          chan struct{}
+	// loopDone closes when Start's polling loop returns. Stop waits for it
+	// before waiting on handlers so no handler is added after that wait.
+	loopDone chan struct{}
+	// handlers tracks in-flight handleUpdate goroutines for Stop.
+	handlers sync.WaitGroup
 }
 
 // NewBot builds the router over flows that cmd/server has already assembled
@@ -125,11 +131,16 @@ func NewBot(deps BotDeps) *Bot {
 		settingsFlow:    deps.SettingsFlow,
 		llmQuestionFlow: deps.LLMQuestionFlow,
 		stopCh:          make(chan struct{}),
+		loopDone:        make(chan struct{}),
 	}
 }
 
-// Start begins listening for Telegram updates.
+// Start polls Telegram updates and handles each in its own goroutine until
+// Stop. It blocks, so callers run it in a goroutine.
 func (b *Bot) Start() {
+	defer close(b.loopDone)
+	defer log.Println("Telegram bot stopped")
+
 	// when bot starts, it fetches messges from user that was stored in telegram while bot was offline,
 	// and handle them with handleUpdate function.
 	pollConfig := tgbotapi.NewUpdate(0)
@@ -140,19 +151,44 @@ func (b *Bot) Start() {
 
 	for {
 		select {
-		case update := <-updates:
-			go b.handleUpdate(update)
+		case update, ok := <-updates:
+			// StopUpdates closes the channel; stop instead of handling empty updates.
+			if !ok {
+				return
+			}
+			b.handlers.Add(1)
+			go func() {
+				defer b.handlers.Done()
+				b.handleUpdate(update)
+			}()
 		case <-b.stopCh:
-			log.Println("Telegram bot stopped")
 			return
 		}
 	}
 }
 
-// Stop signals the bot to stop listening.
-func (b *Bot) Stop() {
+// Stop ends polling, then waits until the polling loop has exited and every
+// in-flight update handler has returned, so the caller can close DB/Redis
+// afterwards. It gives up when ctx ends. Stop must follow Start.
+func (b *Bot) Stop(ctx context.Context) error {
 	close(b.stopCh)
 	b.telegram.StopUpdates()
+
+	handlersDone := make(chan struct{})
+	go func() {
+		<-b.loopDone
+		b.handlers.Wait()
+		close(handlersDone)
+	}()
+	select {
+	case <-handlersDone:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf(
+			"wait for in-flight Telegram updates: %w",
+			ctx.Err(),
+		)
+	}
 }
 
 func (b *Bot) handleUpdate(update tgbotapi.Update) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -122,7 +123,7 @@ func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
 	})
 
 	scheduler.Start()
-	defer scheduler.Stop()
+	defer scheduler.Stop(context.Background())
 
 	// One aligned trigger serves all users and all four configurable slots.
 	entries := cronScheduler.Entries()
@@ -148,5 +149,64 @@ func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
 			got,
 			want,
 		)
+	}
+}
+
+// onceSchedule fires once right after cron starts, then not again for a day.
+type onceSchedule struct {
+	fired atomic.Bool
+}
+
+func (s *onceSchedule) Next(t time.Time) time.Time {
+	if s.fired.Swap(true) {
+		return t.Add(24 * time.Hour)
+	}
+	return t.Add(time.Millisecond)
+}
+
+func TestStopWaitsForRunningJob(t *testing.T) {
+	cronScheduler := cron.New()
+	scheduler := New(Deps{Cron: cronScheduler})
+	running := make(chan struct{})
+	release := make(chan struct{})
+	cronScheduler.Schedule(
+		&onceSchedule{},
+		cron.FuncJob(func() {
+			close(running)
+			<-release
+		}),
+	)
+	cronScheduler.Start()
+	select {
+	case <-running:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the job to start")
+	}
+
+	stopErr := make(
+		chan error,
+		1,
+	)
+	go func() { stopErr <- scheduler.Stop(context.Background()) }()
+	select {
+	case err := <-stopErr:
+		t.Fatalf(
+			"Stop returned %v while a job was still running",
+			err,
+		)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(release)
+	select {
+	case err := <-stopErr:
+		if err != nil {
+			t.Fatalf(
+				"Stop error = %v, want nil once the job finished",
+				err,
+			)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return after the job finished")
 	}
 }

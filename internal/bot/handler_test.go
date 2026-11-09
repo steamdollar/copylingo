@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"testing"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
@@ -100,5 +101,80 @@ func TestClearInlineKeyboardOmitsReplyMarkup(t *testing.T) {
 			"ReplyMarkup = %#v, want nil",
 			edit.ReplyMarkup,
 		)
+	}
+}
+
+// blockingUpdatesAPI feeds updates from a test channel and holds every Send
+// until release closes, so the handler of a delivered update stays in flight.
+type blockingUpdatesAPI struct {
+	mockBotAPI
+	updates chan tgbotapi.Update
+	sending chan struct{}
+	release chan struct{}
+}
+
+func (a *blockingUpdatesAPI) GetUpdatesChan(tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
+	return a.updates
+}
+
+func (a *blockingUpdatesAPI) Send(tgbotapi.Chattable) (tgbotapi.Message, error) {
+	close(a.sending)
+	<-a.release
+	return tgbotapi.Message{MessageID: 1}, nil
+}
+
+func TestStopWaitsForInFlightUpdateHandler(t *testing.T) {
+	api := &blockingUpdatesAPI{
+		updates: make(
+			chan tgbotapi.Update,
+			1,
+		),
+		sending: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	b := NewBot(BotDeps{Telegram: newTelegramClient(api)})
+	go b.Start()
+
+	// /help sends one message, which blocks in Send until release.
+	api.updates <- tgbotapi.Update{
+		UpdateID: 1,
+		Message: commandMessage(
+			"/help",
+			1,
+			1,
+			"learner",
+		),
+	}
+	select {
+	case <-api.sending:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the /help handler to send")
+	}
+
+	stopErr := make(
+		chan error,
+		1,
+	)
+	go func() { stopErr <- b.Stop(context.Background()) }()
+	select {
+	case err := <-stopErr:
+		t.Fatalf(
+			"Stop returned %v while an update handler was still running",
+			err,
+		)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(api.release)
+	select {
+	case err := <-stopErr:
+		if err != nil {
+			t.Fatalf(
+				"Stop error = %v, want nil once the handler finished",
+				err,
+			)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return after the handler finished")
 	}
 }

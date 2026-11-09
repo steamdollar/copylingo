@@ -144,9 +144,21 @@ func (s *Scheduler) Start() {
 	)
 }
 
-// Stop gracefully stops the scheduler.
-func (s *Scheduler) Stop() {
-	s.cron.Stop()
+// Stop stops new ticks and waits for a running dispatch to finish, giving up
+// when ctx ends. Only then does it stop the rate limiter: the dispatch waits
+// on its ticker, so stopping it first would stall the dispatch mid-way after
+// the daily push claim was already taken.
+func (s *Scheduler) Stop(ctx context.Context) error {
+	jobsDone := s.cron.Stop()
+	var waitErr error
+	select {
+	case <-jobsDone.Done():
+	case <-ctx.Done():
+		waitErr = fmt.Errorf(
+			"wait for running scheduler job: %w",
+			ctx.Err(),
+		)
+	}
 	s.dispatcher.limiter.Stop()
 	slog.Info(
 		"Scheduler stopped",
@@ -155,6 +167,7 @@ func (s *Scheduler) Stop() {
 		"source",
 		"scheduler",
 	)
+	return waitErr
 }
 
 func (s *Scheduler) runJob(
