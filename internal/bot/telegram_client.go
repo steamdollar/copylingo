@@ -260,6 +260,21 @@ func (c *TelegramClient) EditMessageReplyMarkup(
 	return err
 }
 
+// DeleteMessage removes a bot message, e.g. a dismissed settings menu.
+func (c *TelegramClient) DeleteMessage(
+	chatID int64,
+	messageID int,
+) error {
+	return c.request(
+		"deleteMessage",
+		chatTarget(chatID),
+		tgbotapi.NewDeleteMessage(
+			chatID,
+			messageID,
+		),
+	)
+}
+
 // EditMessage edits an existing message.
 func (c *TelegramClient) EditMessage(
 	chatID int64,

@@ -15,7 +15,9 @@ import (
 
 type mockBotAPI struct {
 	sentMessages []tgbotapi.Chattable
-	sendErr      error
+	// requests records Request calls (callback answers, deletes, edits that return bool).
+	requests []tgbotapi.Chattable
+	sendErr  error
 	// returnVoiceFileID, when set, is echoed back as the file_id of a sent voice
 	// message so file_id-caching paths can be exercised.
 	returnVoiceFileID string
@@ -36,6 +38,10 @@ func (m *mockBotAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
 }
 
 func (m *mockBotAPI) Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
+	m.requests = append(
+		m.requests,
+		c,
+	)
 	return &tgbotapi.APIResponse{}, nil
 }
 

@@ -45,6 +45,7 @@ const (
 	callbackActionExclude = "exclude"
 	callbackActionCard    = "card"
 	callbackActionKanji   = "kanji"
+	callbackActionClose   = "close"
 
 	callbackActionWordOrder       = "wo"
 	callbackActionWordOrderSelect = "a"

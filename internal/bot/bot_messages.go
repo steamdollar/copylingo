@@ -130,17 +130,14 @@ type botMessages struct {
 
 	// Linked material preferences.
 	materialPreferenceNotice         string
-	materialPreferenceSaveFailed     string
-	materialPreferenceSavedFormat    string
-	materialPreferenceLoadFailed     string
 	linkedQuizMaterialTitle          string
-	materialMaintenanceButtonLabel   string
 	materialExcludedLabel            string
 	materialQuizSessionRejected      string
 	materialNotInSession             string
 	materialPreferenceAppliedNotice  string
 	materialPreferenceMenuFormat     string
 	materialBackToCardButton         string
+	materialPreferenceCloseButton    string
 	materialAlreadyKnowLabel         string
 	materialNormalLabel              string
 	materialSettingsListButton       string
@@ -406,17 +403,14 @@ JLPT N5부터 N1까지, 매일 조금씩 실력을 키워갑니다.
 		settingsBackButton:                 "⬅️ 설정 목록으로",
 
 		materialPreferenceNotice:         "새로 만드는 세션부터 적용됩니다. 현재 세션은 그대로 진행합니다.",
-		materialPreferenceSaveFailed:     "❌ 연결 자료 설정을 저장하지 못했습니다. 다시 시도해 주세요.",
-		materialPreferenceSavedFormat:    "✅ %s로 설정했습니다.\n\n%s\n원래 Quiz 메시지에서 계속하세요.",
-		materialPreferenceLoadFailed:     "❌ 연결 자료 설정을 불러오지 못했습니다. 다시 시도해 주세요.",
 		linkedQuizMaterialTitle:          "이 문제에 연결된 학습 자료",
-		materialMaintenanceButtonLabel:   "유지 복습",
 		materialExcludedLabel:            "학습에서 제외",
 		materialQuizSessionRejected:      "❌ 이 Study Session의 설정을 변경할 수 없습니다.",
 		materialNotInSession:             "❌ 이 세션에 없는 학습 항목입니다.",
 		materialPreferenceAppliedNotice:  "✅ 새로 만드는 세션부터 적용됩니다.",
 		materialPreferenceMenuFormat:     "⚙️ <b>학습 설정</b>\n\n<b>%s</b>\n현재: %s\n\n유지 복습은 30일 간격으로 시작합니다. 정답이면 60→120→최대 180일, 오답이면 일반 학습으로 돌아갑니다.\n학습에서 제외: 새 학습·연결 퀴즈에서 제외합니다.\n\n%s",
 		materialBackToCardButton:         "← 학습 카드로",
+		materialPreferenceCloseButton:    "✕ 닫기",
 		materialAlreadyKnowLabel:         "이미 알아요 · 드물게 복습",
 		materialNormalLabel:              "일반 학습",
 		materialSettingsListButton:       "📚 이미 아는 항목 · 제외 목록",

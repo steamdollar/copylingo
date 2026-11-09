@@ -203,7 +203,7 @@ func newPreferenceQuizBot(t *testing.T) (*SessionFlow, *botMaterialPreferenceRep
 	return flow, repo, stateStores
 }
 
-func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
+func TestQuizMaterialPreferenceUsesSharedMenuAndPreservesSession(t *testing.T) {
 	flow, repo, stateStores := newPreferenceQuizBot(t)
 	before, err := stateStores.quiz.Load(
 		context.Background(),
@@ -220,7 +220,7 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 		{"q:77:policy:999", 42}, // Not in this session.
 		{"q:77:policy:102", 42}, // No linked material.
 		{"q:77:policy:bad", 42},
-		{"q:77:policy:101:normal", 42}, // Quiz offers only maintenance or exclusion.
+		{"q:77:policy:101:bogus", 42},
 		{"q:77:exclude:101:excluded", 42},
 	} {
 		flow.HandleAnswerCallback(
@@ -269,33 +269,23 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 			menu.ReplyMarkup,
 		)
 	}
-	for _, mode := range []model.MaterialReviewMode{model.MaterialReviewMaintenance, model.MaterialReviewExcluded} {
-		if !hasPreferenceCallback(
-			&keyboard,
-			fmt.Sprintf(
+	// Same three choices as the Study card, then a close row instead of
+	// Study's back-to-card row.
+	assertMaterialPreferenceMenu(
+		t,
+		keyboard,
+		model.MaterialReviewNormal,
+		func(mode model.MaterialReviewMode) string {
+			return fmt.Sprintf(
 				formatQuestionPolicySet,
 				77,
 				101,
 				mode,
-			),
-		) {
-			t.Fatalf(
-				"Quiz preference menu lacks %s",
-				mode,
 			)
-		}
-	}
-	if len(keyboard.InlineKeyboard) != 2 || hasPreferenceCallback(
-		&keyboard,
-		"q:77:policy:101:normal",
-	) ||
-		keyboard.InlineKeyboard[0][0].Text != "유지 복습" || keyboard.InlineKeyboard[1][0].Text != "학습에서 제외" {
-		t.Fatalf(
-			"Quiz menu must show exactly two settings: %+v",
-			keyboard,
-		)
-	}
-	for _, mode := range []model.MaterialReviewMode{model.MaterialReviewMaintenance, model.MaterialReviewExcluded} {
+		},
+		"q:77:policy:101:close",
+	)
+	for _, mode := range []model.MaterialReviewMode{model.MaterialReviewMaintenance, model.MaterialReviewExcluded, model.MaterialReviewNormal} {
 		flow.HandleAnswerCallback(
 			context.Background(),
 			preferenceCallback(
@@ -312,27 +302,33 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 			t,
 			flow.telegram.api.(*mockBotAPI),
 		)
-		if !strings.Contains(
+		if edit.MessageID != 55 || !strings.Contains(
 			edit.Text,
-			materialReviewModeLabel(mode),
-		) ||
-			!strings.Contains(
-				edit.Text,
-				"새로 만드는 세션부터 적용",
-			) ||
-			!strings.Contains(
-				edit.Text,
-				"원래 Quiz 메시지",
-			) ||
-			edit.ReplyMarkup != nil {
+			"현재: "+materialReviewModeLabel(mode),
+		) || edit.ReplyMarkup == nil {
 			t.Fatalf(
-				"Quiz selection did not close and confirm %s: %+v",
+				"Quiz selection did not re-render the menu for %s: %+v",
 				mode,
 				edit,
 			)
 		}
+		assertMaterialPreferenceMenu(
+			t,
+			*edit.ReplyMarkup,
+			mode,
+			func(choice model.MaterialReviewMode) string {
+				return fmt.Sprintf(
+					formatQuestionPolicySet,
+					77,
+					101,
+					choice,
+				)
+			},
+			"q:77:policy:101:close",
+		)
 	}
-	if repo.setCalls != 2 || repo.items[[2]int64{42, 10}].ReviewMode != model.MaterialReviewExcluded {
+	// Choosing normal last removes the stored row; no row means normal.
+	if _, stored := repo.items[[2]int64{42, 10}]; repo.setCalls != 3 || stored {
 		t.Fatalf(
 			"Quiz preference choices did not update linked material: %+v",
 			repo,
@@ -347,6 +343,89 @@ func TestQuizMaterialPreferenceRequiresChoiceAndPreservesSession(t *testing.T) {
 		before,
 	) {
 		t.Fatal("Quiz preference callbacks changed the current session")
+	}
+}
+
+func TestQuizMaterialPreferenceCloseDeletesOnlyMenuMessage(t *testing.T) {
+	flow, repo, _ := newPreferenceQuizBot(t)
+	api := flow.telegram.api.(*mockBotAPI)
+	flow.HandleAnswerCallback(
+		context.Background(),
+		preferenceCallback(
+			"q:77:policy:101:close",
+			42,
+		),
+	)
+	if repo.getCalls != 0 || repo.setCalls != 0 || len(api.sentMessages) != 0 {
+		t.Fatalf(
+			"close touched preferences or sent a message: repo=%+v sent=%+v",
+			repo,
+			api.sentMessages,
+		)
+	}
+	if len(api.requests) != 1 {
+		t.Fatalf(
+			"close made %d requests, want one deleteMessage",
+			len(api.requests),
+		)
+	}
+	deleted, ok := api.requests[0].(tgbotapi.DeleteMessageConfig)
+	if !ok || deleted.ChatID != -999 || deleted.MessageID != 55 {
+		t.Fatalf(
+			"close did not delete the menu message: %+v",
+			api.requests[0],
+		)
+	}
+}
+
+// assertMaterialPreferenceMenu checks the shared menu layout: normal,
+// maintenance and excluded rows with only the selected one checked, then one
+// navigation row.
+func assertMaterialPreferenceMenu(
+	t *testing.T,
+	keyboard tgbotapi.InlineKeyboardMarkup,
+	selected model.MaterialReviewMode,
+	choiceCallbackData func(model.MaterialReviewMode) string,
+	navigationCallbackData string,
+) {
+	t.Helper()
+	modes := []model.MaterialReviewMode{
+		model.MaterialReviewNormal,
+		model.MaterialReviewMaintenance,
+		model.MaterialReviewExcluded,
+	}
+	if len(keyboard.InlineKeyboard) != len(modes)+1 {
+		t.Fatalf(
+			"menu rows = %d, want %d: %+v",
+			len(keyboard.InlineKeyboard),
+			len(modes)+1,
+			keyboard,
+		)
+	}
+	for i, mode := range modes {
+		button := keyboard.InlineKeyboard[i][0]
+		label := materialReviewModeLabel(mode)
+		if mode == selected {
+			label = "✓ " + label
+		}
+		if button.Text != label || button.CallbackData == nil || *button.CallbackData != choiceCallbackData(mode) {
+			t.Fatalf(
+				"menu row %d = %q/%v, want %q/%q",
+				i,
+				button.Text,
+				button.CallbackData,
+				label,
+				choiceCallbackData(mode),
+			)
+		}
+	}
+	navigation := keyboard.InlineKeyboard[len(modes)][0]
+	if navigation.CallbackData == nil || *navigation.CallbackData != navigationCallbackData {
+		t.Fatalf(
+			"menu navigation = %+v, want %q",
+			navigation,
+			navigationCallbackData,
+		)
 	}
 }
 
@@ -552,22 +631,24 @@ func TestStudyMaterialPreferenceEscapesHTMLAndExplainsMaintenance(t *testing.T) 
 			)
 		}
 	}
-	for _, mode := range []model.MaterialReviewMode{model.MaterialReviewNormal, model.MaterialReviewMaintenance, model.MaterialReviewExcluded} {
-		if !hasPreferenceCallback(
-			edit.ReplyMarkup,
-			fmt.Sprintf(
+	if edit.ReplyMarkup == nil {
+		t.Fatal("Study preference menu lost its keyboard")
+	}
+	// Same shared menu as Quiz; the navigation row returns to the card.
+	assertMaterialPreferenceMenu(
+		t,
+		*edit.ReplyMarkup,
+		model.MaterialReviewMaintenance,
+		func(mode model.MaterialReviewMode) string {
+			return fmt.Sprintf(
 				formatStudyPolicySet,
 				77,
 				10,
 				mode,
-			),
-		) {
-			t.Errorf(
-				"missing policy %s",
-				mode,
 			)
-		}
-	}
+		},
+		"study:77:card:10",
+	)
 }
 
 func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
@@ -769,11 +850,18 @@ func TestMaterialPreferenceKeyboardAvailabilityAndCallbackLength(t *testing.T) {
 		t.Fatal("preference menu or main navigation missing")
 	}
 	maxID := int(^uint(0) >> 1)
-	keyboards := []tgbotapi.InlineKeyboardMarkup{materialPreferenceKeyboard(
+	_, quizKeyboard := quizMaterialPreferenceMenu(
 		maxID,
 		maxID,
-		model.MaterialReviewNormal,
-	)}
+		model.MaterialReviewMaintenance,
+	)
+	_, studyKeyboard := studyMaterialPreferenceMenu(
+		"title",
+		maxID,
+		maxID,
+		model.MaterialReviewMaintenance,
+	)
+	keyboards := []tgbotapi.InlineKeyboardMarkup{quizKeyboard, studyKeyboard}
 	_, listKeyboard := materialPreferencesView(
 		[]model.MaterialPreference{{MaterialID: maxID}},
 		1,

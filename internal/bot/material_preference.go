@@ -48,6 +48,8 @@ type materialPreferenceList interface {
 
 // Quiz callbacks carry a question ID, never a trusted material ID. Resolve it
 // from the owner's session before showing or changing the linked preference.
+// The menu is a separate message so the question keeps its answer buttons;
+// its close button deletes only that menu message.
 func (sf *SessionFlow) handleQuizMaterialPreference(
 	ctx context.Context,
 	cb *tgbotapi.CallbackQuery,
@@ -68,6 +70,19 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 		false,
 	)
 	if !sessionOK || !questionOK {
+		return
+	}
+	if len(parts) == 5 && parts[4] == callbackActionClose {
+		// Closing reads no session: it removes only the menu message the
+		// button sits on, so it still works after the Quiz has finished.
+		sf.telegram.DeleteMessage(
+			cb.Message.Chat.ID,
+			cb.Message.MessageID,
+		)
+		return
+	}
+	mode, modeOK := materialPreferenceMode(parts)
+	if !modeOK {
 		return
 	}
 	state, err := sf.session.QuizProgress(
@@ -94,85 +109,32 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	if !exists || item.Question.MaterialID == nil {
 		return
 	}
-	var mode model.MaterialReviewMode
-	if len(parts) == 5 {
-		mode = model.MaterialReviewMode(parts[4])
-		if mode != model.MaterialReviewMaintenance && mode != model.MaterialReviewExcluded {
-			return
-		}
-		if err := sf.materialPreference.Set(
-			ctx,
-			cb.From.ID,
-			*item.Question.MaterialID,
-			mode,
-		); err != nil {
-			slog.ErrorContext(
-				ctx,
-				"Failed to set linked quiz material preference",
-				"session_id",
-				sessionID,
-				"question_id",
-				questionID,
-				"user_id",
-				cb.From.ID,
-				"error",
-				err,
-			)
-			sf.telegram.SendMessage(
-				cb.Message.Chat.ID,
-				botMessagesByLocale[botDefaultLocale].materialPreferenceSaveFailed,
-			)
-			return
-		}
-		sf.telegram.EditMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
-			fmt.Sprintf(
-				botMessagesByLocale[botDefaultLocale].materialPreferenceSavedFormat,
-				materialReviewModeLabel(mode),
-				botMessagesByLocale[botDefaultLocale].materialPreferenceNotice,
-			),
-			nil,
-		)
-		return
-	}
-	preference, err := sf.materialPreference.Get(
+	mode, ok := applyMaterialPreference(
 		ctx,
-		cb.From.ID,
+		sf.telegram,
+		sf.materialPreference,
+		cb,
 		*item.Question.MaterialID,
-	)
-	if err != nil {
-		slog.ErrorContext(
-			ctx,
-			"Failed to get linked quiz material preference",
-			"session_id",
-			sessionID,
-			"question_id",
-			questionID,
-			"user_id",
-			cb.From.ID,
-			"error",
-			err,
-		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
-			botMessagesByLocale[botDefaultLocale].materialPreferenceLoadFailed,
-		)
-		return
-	}
-	mode = model.MaterialReviewNormal
-	if preference != nil {
-		mode = preference.ReviewMode
-	}
-	text := materialPreferenceMenuText(
-		botMessagesByLocale[botDefaultLocale].linkedQuizMaterialTitle,
 		mode,
 	)
-	keyboard := quizMaterialPreferenceKeyboard(
+	if !ok {
+		return
+	}
+	text, keyboard := quizMaterialPreferenceMenu(
 		sessionID,
 		questionID,
 		mode,
 	)
+	if len(parts) == 5 {
+		// A choice re-renders the menu message in place, as on the Study card.
+		sf.telegram.EditMessage(
+			cb.Message.Chat.ID,
+			cb.Message.MessageID,
+			text,
+			&keyboard,
+		)
+		return
+	}
 	if err := sf.telegram.SendMessageWithKeyboard(
 		cb.Message.Chat.ID,
 		text,
@@ -191,40 +153,6 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 			err,
 		)
 	}
-}
-
-func quizMaterialPreferenceKeyboard(
-	sessionID,
-	questionID int,
-	selected model.MaterialReviewMode,
-) tgbotapi.InlineKeyboardMarkup {
-	rows := make(
-		[][]tgbotapi.InlineKeyboardButton,
-		0,
-		2,
-	)
-	for _, mode := range []model.MaterialReviewMode{model.MaterialReviewMaintenance, model.MaterialReviewExcluded} {
-		label := botMessagesByLocale[botDefaultLocale].materialMaintenanceButtonLabel
-		if mode == model.MaterialReviewExcluded {
-			label = botMessagesByLocale[botDefaultLocale].materialExcludedLabel
-		}
-		if mode == selected {
-			label = "✓ " + label
-		}
-		rows = append(
-			rows,
-			tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
-				label,
-				fmt.Sprintf(
-					formatQuestionPolicySet,
-					sessionID,
-					questionID,
-					mode,
-				),
-			)),
-		)
-	}
-	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 // handleMaterialPreference only changes selection policy. Opening the menu,
@@ -251,12 +179,9 @@ func (sf *StudyFlow) handleMaterialPreference(
 	if !sessionOK || !materialOK {
 		return
 	}
-	var mode model.MaterialReviewMode
-	if len(parts) == 5 {
-		mode = model.MaterialReviewMode(parts[4])
-		if !mode.Valid() {
-			return
-		}
+	mode, modeOK := materialPreferenceMode(parts)
+	if !modeOK {
+		return
 	}
 	state, err := sf.session.StudyProgress(
 		ctx,
@@ -298,52 +223,19 @@ func (sf *StudyFlow) handleMaterialPreference(
 		)
 		return
 	}
-	if len(parts) == 5 {
-		if err := sf.materialPreference.Set(
-			ctx,
-			cb.From.ID,
-			materialID,
-			mode,
-		); err != nil {
-			materialPreferenceError(
-				ctx,
-				sf.telegram,
-				cb,
-				"set",
-				err,
-			)
-			return
-		}
-		sf.telegram.AnswerCallback(
-			cb.ID,
-			botMessagesByLocale[botDefaultLocale].materialPreferenceAppliedNotice,
-		)
-	} else {
-		preference, err := sf.materialPreference.Get(
-			ctx,
-			cb.From.ID,
-			materialID,
-		)
-		if err != nil {
-			materialPreferenceError(
-				ctx,
-				sf.telegram,
-				cb,
-				"get",
-				err,
-			)
-			return
-		}
-		mode = model.MaterialReviewNormal
-		if preference != nil {
-			mode = preference.ReviewMode
-		}
-	}
-	text := materialPreferenceMenuText(
-		item.Material.Title,
+	mode, ok = applyMaterialPreference(
+		ctx,
+		sf.telegram,
+		sf.materialPreference,
+		cb,
+		materialID,
 		mode,
 	)
-	keyboard := materialPreferenceKeyboard(
+	if !ok {
+		return
+	}
+	text, keyboard := studyMaterialPreferenceMenu(
+		item.Material.Title,
 		sessionID,
 		materialID,
 		mode,
@@ -356,23 +248,134 @@ func (sf *StudyFlow) handleMaterialPreference(
 	)
 }
 
-func materialPreferenceMenuText(
-	subject string,
-	mode model.MaterialReviewMode,
-) string {
-	return fmt.Sprintf(
-		botMessagesByLocale[botDefaultLocale].materialPreferenceMenuFormat,
-		escapeHTML(subject),
-		materialReviewModeLabel(mode),
-		botMessagesByLocale[botDefaultLocale].materialPreferenceNotice,
+// materialPreferenceMode returns the review mode a menu callback chose, or ""
+// when the callback only opens the menu. It reports false for unknown modes.
+func materialPreferenceMode(parts []string) (model.MaterialReviewMode, bool) {
+	if len(parts) != 5 {
+		return "", true
+	}
+	mode := model.MaterialReviewMode(parts[4])
+	return mode, mode.Valid()
+}
+
+// applyMaterialPreference stores the chosen mode, or reads the current one when
+// chosen is "" (menu just opened). On failure it alerts the user and reports false.
+func applyMaterialPreference(
+	ctx context.Context,
+	telegram *TelegramClient,
+	preferences materialPreferences,
+	cb *tgbotapi.CallbackQuery,
+	materialID int,
+	chosen model.MaterialReviewMode,
+) (model.MaterialReviewMode, bool) {
+	if chosen != "" {
+		if err := preferences.Set(
+			ctx,
+			cb.From.ID,
+			materialID,
+			chosen,
+		); err != nil {
+			materialPreferenceError(
+				ctx,
+				telegram,
+				cb,
+				"set",
+				err,
+			)
+			return "", false
+		}
+		telegram.AnswerCallback(
+			cb.ID,
+			botMessagesByLocale[botDefaultLocale].materialPreferenceAppliedNotice,
+		)
+		return chosen, true
+	}
+	preference, err := preferences.Get(
+		ctx,
+		cb.From.ID,
+		materialID,
+	)
+	if err != nil {
+		materialPreferenceError(
+			ctx,
+			telegram,
+			cb,
+			"get",
+			err,
+		)
+		return "", false
+	}
+	if preference == nil {
+		return model.MaterialReviewNormal, true
+	}
+	return preference.ReviewMode, true
+}
+
+// quizMaterialPreferenceMenu is the shared menu for a Quiz question's linked
+// material. Its close button deletes the separate menu message.
+func quizMaterialPreferenceMenu(
+	sessionID,
+	questionID int,
+	selected model.MaterialReviewMode,
+) (string, tgbotapi.InlineKeyboardMarkup) {
+	callbackData := func(action string) string {
+		return fmt.Sprintf(
+			formatQuestionPolicySet,
+			sessionID,
+			questionID,
+			action,
+		)
+	}
+	return materialPreferenceMenu(
+		botMessagesByLocale[botDefaultLocale].linkedQuizMaterialTitle,
+		selected,
+		func(mode model.MaterialReviewMode) string { return callbackData(string(mode)) },
+		tgbotapi.NewInlineKeyboardButtonData(
+			botMessagesByLocale[botDefaultLocale].materialPreferenceCloseButton,
+			callbackData(callbackActionClose),
+		),
 	)
 }
 
-func materialPreferenceKeyboard(
+// studyMaterialPreferenceMenu is the shared menu for a Study card. Its back
+// button re-renders the same card in place.
+func studyMaterialPreferenceMenu(
+	title string,
 	sessionID,
 	materialID int,
 	selected model.MaterialReviewMode,
-) tgbotapi.InlineKeyboardMarkup {
+) (string, tgbotapi.InlineKeyboardMarkup) {
+	return materialPreferenceMenu(
+		title,
+		selected,
+		func(mode model.MaterialReviewMode) string {
+			return fmt.Sprintf(
+				formatStudyPolicySet,
+				sessionID,
+				materialID,
+				mode,
+			)
+		},
+		tgbotapi.NewInlineKeyboardButtonData(
+			botMessagesByLocale[botDefaultLocale].materialBackToCardButton,
+			fmt.Sprintf(
+				formatStudyCard,
+				sessionID,
+				materialID,
+			),
+		),
+	)
+}
+
+// materialPreferenceMenu renders the menu shared by the Quiz and Study screens:
+// the subject and current mode, one button per review mode with the current
+// one checked, and a final navigation button chosen by the caller.
+func materialPreferenceMenu(
+	subject string,
+	selected model.MaterialReviewMode,
+	choiceCallbackData func(model.MaterialReviewMode) string,
+	navigation tgbotapi.InlineKeyboardButton,
+) (string, tgbotapi.InlineKeyboardMarkup) {
 	rows := make(
 		[][]tgbotapi.InlineKeyboardButton,
 		0,
@@ -387,27 +390,21 @@ func materialPreferenceKeyboard(
 			rows,
 			tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
 				label,
-				fmt.Sprintf(
-					formatStudyPolicySet,
-					sessionID,
-					materialID,
-					mode,
-				),
+				choiceCallbackData(mode),
 			)),
 		)
 	}
 	rows = append(
 		rows,
-		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(
-			botMessagesByLocale[botDefaultLocale].materialBackToCardButton,
-			fmt.Sprintf(
-				formatStudyCard,
-				sessionID,
-				materialID,
-			),
-		)),
+		tgbotapi.NewInlineKeyboardRow(navigation),
 	)
-	return tgbotapi.NewInlineKeyboardMarkup(rows...)
+	text := fmt.Sprintf(
+		botMessagesByLocale[botDefaultLocale].materialPreferenceMenuFormat,
+		escapeHTML(subject),
+		materialReviewModeLabel(selected),
+		botMessagesByLocale[botDefaultLocale].materialPreferenceNotice,
+	)
+	return text, tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
 func materialReviewModeLabel(mode model.MaterialReviewMode) string {

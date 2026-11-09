@@ -121,7 +121,7 @@ q:{session_id}:{question_id}:{n}  → 답변 선택
 q:{session_id}:next:{idx}         → 다음 문제
 q:{session_id}:ask:{question_id}  → LLM 질문
 q:{session_id}:wo:{question_id}:{a|u|r|s}[:{n}] → 어순 선택·되돌리기·초기화·제출
-q:{session_id}:policy:{question_id}[:{mode}]   → 연결 자료 설정 (mode 있으면 저장)
+q:{session_id}:policy:{question_id}[:{mode|close}]   → 연결 자료 설정 (mode 있으면 저장, close면 메뉴 메시지 삭제)
 menu:{main|study|review|stats|settings}        → 메인 메뉴 이동
 stats:progress                    → 통계 진도 탭 (정답률 탭은 menu:stats)
 study:{session_id}:{start|next|prev|finish|ask|card|policy|kanji}[:...] → Study 카드 이동·질문·자료 설정·한자 해설
