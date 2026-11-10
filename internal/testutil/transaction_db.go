@@ -21,7 +21,7 @@ func TransactionDB() *sqlx.DB {
 type transactionConnector struct{}
 
 func (transactionConnector) Connect(context.Context) (driver.Conn, error) {
-	return transactionConn{}, nil
+	return transactionConnection{}, nil
 }
 
 func (transactionConnector) Driver() driver.Driver {
@@ -31,20 +31,20 @@ func (transactionConnector) Driver() driver.Driver {
 type transactionDriver struct{}
 
 func (transactionDriver) Open(string) (driver.Conn, error) {
-	return transactionConn{}, nil
+	return transactionConnection{}, nil
 }
 
-type transactionConn struct{}
+type transactionConnection struct{}
 
-func (transactionConn) Prepare(string) (driver.Stmt, error) {
+func (transactionConnection) Prepare(string) (driver.Stmt, error) {
 	return nil, errors.New("test transaction database does not execute SQL")
 }
 
-func (transactionConn) Close() error { return nil }
+func (transactionConnection) Close() error { return nil }
 
-func (transactionConn) Begin() (driver.Tx, error) { return transactionTx{}, nil }
+func (transactionConnection) Begin() (driver.Tx, error) { return transactionTx{}, nil }
 
-func (transactionConn) BeginTx(
+func (transactionConnection) BeginTx(
 	context.Context,
 	driver.TxOptions,
 ) (driver.Tx, error) {

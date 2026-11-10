@@ -47,7 +47,7 @@ func TestWithinTxRollsBackWhenStudyMaterialInsertFails(t *testing.T) {
 		}
 	}
 
-	repo := NewSessionRepository(db)
+	repository := NewSessionRepository(db)
 	createStudySession := func(
 		session *model.Session,
 		materialIDs []int,
@@ -58,7 +58,7 @@ func TestWithinTxRollsBackWhenStudyMaterialInsertFails(t *testing.T) {
 			db,
 			func(tx *sqlx.Tx) error {
 				var err error
-				sessionID, err = repo.CreateSessionInTx(
+				sessionID, err = repository.CreateSessionInTx(
 					ctx,
 					tx,
 					session,
@@ -66,7 +66,7 @@ func TestWithinTxRollsBackWhenStudyMaterialInsertFails(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				return repo.CreateSessionMaterialsInTx(
+				return repository.CreateSessionMaterialsInTx(
 					ctx,
 					tx,
 					sessionID,

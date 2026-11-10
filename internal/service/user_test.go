@@ -7,117 +7,195 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type mockUserRepo struct {
-	getOrCreateFn        func(ctx context.Context, telegramID int64, username string) (*model.User, error)
-	getByIDFn            func(ctx context.Context, id int64) (*model.User, error)
-	getAllUsersFn        func(ctx context.Context) ([]model.User, error)
-	getActiveTimezonesFn func(ctx context.Context) ([]string, error)
-	getUsersBySlotFn     func(ctx context.Context, slot model.SessionSlot, localTime string, timezone string) ([]model.User, error)
-	updateSlotTimeFn     func(ctx context.Context, userID int64, slot model.SessionSlot, timeVal *string) error
-	updateTimezoneFn     func(ctx context.Context, userID int64, timezone string) error
+type mockUserRepository struct {
+	getOrCreateFunc func(
+		ctx context.Context,
+		telegramID int64,
+		username string,
+	) (*model.User, error)
+	getByIDFunc func(
+		ctx context.Context,
+		id int64,
+	) (*model.User, error)
+	getAllUsersFunc        func(ctx context.Context) ([]model.User, error)
+	getActiveTimezonesFunc func(ctx context.Context) ([]string, error)
+	getUsersBySlotFunc     func(
+		ctx context.Context,
+		slot model.SessionSlot,
+		localTime string,
+		timezone string,
+	) ([]model.User, error)
+	updateSlotTimeFunc func(
+		ctx context.Context,
+		userID int64,
+		slot model.SessionSlot,
+		timeValue *string,
+	) error
+	updateTimezoneFunc func(
+		ctx context.Context,
+		userID int64,
+		timezone string,
+	) error
 }
 
-func (m *mockUserRepo) GetOrCreate(ctx context.Context, tid int64, user string) (*model.User, error) {
-	if m.getOrCreateFn != nil {
-		return m.getOrCreateFn(ctx, tid, user)
+func (mock *mockUserRepository) GetOrCreate(
+	ctx context.Context,
+	telegramID int64,
+	user string,
+) (*model.User, error) {
+	if mock.getOrCreateFunc != nil {
+		return mock.getOrCreateFunc(
+			ctx,
+			telegramID,
+			user,
+		)
 	}
 	return nil, nil
 }
-func (m *mockUserRepo) GetByID(ctx context.Context, id int64) (*model.User, error) {
-	if m.getByIDFn != nil {
-		return m.getByIDFn(ctx, id)
+func (mock *mockUserRepository) GetByID(
+	ctx context.Context,
+	id int64,
+) (*model.User, error) {
+	if mock.getByIDFunc != nil {
+		return mock.getByIDFunc(
+			ctx,
+			id,
+		)
 	}
 	return nil, nil
 }
-func (m *mockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error) {
-	if m.getAllUsersFn != nil {
-		return m.getAllUsersFn(ctx)
+func (mock *mockUserRepository) GetAllUsers(ctx context.Context) ([]model.User, error) {
+	if mock.getAllUsersFunc != nil {
+		return mock.getAllUsersFunc(ctx)
 	}
 	return nil, nil
 }
-func (m *mockUserRepo) GetActiveTimezones(ctx context.Context) ([]string, error) {
-	if m.getActiveTimezonesFn != nil {
-		return m.getActiveTimezonesFn(ctx)
+func (mock *mockUserRepository) GetActiveTimezones(ctx context.Context) ([]string, error) {
+	if mock.getActiveTimezonesFunc != nil {
+		return mock.getActiveTimezonesFunc(ctx)
 	}
 	return nil, nil
 }
 
-func (m *mockUserRepo) GetUsersBySlot(
+func (mock *mockUserRepository) GetUsersBySlot(
 	ctx context.Context,
 	slot model.SessionSlot,
 	localTime string,
 	timezone string,
 ) ([]model.User, error) {
-	if m.getUsersBySlotFn != nil {
-		return m.getUsersBySlotFn(ctx, slot, localTime, timezone)
+	if mock.getUsersBySlotFunc != nil {
+		return mock.getUsersBySlotFunc(
+			ctx,
+			slot,
+			localTime,
+			timezone,
+		)
 	}
 	return nil, nil
 }
 
-func (m *mockUserRepo) UpdateSlotTime(
+func (mock *mockUserRepository) UpdateSlotTime(
 	ctx context.Context,
 	userID int64,
 	slot model.SessionSlot,
-	timeVal *string,
+	timeValue *string,
 ) error {
-	if m.updateSlotTimeFn != nil {
-		return m.updateSlotTimeFn(ctx, userID, slot, timeVal)
+	if mock.updateSlotTimeFunc != nil {
+		return mock.updateSlotTimeFunc(
+			ctx,
+			userID,
+			slot,
+			timeValue,
+		)
 	}
 	return nil
 }
-func (m *mockUserRepo) UpdateTimezone(ctx context.Context, userID int64, timezone string) error {
-	if m.updateTimezoneFn != nil {
-		return m.updateTimezoneFn(ctx, userID, timezone)
+func (mock *mockUserRepository) UpdateTimezone(
+	ctx context.Context,
+	userID int64,
+	timezone string,
+) error {
+	if mock.updateTimezoneFunc != nil {
+		return mock.updateTimezoneFunc(
+			ctx,
+			userID,
+			timezone,
+		)
 	}
 	return nil
 }
 
 func TestGetUser(t *testing.T) {
 	ctx := context.Background()
-	tid := int64(12345)
+	expectedTelegramID := int64(12345)
 	user := "testuser"
 
-	mRepo := &mockUserRepo{
-		getOrCreateFn: func(ctx context.Context, telegramID int64, username string) (*model.User, error) {
-			if telegramID != tid || username != user {
-				t.Errorf("unexpected args: %d, %s", telegramID, username)
+	userRepositoryMock := &mockUserRepository{
+		getOrCreateFunc: func(
+			ctx context.Context,
+			telegramID int64,
+			username string,
+		) (*model.User, error) {
+			if telegramID != expectedTelegramID || username != user {
+				t.Errorf(
+					"unexpected args: %d, %s",
+					telegramID,
+					username,
+				)
 			}
-			return &model.User{ID: tid, Username: user}, nil
+			return &model.User{ID: expectedTelegramID, Username: user}, nil
 		},
 	}
 
-	svc := NewUserService(mRepo)
-	u, err := svc.GetUser(ctx, tid, user)
+	userService := NewUserService(userRepositoryMock)
+	returnedUser, err := userService.GetUser(
+		ctx,
+		expectedTelegramID,
+		user,
+	)
 
 	if err != nil {
-		t.Fatalf("GetUser failed: %v", err)
+		t.Fatalf(
+			"GetUser failed: %v",
+			err,
+		)
 	}
-	if u.ID != tid {
-		t.Errorf("expected ID %d, got %d", tid, u.ID)
+	if returnedUser.ID != expectedTelegramID {
+		t.Errorf(
+			"expected ID %d, got %d",
+			expectedTelegramID,
+			returnedUser.ID,
+		)
 	}
 }
 
 func TestGetAllUsers(t *testing.T) {
 	ctx := context.Background()
 
-	mRepo := &mockUserRepo{
-		getAllUsersFn: func(ctx context.Context) ([]model.User, error) {
+	userRepositoryMock := &mockUserRepository{
+		getAllUsersFunc: func(ctx context.Context) ([]model.User, error) {
 			return []model.User{{ID: 1}, {ID: 2}}, nil
 		},
 	}
 
-	svc := NewUserService(mRepo)
-	users, err := svc.GetAllUsers(ctx)
+	userService := NewUserService(userRepositoryMock)
+	users, err := userService.GetAllUsers(ctx)
 
 	if err != nil {
-		t.Fatalf("GetAllUsers failed: %v", err)
+		t.Fatalf(
+			"GetAllUsers failed: %v",
+			err,
+		)
 	}
 	if len(users) != 2 {
-		t.Errorf("expected 2 users, got %d", len(users))
+		t.Errorf(
+			"expected 2 users, got %d",
+			len(users),
+		)
 	}
 }
 
-func TestIsValid30MinTime(t *testing.T) {
+func TestIsValid30MinuteTime(t *testing.T) {
 	tests := []struct {
 		input string
 		want  bool
@@ -139,10 +217,15 @@ func TestIsValid30MinTime(t *testing.T) {
 		{"", false},
 	}
 
-	for _, tc := range tests {
-		got := IsValid30MinTime(tc.input)
-		if got != tc.want {
-			t.Errorf("IsValid30MinTime(%q) = %v, want %v", tc.input, got, tc.want)
+	for _, testCase := range tests {
+		got := IsValid30MinuteTime(testCase.input)
+		if got != testCase.want {
+			t.Errorf(
+				"IsValid30MinuteTime(%q) = %v, want %v",
+				testCase.input,
+				got,
+				testCase.want,
+			)
 		}
 	}
 }
@@ -150,61 +233,113 @@ func TestIsValid30MinTime(t *testing.T) {
 func TestUpdateSlotTime_ValidatesFormat(t *testing.T) {
 	ctx := context.Background()
 	var updatedTime *string
-	mRepo := &mockUserRepo{
-		updateSlotTimeFn: func(ctx context.Context, userID int64, slot model.SessionSlot, timeVal *string) error {
-			updatedTime = timeVal
+	userRepositoryMock := &mockUserRepository{
+		updateSlotTimeFunc: func(
+			ctx context.Context,
+			userID int64,
+			slot model.SessionSlot,
+			timeValue *string,
+		) error {
+			updatedTime = timeValue
 			return nil
 		},
 	}
-	svc := NewUserService(mRepo)
+	userService := NewUserService(userRepositoryMock)
 
 	// Invalid time should return error
 	badTime := "08:15"
-	if err := svc.UpdateSlotTime(ctx, 1, model.SessionSlotMorningStudy, &badTime); err == nil {
+	if err := userService.UpdateSlotTime(
+		ctx,
+		1,
+		model.SessionSlotMorningStudy,
+		&badTime,
+	); err == nil {
 		t.Error("expected error for 08:15, got nil")
 	}
 
 	// Valid time should succeed
 	validTime := "08:30"
-	if err := svc.UpdateSlotTime(ctx, 1, model.SessionSlotMorningStudy, &validTime); err != nil {
-		t.Fatalf("unexpected error for 08:30: %v", err)
+	if err := userService.UpdateSlotTime(
+		ctx,
+		1,
+		model.SessionSlotMorningStudy,
+		&validTime,
+	); err != nil {
+		t.Fatalf(
+			"unexpected error for 08:30: %v",
+			err,
+		)
 	}
 	if updatedTime == nil || *updatedTime != "08:30" {
-		t.Errorf("updatedTime = %v, want 08:30", updatedTime)
+		t.Errorf(
+			"updatedTime = %v, want 08:30",
+			updatedTime,
+		)
 	}
 
 	// Nil time (disable slot) should succeed
-	if err := svc.UpdateSlotTime(ctx, 1, model.SessionSlotMorningStudy, nil); err != nil {
-		t.Fatalf("unexpected error for nil time: %v", err)
+	if err := userService.UpdateSlotTime(
+		ctx,
+		1,
+		model.SessionSlotMorningStudy,
+		nil,
+	); err != nil {
+		t.Fatalf(
+			"unexpected error for nil time: %v",
+			err,
+		)
 	}
 	if updatedTime != nil {
-		t.Errorf("expected updatedTime to be nil, got %v", *updatedTime)
+		t.Errorf(
+			"expected updatedTime to be nil, got %v",
+			*updatedTime,
+		)
 	}
 }
 
 func TestUpdateTimezone_ValidatesIANA(t *testing.T) {
 	ctx := context.Background()
-	var savedTZ string
-	mRepo := &mockUserRepo{
-		updateTimezoneFn: func(ctx context.Context, userID int64, timezone string) error {
-			savedTZ = timezone
+	var savedTimezone string
+	userRepositoryMock := &mockUserRepository{
+		updateTimezoneFunc: func(
+			ctx context.Context,
+			userID int64,
+			timezone string,
+		) error {
+			savedTimezone = timezone
 			return nil
 		},
 	}
-	svc := NewUserService(mRepo)
+	userService := NewUserService(userRepositoryMock)
 
 	// Invalid timezone should fail
-	if err := svc.UpdateTimezone(ctx, 1, "Invalid/TimeZone_Foo"); err == nil {
+	if err := userService.UpdateTimezone(
+		ctx,
+		1,
+		"Invalid/TimeZone_Foo",
+	); err == nil {
 		t.Error("expected error for invalid timezone, got nil")
 	}
 
 	// Valid timezones should succeed
-	for _, tz := range []string{"Asia/Seoul", "America/New_York", "UTC"} {
-		if err := svc.UpdateTimezone(ctx, 1, tz); err != nil {
-			t.Fatalf("unexpected error for timezone %q: %v", tz, err)
+	for _, timezone := range []string{"Asia/Seoul", "America/New_York", "UTC"} {
+		if err := userService.UpdateTimezone(
+			ctx,
+			1,
+			timezone,
+		); err != nil {
+			t.Fatalf(
+				"unexpected error for timezone %q: %v",
+				timezone,
+				err,
+			)
 		}
-		if savedTZ != tz {
-			t.Errorf("savedTZ = %q, want %q", savedTZ, tz)
+		if savedTimezone != timezone {
+			t.Errorf(
+				"savedTimezone = %q, want %q",
+				savedTimezone,
+				timezone,
+			)
 		}
 	}
 }

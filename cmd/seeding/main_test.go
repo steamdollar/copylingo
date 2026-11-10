@@ -177,8 +177,8 @@ func TestKanjiNotes(t *testing.T) {
 			err,
 		)
 	}
-	noteByChar := make(map[string]string)
-	keyByChar := make(map[string]string)
+	noteByCharacter := make(map[string]string)
+	keyByCharacter := make(map[string]string)
 	for _, material := range materials {
 		if material.Category != model.MaterialCategoryVocabulary {
 			continue
@@ -212,37 +212,37 @@ func TestKanjiNotes(t *testing.T) {
 		}
 		seen := make(map[string]bool)
 		for _, note := range notes {
-			if utf8.RuneCountInString(note.Char) != 1 || !strings.Contains(
+			if utf8.RuneCountInString(note.Character) != 1 || !strings.Contains(
 				payload.Kanji,
-				note.Char,
-			) || seen[note.Char] {
+				note.Character,
+			) || seen[note.Character] {
 				t.Fatalf(
 					"material %q: note char %q must be one kanji of %q, once",
 					material.MaterialKey,
-					note.Char,
+					note.Character,
 					payload.Kanji,
 				)
 			}
-			seen[note.Char] = true
+			seen[note.Character] = true
 			if problem := kanjiNoteProblem(note); problem != "" {
 				t.Fatalf(
 					"material %q kanji %q: %s",
 					material.MaterialKey,
-					note.Char,
+					note.Character,
 					problem,
 				)
 			}
 			encoded, _ := json.Marshal(note)
-			if previous, ok := noteByChar[note.Char]; ok && previous != string(encoded) {
+			if previous, ok := noteByCharacter[note.Character]; ok && previous != string(encoded) {
 				t.Fatalf(
 					"kanji %q has different notes in %q and %q",
-					note.Char,
-					keyByChar[note.Char],
+					note.Character,
+					keyByCharacter[note.Character],
 					material.MaterialKey,
 				)
 			}
-			noteByChar[note.Char] = string(encoded)
-			keyByChar[note.Char] = material.MaterialKey
+			noteByCharacter[note.Character] = string(encoded)
+			keyByCharacter[note.Character] = material.MaterialKey
 		}
 	}
 }
@@ -349,8 +349,8 @@ func TestKanjiReadings(t *testing.T) {
 			err,
 		)
 	}
-	kanjiLevelByChar := make(map[string]string)
-	keyByChar := make(map[string]string)
+	kanjiLevelByCharacter := make(map[string]string)
+	keyByCharacter := make(map[string]string)
 	for _, material := range materials {
 		if material.Category != model.MaterialCategoryVocabulary {
 			continue
@@ -412,18 +412,18 @@ func TestKanjiReadings(t *testing.T) {
 				reading.On,
 				"·",
 			) + " / " + reading.HunEum
-			if previous, ok := kanjiLevelByChar[reading.Text]; ok && previous != kanjiLevel {
+			if previous, ok := kanjiLevelByCharacter[reading.Text]; ok && previous != kanjiLevel {
 				t.Fatalf(
 					"kanji %q lists on'yomi / 훈음 %q in %q but %q in %q",
 					reading.Text,
 					previous,
-					keyByChar[reading.Text],
+					keyByCharacter[reading.Text],
 					kanjiLevel,
 					material.MaterialKey,
 				)
 			}
-			kanjiLevelByChar[reading.Text] = kanjiLevel
-			keyByChar[reading.Text] = material.MaterialKey
+			kanjiLevelByCharacter[reading.Text] = kanjiLevel
+			keyByCharacter[reading.Text] = material.MaterialKey
 		}
 	}
 }
@@ -465,12 +465,12 @@ func kanjiReadingProblem(reading model.KanjiReading) string {
 	return ""
 }
 
-func isHiragana(r rune) bool {
-	return r >= 'ぁ' && r <= 'ゖ'
+func isHiragana(character rune) bool {
+	return character >= 'ぁ' && character <= 'ゖ'
 }
 
-func isKatakana(r rune) bool {
-	return r >= 'ァ' && r <= 'ヶ'
+func isKatakana(character rune) bool {
+	return character >= 'ァ' && character <= 'ヶ'
 }
 
 func assertQuestionRecord(
@@ -512,7 +512,7 @@ func assertQuestionRecord(
 		)
 	}
 	switch question.Type {
-	case model.QuestionMultipleChoice, model.QuestionReadingComp, model.QuestionListening:
+	case model.QuestionMultipleChoice, model.QuestionReadingComprehension, model.QuestionListening:
 		distinct := make(map[string]bool)
 		for _, option := range options {
 			distinct[option] = true
@@ -552,9 +552,9 @@ func questionKey(key string) *string {
 func TestCollectQuestionsLinksNestedQuestions(t *testing.T) {
 	t.Parallel()
 
-	vocab := model.Question{
+	vocabulary := model.Question{
 		QuestionKey:   questionKey("ja:question:n4:sample_vocab"),
-		Skill:         model.SkillPtr(model.SkillVocabKanjiReading),
+		Skill:         model.SkillPointer(model.SkillVocabularyKanjiReading),
 		Type:          model.QuestionFillBlank,
 		Category:      model.CategoryVocabulary,
 		Prompt:        "「経験」의 읽기를 쓰세요.",
@@ -564,7 +564,7 @@ func TestCollectQuestionsLinksNestedQuestions(t *testing.T) {
 	}
 	listening := model.Question{
 		QuestionKey:   questionKey("ja:listening:n4:sample_listening"),
-		Skill:         model.SkillPtr(model.SkillListeningTask),
+		Skill:         model.SkillPointer(model.SkillListeningTask),
 		Type:          model.QuestionListening,
 		Category:      model.CategoryListening,
 		Prompt:        "몇 시에 갑니까?",
@@ -572,7 +572,10 @@ func TestCollectQuestionsLinksNestedQuestions(t *testing.T) {
 		Difficulty:    1,
 	}
 	materials := []*materialRecord{
-		{Material: model.Material{ID: 42, MaterialKey: "ja:vocab:n4_word_0001"}, Questions: []model.Question{vocab}},
+		{
+			Material:  model.Material{ID: 42, MaterialKey: "ja:vocab:n4_word_0001"},
+			Questions: []model.Question{vocabulary},
+		},
 		{Material: model.Material{ID: 43, MaterialKey: "ja:vocab:n4_word_0002"}},
 	}
 	questions := collectQuestions(
@@ -585,7 +588,7 @@ func TestCollectQuestionsLinksNestedQuestions(t *testing.T) {
 			len(questions),
 		)
 	}
-	if nested := questions[0]; *nested.QuestionKey != *vocab.QuestionKey || nested.MaterialID == nil ||
+	if nested := questions[0]; *nested.QuestionKey != *vocabulary.QuestionKey || nested.MaterialID == nil ||
 		*nested.MaterialID != 42 {
 		t.Fatalf(
 			"nested question not linked to its material: %+v",
@@ -601,17 +604,17 @@ func TestCollectQuestionsLinksNestedQuestions(t *testing.T) {
 	}
 }
 
-func TestParseLanguageArg(t *testing.T) {
+func TestParseLanguageArgument(t *testing.T) {
 	t.Parallel()
 
 	languages := []string{japanese}
-	language, err := parseLanguageArg(
+	language, err := parseLanguageArgument(
 		[]string{japanese},
 		languages,
 	)
 	if err != nil || language != japanese {
 		t.Fatalf(
-			"parseLanguageArg(%q) = %q, %v; want %q, nil",
+			"parseLanguageArgument(%q) = %q, %v; want %q, nil",
 			japanese,
 			language,
 			err,
@@ -620,7 +623,7 @@ func TestParseLanguageArg(t *testing.T) {
 	}
 	// Missing, extra, unknown and non-exact arguments all fail before any
 	// loading.
-	for _, args := range [][]string{
+	for _, arguments := range [][]string{
 		nil,
 		{japanese, "n5"},
 		{""},
@@ -628,13 +631,13 @@ func TestParseLanguageArg(t *testing.T) {
 		{"JA"},
 		{" ja"},
 	} {
-		if _, err := parseLanguageArg(
-			args,
+		if _, err := parseLanguageArgument(
+			arguments,
 			languages,
 		); err == nil {
 			t.Fatalf(
-				"parseLanguageArg(%q) error = nil, want error",
-				args,
+				"parseLanguageArgument(%q) error = nil, want error",
+				arguments,
 			)
 		}
 	}

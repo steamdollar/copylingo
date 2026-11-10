@@ -69,7 +69,7 @@ func TestSessionTypeLabel(t *testing.T) {
 func TestTruncate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		s      string
+		text   string
 		maxLen int
 		want   string
 	}{
@@ -83,15 +83,15 @@ func TestTruncate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(
-			tt.s,
+			tt.text,
 			func(t *testing.T) {
 				if got := truncate(
-					tt.s,
+					tt.text,
 					tt.maxLen,
 				); got != tt.want {
 					t.Errorf(
 						"truncate(%q, %d) = %q, want %q",
-						tt.s,
+						tt.text,
 						tt.maxLen,
 						got,
 						tt.want,
@@ -133,63 +133,63 @@ func TestStripHTML(t *testing.T) {
 
 func TestMainMenuKeyboard(t *testing.T) {
 	t.Parallel()
-	kb := mainMenuKeyboard()
-	if len(kb.InlineKeyboard) != 1 {
+	keyboard := mainMenuKeyboard()
+	if len(keyboard.InlineKeyboard) != 1 {
 		t.Fatalf(
 			"expected 1 row, got %d",
-			len(kb.InlineKeyboard),
+			len(keyboard.InlineKeyboard),
 		)
 	}
-	if len(kb.InlineKeyboard[0]) != 1 {
+	if len(keyboard.InlineKeyboard[0]) != 1 {
 		t.Fatalf(
 			"expected 1 button, got %d",
-			len(kb.InlineKeyboard[0]),
+			len(keyboard.InlineKeyboard[0]),
 		)
 	}
-	btn := kb.InlineKeyboard[0][0]
-	if btn.Text != "🏠 메뉴로" {
+	button := keyboard.InlineKeyboard[0][0]
+	if button.Text != "🏠 메뉴로" {
 		t.Errorf(
 			"expected text '🏠 메뉴로', got %q",
-			btn.Text,
+			button.Text,
 		)
 	}
-	if *btn.CallbackData != callbackMenuMain {
+	if *button.CallbackData != callbackMenuMain {
 		t.Errorf(
 			"expected callback data %q, got %q",
 			callbackMenuMain,
-			*btn.CallbackData,
+			*button.CallbackData,
 		)
 	}
 }
 
 func TestShowSessionFetchError(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{},
+		SessionFlowDependencies{},
 	)
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: 123},
 			MessageID: 456,
 		},
 	}
 
-	sf.showSessionFetchError(cb)
+	sessionFlow.showSessionFetchError(callbackQuery)
 
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"expected 1 message, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	edit, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
-			mAPI.sentMessages[0],
+			mockAPI.sentMessages[0],
 		)
 	}
 	if edit.ChatID != 123 || edit.MessageID != 456 {
@@ -202,34 +202,34 @@ func TestShowSessionFetchError(t *testing.T) {
 }
 
 func TestShowQuizActiveSessionUnavailable(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{},
+		SessionFlowDependencies{},
 	)
 
 	t.Run(
 		"with editMessageID",
 		func(t *testing.T) {
-			mAPI.sentMessages = nil
+			mockAPI.sentMessages = nil
 			editID := 789
-			sf.showQuizActiveSessionUnavailable(
+			sessionFlow.showQuizActiveSessionUnavailable(
 				123,
 				&editID,
 			)
 
-			if len(mAPI.sentMessages) != 1 {
+			if len(mockAPI.sentMessages) != 1 {
 				t.Fatalf(
 					"expected 1 message, got %d",
-					len(mAPI.sentMessages),
+					len(mockAPI.sentMessages),
 				)
 			}
-			edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+			edit, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 			if !ok {
 				t.Fatalf(
 					"expected EditMessageTextConfig, got %T",
-					mAPI.sentMessages[0],
+					mockAPI.sentMessages[0],
 				)
 			}
 			if edit.MessageID != 789 {
@@ -244,29 +244,29 @@ func TestShowQuizActiveSessionUnavailable(t *testing.T) {
 	t.Run(
 		"without editMessageID",
 		func(t *testing.T) {
-			mAPI.sentMessages = nil
-			sf.showQuizActiveSessionUnavailable(
+			mockAPI.sentMessages = nil
+			sessionFlow.showQuizActiveSessionUnavailable(
 				123,
 				nil,
 			)
 
-			if len(mAPI.sentMessages) != 1 {
+			if len(mockAPI.sentMessages) != 1 {
 				t.Fatalf(
 					"expected 1 message, got %d",
-					len(mAPI.sentMessages),
+					len(mockAPI.sentMessages),
 				)
 			}
-			msg, ok := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+			message, ok := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 			if !ok {
 				t.Fatalf(
 					"expected MessageConfig, got %T",
-					mAPI.sentMessages[0],
+					mockAPI.sentMessages[0],
 				)
 			}
-			if msg.ChatID != 123 {
+			if message.ChatID != 123 {
 				t.Errorf(
 					"expected ChatID 123, got %d",
-					msg.ChatID,
+					message.ChatID,
 				)
 			}
 		},

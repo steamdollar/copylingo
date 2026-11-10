@@ -14,15 +14,15 @@ type fakeTipCandidates struct {
 	err     error
 }
 
-func (f *fakeTipCandidates) CreateCandidate(
+func (fake *fakeTipCandidates) CreateCandidate(
 	_ context.Context,
 	candidate *model.TipCandidate,
 ) error {
-	f.created = append(
-		f.created,
+	fake.created = append(
+		fake.created,
 		candidate,
 	)
-	return f.err
+	return fake.err
 }
 
 // fakeLearningQuestionLLM returns a fixed answer or error.
@@ -31,11 +31,11 @@ type fakeLearningQuestionLLM struct {
 	err    error
 }
 
-func (f *fakeLearningQuestionLLM) AnswerLearningQuestion(
+func (fake *fakeLearningQuestionLLM) AnswerLearningQuestion(
 	context.Context,
 	string,
 ) (string, error) {
-	return f.answer, f.err
+	return fake.answer, fake.err
 }
 
 func TestLLMQuestionServiceAnswer(t *testing.T) {
@@ -51,7 +51,7 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 		"stores question and answer as candidate",
 		func(t *testing.T) {
 			tips := &fakeTipCandidates{}
-			svc := NewLLMQuestionService(
+			llmQuestionService := NewLLMQuestionService(
 				answerWith(
 					"answer",
 					nil,
@@ -59,7 +59,7 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 				tips,
 				"test-model",
 			)
-			got, err := svc.Answer(
+			got, err := llmQuestionService.Answer(
 				context.Background(),
 				user,
 				"learner",
@@ -79,12 +79,14 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 					len(tips.created),
 				)
 			}
-			c := tips.created[0]
-			if c.UserID != 7 || c.Username != "learner" || c.Language != "ja" || c.ProficiencyLevel != "N4" ||
-				c.Question != "question" || c.Answer != "answer" || c.SourceModel == nil || *c.SourceModel != "test-model" {
+			candidate := tips.created[0]
+			if candidate.UserID != 7 || candidate.Username != "learner" || candidate.Language != "ja" ||
+				candidate.ProficiencyLevel != "N4" || candidate.Question != "question" || candidate.Answer != "answer" ||
+				candidate.SourceModel == nil ||
+				*candidate.SourceModel != "test-model" {
 				t.Fatalf(
 					"candidate = %+v",
-					c,
+					candidate,
 				)
 			}
 		},
@@ -93,7 +95,7 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 	t.Run(
 		"candidate failure still returns answer",
 		func(t *testing.T) {
-			svc := NewLLMQuestionService(
+			llmQuestionService := NewLLMQuestionService(
 				answerWith(
 					"answer",
 					nil,
@@ -101,7 +103,7 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 				&fakeTipCandidates{err: errors.New("db down")},
 				" ",
 			)
-			got, err := svc.Answer(
+			got, err := llmQuestionService.Answer(
 				context.Background(),
 				user,
 				"learner",
@@ -123,7 +125,7 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 		func(t *testing.T) {
 			tips := &fakeTipCandidates{}
 			llmErr := errors.New("provider failed")
-			svc := NewLLMQuestionService(
+			llmQuestionService := NewLLMQuestionService(
 				answerWith(
 					"",
 					llmErr,
@@ -131,7 +133,7 @@ func TestLLMQuestionServiceAnswer(t *testing.T) {
 				tips,
 				"test-model",
 			)
-			if _, err := svc.Answer(
+			if _, err := llmQuestionService.Answer(
 				context.Background(),
 				user,
 				"learner",

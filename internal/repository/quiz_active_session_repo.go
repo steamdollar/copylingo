@@ -62,12 +62,15 @@ type questionSessionWithStateRow struct {
 }
 
 // LoadQuestionSessionWithStateBySessionID loads the full ordered question session state in one DB round-trip.
-func (r *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
+func (repository *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
 	var rows []questionSessionWithStateRow
-	if err := r.db.SelectContext(ctx, &rows, `
+	if err := repository.db.SelectContext(
+		ctx,
+		&rows,
+		`
 		SELECT
 			s.id AS session_id,
 			s.user_id,
@@ -112,7 +115,9 @@ func (r *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 			ON uqp.user_id = s.user_id AND uqp.question_id = q.id
 		WHERE s.id = $1
 		ORDER BY sq.question_order
-	`, sessionID); err != nil {
+	`,
+		sessionID,
+	); err != nil {
 		return nil, fmt.Errorf(
 			"ActiveSessionRepository.LoadQuestionSessionWithStateBySessionID session_id=%d: %w",
 			sessionID,
@@ -142,50 +147,57 @@ func (r *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 			CompletedAt:    first.CompletedAt,
 			CreatedAt:      first.SessionCreatedAt,
 		},
-		Items:        make([]model.QuizActiveSessionQuestion, 0, len(rows)),
+		Items: make(
+			[]model.QuizActiveSessionQuestion,
+			0,
+			len(rows),
+		),
 		UpdatedAt:    time.Now(),
 		CurrentIndex: 0,
 	}
 
 	for _, row := range rows {
-		state.Items = append(state.Items, model.QuizActiveSessionQuestion{
-			SessionQuestion: model.SessionQuestion{
-				ID:            row.SessionQuestionID,
-				SessionID:     row.SessionID,
-				QuestionID:    row.QuestionID,
-				QuestionOrder: row.QuestionOrder,
-				IsReview:      row.IsReview,
-				UserAnswer:    row.UserAnswer,
-				IsCorrect:     row.IsCorrect,
+		state.Items = append(
+			state.Items,
+			model.QuizActiveSessionQuestion{
+				SessionQuestion: model.SessionQuestion{
+					ID:            row.SessionQuestionID,
+					SessionID:     row.SessionID,
+					QuestionID:    row.QuestionID,
+					QuestionOrder: row.QuestionOrder,
+					IsReview:      row.IsReview,
+					UserAnswer:    row.UserAnswer,
+					IsCorrect:     row.IsCorrect,
+				},
+				Question: model.Question{
+					ID:               row.QuestionID,
+					ContentID:        row.ContentID,
+					MaterialID:       row.MaterialID,
+					Type:             row.QuestionType,
+					Language:         row.Language,
+					ProficiencyLevel: row.ProficiencyLevel,
+					Category:         row.Category,
+					Prompt:           row.Prompt,
+					Options:          row.Options,
+					CorrectAnswer:    row.CorrectAnswer,
+					Explanation:      row.Explanation,
+					AudioPath:        row.AudioPath,
+					Difficulty:       row.Difficulty,
+					CreatedAt:        row.QuestionCreatedAt,
+				},
+				Progress: model.UserQuestionProgress{
+					UserID:         row.UserID,
+					QuestionID:     row.QuestionID,
+					EaseFactor:     row.ProgressEaseFactor,
+					IntervalDays:   row.ProgressIntervalDays,
+					Repetitions:    row.ProgressRepetitions,
+					NextReviewAt:   row.ProgressNextReviewAt,
+					LastReviewedAt: row.ProgressLastReviewedAt,
+					TimesServed:    row.ProgressTimesServed,
+					TimesCorrect:   row.ProgressTimesCorrect,
+				},
 			},
-			Question: model.Question{
-				ID:               row.QuestionID,
-				ContentID:        row.ContentID,
-				MaterialID:       row.MaterialID,
-				Type:             row.QuestionType,
-				Language:         row.Language,
-				ProficiencyLevel: row.ProficiencyLevel,
-				Category:         row.Category,
-				Prompt:           row.Prompt,
-				Options:          row.Options,
-				CorrectAnswer:    row.CorrectAnswer,
-				Explanation:      row.Explanation,
-				AudioPath:        row.AudioPath,
-				Difficulty:       row.Difficulty,
-				CreatedAt:        row.QuestionCreatedAt,
-			},
-			Progress: model.UserQuestionProgress{
-				UserID:         row.UserID,
-				QuestionID:     row.QuestionID,
-				EaseFactor:     row.ProgressEaseFactor,
-				IntervalDays:   row.ProgressIntervalDays,
-				Repetitions:    row.ProgressRepetitions,
-				NextReviewAt:   row.ProgressNextReviewAt,
-				LastReviewedAt: row.ProgressLastReviewedAt,
-				TimesServed:    row.ProgressTimesServed,
-				TimesCorrect:   row.ProgressTimesCorrect,
-			},
-		})
+		)
 	}
 	state.RecountAnswered()
 
@@ -193,10 +205,20 @@ func (r *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 }
 
 // FlushQuizActiveSession persists the question session state in a single DB transaction.
-func (r *QuizActiveSessionRepository) FlushQuizActiveSession(ctx context.Context, state *model.QuizActiveSessionState) error {
-	tx, err := r.db.BeginTxx(ctx, nil)
+func (repository *QuizActiveSessionRepository) FlushQuizActiveSession(
+	ctx context.Context,
+	state *model.QuizActiveSessionState,
+) error {
+	tx, err := repository.db.BeginTxx(
+		ctx,
+		nil,
+	)
 	if err != nil {
-		return fmt.Errorf("ActiveSessionRepository.FlushActiveSession begin session_id=%d: %w", state.Session.ID, err)
+		return fmt.Errorf(
+			"ActiveSessionRepository.FlushActiveSession begin session_id=%d: %w",
+			state.Session.ID,
+			err,
+		)
 	}
 
 	committed := false
@@ -206,24 +228,44 @@ func (r *QuizActiveSessionRepository) FlushQuizActiveSession(ctx context.Context
 		}
 	}()
 
-	flushed, err := markSessionCompleted(ctx, tx, state)
+	flushed, err := markSessionCompleted(
+		ctx,
+		tx,
+		state,
+	)
 	if err != nil {
 		return err
 	}
 	if flushed {
-		if err := flushSessionQuestions(ctx, tx, state.Items); err != nil {
+		if err := flushSessionQuestions(
+			ctx,
+			tx,
+			state.Items,
+		); err != nil {
 			return err
 		}
-		if err := flushQuestionProgress(ctx, tx, state.Items); err != nil {
+		if err := flushQuestionProgress(
+			ctx,
+			tx,
+			state.Items,
+		); err != nil {
 			return err
 		}
-		if err := flushQuizMaterialPreferences(ctx, tx, state.Session.ID); err != nil {
+		if err := flushQuizMaterialPreferences(
+			ctx,
+			tx,
+			state.Session.ID,
+		); err != nil {
 			return err
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("ActiveSessionRepository.FlushActiveSession commit session_id=%d: %w", state.Session.ID, err)
+		return fmt.Errorf(
+			"ActiveSessionRepository.FlushActiveSession commit session_id=%d: %w",
+			state.Session.ID,
+			err,
+		)
 	}
 	committed = true
 	return nil
@@ -232,9 +274,22 @@ func (r *QuizActiveSessionRepository) FlushQuizActiveSession(ctx context.Context
 // The persisted session answers are authoritative. Updating preferences in the
 // completion transaction keeps retries idempotent and makes any wrong variant
 // override correct variants of the same material.
-func flushQuizMaterialPreferences(ctx context.Context, tx *sqlx.Tx, sessionID int) error {
-	if _, err := tx.ExecContext(ctx, quizMaterialPreferencesCompletionQuery, sessionID, model.MaxMaintenanceDays); err != nil {
-		return fmt.Errorf("ActiveSessionRepository.flushQuizMaterialPreferences session_id=%d: %w", sessionID, err)
+func flushQuizMaterialPreferences(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	sessionID int,
+) error {
+	if _, err := tx.ExecContext(
+		ctx,
+		quizMaterialPreferencesCompletionQuery,
+		sessionID,
+		model.MaxMaintenanceDays,
+	); err != nil {
+		return fmt.Errorf(
+			"ActiveSessionRepository.flushQuizMaterialPreferences session_id=%d: %w",
+			sessionID,
+			err,
+		)
 	}
 	return nil
 }
@@ -271,13 +326,23 @@ const quizMaterialPreferencesCompletionQuery = `
 		AND result.all_correct
 `
 
-func markSessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.QuizActiveSessionState) (bool, error) {
+func markSessionCompleted(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	state *model.QuizActiveSessionState,
+) (bool, error) {
 	correctCount := state.CorrectCount()
-	res, err := tx.ExecContext(ctx, `
+	result, err := tx.ExecContext(
+		ctx,
+		`
 		UPDATE sessions
 		SET status = $2, correct_count = $3, completed_at = NOW()
 		WHERE id = $1 AND status <> $2
-	`, state.Session.ID, model.SessionCompleted, correctCount)
+	`,
+		state.Session.ID,
+		model.SessionCompleted,
+		correctCount,
+	)
 	if err != nil {
 		return false, fmt.Errorf(
 			"ActiveSessionRepository.markSessionCompleted session_id=%d: %w",
@@ -286,7 +351,7 @@ func markSessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.QuizAct
 		)
 	}
 
-	rows, err := res.RowsAffected()
+	rows, err := result.RowsAffected()
 	if err != nil {
 		return false, fmt.Errorf(
 			"ActiveSessionRepository.markSessionCompleted rows session_id=%d: %w",
@@ -297,31 +362,60 @@ func markSessionCompleted(ctx context.Context, tx *sqlx.Tx, state *model.QuizAct
 	return rows > 0, nil
 }
 
-func flushSessionQuestions(ctx context.Context, tx *sqlx.Tx, items []model.QuizActiveSessionQuestion) error {
+func flushSessionQuestions(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	items []model.QuizActiveSessionQuestion,
+) error {
 	if len(items) == 0 {
 		return nil
 	}
 
 	var values strings.Builder
-	args := make([]any, 0, len(items)*3)
+	arguments := make(
+		[]any,
+		0,
+		len(items)*3,
+	)
 	for i, item := range items {
 		if i > 0 {
 			values.WriteString(",")
 		}
 		base := i * 3
-		values.WriteString(fmt.Sprintf("($%d,$%d,$%d)", base+1, base+2, base+3))
-		args = append(args, item.SessionQuestion.ID, item.SessionQuestion.UserAnswer, item.SessionQuestion.IsCorrect)
+		values.WriteString(fmt.Sprintf(
+			"($%d,$%d,$%d)",
+			base+1,
+			base+2,
+			base+3,
+		))
+		arguments = append(
+			arguments,
+			item.SessionQuestion.ID,
+			item.SessionQuestion.UserAnswer,
+			item.SessionQuestion.IsCorrect,
+		)
 	}
 
-	query := fmt.Sprintf(`
+	query := fmt.Sprintf(
+		`
 		UPDATE session_questions AS sq
 		SET user_answer = v.user_answer::text,
 			is_correct = v.is_correct::boolean
 		FROM (VALUES %s) AS v(id, user_answer, is_correct)
 		WHERE sq.id = v.id::int
-	`, values.String())
-	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("ActiveSessionRepository.flushSessionQuestions count=%d: %w", len(items), err)
+	`,
+		values.String(),
+	)
+	if _, err := tx.ExecContext(
+		ctx,
+		query,
+		arguments...,
+	); err != nil {
+		return fmt.Errorf(
+			"ActiveSessionRepository.flushSessionQuestions count=%d: %w",
+			len(items),
+			err,
+		)
 	}
 	return nil
 }
@@ -332,20 +426,36 @@ type questionProgressFlushRow struct {
 	CorrectDelta int
 }
 
-func flushQuestionProgress(ctx context.Context, tx *sqlx.Tx, items []model.QuizActiveSessionQuestion) error {
-	query, args, count := buildQuestionProgressUpsert(items)
+func flushQuestionProgress(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	items []model.QuizActiveSessionQuestion,
+) error {
+	query, arguments, count := buildQuestionProgressUpsert(items)
 	if count == 0 {
 		return nil
 	}
-	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
-		return fmt.Errorf("ActiveSessionRepository.flushQuestionProgress count=%d: %w", count, err)
+	if _, err := tx.ExecContext(
+		ctx,
+		query,
+		arguments...,
+	); err != nil {
+		return fmt.Errorf(
+			"ActiveSessionRepository.flushQuestionProgress count=%d: %w",
+			count,
+			err,
+		)
 	}
 	return nil
 }
 
 func buildQuestionProgressUpsert(items []model.QuizActiveSessionQuestion) (string, []any, int) {
 	rowsByID := make(map[int]*questionProgressFlushRow)
-	ids := make([]int, 0, len(items))
+	ids := make(
+		[]int,
+		0,
+		len(items),
+	)
 	for _, item := range items {
 		if item.SessionQuestion.IsCorrect == nil {
 			continue
@@ -355,7 +465,10 @@ func buildQuestionProgressUpsert(items []model.QuizActiveSessionQuestion) (strin
 		if !ok {
 			row = &questionProgressFlushRow{Progress: item.Progress}
 			rowsByID[item.Question.ID] = row
-			ids = append(ids, item.Question.ID)
+			ids = append(
+				ids,
+				item.Question.ID,
+			)
 		}
 		row.Progress = item.Progress
 		row.ServedDelta++
@@ -368,18 +481,33 @@ func buildQuestionProgressUpsert(items []model.QuizActiveSessionQuestion) (strin
 	}
 
 	var values strings.Builder
-	args := make([]any, 0, len(ids)*9)
+	arguments := make(
+		[]any,
+		0,
+		len(ids)*9,
+	)
 	for i, id := range ids {
 		if i > 0 {
 			values.WriteString(",")
 		}
 		base := i * 9
-		values.WriteString(fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9))
+		values.WriteString(fmt.Sprintf(
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base+1,
+			base+2,
+			base+3,
+			base+4,
+			base+5,
+			base+6,
+			base+7,
+			base+8,
+			base+9,
+		))
 
 		row := rowsByID[id]
 		progress := row.Progress
-		args = append(args,
+		arguments = append(
+			arguments,
 			progress.UserID,
 			progress.QuestionID,
 			row.ServedDelta,
@@ -392,7 +520,8 @@ func buildQuestionProgressUpsert(items []model.QuizActiveSessionQuestion) (strin
 		)
 	}
 
-	query := fmt.Sprintf(`
+	query := fmt.Sprintf(
+		`
 		INSERT INTO user_question_progress (
 			user_id, question_id, times_served, times_correct, ease_factor,
 			interval_days, repetitions, next_review_at, last_reviewed_at
@@ -407,6 +536,8 @@ func buildQuestionProgressUpsert(items []model.QuizActiveSessionQuestion) (strin
 			next_review_at = EXCLUDED.next_review_at,
 			last_reviewed_at = EXCLUDED.last_reviewed_at,
 			updated_at = NOW()
-	`, values.String())
-	return query, args, len(ids)
+	`,
+		values.String(),
+	)
+	return query, arguments, len(ids)
 }

@@ -34,21 +34,21 @@ func newFakeInteractionsRedis() *fakeInteractionsRedis {
 	}
 }
 
-func (f *fakeInteractionsRedis) Get(
+func (fake *fakeInteractionsRedis) Get(
 	_ context.Context,
 	key string,
 ) *redis.StringCmd {
-	f.getKeys = append(
-		f.getKeys,
+	fake.getKeys = append(
+		fake.getKeys,
 		key,
 	)
-	if f.getErr != nil {
+	if fake.getErr != nil {
 		return redis.NewStringResult(
 			"",
-			f.getErr,
+			fake.getErr,
 		)
 	}
-	value, ok := f.values[key]
+	value, ok := fake.values[key]
 	if !ok {
 		return redis.NewStringResult(
 			"",
@@ -61,21 +61,21 @@ func (f *fakeInteractionsRedis) Get(
 	)
 }
 
-func (f *fakeInteractionsRedis) GetDel(
+func (fake *fakeInteractionsRedis) GetDel(
 	_ context.Context,
 	key string,
 ) *redis.StringCmd {
-	f.getDelKeys = append(
-		f.getDelKeys,
+	fake.getDelKeys = append(
+		fake.getDelKeys,
 		key,
 	)
-	if f.getDelErr != nil {
+	if fake.getDelErr != nil {
 		return redis.NewStringResult(
 			"",
-			f.getDelErr,
+			fake.getDelErr,
 		)
 	}
-	value, ok := f.values[key]
+	value, ok := fake.values[key]
 	if !ok {
 		return redis.NewStringResult(
 			"",
@@ -83,11 +83,11 @@ func (f *fakeInteractionsRedis) GetDel(
 		)
 	}
 	delete(
-		f.values,
+		fake.values,
 		key,
 	)
 	delete(
-		f.expiration,
+		fake.expiration,
 		key,
 	)
 	return redis.NewStringResult(
@@ -96,61 +96,61 @@ func (f *fakeInteractionsRedis) GetDel(
 	)
 }
 
-func (f *fakeInteractionsRedis) Set(
+func (fake *fakeInteractionsRedis) Set(
 	_ context.Context,
 	key string,
 	value any,
 	expiration time.Duration,
 ) *redis.StatusCmd {
-	f.setKeys = append(
-		f.setKeys,
+	fake.setKeys = append(
+		fake.setKeys,
 		key,
 	)
-	if f.setErr != nil {
+	if fake.setErr != nil {
 		return redis.NewStatusResult(
 			"",
-			f.setErr,
+			fake.setErr,
 		)
 	}
 	switch value := value.(type) {
 	case []byte:
-		f.values[key] = string(value)
+		fake.values[key] = string(value)
 	default:
-		f.values[key] = fmt.Sprint(value)
+		fake.values[key] = fmt.Sprint(value)
 	}
-	f.expiration[key] = expiration
+	fake.expiration[key] = expiration
 	return redis.NewStatusResult(
 		"OK",
 		nil,
 	)
 }
 
-func (f *fakeInteractionsRedis) Del(
+func (fake *fakeInteractionsRedis) Del(
 	_ context.Context,
 	keys ...string,
 ) *redis.IntCmd {
-	f.delCalls = append(
-		f.delCalls,
+	fake.delCalls = append(
+		fake.delCalls,
 		append(
 			[]string(nil),
 			keys...,
 		),
 	)
-	if f.delErr != nil {
+	if fake.delErr != nil {
 		return redis.NewIntResult(
 			0,
-			f.delErr,
+			fake.delErr,
 		)
 	}
 	var deleted int64
 	for _, key := range keys {
-		if _, ok := f.values[key]; ok {
+		if _, ok := fake.values[key]; ok {
 			delete(
-				f.values,
+				fake.values,
 				key,
 			)
 			delete(
-				f.expiration,
+				fake.expiration,
 				key,
 			)
 			deleted++
@@ -164,13 +164,13 @@ func (f *fakeInteractionsRedis) Del(
 
 func assertInteractionSet(
 	t *testing.T,
-	rdb *fakeInteractionsRedis,
+	redisClient *fakeInteractionsRedis,
 	key,
 	value string,
 	ttl time.Duration,
 ) {
 	t.Helper()
-	if got := rdb.values[key]; got != value {
+	if got := redisClient.values[key]; got != value {
 		t.Fatalf(
 			"Redis value for %q = %q, want %q",
 			key,
@@ -178,7 +178,7 @@ func assertInteractionSet(
 			value,
 		)
 	}
-	if got := rdb.expiration[key]; got != ttl {
+	if got := redisClient.expiration[key]; got != ttl {
 		t.Fatalf(
 			"Redis TTL for %q = %s, want %s",
 			key,
@@ -190,8 +190,8 @@ func assertInteractionSet(
 
 func TestLLMPendingFormatsAndConsumesOnce(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeInteractionsRedis()
-	store := NewInteractions(rdb)
+	redisClient := newFakeInteractionsRedis()
+	store := NewInteractions(redisClient)
 	cases := []struct {
 		userID int64
 		input  model.PendingLLMInput
@@ -210,51 +210,51 @@ func TestLLMPendingFormatsAndConsumesOnce(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
+	for _, testCase := range cases {
 		key := fmt.Sprintf(
 			"user:%d:llm_pending",
-			tc.userID,
+			testCase.userID,
 		)
 		if err := store.SetLLMPending(
 			ctx,
-			tc.userID,
-			tc.input,
+			testCase.userID,
+			testCase.input,
 		); err != nil {
 			t.Fatalf(
 				"SetLLMPending(%d) error = %v",
-				tc.userID,
+				testCase.userID,
 				err,
 			)
 		}
 		assertInteractionSet(
 			t,
-			rdb,
+			redisClient,
 			key,
-			tc.value,
+			testCase.value,
 			10*time.Minute,
 		)
 
 		got, found, err := store.TakeLLMPending(
 			ctx,
-			tc.userID,
+			testCase.userID,
 		)
-		if err != nil || !found || got != tc.input {
+		if err != nil || !found || got != testCase.input {
 			t.Fatalf(
 				"TakeLLMPending(%d) = %+v, %t, %v; want %+v, true, nil",
-				tc.userID,
+				testCase.userID,
 				got,
 				found,
 				err,
-				tc.input,
+				testCase.input,
 			)
 		}
 		if _, found, err := store.TakeLLMPending(
 			ctx,
-			tc.userID,
+			testCase.userID,
 		); err != nil || found {
 			t.Fatalf(
 				"second TakeLLMPending(%d) = found %t, error %v; want missing",
-				tc.userID,
+				testCase.userID,
 				found,
 				err,
 			)
@@ -262,7 +262,7 @@ func TestLLMPendingFormatsAndConsumesOnce(t *testing.T) {
 	}
 
 	malformedKey := "user:13:llm_pending"
-	rdb.values[malformedKey] = "q:bad:3"
+	redisClient.values[malformedKey] = "q:bad:3"
 	got, found, err := store.TakeLLMPending(
 		ctx,
 		13,
@@ -292,12 +292,12 @@ func TestLLMPendingFormatsAndConsumesOnce(t *testing.T) {
 		malformedKey, malformedKey,
 	}
 	if !reflect.DeepEqual(
-		rdb.getDelKeys,
+		redisClient.getDelKeys,
 		wantGetDelKeys,
 	) {
 		t.Fatalf(
 			"pending GetDel keys = %v, want %v",
-			rdb.getDelKeys,
+			redisClient.getDelKeys,
 			wantGetDelKeys,
 		)
 	}
@@ -305,11 +305,11 @@ func TestLLMPendingFormatsAndConsumesOnce(t *testing.T) {
 
 func TestActiveQuestionAndClearInputContracts(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeInteractionsRedis()
-	store := NewInteractions(rdb)
+	redisClient := newFakeInteractionsRedis()
+	store := NewInteractions(redisClient)
 	chatID, userID := int64(123), int64(456)
 	activeKey, pendingKey := "user:123:active_question", "user:456:llm_pending"
-	question := model.ActiveQuestionRef{SessionID: 51, QuestionIndex: 2}
+	question := model.ActiveQuestionReference{SessionID: 51, QuestionIndex: 2}
 
 	if err := store.SetActiveQuestion(
 		ctx,
@@ -323,7 +323,7 @@ func TestActiveQuestionAndClearInputContracts(t *testing.T) {
 	}
 	assertInteractionSet(
 		t,
-		rdb,
+		redisClient,
 		activeKey,
 		"51:2",
 		time.Hour,
@@ -340,11 +340,11 @@ func TestActiveQuestionAndClearInputContracts(t *testing.T) {
 			question,
 		)
 	}
-	if len(rdb.getKeys) != 1 || rdb.getKeys[0] != activeKey || len(rdb.getDelKeys) != 0 {
+	if len(redisClient.getKeys) != 1 || redisClient.getKeys[0] != activeKey || len(redisClient.getDelKeys) != 0 {
 		t.Fatalf(
 			"active question reads: GET %v, GETDEL %v; want GET only",
-			rdb.getKeys,
-			rdb.getDelKeys,
+			redisClient.getKeys,
+			redisClient.getDelKeys,
 		)
 	}
 	if err := store.DeleteActiveQuestion(
@@ -357,12 +357,12 @@ func TestActiveQuestionAndClearInputContracts(t *testing.T) {
 		)
 	}
 	if !reflect.DeepEqual(
-		rdb.delCalls[len(rdb.delCalls)-1],
+		redisClient.delCalls[len(redisClient.delCalls)-1],
 		[]string{activeKey},
 	) {
 		t.Fatalf(
 			"DeleteActiveQuestion() keys = %v, want [%s]",
-			rdb.delCalls[len(rdb.delCalls)-1],
+			redisClient.delCalls[len(redisClient.delCalls)-1],
 			activeKey,
 		)
 	}
@@ -398,21 +398,21 @@ func TestActiveQuestionAndClearInputContracts(t *testing.T) {
 		)
 	}
 	if !reflect.DeepEqual(
-		rdb.delCalls[len(rdb.delCalls)-1],
+		redisClient.delCalls[len(redisClient.delCalls)-1],
 		[]string{activeKey, pendingKey},
 	) {
 		t.Fatalf(
 			"ClearInput(with user) keys = %v, want active question and pending keys",
-			rdb.delCalls[len(rdb.delCalls)-1],
+			redisClient.delCalls[len(redisClient.delCalls)-1],
 		)
 	}
-	if _, exists := rdb.values[activeKey]; exists {
+	if _, exists := redisClient.values[activeKey]; exists {
 		t.Fatalf(
 			"ClearInput(with user) left %q",
 			activeKey,
 		)
 	}
-	if _, exists := rdb.values[pendingKey]; exists {
+	if _, exists := redisClient.values[pendingKey]; exists {
 		t.Fatalf(
 			"ClearInput(with user) left %q",
 			pendingKey,
@@ -450,23 +450,23 @@ func TestActiveQuestionAndClearInputContracts(t *testing.T) {
 		)
 	}
 	if !reflect.DeepEqual(
-		rdb.delCalls[len(rdb.delCalls)-1],
+		redisClient.delCalls[len(redisClient.delCalls)-1],
 		[]string{activeKey},
 	) {
 		t.Fatalf(
 			"ClearInput(without user) keys = %v, want only active question key",
-			rdb.delCalls[len(rdb.delCalls)-1],
+			redisClient.delCalls[len(redisClient.delCalls)-1],
 		)
 	}
-	if _, ok := rdb.values[pendingKey]; !ok {
+	if _, ok := redisClient.values[pendingKey]; !ok {
 		t.Fatal("ClearInput(without user) deleted the user pending key")
 	}
 }
 
 func TestWordOrderDraftFormatAndCorruptCleanup(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeInteractionsRedis()
-	store := NewInteractions(rdb)
+	redisClient := newFakeInteractionsRedis()
+	store := NewInteractions(redisClient)
 	key := "session:12:word_order:4:draft"
 	want := []int{2, 0, 1}
 
@@ -483,7 +483,7 @@ func TestWordOrderDraftFormatAndCorruptCleanup(t *testing.T) {
 	}
 	assertInteractionSet(
 		t,
-		rdb,
+		redisClient,
 		key,
 		"[2,0,1]",
 		24*time.Hour,
@@ -505,7 +505,7 @@ func TestWordOrderDraftFormatAndCorruptCleanup(t *testing.T) {
 		)
 	}
 
-	rdb.values[key] = "{malformed"
+	redisClient.values[key] = "{malformed"
 	got, err = store.GetWordOrderDraft(
 		ctx,
 		12,
@@ -518,15 +518,15 @@ func TestWordOrderDraftFormatAndCorruptCleanup(t *testing.T) {
 			err,
 		)
 	}
-	if _, exists := rdb.values[key]; exists {
+	if _, exists := redisClient.values[key]; exists {
 		t.Fatalf(
 			"GetWordOrderDraft(corrupt) left %q",
 			key,
 		)
 	}
 
-	rdb.values[key] = "{malformed"
-	rdb.delErr = errors.New("redis delete unavailable")
+	redisClient.values[key] = "{malformed"
+	redisClient.delErr = errors.New("redis delete unavailable")
 	got, err = store.GetWordOrderDraft(
 		ctx,
 		12,
@@ -540,12 +540,12 @@ func TestWordOrderDraftFormatAndCorruptCleanup(t *testing.T) {
 		)
 	}
 	if !reflect.DeepEqual(
-		rdb.delCalls[len(rdb.delCalls)-1],
+		redisClient.delCalls[len(redisClient.delCalls)-1],
 		[]string{key},
 	) {
 		t.Fatalf(
 			"corrupt draft delete keys = %v, want [%s]",
-			rdb.delCalls[len(rdb.delCalls)-1],
+			redisClient.delCalls[len(redisClient.delCalls)-1],
 			key,
 		)
 	}
@@ -553,16 +553,16 @@ func TestWordOrderDraftFormatAndCorruptCleanup(t *testing.T) {
 
 func TestMessageAndSessionMetadataContracts(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeInteractionsRedis()
-	store := NewInteractions(rdb)
-	ref := model.TelegramMessageRef{ChatID: -100123, MessageID: 45}
+	redisClient := newFakeInteractionsRedis()
+	store := NewInteractions(redisClient)
+	messageReference := model.TelegramMessageReference{ChatID: -100123, MessageID: 45}
 	messageKey := "handwriting:msg:7:9"
 
 	if err := store.SaveHandwritingMessage(
 		ctx,
 		7,
 		9,
-		ref,
+		messageReference,
 	); err != nil {
 		t.Fatalf(
 			"SaveHandwritingMessage() error = %v",
@@ -571,44 +571,44 @@ func TestMessageAndSessionMetadataContracts(t *testing.T) {
 	}
 	assertInteractionSet(
 		t,
-		rdb,
+		redisClient,
 		messageKey,
 		"-100123:45",
 		time.Hour,
 	)
-	gotRef, err := store.GetHandwritingMessage(
+	gotReference, err := store.GetHandwritingMessage(
 		ctx,
 		7,
 		9,
 	)
-	if err != nil || gotRef == nil || *gotRef != ref {
+	if err != nil || gotReference == nil || *gotReference != messageReference {
 		t.Fatalf(
 			"GetHandwritingMessage() = %+v, %v; want %+v, nil",
-			gotRef,
+			gotReference,
 			err,
-			ref,
+			messageReference,
 		)
 	}
-	missingRef, err := store.GetHandwritingMessage(
+	missingReference, err := store.GetHandwritingMessage(
 		ctx,
 		7,
 		10,
 	)
-	if err != nil || missingRef != nil {
+	if err != nil || missingReference != nil {
 		t.Fatalf(
 			"GetHandwritingMessage(missing) = %+v, %v; want nil, nil",
-			missingRef,
+			missingReference,
 			err,
 		)
 	}
-	rdb.values["handwriting:msg:7:11"] = "invalid"
+	redisClient.values["handwriting:msg:7:11"] = "invalid"
 	if _, err := store.GetHandwritingMessage(
 		ctx,
 		7,
 		11,
 	); !errors.Is(
 		err,
-		model.ErrInvalidTelegramMessageRef,
+		model.ErrInvalidTelegramMessageReference,
 	) {
 		t.Fatalf(
 			"GetHandwritingMessage(invalid) error = %v, want invalid reference",
@@ -629,7 +629,7 @@ func TestMessageAndSessionMetadataContracts(t *testing.T) {
 	}
 	assertInteractionSet(
 		t,
-		rdb,
+		redisClient,
 		fingerprintKey,
 		"ab12cd34",
 		24*time.Hour,
@@ -646,7 +646,7 @@ func TestMessageAndSessionMetadataContracts(t *testing.T) {
 	}
 
 	getErr := errors.New("redis read unavailable")
-	rdb.getErr = getErr
+	redisClient.getErr = getErr
 	if _, err := store.GetHandwritingMessage(
 		ctx,
 		7,

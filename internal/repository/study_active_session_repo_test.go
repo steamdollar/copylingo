@@ -36,7 +36,10 @@ func TestStudySessionFromRowMapsParentSession(t *testing.T) {
 		session.CorrectCount != 0 ||
 		session.StartedAt != &startedAt ||
 		session.CompletedAt != &completedAt {
-		t.Fatalf("unexpected session mapping: %+v", session)
+		t.Fatalf(
+			"unexpected session mapping: %+v",
+			session,
+		)
 	}
 }
 
@@ -54,7 +57,11 @@ func TestStudyMaterialPreferenceCompletionPostgres(t *testing.T) {
 		`INSERT INTO sessions (id,user_id,mode,created_at) VALUES (1,42,'study',NOW()-INTERVAL '1 hour')`,
 		`INSERT INTO session_materials (id,session_id,material_id) SELECT id,1,id FROM materials`,
 	} {
-		mustPreferenceExec(t, tx, query)
+		mustPreferenceExec(
+			t,
+			tx,
+			query,
+		)
 	}
 	studied := time.Now()
 	state := &model.StudyActiveSessionState{Session: model.Session{ID: 1, UserID: 42}}
@@ -63,28 +70,59 @@ func TestStudyMaterialPreferenceCompletionPostgres(t *testing.T) {
 		if id == 5 {
 			at = nil
 		}
-		state.Items = append(state.Items, model.StudySessionMaterial{
-			SessionMaterial: model.SessionMaterial{ID: id, SessionID: 1, MaterialID: id, StudiedAt: at},
-			Material:        model.Material{ID: id},
-		})
+		state.Items = append(
+			state.Items,
+			model.StudySessionMaterial{
+				SessionMaterial: model.SessionMaterial{ID: id, SessionID: 1, MaterialID: id, StudiedAt: at},
+				Material:        model.Material{ID: id},
+			},
+		)
 	}
-	flushed, err := markStudySessionCompleted(ctx, tx, state)
+	flushed, err := markStudySessionCompleted(
+		ctx,
+		tx,
+		state,
+	)
 	if err != nil || !flushed {
-		t.Fatalf("mark complete: %v, %v", flushed, err)
+		t.Fatalf(
+			"mark complete: %v, %v",
+			flushed,
+			err,
+		)
 	}
-	if err := flushStudySessionMaterials(ctx, tx, state.Items); err != nil {
+	if err := flushStudySessionMaterials(
+		ctx,
+		tx,
+		state.Items,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if err := flushUserMaterialProgress(ctx, tx, state); err != nil {
+	if err := flushUserMaterialProgress(
+		ctx,
+		tx,
+		state,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if err := flushStudyMaterialPreferences(ctx, tx, 1); err != nil {
+	if err := flushStudyMaterialPreferences(
+		ctx,
+		tx,
+		1,
+	); err != nil {
 		t.Fatal(err)
 	}
-	repo := &MaterialPreferenceRepository{db: tx}
-	got, err := repo.Get(ctx, 42, 1)
+	repository := &MaterialPreferenceRepository{db: tx}
+	got, err := repository.Get(
+		ctx,
+		42,
+		1,
+	)
 	if err != nil || got.CheckIntervalDays != 60 {
-		t.Fatalf("study granted mastery: %+v, %v", got, err)
+		t.Fatalf(
+			"study granted mastery: %+v, %v",
+			got,
+			err,
+		)
 	}
 	var delta float64
 	if err := tx.GetContext(
@@ -95,7 +133,10 @@ func TestStudyMaterialPreferenceCompletionPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	if delta != 60 {
-		t.Fatalf("study interval=%v, want unchanged 60", delta)
+		t.Fatalf(
+			"study interval=%v, want unchanged 60",
+			delta,
+		)
 	}
 	for _, id := range []int{2, 3, 4, 5} {
 		var untouched bool
@@ -108,22 +149,57 @@ func TestStudyMaterialPreferenceCompletionPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !untouched {
-			t.Fatalf("study changed excluded/stale/unviewed preference %d", id)
+			t.Fatalf(
+				"study changed excluded/stale/unviewed preference %d",
+				id,
+			)
 		}
 	}
-	other, err := repo.Get(ctx, 99, 1)
+	other, err := repository.Get(
+		ctx,
+		99,
+		1,
+	)
 	if err != nil || other.CheckIntervalDays != 30 || other.NextCheckAt == nil || !other.NextCheckAt.Before(studied) {
-		t.Fatalf("other user changed: %+v, %v", other, err)
+		t.Fatalf(
+			"other user changed: %+v, %v",
+			other,
+			err,
+		)
 	}
-	flushed, err = markStudySessionCompleted(ctx, tx, state)
+	flushed, err = markStudySessionCompleted(
+		ctx,
+		tx,
+		state,
+	)
 	if err != nil || flushed {
-		t.Fatalf("duplicate study completion: %v, %v", flushed, err)
+		t.Fatalf(
+			"duplicate study completion: %v, %v",
+			flushed,
+			err,
+		)
 	}
-	if err := flushStudyMaterialPreferences(ctx, tx, 1); err != nil {
+	if err := flushStudyMaterialPreferences(
+		ctx,
+		tx,
+		1,
+	); err != nil {
 		t.Fatal(err)
 	}
-	after, err := repo.Get(ctx, 42, 1)
-	if err != nil || !reflect.DeepEqual(got, after) {
-		t.Fatalf("study replay changed preference: %+v -> %+v, %v", got, after, err)
+	after, err := repository.Get(
+		ctx,
+		42,
+		1,
+	)
+	if err != nil || !reflect.DeepEqual(
+		got,
+		after,
+	) {
+		t.Fatalf(
+			"study replay changed preference: %+v -> %+v, %v",
+			got,
+			after,
+			err,
+		)
 	}
 }

@@ -9,14 +9,14 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type analyzerUserRepo interface {
+type analyzerUserRepository interface {
 	GetByID(
 		ctx context.Context,
 		id int64,
 	) (*model.User, error)
 }
 
-type sessionStatRepo interface {
+type sessionStatsRepository interface {
 	GetTodayStats(
 		ctx context.Context,
 		userID int64,
@@ -27,7 +27,7 @@ type sessionStatRepo interface {
 	) (map[string]float64, error)
 }
 
-type materialProgressRepo interface {
+type materialProgressRepository interface {
 	GetLevelProgress(
 		ctx context.Context,
 		userID int64,
@@ -37,29 +37,29 @@ type materialProgressRepo interface {
 
 // AnalyzerService provides learning analytics and recommendations.
 type AnalyzerService struct {
-	userRepo            analyzerUserRepo
-	sessionQuestionRepo sessionStatRepo
-	materialRepo        materialProgressRepo
+	userRepository            analyzerUserRepository
+	sessionQuestionRepository sessionStatsRepository
+	materialRepository        materialProgressRepository
 }
 
 func NewAnalyzerService(
-	userRepo analyzerUserRepo,
-	sessionQuestionRepo sessionStatRepo,
-	materialRepo materialProgressRepo,
+	userRepository analyzerUserRepository,
+	sessionQuestionRepository sessionStatsRepository,
+	materialRepository materialProgressRepository,
 ) *AnalyzerService {
 	return &AnalyzerService{
-		userRepo:            userRepo,
-		sessionQuestionRepo: sessionQuestionRepo,
-		materialRepo:        materialRepo,
+		userRepository:            userRepository,
+		sessionQuestionRepository: sessionQuestionRepository,
+		materialRepository:        materialRepository,
 	}
 }
 
 // GetUserStats returns comprehensive learning statistics.
-func (a *AnalyzerService) GetUserStats(
+func (service *AnalyzerService) GetUserStats(
 	ctx context.Context,
 	userID int64,
 ) (*model.UserStats, error) {
-	user, err := a.userRepo.GetByID(
+	user, err := service.userRepository.GetByID(
 		ctx,
 		userID,
 	)
@@ -67,7 +67,7 @@ func (a *AnalyzerService) GetUserStats(
 		return nil, err
 	}
 
-	todayTotal, todayCorrect, err := a.sessionQuestionRepo.GetTodayStats(
+	todayTotal, todayCorrect, err := service.sessionQuestionRepository.GetTodayStats(
 		ctx,
 		userID,
 	)
@@ -75,7 +75,7 @@ func (a *AnalyzerService) GetUserStats(
 		return nil, err
 	}
 
-	categoryAcc, err := a.sessionQuestionRepo.GetCategoryAccuracy(
+	categoryAccuracy, err := service.sessionQuestionRepository.GetCategoryAccuracy(
 		ctx,
 		userID,
 	)
@@ -88,11 +88,11 @@ func (a *AnalyzerService) GetUserStats(
 		CurrentStreak:      user.StreakDays,
 		TodayQuestions:     todayTotal,
 		TodayCorrect:       todayCorrect,
-		VocabularyAccuracy: categoryAcc[string(model.CategoryVocabulary)],
-		GrammarAccuracy:    categoryAcc[string(model.CategoryGrammar)],
-		KanjiAccuracy:      categoryAcc[string(model.CategoryKanji)],
-		ReadingAccuracy:    categoryAcc[string(model.CategoryReading)],
-		ListeningAccuracy:  categoryAcc[string(model.CategoryListening)],
+		VocabularyAccuracy: categoryAccuracy[string(model.CategoryVocabulary)],
+		GrammarAccuracy:    categoryAccuracy[string(model.CategoryGrammar)],
+		KanjiAccuracy:      categoryAccuracy[string(model.CategoryKanji)],
+		ReadingAccuracy:    categoryAccuracy[string(model.CategoryReading)],
+		ListeningAccuracy:  categoryAccuracy[string(model.CategoryListening)],
 	}
 
 	// Overall accuracy
@@ -106,11 +106,11 @@ func (a *AnalyzerService) GetUserStats(
 // GetLevelProgress returns, for each level of the user's language, the share
 // of materials studied at least once. Japanese levels run NZ → N1; other
 // languages keep the repository's lexical order.
-func (a *AnalyzerService) GetLevelProgress(
+func (service *AnalyzerService) GetLevelProgress(
 	ctx context.Context,
 	userID int64,
 ) ([]model.LevelProgress, error) {
-	user, err := a.userRepo.GetByID(
+	user, err := service.userRepository.GetByID(
 		ctx,
 		userID,
 	)
@@ -122,7 +122,7 @@ func (a *AnalyzerService) GetLevelProgress(
 		)
 	}
 
-	progress, err := a.materialRepo.GetLevelProgress(
+	progress, err := service.materialRepository.GetLevelProgress(
 		ctx,
 		userID,
 		user.Language,

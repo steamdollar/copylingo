@@ -22,19 +22,19 @@ type fakeHandwritingScreen struct {
 	hasDeadline bool
 }
 
-func (f *fakeHandwritingScreen) ShowHandwritingGraded(
+func (fake *fakeHandwritingScreen) ShowHandwritingGraded(
 	ctx context.Context,
 	sessionID,
 	questionID int,
 ) {
-	f.sessionID = sessionID
-	f.questionID = questionID
-	_, f.hasDeadline = ctx.Deadline()
+	fake.sessionID = sessionID
+	fake.questionID = questionID
+	_, fake.hasDeadline = ctx.Deadline()
 }
 
 func TestRefreshHandwritingMessageReportsGradedQuestionWithTimeout(t *testing.T) {
 	screen := &fakeHandwritingScreen{}
-	handler := NewHandler(HandlerDeps{HandwritingScreen: screen})
+	handler := NewHandler(HandlerDependencies{HandwritingScreen: screen})
 
 	handler.refreshHandwritingMessage(
 		context.Background(),
@@ -56,28 +56,28 @@ const oneStrokeSubmitBody = `{"init_data":"dummy","session_id":1,"question_id":1
 
 // mockQuizSession fakes service.SessionService's Mini App surface.
 type mockQuizSession struct {
-	submitHandwritingFn func(
+	submitHandwritingFunc func(
 		ctx context.Context,
-		req service.HandwritingSubmitRequest,
+		request service.HandwritingSubmitRequest,
 	) (*service.HandwritingSubmitResult, error)
 }
 
-func (m *mockQuizSession) SubmitHandwriting(
+func (mock *mockQuizSession) SubmitHandwriting(
 	ctx context.Context,
-	req service.HandwritingSubmitRequest,
+	request service.HandwritingSubmitRequest,
 ) (*service.HandwritingSubmitResult, error) {
-	return m.submitHandwritingFn(
+	return mock.submitHandwritingFunc(
 		ctx,
-		req,
+		request,
 	)
 }
 
 type mockVerifier struct {
-	verifyFn func(initData string) (*TelegramUser, error)
+	verifyFunc func(initData string) (*TelegramUser, error)
 }
 
-func (m *mockVerifier) Verify(initData string) (*TelegramUser, error) {
-	return m.verifyFn(initData)
+func (mock *mockVerifier) Verify(initData string) (*TelegramUser, error) {
+	return mock.verifyFunc(initData)
 }
 
 func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
@@ -124,51 +124,51 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 			tt.name,
 			func(t *testing.T) {
 				handwriting := &mockQuizSession{
-					submitHandwritingFn: func(
+					submitHandwritingFunc: func(
 						ctx context.Context,
-						req service.HandwritingSubmitRequest,
+						request service.HandwritingSubmitRequest,
 					) (*service.HandwritingSubmitResult, error) {
 						return nil, tt.serviceErr
 					},
 				}
 				verifier := &mockVerifier{
-					verifyFn: func(initData string) (*TelegramUser, error) {
+					verifyFunc: func(initData string) (*TelegramUser, error) {
 						return &TelegramUser{ID: 123}, nil
 					},
 				}
-				handler := NewHandler(HandlerDeps{
+				handler := NewHandler(HandlerDependencies{
 					Session:           handwriting,
 					Verifier:          verifier,
 					HandwritingScreen: &fakeHandwritingScreen{},
 				})
 
-				w := httptest.NewRecorder()
-				c, _ := gin.CreateTestContext(w)
-				reqBody := oneStrokeSubmitBody
-				c.Request, _ = http.NewRequest(
+				recorder := httptest.NewRecorder()
+				ginContext, _ := gin.CreateTestContext(recorder)
+				requestBody := oneStrokeSubmitBody
+				ginContext.Request, _ = http.NewRequest(
 					"POST",
 					"/api/miniapp/handwriting/submit",
-					strings.NewReader(reqBody),
+					strings.NewReader(requestBody),
 				)
-				c.Request.Header.Set(
+				ginContext.Request.Header.Set(
 					"Content-Type",
 					"application/json",
 				)
 
-				handler.SubmitHandwriting(c)
+				handler.SubmitHandwriting(ginContext)
 
-				if w.Code != tt.wantStatus {
+				if recorder.Code != tt.wantStatus {
 					t.Errorf(
 						"expected status %d, got %d",
 						tt.wantStatus,
-						w.Code,
+						recorder.Code,
 					)
 				}
 
-				var resp map[string]string
+				var response map[string]string
 				if err := json.Unmarshal(
-					w.Body.Bytes(),
-					&resp,
+					recorder.Body.Bytes(),
+					&response,
 				); err != nil {
 					t.Fatalf(
 						"failed to unmarshal response: %v",
@@ -176,7 +176,7 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 					)
 				}
 
-				if got := resp["error"]; got != tt.wantBody {
+				if got := response["error"]; got != tt.wantBody {
 					t.Errorf(
 						"expected error message %q, got %q",
 						tt.wantBody,
@@ -185,12 +185,12 @@ func TestSubmitHandwriting_ErrorSanitization(t *testing.T) {
 				}
 
 				if tt.notWantInBody != "" && strings.Contains(
-					w.Body.String(),
+					recorder.Body.String(),
 					tt.notWantInBody,
 				) {
 					t.Errorf(
 						"response leaked sensitive information: %s",
-						w.Body.String(),
+						recorder.Body.String(),
 					)
 				}
 			},
@@ -204,19 +204,19 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 	t.Run(
 		"invalid json",
 		func(t *testing.T) {
-			handler := NewHandler(HandlerDeps{})
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request, _ = http.NewRequest(
+			handler := NewHandler(HandlerDependencies{})
+			recorder := httptest.NewRecorder()
+			ginContext, _ := gin.CreateTestContext(recorder)
+			ginContext.Request, _ = http.NewRequest(
 				"POST",
 				"/submit",
 				strings.NewReader(`{invalid`),
 			)
-			handler.SubmitHandwriting(c)
-			if w.Code != http.StatusBadRequest {
+			handler.SubmitHandwriting(ginContext)
+			if recorder.Code != http.StatusBadRequest {
 				t.Errorf(
 					"expected 400, got %d",
-					w.Code,
+					recorder.Code,
 				)
 			}
 		},
@@ -226,28 +226,28 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 		"auth failure",
 		func(t *testing.T) {
 			verifier := &mockVerifier{
-				verifyFn: func(initData string) (*TelegramUser, error) {
+				verifyFunc: func(initData string) (*TelegramUser, error) {
 					return nil, errors.New("auth failed")
 				},
 			}
-			handler := NewHandler(HandlerDeps{Verifier: verifier})
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			reqBody := `{"init_data":"bad","session_id":1,"question_id":1,"strokes":[]}`
-			c.Request, _ = http.NewRequest(
+			handler := NewHandler(HandlerDependencies{Verifier: verifier})
+			recorder := httptest.NewRecorder()
+			ginContext, _ := gin.CreateTestContext(recorder)
+			requestBody := `{"init_data":"bad","session_id":1,"question_id":1,"strokes":[]}`
+			ginContext.Request, _ = http.NewRequest(
 				"POST",
 				"/submit",
-				strings.NewReader(reqBody),
+				strings.NewReader(requestBody),
 			)
-			c.Request.Header.Set(
+			ginContext.Request.Header.Set(
 				"Content-Type",
 				"application/json",
 			)
-			handler.SubmitHandwriting(c)
-			if w.Code != http.StatusUnauthorized {
+			handler.SubmitHandwriting(ginContext)
+			if recorder.Code != http.StatusUnauthorized {
 				t.Errorf(
 					"expected 401, got %d",
-					w.Code,
+					recorder.Code,
 				)
 			}
 		},
@@ -257,61 +257,61 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 		"success",
 		func(t *testing.T) {
 			handwriting := &mockQuizSession{
-				submitHandwritingFn: func(
+				submitHandwritingFunc: func(
 					ctx context.Context,
-					req service.HandwritingSubmitRequest,
+					request service.HandwritingSubmitRequest,
 				) (*service.HandwritingSubmitResult, error) {
 					if !bytes.HasPrefix(
-						req.Image,
+						request.Image,
 						[]byte("\x89PNG"),
 					) {
 						t.Errorf(
 							"service got %d bytes, want a rendered PNG",
-							len(req.Image),
+							len(request.Image),
 						)
 					}
 					return &service.HandwritingSubmitResult{IsCorrect: true}, nil
 				},
 			}
 			verifier := &mockVerifier{
-				verifyFn: func(initData string) (*TelegramUser, error) {
+				verifyFunc: func(initData string) (*TelegramUser, error) {
 					return &TelegramUser{ID: 123}, nil
 				},
 			}
-			handler := NewHandler(HandlerDeps{
+			handler := NewHandler(HandlerDependencies{
 				Session:           handwriting,
 				Verifier:          verifier,
 				HandwritingScreen: &fakeHandwritingScreen{},
 			})
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			reqBody := oneStrokeSubmitBody
-			c.Request, _ = http.NewRequest(
+			recorder := httptest.NewRecorder()
+			ginContext, _ := gin.CreateTestContext(recorder)
+			requestBody := oneStrokeSubmitBody
+			ginContext.Request, _ = http.NewRequest(
 				"POST",
 				"/submit",
-				strings.NewReader(reqBody),
+				strings.NewReader(requestBody),
 			)
-			c.Request.Header.Set(
+			ginContext.Request.Header.Set(
 				"Content-Type",
 				"application/json",
 			)
 
-			handler.SubmitHandwriting(c)
+			handler.SubmitHandwriting(ginContext)
 
-			if w.Code != http.StatusOK {
+			if recorder.Code != http.StatusOK {
 				t.Errorf(
 					"expected 200, got %d",
-					w.Code,
+					recorder.Code,
 				)
 			}
 			if !strings.Contains(
-				w.Body.String(),
+				recorder.Body.String(),
 				`"is_correct":true`,
 			) {
 				t.Errorf(
 					"unexpected body: %s",
-					w.Body.String(),
+					recorder.Body.String(),
 				)
 			}
 		},
@@ -321,9 +321,9 @@ func TestSubmitHandwriting_AuthAndBind(t *testing.T) {
 // Empty strokes cannot be rendered, so the request is rejected before grading.
 func TestSubmitHandwriting_EmptyStrokesRejectedBeforeGrading(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewHandler(HandlerDeps{
+	handler := NewHandler(HandlerDependencies{
 		Session: &mockQuizSession{
-			submitHandwritingFn: func(
+			submitHandwritingFunc: func(
 				context.Context,
 				service.HandwritingSubmitRequest,
 			) (*service.HandwritingSubmitResult, error) {
@@ -332,30 +332,30 @@ func TestSubmitHandwriting_EmptyStrokesRejectedBeforeGrading(t *testing.T) {
 			},
 		},
 		Verifier: &mockVerifier{
-			verifyFn: func(string) (*TelegramUser, error) {
+			verifyFunc: func(string) (*TelegramUser, error) {
 				return &TelegramUser{ID: 123}, nil
 			},
 		},
 	})
 
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(
+	recorder := httptest.NewRecorder()
+	ginContext, _ := gin.CreateTestContext(recorder)
+	ginContext.Request, _ = http.NewRequest(
 		"POST",
 		"/submit",
 		strings.NewReader(`{"init_data":"dummy","session_id":1,"question_id":1,"strokes":[]}`),
 	)
-	c.Request.Header.Set(
+	ginContext.Request.Header.Set(
 		"Content-Type",
 		"application/json",
 	)
 
-	handler.SubmitHandwriting(c)
+	handler.SubmitHandwriting(ginContext)
 
-	if w.Code != http.StatusBadRequest {
+	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf(
 			"status = %d, want 400",
-			w.Code,
+			recorder.Code,
 		)
 	}
 }

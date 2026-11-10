@@ -12,13 +12,13 @@ func TestLevelProgressPercentRoundsDown(t *testing.T) {
 		{name: "almost done", progress: LevelProgress{TotalMaterials: 1000, StudiedMaterials: 999}, want: 99},
 		{name: "done", progress: LevelProgress{TotalMaterials: 800, StudiedMaterials: 800}, want: 100},
 	}
-	for _, tc := range cases {
-		if got := tc.progress.Percent(); got != tc.want {
+	for _, testCase := range cases {
+		if got := testCase.progress.Percent(); got != testCase.want {
 			t.Errorf(
 				"%s: Percent() = %d, want %d",
-				tc.name,
+				testCase.name,
 				got,
-				tc.want,
+				testCase.want,
 			)
 		}
 	}

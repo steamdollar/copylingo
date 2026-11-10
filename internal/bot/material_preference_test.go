@@ -14,7 +14,7 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-type botMaterialPreferenceRepo struct {
+type botMaterialPreferenceRepository struct {
 	items     map[[2]int64]model.MaterialPreference
 	getCalls  int
 	setCalls  int
@@ -24,50 +24,50 @@ type botMaterialPreferenceRepo struct {
 	listLimit int
 }
 
-func (r *botMaterialPreferenceRepo) Get(
+func (repository *botMaterialPreferenceRepository) Get(
 	_ context.Context,
 	userID int64,
 	materialID int,
 ) (*model.MaterialPreference, error) {
-	r.getCalls++
-	item, ok := r.items[[2]int64{userID, int64(materialID)}]
+	repository.getCalls++
+	item, ok := repository.items[[2]int64{userID, int64(materialID)}]
 	if !ok {
 		return nil, nil
 	}
 	return &item, nil
 }
 
-func (r *botMaterialPreferenceRepo) Set(
+func (repository *botMaterialPreferenceRepository) Set(
 	_ context.Context,
 	userID int64,
 	materialID int,
 	mode model.MaterialReviewMode,
 ) error {
-	r.setCalls++
+	repository.setCalls++
 	key := [2]int64{userID, int64(materialID)}
 	if mode == model.MaterialReviewNormal {
 		delete(
-			r.items,
+			repository.items,
 			key,
 		)
 		return nil
 	}
-	item := r.items[key]
+	item := repository.items[key]
 	item.UserID, item.MaterialID, item.ReviewMode = userID, materialID, mode
-	r.items[key] = item
+	repository.items[key] = item
 	return nil
 }
 
-func (r *botMaterialPreferenceRepo) List(
+func (repository *botMaterialPreferenceRepository) List(
 	_ context.Context,
 	userID int64,
 	offset,
 	limit int,
 ) ([]model.MaterialPreference, error) {
-	r.listCalls++
-	r.listUser, r.listStart, r.listLimit = userID, offset, limit
+	repository.listCalls++
+	repository.listUser, repository.listStart, repository.listLimit = userID, offset, limit
 	var items []model.MaterialPreference
-	for _, item := range r.items {
+	for _, item := range repository.items {
 		if item.UserID == userID {
 			items = append(
 				items,
@@ -110,9 +110,9 @@ func preferenceCallback(
 
 func newPreferenceStudyBot(
 	t *testing.T,
-) (*StudyFlow, *botMaterialPreferenceRepo, *testInteractionStores, *botStudyActiveRepo) {
+) (*StudyFlow, *botMaterialPreferenceRepository, *testInteractionStores, *botStudyActiveRepository) {
 	t.Helper()
-	activeRepo := &botStudyActiveRepo{
+	activeRepository := &botStudyActiveRepository{
 		session: &model.Session{ID: 77, UserID: 42, Mode: model.SessionModeStudy, Status: model.SessionInProgress},
 		items: []model.StudySessionMaterial{
 			studyItem(
@@ -144,7 +144,7 @@ func newPreferenceStudyBot(
 	stateStores := newTestInteractionStores()
 	session := newTestSessionService(
 		stateStores,
-		service.SessionDeps{StudyActiveSessionRepo: activeRepo},
+		service.SessionDependencies{StudyActiveSessionRepository: activeRepository},
 	)
 	if _, err := session.StudyProgress(
 		context.Background(),
@@ -153,19 +153,19 @@ func newPreferenceStudyBot(
 	); err != nil {
 		t.Fatal(err)
 	}
-	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
+	repository := &botMaterialPreferenceRepository{items: make(map[[2]int64]model.MaterialPreference)}
 	flow := newTestStudyFlow(
 		&mockBotAPI{},
 		nil,
-		StudyFlowDeps{
+		StudyFlowDependencies{
 			Session:            session,
-			MaterialPreference: service.NewMaterialPreferenceService(repo),
+			MaterialPreference: service.NewMaterialPreferenceService(repository),
 		},
 	)
-	return flow, repo, stateStores, activeRepo
+	return flow, repository, stateStores, activeRepository
 }
 
-func newPreferenceQuizBot(t *testing.T) (*SessionFlow, *botMaterialPreferenceRepo, *testInteractionStores) {
+func newPreferenceQuizBot(t *testing.T) (*SessionFlow, *botMaterialPreferenceRepository, *testInteractionStores) {
 	t.Helper()
 	linkedMaterialID := 10
 	stateStores := newTestInteractionStores()
@@ -187,24 +187,24 @@ func newPreferenceQuizBot(t *testing.T) (*SessionFlow, *botMaterialPreferenceRep
 			},
 		},
 	)
-	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
+	repository := &botMaterialPreferenceRepository{items: make(map[[2]int64]model.MaterialPreference)}
 	flow := newTestSessionFlow(
 		&mockBotAPI{},
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
-			MaterialPreference: service.NewMaterialPreferenceService(repo),
+			MaterialPreference: service.NewMaterialPreferenceService(repository),
 			PublicBaseURL:      "https://example.com",
 		},
 	)
-	return flow, repo, stateStores
+	return flow, repository, stateStores
 }
 
 func TestQuizMaterialPreferenceUsesSharedMenuAndPreservesSession(t *testing.T) {
-	flow, repo, stateStores := newPreferenceQuizBot(t)
+	flow, repository, stateStores := newPreferenceQuizBot(t)
 	before, err := stateStores.quiz.Load(
 		context.Background(),
 		77,
@@ -231,10 +231,10 @@ func TestQuizMaterialPreferenceUsesSharedMenuAndPreservesSession(t *testing.T) {
 			),
 		)
 	}
-	if repo.getCalls != 0 || repo.setCalls != 0 {
+	if repository.getCalls != 0 || repository.setCalls != 0 {
 		t.Fatalf(
 			"unauthorized or invalid callback reached preferences: %+v",
-			repo,
+			repository,
 		)
 	}
 	// Buttons sent before this change open the menu instead of excluding directly.
@@ -245,10 +245,10 @@ func TestQuizMaterialPreferenceUsesSharedMenuAndPreservesSession(t *testing.T) {
 			42,
 		),
 	)
-	if repo.getCalls != 1 || repo.setCalls != 0 {
+	if repository.getCalls != 1 || repository.setCalls != 0 {
 		t.Fatalf(
 			"opening the menu changed the preference: %+v",
-			repo,
+			repository,
 		)
 	}
 	messages := flow.telegram.api.(*mockBotAPI).sentMessages
@@ -328,10 +328,10 @@ func TestQuizMaterialPreferenceUsesSharedMenuAndPreservesSession(t *testing.T) {
 		)
 	}
 	// Choosing normal last removes the stored row; no row means normal.
-	if _, stored := repo.items[[2]int64{42, 10}]; repo.setCalls != 3 || stored {
+	if _, stored := repository.items[[2]int64{42, 10}]; repository.setCalls != 3 || stored {
 		t.Fatalf(
 			"Quiz preference choices did not update linked material: %+v",
-			repo,
+			repository,
 		)
 	}
 	after, err := stateStores.quiz.Load(
@@ -347,7 +347,7 @@ func TestQuizMaterialPreferenceUsesSharedMenuAndPreservesSession(t *testing.T) {
 }
 
 func TestQuizMaterialPreferenceCloseDeletesOnlyMenuMessage(t *testing.T) {
-	flow, repo, _ := newPreferenceQuizBot(t)
+	flow, repository, _ := newPreferenceQuizBot(t)
 	api := flow.telegram.api.(*mockBotAPI)
 	flow.HandleAnswerCallback(
 		context.Background(),
@@ -356,10 +356,10 @@ func TestQuizMaterialPreferenceCloseDeletesOnlyMenuMessage(t *testing.T) {
 			42,
 		),
 	)
-	if repo.getCalls != 0 || repo.setCalls != 0 || len(api.sentMessages) != 0 {
+	if repository.getCalls != 0 || repository.setCalls != 0 || len(api.sentMessages) != 0 {
 		t.Fatalf(
 			"close touched preferences or sent a message: repo=%+v sent=%+v",
-			repo,
+			repository,
 			api.sentMessages,
 		)
 	}
@@ -505,7 +505,7 @@ func TestQuizMaterialPreferenceButtonFollowsLinkedQuestions(t *testing.T) {
 }
 
 func TestStudyMaterialPreferenceDoesNotChangeSessionProgress(t *testing.T) {
-	flow, repo, stateStores, activeRepo := newPreferenceStudyBot(t)
+	flow, repository, stateStores, activeRepository := newPreferenceStudyBot(t)
 	before, err := stateStores.study.Load(
 		context.Background(),
 		77,
@@ -541,17 +541,17 @@ func TestStudyMaterialPreferenceDoesNotChangeSessionProgress(t *testing.T) {
 				got,
 			)
 		}
-		if activeRepo.flushedState != nil {
+		if activeRepository.flushedState != nil {
 			t.Fatalf(
 				"%s flushed Study progress",
 				data,
 			)
 		}
 	}
-	if repo.getCalls != 1 || repo.setCalls != 3 || len(repo.items) != 0 {
+	if repository.getCalls != 1 || repository.setCalls != 3 || len(repository.items) != 0 {
 		t.Fatalf(
 			"unexpected preference operations: %+v",
-			repo,
+			repository,
 		)
 	}
 	edit := lastEditMessage(
@@ -573,7 +573,7 @@ func TestStudyMaterialPreferenceDoesNotChangeSessionProgress(t *testing.T) {
 }
 
 func TestStudyMaterialPreferenceRequiresOwnerAndMembership(t *testing.T) {
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name string
 		data string
 		user int64
@@ -585,20 +585,20 @@ func TestStudyMaterialPreferenceRequiresOwnerAndMembership(t *testing.T) {
 		{"forged session", "study:999:policy:10:excluded", 42},
 	} {
 		t.Run(
-			tc.name,
+			testCase.name,
 			func(t *testing.T) {
-				flow, repo, _, _ := newPreferenceStudyBot(t)
+				flow, repository, _, _ := newPreferenceStudyBot(t)
 				flow.HandleCallback(
 					context.Background(),
 					preferenceCallback(
-						tc.data,
-						tc.user,
+						testCase.data,
+						testCase.user,
 					),
 				)
-				if repo.getCalls != 0 || repo.setCalls != 0 {
+				if repository.getCalls != 0 || repository.setCalls != 0 {
 					t.Fatalf(
 						"unauthorized access reached preference service: %+v",
-						repo,
+						repository,
 					)
 				}
 			},
@@ -652,9 +652,9 @@ func TestStudyMaterialPreferenceEscapesHTMLAndExplainsMaintenance(t *testing.T) 
 }
 
 func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
-	repo := &botMaterialPreferenceRepo{items: make(map[[2]int64]model.MaterialPreference)}
+	repository := &botMaterialPreferenceRepository{items: make(map[[2]int64]model.MaterialPreference)}
 	for materialID := 1; materialID <= 9; materialID++ {
-		repo.items[[2]int64{42, int64(materialID)}] = model.MaterialPreference{
+		repository.items[[2]int64{42, int64(materialID)}] = model.MaterialPreference{
 			UserID:     42,
 			MaterialID: materialID,
 			MaterialTitle: fmt.Sprintf(
@@ -665,18 +665,18 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 		}
 	}
 	otherKey := [2]int64{43, 9}
-	repo.items[otherKey] = model.MaterialPreference{
+	repository.items[otherKey] = model.MaterialPreference{
 		UserID:        43,
 		MaterialID:    9,
 		MaterialTitle: "other-user-secret",
 		ReviewMode:    model.MaterialReviewExcluded,
 	}
 	api := &mockBotAPI{}
-	b := newTestSettingsFlow(
+	flow := newTestSettingsFlow(
 		api,
-		SettingsFlowDeps{MaterialPreference: service.NewMaterialPreferenceService(repo)},
+		SettingsFlowDependencies{MaterialPreference: service.NewMaterialPreferenceService(repository)},
 	)
-	b.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		preferenceCallback(
 			"settings:materials:0",
@@ -687,10 +687,12 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 		t,
 		api,
 	)
-	if repo.listCalls != 1 || repo.listUser != 42 || repo.listStart != 0 || repo.listLimit != 9 || repo.getCalls != 0 {
+	if repository.listCalls != 1 || repository.listUser != 42 || repository.listStart != 0 ||
+		repository.listLimit != 9 ||
+		repository.getCalls != 0 {
 		t.Fatalf(
 			"expected one user-scoped batch query: %+v",
-			repo,
+			repository,
 		)
 	}
 	if !strings.Contains(
@@ -719,7 +721,7 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 		) {
 		t.Fatal("incorrect first page navigation")
 	}
-	b.handleSettingsCallback(
+	flow.handleSettingsCallback(
 		context.Background(),
 		preferenceCallback(
 			"settings:materials:1",
@@ -730,7 +732,7 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 		t,
 		api,
 	)
-	if repo.listStart != 8 || !strings.Contains(
+	if repository.listStart != 8 || !strings.Contains(
 		edit.Text,
 		"item 9",
 	) ||
@@ -748,7 +750,7 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 		)
 	}
 	for i := 0; i < 2; i++ {
-		b.handleSettingsCallback(
+		flow.handleSettingsCallback(
 			context.Background(),
 			preferenceCallback(
 				"settings:restore:9:1",
@@ -756,10 +758,10 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 			),
 		)
 	}
-	if _, ok := repo.items[[2]int64{42, 9}]; ok {
+	if _, ok := repository.items[[2]int64{42, 9}]; ok {
 		t.Fatal("current user's preference was not restored")
 	}
-	if repo.items[otherKey].ReviewMode != model.MaterialReviewExcluded {
+	if repository.items[otherKey].ReviewMode != model.MaterialReviewExcluded {
 		t.Fatal("restore changed another user's preference")
 	}
 	edit = lastEditMessage(
@@ -786,7 +788,7 @@ func TestMaterialPreferencesListPaginationAndUserScopedRestore(t *testing.T) {
 }
 
 func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
-	flow, repo, _, _ := newPreferenceStudyBot(t)
+	flow, repository, _, _ := newPreferenceStudyBot(t)
 	for _, data := range []string{
 		"study:77:policy", "study:77:policy:0", "study:77:policy:-1", "study:77:policy:10:bogus",
 		"study:77:policy:10:normal:extra", "study:77:policy:10:", "study:0:policy:10:normal",
@@ -804,11 +806,11 @@ func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
 			),
 		)
 	}
-	b := newTestSettingsFlow(
+	settingsFlow := newTestSettingsFlow(
 		nil,
-		SettingsFlowDeps{
+		SettingsFlowDependencies{
 			Telegram:           flow.telegram,
-			MaterialPreference: service.NewMaterialPreferenceService(repo),
+			MaterialPreference: service.NewMaterialPreferenceService(repository),
 		},
 	)
 	for _, data := range []string{
@@ -821,7 +823,7 @@ func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
 			int(^uint(0)>>1),
 		),
 	} {
-		b.handleSettingsCallback(
+		settingsFlow.handleSettingsCallback(
 			context.Background(),
 			preferenceCallback(
 				data,
@@ -829,10 +831,10 @@ func TestMaterialPreferenceCallbacksRejectMalformedInput(t *testing.T) {
 			),
 		)
 	}
-	if repo.getCalls != 0 || repo.setCalls != 0 || repo.listCalls != 0 {
+	if repository.getCalls != 0 || repository.setCalls != 0 || repository.listCalls != 0 {
 		t.Fatalf(
 			"malformed callback reached preference repository: %+v",
-			repo,
+			repository,
 		)
 	}
 }

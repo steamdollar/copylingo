@@ -35,17 +35,17 @@ type sessionRedis interface {
 // Use NewQuizSessions or NewStudySessions to configure its state type and key.
 // The zero value is not ready for use.
 type SessionStore[T any] struct {
-	rdb      sessionRedis
-	key      func(sessionID int) string
-	name     string
-	validate func(
+	redisClient sessionRedis
+	key         func(sessionID int) string
+	name        string
+	validate    func(
 		state *T,
 		sessionID int,
 	) bool
 }
 
 func newSessionStore[T any](
-	rdb sessionRedis,
+	redisClient sessionRedis,
 	key func(int) string,
 	name string,
 	validate func(
@@ -53,17 +53,17 @@ func newSessionStore[T any](
 		int,
 	) bool,
 ) *SessionStore[T] {
-	return &SessionStore[T]{rdb: rdb, key: key, name: name, validate: validate}
+	return &SessionStore[T]{redisClient: redisClient, key: key, name: name, validate: validate}
 }
 
 // Load rejects malformed JSON and state that fails the configured validator.
-func (s *SessionStore[T]) Load(
+func (store *SessionStore[T]) Load(
 	ctx context.Context,
 	sessionID int,
 ) (*T, error) {
-	raw, err := s.rdb.Get(
+	raw, err := store.redisClient.Get(
 		ctx,
-		s.key(sessionID),
+		store.key(sessionID),
 	).Result()
 	if errors.Is(
 		err,
@@ -78,7 +78,7 @@ func (s *SessionStore[T]) Load(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"load %s session state session_id=%d: %w",
-			s.name,
+			store.name,
 			sessionID,
 			err,
 		)
@@ -89,17 +89,17 @@ func (s *SessionStore[T]) Load(
 		[]byte(raw),
 		&state,
 	); err != nil {
-		return nil, s.deleteCorrupt(
+		return nil, store.deleteCorrupt(
 			ctx,
 			sessionID,
 			err,
 		)
 	}
-	if s.validate != nil && !s.validate(
+	if store.validate != nil && !store.validate(
 		&state,
 		sessionID,
 	) {
-		return nil, s.deleteCorrupt(
+		return nil, store.deleteCorrupt(
 			ctx,
 			sessionID,
 			nil,
@@ -108,7 +108,7 @@ func (s *SessionStore[T]) Load(
 	return &state, nil
 }
 
-func (s *SessionStore[T]) deleteCorrupt(
+func (store *SessionStore[T]) deleteCorrupt(
 	ctx context.Context,
 	sessionID int,
 	cause error,
@@ -125,7 +125,7 @@ func (s *SessionStore[T]) deleteCorrupt(
 			cause,
 		)
 	}
-	if deleteErr := s.Delete(
+	if deleteErr := store.Delete(
 		ctx,
 		sessionID,
 	); deleteErr != nil {
@@ -138,7 +138,7 @@ func (s *SessionStore[T]) deleteCorrupt(
 }
 
 // Save writes a JSON snapshot and renews the existing session TTL.
-func (s *SessionStore[T]) Save(
+func (store *SessionStore[T]) Save(
 	ctx context.Context,
 	sessionID int,
 	state *T,
@@ -147,20 +147,20 @@ func (s *SessionStore[T]) Save(
 	if err != nil {
 		return fmt.Errorf(
 			"marshal %s session state session_id=%d: %w",
-			s.name,
+			store.name,
 			sessionID,
 			err,
 		)
 	}
-	if err := s.rdb.Set(
+	if err := store.redisClient.Set(
 		ctx,
-		s.key(sessionID),
+		store.key(sessionID),
 		raw,
 		sessionWorkingSetTTL,
 	).Err(); err != nil {
 		return fmt.Errorf(
 			"save %s session state session_id=%d: %w",
-			s.name,
+			store.name,
 			sessionID,
 			err,
 		)
@@ -169,17 +169,17 @@ func (s *SessionStore[T]) Save(
 }
 
 // Delete removes working state after completion or corruption handling.
-func (s *SessionStore[T]) Delete(
+func (store *SessionStore[T]) Delete(
 	ctx context.Context,
 	sessionID int,
 ) error {
-	if err := s.rdb.Del(
+	if err := store.redisClient.Del(
 		ctx,
-		s.key(sessionID),
+		store.key(sessionID),
 	).Err(); err != nil {
 		return fmt.Errorf(
 			"delete %s session state session_id=%d: %w",
-			s.name,
+			store.name,
 			sessionID,
 			err,
 		)

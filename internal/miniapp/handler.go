@@ -20,7 +20,7 @@ import (
 type quizSession interface {
 	SubmitHandwriting(
 		ctx context.Context,
-		req service.HandwritingSubmitRequest,
+		request service.HandwritingSubmitRequest,
 	) (*service.HandwritingSubmitResult, error)
 }
 
@@ -45,7 +45,7 @@ type Handler struct {
 	handwritingScreen handwritingScreen
 }
 
-type HandlerDeps struct {
+type HandlerDependencies struct {
 	Session           quizSession
 	Verifier          verifier
 	HandwritingScreen handwritingScreen
@@ -58,64 +58,64 @@ type handwritingSubmitRequest struct {
 	Strokes    []Stroke `json:"strokes"     binding:"required"`
 }
 
-func NewHandler(deps HandlerDeps) *Handler {
+func NewHandler(dependencies HandlerDependencies) *Handler {
 	return &Handler{
-		session:           deps.Session,
-		verifier:          deps.Verifier,
-		handwritingScreen: deps.HandwritingScreen,
+		session:           dependencies.Session,
+		verifier:          dependencies.Verifier,
+		handwritingScreen: dependencies.HandwritingScreen,
 	}
 }
 
 // RegisterRoutes serves the handwriting Mini App assets and its API on handler,
 // which cmd/server builds with its dependencies.
 func RegisterRoutes(
-	r *gin.Engine,
+	router *gin.Engine,
 	handler *Handler,
 ) {
-	r.Static(
+	router.Static(
 		"/miniapp/handwriting/assets",
 		"./web/miniapp/handwriting",
 	)
-	r.GET(
+	router.GET(
 		config.PathHandwritingMiniApp,
-		func(c *gin.Context) {
-			c.File("./web/miniapp/handwriting/index.html")
+		func(ginContext *gin.Context) {
+			ginContext.File("./web/miniapp/handwriting/index.html")
 		},
 	)
-	r.POST(
+	router.POST(
 		config.PathHandwritingSubmit,
 		handler.SubmitHandwriting,
 	)
 }
 
-func (h *Handler) SubmitHandwriting(c *gin.Context) {
+func (handler *Handler) SubmitHandwriting(ginContext *gin.Context) {
 	startedAt := time.Now()
-	ctx := observability.WithAttrs(
-		c.Request.Context(),
+	ctx := observability.WithAttributes(
+		ginContext.Request.Context(),
 		slog.String(
 			"source",
 			"miniapp.handwriting",
 		),
 	)
 
-	var req handwritingSubmitRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(
+	var request handwritingSubmitRequest
+	if err := ginContext.ShouldBindJSON(&request); err != nil {
+		ginContext.JSON(
 			http.StatusBadRequest,
 			gin.H{"error": "invalid request"},
 		)
 		return
 	}
 
-	user, err := h.verifier.Verify(req.InitData)
+	user, err := handler.verifier.Verify(request.InitData)
 	if err != nil {
-		c.JSON(
+		ginContext.JSON(
 			http.StatusUnauthorized,
 			gin.H{"error": "invalid telegram init data"},
 		)
 		return
 	}
-	ctx = observability.WithAttrs(
+	ctx = observability.WithAttributes(
 		ctx,
 		slog.Int64(
 			"user_id",
@@ -123,18 +123,18 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 		),
 		slog.Int(
 			"session_id",
-			req.SessionID,
+			request.SessionID,
 		),
 		slog.Int(
 			"question_id",
-			req.QuestionID,
+			request.QuestionID,
 		),
 	)
 
-	result, err := h.renderAndSubmit(
+	result, err := handler.renderAndSubmit(
 		ctx,
 		user.ID,
-		req,
+		request,
 	)
 	if err != nil {
 		publicErr := handwritingPublicError(err)
@@ -148,7 +148,7 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 			"error",
 			err,
 		)
-		c.JSON(
+		ginContext.JSON(
 			publicErr.status,
 			gin.H{"error": publicErr.message},
 		)
@@ -167,13 +167,13 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 	)
 
 	// Refresh Telegram message buttons in background
-	go h.refreshHandwritingMessage(
+	go handler.refreshHandwritingMessage(
 		context.WithoutCancel(ctx),
-		req.SessionID,
-		req.QuestionID,
+		request.SessionID,
+		request.QuestionID,
 	)
 
-	c.JSON(
+	ginContext.JSON(
 		http.StatusOK,
 		result,
 	)
@@ -181,24 +181,24 @@ func (h *Handler) SubmitHandwriting(c *gin.Context) {
 
 // renderAndSubmit turns the strokes into the PNG the service grades. Strokes
 // are this Mini App's input format, so the service only ever sees the image.
-func (h *Handler) renderAndSubmit(
+func (handler *Handler) renderAndSubmit(
 	ctx context.Context,
 	userID int64,
-	req handwritingSubmitRequest,
+	request handwritingSubmitRequest,
 ) (*service.HandwritingSubmitResult, error) {
-	image, err := RenderStrokesPNG(req.Strokes)
+	image, err := RenderStrokesPNG(request.Strokes)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"render handwriting strokes: %w",
 			err,
 		)
 	}
-	return h.session.SubmitHandwriting(
+	return handler.session.SubmitHandwriting(
 		ctx,
 		service.HandwritingSubmitRequest{
 			UserID:     userID,
-			SessionID:  req.SessionID,
-			QuestionID: req.QuestionID,
+			SessionID:  request.SessionID,
+			QuestionID: request.QuestionID,
 			Image:      image,
 		},
 	)
@@ -239,12 +239,12 @@ func handwritingPublicError(err error) publicError {
 	}
 }
 
-func (h *Handler) refreshHandwritingMessage(
+func (handler *Handler) refreshHandwritingMessage(
 	parent context.Context,
 	sessionID,
 	questionID int,
 ) {
-	parent = observability.WithAttrs(
+	parent = observability.WithAttributes(
 		parent,
 		slog.String(
 			"source",
@@ -265,7 +265,7 @@ func (h *Handler) refreshHandwritingMessage(
 	)
 	defer cancel()
 
-	h.handwritingScreen.ShowHandwritingGraded(
+	handler.handwritingScreen.ShowHandwritingGraded(
 		ctx,
 		sessionID,
 		questionID,

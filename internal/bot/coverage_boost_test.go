@@ -29,66 +29,66 @@ func storeActiveState(
 	)
 }
 
-// streakRepoStub satisfies SessionService's user repo (UpdateStreak).
-type streakRepoStub struct {
+// streakRepositoryStub satisfies SessionService's user repo (UpdateStreak).
+type streakRepositoryStub struct {
 	updated bool
 }
 
-func (g *streakRepoStub) UpdateStreak(
+func (stub *streakRepositoryStub) UpdateStreak(
 	ctx context.Context,
 	userID int64,
 ) error {
-	g.updated = true
+	stub.updated = true
 	return nil
 }
 
-// activeRepoStub satisfies the active session repository for Flush.
-type activeRepoStub struct {
+// activeRepositoryStub satisfies the active session repository for Flush.
+type activeRepositoryStub struct {
 	flushed bool
 }
 
-func (a *activeRepoStub) LoadQuestionSessionWithStateBySessionID(
+func (stub *activeRepositoryStub) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
 	return nil, nil
 }
-func (a *activeRepoStub) FlushQuizActiveSession(
+func (stub *activeRepositoryStub) FlushQuizActiveSession(
 	ctx context.Context,
 	state *model.QuizActiveSessionState,
 ) error {
-	a.flushed = true
+	stub.flushed = true
 	return nil
 }
 
 // botWithActive wires a SessionFlow whose QuizActiveSession + Grader use the given repo/redis.
 func botWithActive(
 	stateStores *testInteractionStores,
-	repo *activeRepoStub,
-	userRepo *streakRepoStub,
+	repository *activeRepositoryStub,
+	userRepository *streakRepositoryStub,
 ) (*SessionFlow, *mockBotAPI) {
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{
-					QuizActiveSessionRepo: repo,
-					UserRepo:              userRepo,
-					LLM:                   &mockLLM{},
+				service.SessionDependencies{
+					QuizActiveSessionRepository: repository,
+					UserRepository:              userRepository,
+					LLM:                         &mockLLM{},
 				},
 			),
 		},
 	)
-	return sf, mAPI
+	return sessionFlow, mockAPI
 }
 
-func cbWithMessage(
+func callbackWithMessage(
 	data string,
 	chatID int64,
-	msgID int,
+	messageID int,
 	userID int64,
 ) *tgbotapi.CallbackQuery {
 	return &tgbotapi.CallbackQuery{
@@ -96,24 +96,24 @@ func cbWithMessage(
 		From: &tgbotapi.User{ID: userID},
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: chatID},
-			MessageID: msgID,
+			MessageID: messageID,
 		},
 	}
 }
 
-func collectText(msgs []tgbotapi.Chattable) string {
-	var sb strings.Builder
-	for _, m := range msgs {
-		switch v := m.(type) {
+func collectText(messages []tgbotapi.Chattable) string {
+	var builder strings.Builder
+	for _, chattable := range messages {
+		switch chattable := chattable.(type) {
 		case tgbotapi.MessageConfig:
-			sb.WriteString(v.Text)
-			sb.WriteString("\n")
+			builder.WriteString(chattable.Text)
+			builder.WriteString("\n")
 		case tgbotapi.EditMessageTextConfig:
-			sb.WriteString(v.Text)
-			sb.WriteString("\n")
+			builder.WriteString(chattable.Text)
+			builder.WriteString("\n")
 		}
 	}
-	return sb.String()
+	return builder.String()
 }
 
 // --- finishSession ---------------------------------------------------------
@@ -121,12 +121,12 @@ func collectText(msgs []tgbotapi.Chattable) string {
 func TestFinishSession_Summary(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	repo := &activeRepoStub{}
-	userRepo := &streakRepoStub{}
-	sf, mAPI := botWithActive(
+	repository := &activeRepositoryStub{}
+	userRepository := &streakRepositoryStub{}
+	sessionFlow, mockAPI := botWithActive(
 		stateStores,
-		repo,
-		userRepo,
+		repository,
+		userRepository,
 	)
 
 	sessionID := 10
@@ -142,7 +142,11 @@ func TestFinishSession_Summary(t *testing.T) {
 				Question:        model.Question{ID: 1, Type: model.QuestionMultipleChoice},
 			},
 			{
-				SessionQuestion: model.SessionQuestion{QuestionID: 2, IsCorrect: &wrong, UserAnswer: ptr("banana")},
+				SessionQuestion: model.SessionQuestion{
+					QuestionID: 2,
+					IsCorrect:  &wrong,
+					UserAnswer: stringPointer("banana"),
+				},
 				Question: model.Question{
 					ID:            2,
 					Type:          model.QuestionMultipleChoice,
@@ -159,25 +163,25 @@ func TestFinishSession_Summary(t *testing.T) {
 		state,
 	)
 
-	cb := cbWithMessage(
+	callbackQuery := callbackWithMessage(
 		"session:10:finish",
 		123,
 		456,
 		userID,
 	)
-	sf.finishSession(
+	sessionFlow.finishSession(
 		ctx,
-		cb,
+		callbackQuery,
 		sessionID,
 	)
 
-	if !repo.flushed {
+	if !repository.flushed {
 		t.Error("expected FlushActiveSession to be called")
 	}
-	if !userRepo.updated {
+	if !userRepository.updated {
 		t.Error("expected UpdateStreak to be called")
 	}
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"세션 완료",
@@ -212,12 +216,12 @@ func TestFinishSession_Summary(t *testing.T) {
 func TestHandleSessionCallback_Finish(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	repo := &activeRepoStub{}
-	userRepo := &streakRepoStub{}
-	sf, mAPI := botWithActive(
+	repository := &activeRepositoryStub{}
+	userRepository := &streakRepositoryStub{}
+	sessionFlow, mockAPI := botWithActive(
 		stateStores,
-		repo,
-		userRepo,
+		repository,
+		userRepository,
 	)
 
 	sessionID := 11
@@ -240,9 +244,9 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 		state,
 	)
 
-	sf.HandleSessionCallback(
+	sessionFlow.HandleSessionCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"session:11:finish",
 			123,
 			456,
@@ -250,26 +254,26 @@ func TestHandleSessionCallback_Finish(t *testing.T) {
 		),
 	)
 
-	if !repo.flushed {
+	if !repository.flushed {
 		t.Error("expected finish action to flush the session")
 	}
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected summary message")
 	}
 }
 
 func TestHandleSessionCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	sf, _ := botWithActive(
+	sessionFlow, _ := botWithActive(
 		newTestInteractionStores(),
-		&activeRepoStub{},
-		&streakRepoStub{},
+		&activeRepositoryStub{},
+		&streakRepositoryStub{},
 	)
 
 	// fewer than 3 parts -> early return, must not panic
-	sf.HandleSessionCallback(
+	sessionFlow.HandleSessionCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"session:onlytwo",
 			1,
 			2,
@@ -277,9 +281,9 @@ func TestHandleSessionCallback_BadData(t *testing.T) {
 		),
 	)
 	// non-numeric session id -> early return
-	sf.HandleSessionCallback(
+	sessionFlow.HandleSessionCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"session:abc:start",
 			1,
 			2,
@@ -293,16 +297,16 @@ func TestHandleSessionCallback_BadData(t *testing.T) {
 func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	repo := &activeRepoStub{}
-	sf, mAPI := botWithActive(
+	repository := &activeRepositoryStub{}
+	sessionFlow, mockAPI := botWithActive(
 		stateStores,
-		repo,
-		&streakRepoStub{},
+		repository,
+		&streakRepositoryStub{},
 	)
 
 	sessionID := 20
 	questionID := 5
-	opts, _ := json.Marshal([]string{"apple", "banana"})
+	options, _ := json.Marshal([]string{"apple", "banana"})
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID, UserID: 1},
@@ -311,7 +315,7 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 				SessionQuestion: model.SessionQuestion{QuestionID: questionID},
 				Question: model.Question{
 					ID: questionID, Type: model.QuestionMultipleChoice,
-					Options: opts, CorrectAnswer: "apple", Explanation: "fruit",
+					Options: options, CorrectAnswer: "apple", Explanation: "fruit",
 				},
 			},
 		},
@@ -323,11 +327,11 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 		state,
 	)
 
-	// q:{session}:{question}:{optionIdx} -> select option 0 ("apple", correct)
+	// q:{session}:{question}:{optionIndex} -> select option 0 ("apple", correct)
 	data := "q:20:5:0"
-	sf.HandleAnswerCallback(
+	sessionFlow.HandleAnswerCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			data,
 			123,
 			456,
@@ -335,7 +339,7 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 		),
 	)
 
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"정답",
@@ -350,10 +354,10 @@ func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	sf, mAPI := botWithActive(
+	sessionFlow, mockAPI := botWithActive(
 		stateStores,
-		&activeRepoStub{},
-		&streakRepoStub{},
+		&activeRepositoryStub{},
+		&streakRepositoryStub{},
 	)
 
 	sessionID := 21
@@ -375,9 +379,9 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 	)
 
 	// q:{session}:next:{idx} with current question unanswered -> prompt to submit first
-	sf.HandleAnswerCallback(
+	sessionFlow.HandleAnswerCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"q:21:next:0",
 			123,
 			456,
@@ -385,7 +389,7 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 		),
 	)
 
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"손글씨",
@@ -399,16 +403,16 @@ func TestHandleAnswerCallback_NextBeforeAnswering(t *testing.T) {
 
 func TestHandleAnswerCallback_BadData(t *testing.T) {
 	ctx := context.Background()
-	sf, _ := botWithActive(
+	sessionFlow, _ := botWithActive(
 		newTestInteractionStores(),
-		&activeRepoStub{},
-		&streakRepoStub{},
+		&activeRepositoryStub{},
+		&streakRepositoryStub{},
 	)
 
 	// fewer than 4 parts -> early return, no panic
-	sf.HandleAnswerCallback(
+	sessionFlow.HandleAnswerCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"q:20:5",
 			1,
 			2,
@@ -416,9 +420,9 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 		),
 	)
 	// non-numeric session id
-	sf.HandleAnswerCallback(
+	sessionFlow.HandleAnswerCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"q:x:5:0",
 			1,
 			2,
@@ -432,14 +436,14 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	sf, mAPI := botWithActive(
+	sessionFlow, mockAPI := botWithActive(
 		stateStores,
-		&activeRepoStub{},
-		&streakRepoStub{},
+		&activeRepositoryStub{},
+		&streakRepositoryStub{},
 	)
 
 	sessionID := 30
-	opts, _ := json.Marshal([]string{"A", "B", "C", "D"})
+	options, _ := json.Marshal([]string{"A", "B", "C", "D"})
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID, UserID: 1},
@@ -450,7 +454,7 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 					ID:      1,
 					Type:    model.QuestionMultipleChoice,
 					Prompt:  "Pick one",
-					Options: opts,
+					Options: options,
 				},
 			},
 		},
@@ -462,7 +466,7 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 		state,
 	)
 
-	sf.showQuestion(
+	sessionFlow.showQuestion(
 		ctx,
 		123,
 		nil,
@@ -470,37 +474,37 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 		0,
 	)
 
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected a question message")
 	}
-	msg, ok := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	message, ok := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !ok {
 		t.Fatalf(
 			"expected MessageConfig, got %T",
-			mAPI.sentMessages[0],
+			mockAPI.sentMessages[0],
 		)
 	}
 	if !strings.Contains(
-		msg.Text,
+		message.Text,
 		"Pick one",
 	) {
 		t.Errorf(
 			"expected prompt text, got %q",
-			msg.Text,
+			message.Text,
 		)
 	}
-	kb, ok := msg.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
+	keyboard, ok := message.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
 	if !ok {
 		t.Fatalf(
 			"expected inline keyboard, got %T",
-			msg.ReplyMarkup,
+			message.ReplyMarkup,
 		)
 	}
 	// 4 options -> 2 rows of 2
-	if len(kb.InlineKeyboard) != 2 {
+	if len(keyboard.InlineKeyboard) != 2 {
 		t.Errorf(
 			"expected 2 option rows, got %d",
-			len(kb.InlineKeyboard),
+			len(keyboard.InlineKeyboard),
 		)
 	}
 }
@@ -508,10 +512,10 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	sf, mAPI := botWithActive(
+	sessionFlow, mockAPI := botWithActive(
 		stateStores,
-		&activeRepoStub{},
-		&streakRepoStub{},
+		&activeRepositoryStub{},
+		&streakRepositoryStub{},
 	)
 
 	sessionID := 31
@@ -529,8 +533,8 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 		state,
 	)
 
-	// questionIdx beyond items -> finish button branch
-	sf.showQuestion(
+	// questionIndex beyond items -> finish button branch
+	sessionFlow.showQuestion(
 		ctx,
 		123,
 		nil,
@@ -538,7 +542,7 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 		5,
 	)
 
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"모든 문제를 풀었습니다",
@@ -554,10 +558,10 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 
 func TestProcessAnswerText_Wrong(t *testing.T) {
 	stateStores := newTestInteractionStores()
-	sf, mAPI := botWithActive(
+	sessionFlow, mockAPI := botWithActive(
 		stateStores,
-		&activeRepoStub{},
-		&streakRepoStub{},
+		&activeRepositoryStub{},
+		&streakRepositoryStub{},
 	)
 
 	sessionID, questionID := 40, 1
@@ -585,7 +589,7 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 
 	answerByText(
 		t,
-		sf,
+		sessionFlow,
 		stateStores,
 		123,
 		&tgbotapi.User{ID: 1},
@@ -594,7 +598,7 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 		"banana",
 	)
 
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"오답",
@@ -617,33 +621,33 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 
 // --- handler.go stats/streak/menu paths ------------------------------------
 
-type analyzerUserRepoStub struct{ streak int }
+type analyzerUserRepositoryStub struct{ streak int }
 
-func (a *analyzerUserRepoStub) GetByID(
+func (stub *analyzerUserRepositoryStub) GetByID(
 	ctx context.Context,
 	id int64,
 ) (*model.User, error) {
-	return &model.User{ID: id, StreakDays: a.streak, Language: "ja", ProficiencyLevel: "N5"}, nil
+	return &model.User{ID: id, StreakDays: stub.streak, Language: "ja", ProficiencyLevel: "N5"}, nil
 }
 
-type statRepoStub struct{}
+type statsRepositoryStub struct{}
 
-func (s *statRepoStub) GetTodayStats(
+func (stub *statsRepositoryStub) GetTodayStats(
 	ctx context.Context,
 	userID int64,
 ) (int, int, error) {
 	return 10, 7, nil
 }
-func (s *statRepoStub) GetCategoryAccuracy(
+func (stub *statsRepositoryStub) GetCategoryAccuracy(
 	ctx context.Context,
 	userID int64,
 ) (map[string]float64, error) {
 	return map[string]float64{"vocabulary": 80, "grammar": 60}, nil
 }
 
-type materialProgressRepoStub struct{}
+type materialProgressRepositoryStub struct{}
 
-func (m *materialProgressRepoStub) GetLevelProgress(
+func (stub *materialProgressRepositoryStub) GetLevelProgress(
 	ctx context.Context,
 	userID int64,
 	language string,
@@ -655,30 +659,30 @@ func (m *materialProgressRepoStub) GetLevelProgress(
 }
 
 func botWithAnalyzer() (*Bot, *mockBotAPI) {
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	analyzer := service.NewAnalyzerService(
-		&analyzerUserRepoStub{streak: 5},
-		&statRepoStub{},
-		&materialProgressRepoStub{},
+		&analyzerUserRepositoryStub{streak: 5},
+		&statsRepositoryStub{},
+		&materialProgressRepositoryStub{},
 	)
-	b := newTestBot(
-		mAPI,
+	bot := newTestBot(
+		mockAPI,
 		nil,
 		&testServices{Analyzer: analyzer},
 	)
-	return b, mAPI
+	return bot, mockAPI
 }
 
 func TestHandleStats(t *testing.T) {
-	b, mAPI := botWithAnalyzer()
-	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
+	bot, mockAPI := botWithAnalyzer()
+	message := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
 
-	b.handleStats(
+	bot.handleStats(
 		context.Background(),
-		msg,
+		message,
 	)
 
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"학습 통계",
@@ -700,15 +704,15 @@ func TestHandleStats(t *testing.T) {
 }
 
 func TestHandleStreak(t *testing.T) {
-	b, mAPI := botWithAnalyzer()
-	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
+	bot, mockAPI := botWithAnalyzer()
+	message := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
 
-	b.handleStreak(
+	bot.handleStreak(
 		context.Background(),
-		msg,
+		message,
 	)
 
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"스트릭",
@@ -721,27 +725,27 @@ func TestHandleStreak(t *testing.T) {
 }
 
 func TestHandleStatsCallback(t *testing.T) {
-	b, mAPI := botWithAnalyzer()
-	cb := cbWithMessage(
+	bot, mockAPI := botWithAnalyzer()
+	callbackQuery := callbackWithMessage(
 		"menu:stats",
 		1,
 		2,
 		3,
 	)
 
-	b.handleStatsCallback(
+	bot.handleStatsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected stats edit message")
 	}
-	edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	edit, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
-			mAPI.sentMessages[0],
+			mockAPI.sentMessages[0],
 		)
 	}
 	if !strings.Contains(
@@ -761,11 +765,11 @@ func TestHandleStatsCallback(t *testing.T) {
 }
 
 func TestHandleStatsProgressCallback(t *testing.T) {
-	b, mAPI := botWithAnalyzer()
+	bot, mockAPI := botWithAnalyzer()
 
-	b.handleCallback(
+	bot.handleCallback(
 		context.Background(),
-		cbWithMessage(
+		callbackWithMessage(
 			callbackStatsProgress,
 			1,
 			2,
@@ -775,7 +779,7 @@ func TestHandleStatsProgressCallback(t *testing.T) {
 
 	var edit tgbotapi.EditMessageTextConfig
 	found := false
-	for _, sent := range mAPI.sentMessages {
+	for _, sent := range mockAPI.sentMessages {
 		if candidate, ok := sent.(tgbotapi.EditMessageTextConfig); ok {
 			edit = candidate
 			found = true
@@ -842,9 +846,9 @@ func assertStatsTabs(
 }
 
 func TestHandleMenu(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	userSvc := service.NewUserService(&mockUserRepo{
-		getOrCreateFn: func(
+	mockAPI := &mockBotAPI{}
+	userService := service.NewUserService(&mockUserRepository{
+		getOrCreateFunc: func(
 			ctx context.Context,
 			id int64,
 			username string,
@@ -852,28 +856,28 @@ func TestHandleMenu(t *testing.T) {
 			return &model.User{ID: id, StreakDays: 3, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
-	b := newTestBot(
-		mAPI,
+	bot := newTestBot(
+		mockAPI,
 		nil,
 		&testServices{
-			User: userSvc,
+			User: userService,
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{QuestionRepo: &mockSRSRepo{}},
+				service.SessionDependencies{QuestionRepository: &mockSRSRepository{}},
 			),
 		},
 	)
 
-	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
-	b.handleMenu(
+	message := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
+	bot.handleMenu(
 		context.Background(),
-		msg,
+		message,
 	)
 
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected menu message")
 	}
-	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	sent := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !strings.Contains(
 		sent.Text,
 		"CopyLingo",
@@ -885,11 +889,11 @@ func TestHandleMenu(t *testing.T) {
 	}
 }
 
-func ptr(s string) *string { return &s }
+func stringPointer(value string) *string { return &value }
 
 func TestTelegramClientEditMessageReplyMarkup(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	client := newTelegramClient(mAPI)
+	mockAPI := &mockBotAPI{}
+	client := newTelegramClient(mockAPI)
 
 	markup := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -909,16 +913,16 @@ func TestTelegramClientEditMessageReplyMarkup(t *testing.T) {
 			err,
 		)
 	}
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"expected 1 sent, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	if _, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig); !ok {
+	if _, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig); !ok {
 		t.Fatalf(
 			"expected EditMessageReplyMarkupConfig, got %T",
-			mAPI.sentMessages[0],
+			mockAPI.sentMessages[0],
 		)
 	}
 }

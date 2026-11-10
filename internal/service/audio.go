@@ -38,11 +38,11 @@ func NewAudioService(
 
 // GetClip fetches the stored OGG bytes for an object key (serve-time fallback used
 // on the first send, or after a Telegram file_id is invalidated).
-func (s *AudioService) GetClip(
+func (service *AudioService) GetClip(
 	ctx context.Context,
 	key string,
 ) ([]byte, error) {
-	return s.store.Get(
+	return service.store.Get(
 		ctx,
 		key,
 	)
@@ -50,12 +50,12 @@ func (s *AudioService) GetClip(
 
 // CacheFileID stores the Telegram file_id returned after the first upload so later
 // sends can reuse it (ADR-032). The object store stays the SSOT.
-func (s *AudioService) CacheFileID(
+func (service *AudioService) CacheFileID(
 	ctx context.Context,
 	questionID int,
 	fileID string,
 ) error {
-	return s.questions.SetAudioFileID(
+	return service.questions.SetAudioFileID(
 		ctx,
 		questionID,
 		fileID,

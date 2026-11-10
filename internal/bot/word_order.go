@@ -22,13 +22,13 @@ func wordOrderShuffleOrder(
 	if count <= 0 {
 		return nil
 	}
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(fmt.Sprintf(
+	hasher := fnv.New64a()
+	_, _ = hasher.Write([]byte(fmt.Sprintf(
 		"%d:%d",
 		sessionID,
 		questionID,
 	)))
-	order := rand.New(rand.NewSource(int64(h.Sum64()))).Perm(count)
+	order := rand.New(rand.NewSource(int64(hasher.Sum64()))).Perm(count)
 	return order
 }
 
@@ -40,25 +40,25 @@ func validWordOrderSelection(
 		map[int]struct{},
 		len(selection),
 	)
-	for _, idx := range selection {
-		if idx < 0 || idx >= optionCount {
+	for _, index := range selection {
+		if index < 0 || index >= optionCount {
 			return false
 		}
-		if _, ok := seen[idx]; ok {
+		if _, ok := seen[index]; ok {
 			return false
 		}
-		seen[idx] = struct{}{}
+		seen[index] = struct{}{}
 	}
 	return true
 }
 
-func (sf *SessionFlow) getWordOrderDraft(
+func (flow *SessionFlow) getWordOrderDraft(
 	ctx context.Context,
 	sessionID,
 	questionID,
 	optionCount int,
 ) ([]int, error) {
-	selection, err := sf.drafts.GetWordOrderDraft(
+	selection, err := flow.drafts.GetWordOrderDraft(
 		ctx,
 		sessionID,
 		questionID,
@@ -71,7 +71,7 @@ func (sf *SessionFlow) getWordOrderDraft(
 		optionCount,
 	) {
 		// A corrupt/stale draft must not make a question impossible to answer.
-		_ = sf.drafts.DeleteWordOrderDraft(
+		_ = flow.drafts.DeleteWordOrderDraft(
 			ctx,
 			sessionID,
 			questionID,
@@ -81,13 +81,13 @@ func (sf *SessionFlow) getWordOrderDraft(
 	return selection, nil
 }
 
-func (sf *SessionFlow) setWordOrderDraft(
+func (flow *SessionFlow) setWordOrderDraft(
 	ctx context.Context,
 	sessionID,
 	questionID int,
 	selection []int,
 ) error {
-	return sf.drafts.SetWordOrderDraft(
+	return flow.drafts.SetWordOrderDraft(
 		ctx,
 		sessionID,
 		questionID,
@@ -95,12 +95,12 @@ func (sf *SessionFlow) setWordOrderDraft(
 	)
 }
 
-func (sf *SessionFlow) deleteWordOrderDraft(
+func (flow *SessionFlow) deleteWordOrderDraft(
 	ctx context.Context,
 	sessionID,
 	questionID int,
 ) {
-	_ = sf.drafts.DeleteWordOrderDraft(
+	_ = flow.drafts.DeleteWordOrderDraft(
 		ctx,
 		sessionID,
 		questionID,
@@ -120,11 +120,11 @@ func wordOrderDisplayText(
 			0,
 			len(selection),
 		)
-		for _, idx := range selection {
-			if idx >= 0 && idx < len(options) {
+		for _, index := range selection {
+			if index >= 0 && index < len(options) {
 				chunks = append(
 					chunks,
-					options[idx],
+					options[index],
 				)
 			}
 		}
@@ -153,8 +153,8 @@ func wordOrderKeyboard(
 		map[int]struct{},
 		len(selection),
 	)
-	for _, idx := range selection {
-		selected[idx] = struct{}{}
+	for _, index := range selection {
+		selected[index] = struct{}{}
 	}
 	order := wordOrderShuffleOrder(
 		sessionID,
@@ -166,20 +166,20 @@ func wordOrderKeyboard(
 		0,
 		len(options)+1,
 	)
-	for _, idx := range order {
-		if _, ok := selected[idx]; ok {
+	for _, index := range order {
+		if _, ok := selected[index]; ok {
 			continue
 		}
 		rows = append(
 			rows,
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(
-					options[idx],
+					options[index],
 					fmt.Sprintf(
 						formatWordOrderSelect,
 						sessionID,
 						questionID,
-						idx,
+						index,
 					),
 				),
 			),
@@ -223,7 +223,7 @@ func wordOrderKeyboard(
 	return &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
-func (sf *SessionFlow) renderWordOrder(
+func (flow *SessionFlow) renderWordOrder(
 	ctx context.Context,
 	sessionID int,
 	question model.Question,
@@ -232,7 +232,7 @@ func (sf *SessionFlow) renderWordOrder(
 	if err != nil || len(options) == 0 {
 		return "", nil, true
 	}
-	selection, err := sf.getWordOrderDraft(
+	selection, err := flow.getWordOrderDraft(
 		ctx,
 		sessionID,
 		question.ID,
@@ -253,20 +253,20 @@ func (sf *SessionFlow) renderWordOrder(
 		), false
 }
 
-func (sf *SessionFlow) wordOrderCurrentItem(
+func (flow *SessionFlow) wordOrderCurrentItem(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID,
 	questionID int,
 ) (*model.QuizActiveSessionState, *model.QuizActiveSessionQuestion, bool) {
-	if cb == nil || cb.From == nil {
+	if callbackQuery == nil || callbackQuery.From == nil {
 		return nil, nil, false
 	}
-	state, err := sf.session.QuizProgress(
+	state, err := flow.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
-	if err != nil || state.Session.UserID != cb.From.ID {
+	if err != nil || state.Session.UserID != callbackQuery.From.ID {
 		return nil, nil, false
 	}
 	item, _, ok := state.CurrentItemByQuestionID(questionID)
@@ -282,11 +282,11 @@ func wordOrderUpdatedText(
 	options []string,
 	selection []int,
 ) string {
-	if idx := strings.Index(
+	if index := strings.Index(
 		existing,
 		botMessagesByLocale[botDefaultLocale].wordOrderAssembledPrefix,
-	); idx >= 0 {
-		existing = existing[:idx]
+	); index >= 0 {
+		existing = existing[:index]
 	}
 	if strings.TrimSpace(existing) == "" {
 		existing = prompt
@@ -298,28 +298,28 @@ func wordOrderUpdatedText(
 	)
 }
 
-func (sf *SessionFlow) handleWordOrderCallback(
+func (flow *SessionFlow) handleWordOrderCallback(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
-	if cb == nil || cb.Message == nil {
+	if callbackQuery == nil || callbackQuery.Message == nil {
 		return
 	}
 	parts := strings.Split(
-		cb.Data,
+		callbackQuery.Data,
 		":",
 	)
 	if len(parts) < 5 || parts[0] != callback.QuestionRoot || parts[2] != callbackActionWordOrder {
 		return
 	}
-	sessionID, err1 := strconv.Atoi(parts[1])
-	questionID, err2 := strconv.Atoi(parts[3])
-	if err1 != nil || err2 != nil {
+	sessionID, sessionIDErr := strconv.Atoi(parts[1])
+	questionID, questionIDErr := strconv.Atoi(parts[3])
+	if sessionIDErr != nil || questionIDErr != nil {
 		return
 	}
-	_, item, ok := sf.wordOrderCurrentItem(
+	_, item, ok := flow.wordOrderCurrentItem(
 		ctx,
-		cb,
+		callbackQuery,
 		sessionID,
 		questionID,
 	)
@@ -329,8 +329,8 @@ func (sf *SessionFlow) handleWordOrderCallback(
 	action := parts[4]
 	if item.SessionQuestion.IsCorrect != nil {
 		if action == callbackActionWordOrderSubmit && len(parts) == 5 {
-			sf.telegram.SendMessage(
-				cb.Message.Chat.ID,
+			flow.telegram.SendMessage(
+				callbackQuery.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].alreadyAnswered,
 			)
 		}
@@ -340,7 +340,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 	if err != nil || len(options) == 0 {
 		return
 	}
-	selection, err := sf.getWordOrderDraft(
+	selection, err := flow.getWordOrderDraft(
 		ctx,
 		sessionID,
 		questionID,
@@ -355,18 +355,18 @@ func (sf *SessionFlow) handleWordOrderCallback(
 		if len(parts) != 6 {
 			return
 		}
-		idx, err := strconv.Atoi(parts[5])
-		if err != nil || idx < 0 || idx >= len(options) {
+		index, err := strconv.Atoi(parts[5])
+		if err != nil || index < 0 || index >= len(options) {
 			return
 		}
 		for _, selected := range selection {
-			if selected == idx {
+			if selected == index {
 				return
 			}
 		}
 		selection = append(
 			selection,
-			idx,
+			index,
 		)
 	case callbackActionWordOrderUndo:
 		if len(parts) != 5 || len(selection) == 0 {
@@ -383,40 +383,40 @@ func (sf *SessionFlow) handleWordOrderCallback(
 			return
 		}
 		if item.SessionQuestion.IsCorrect != nil {
-			sf.telegram.SendMessage(
-				cb.Message.Chat.ID,
+			flow.telegram.SendMessage(
+				callbackQuery.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].alreadyAnswered,
 			)
 			return
 		}
-		editMessageID := cb.Message.MessageID
-		result, err := sf.session.SubmitQuizWordOrder(
+		editMessageID := callbackQuery.Message.MessageID
+		result, err := flow.session.SubmitQuizWordOrder(
 			ctx,
-			cb.From.ID,
+			callbackQuery.From.ID,
 			sessionID,
 			questionID,
 			selection,
 		)
 		if err != nil {
-			sf.handleQuizAnswerError(
+			flow.handleQuizAnswerError(
 				ctx,
-				cb.Message.Chat.ID,
+				callbackQuery.Message.Chat.ID,
 				sessionID,
 				&editMessageID,
 				err,
 			)
 		} else {
-			sf.renderQuizAnswerResult(
-				cb.Message.Chat.ID,
-				cb.From,
+			flow.renderQuizAnswerResult(
+				callbackQuery.Message.Chat.ID,
+				callbackQuery.From,
 				sessionID,
 				result,
 				&editMessageID,
 			)
 		}
-		if state, _, valid := sf.wordOrderCurrentItem(
+		if state, _, valid := flow.wordOrderCurrentItem(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 			questionID,
 		); valid {
@@ -424,7 +424,7 @@ func (sf *SessionFlow) handleWordOrderCallback(
 				questionID,
 			); exists &&
 				current.SessionQuestion.IsCorrect != nil {
-				sf.deleteWordOrderDraft(
+				flow.deleteWordOrderDraft(
 					ctx,
 					sessionID,
 					questionID,
@@ -442,13 +442,13 @@ func (sf *SessionFlow) handleWordOrderCallback(
 		return
 	}
 	if action == callbackActionWordOrderReset {
-		sf.deleteWordOrderDraft(
+		flow.deleteWordOrderDraft(
 			ctx,
 			sessionID,
 			questionID,
 		)
 	} else {
-		if err := sf.setWordOrderDraft(
+		if err := flow.setWordOrderDraft(
 			ctx,
 			sessionID,
 			questionID,
@@ -458,20 +458,20 @@ func (sf *SessionFlow) handleWordOrderCallback(
 		}
 	}
 	text := wordOrderUpdatedText(
-		cb.Message.Text,
+		callbackQuery.Message.Text,
 		item.Question.Prompt,
 		options,
 		selection,
 	)
-	kb := wordOrderKeyboard(
+	keyboard := wordOrderKeyboard(
 		sessionID,
 		questionID,
 		options,
 		selection,
 	)
 	if item.Question.MaterialID != nil {
-		kb.InlineKeyboard = append(
-			kb.InlineKeyboard,
+		keyboard.InlineKeyboard = append(
+			keyboard.InlineKeyboard,
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(
 					botMessagesByLocale[botDefaultLocale].linkedMaterialSettingsButton,
@@ -484,10 +484,10 @@ func (sf *SessionFlow) handleWordOrderCallback(
 			),
 		)
 	}
-	sf.telegram.EditMessage(
-		cb.Message.Chat.ID,
-		cb.Message.MessageID,
+	flow.telegram.EditMessage(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.Message.MessageID,
 		text,
-		kb,
+		keyboard,
 	)
 }

@@ -17,22 +17,32 @@ func NewPassThroughProcessor() *PassThroughProcessor {
 }
 
 // Process converts raw content to model.Content.
-func (p *PassThroughProcessor) Process(ctx context.Context, raw []RawContent) ([]model.Content, error) {
-	contents := make([]model.Content, 0, len(raw))
+func (processor *PassThroughProcessor) Process(
+	ctx context.Context,
+	raw []RawContent,
+) ([]model.Content, error) {
+	contents := make(
+		[]model.Content,
+		0,
+		len(raw),
+	)
 
-	for _, r := range raw {
-		contents = append(contents, model.Content{
-			SourceType:       model.ContentSourceType(r.SourceType),
-			SourceURL:        r.SourceURL,
-			Title:            r.Title,
-			Body:             r.Body,
-			Language:         r.Language,
-			ProficiencyLevel: r.Level,
-			Difficulty:       r.Difficulty,
-			Tags:             r.Tags,
-			IsArticle:        r.IsArticle,
-			CollectedAt:      time.Now(),
-		})
+	for _, rawContent := range raw {
+		contents = append(
+			contents,
+			model.Content{
+				SourceType:       model.ContentSourceType(rawContent.SourceType),
+				SourceURL:        rawContent.SourceURL,
+				Title:            rawContent.Title,
+				Body:             rawContent.Body,
+				Language:         rawContent.Language,
+				ProficiencyLevel: rawContent.Level,
+				Difficulty:       rawContent.Difficulty,
+				Tags:             rawContent.Tags,
+				IsArticle:        rawContent.IsArticle,
+				CollectedAt:      time.Now(),
+			},
+		)
 	}
 
 	return contents, nil

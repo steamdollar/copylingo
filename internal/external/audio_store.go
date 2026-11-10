@@ -35,12 +35,12 @@ func AudioKey(
 	)
 }
 
-func keySegment(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	if s == "" {
+func keySegment(segment string) string {
+	segment = strings.ToLower(strings.TrimSpace(segment))
+	if segment == "" {
 		return "unknown"
 	}
-	return s
+	return segment
 }
 
 // S3AudioStore is the object store for TTS audio (ADR-032), targeting any
@@ -65,37 +65,37 @@ type S3Options struct {
 // NewS3AudioStore constructs an S3 client from static credentials and an optional
 // custom endpoint (empty => AWS default for the region). Path-style addressing is
 // required by MinIO and harmless to leave off for AWS.
-func NewS3AudioStore(opts S3Options) *S3AudioStore {
-	awsCfg := aws.Config{
-		Region: opts.Region,
+func NewS3AudioStore(options S3Options) *S3AudioStore {
+	awsConfig := aws.Config{
+		Region: options.Region,
 		Credentials: credentials.NewStaticCredentialsProvider(
-			opts.AccessKey,
-			opts.SecretKey,
+			options.AccessKey,
+			options.SecretKey,
 			"",
 		),
 	}
 
 	client := s3.NewFromConfig(
-		awsCfg,
-		func(o *s3.Options) {
-			if endpoint := strings.TrimSpace(opts.Endpoint); endpoint != "" {
-				o.BaseEndpoint = aws.String(endpoint)
+		awsConfig,
+		func(clientOptions *s3.Options) {
+			if endpoint := strings.TrimSpace(options.Endpoint); endpoint != "" {
+				clientOptions.BaseEndpoint = aws.String(endpoint)
 			}
-			o.UsePathStyle = opts.UsePathStyle
+			clientOptions.UsePathStyle = options.UsePathStyle
 		},
 	)
 
-	return &S3AudioStore{client: client, bucket: opts.Bucket}
+	return &S3AudioStore{client: client, bucket: options.Bucket}
 }
 
-func (s *S3AudioStore) Exists(
+func (store *S3AudioStore) Exists(
 	ctx context.Context,
 	key string,
 ) (bool, error) {
-	_, err := s.client.HeadObject(
+	_, err := store.client.HeadObject(
 		ctx,
 		&s3.HeadObjectInput{
-			Bucket: aws.String(s.bucket),
+			Bucket: aws.String(store.bucket),
 			Key:    aws.String(key),
 		},
 	)
@@ -112,16 +112,16 @@ func (s *S3AudioStore) Exists(
 	return true, nil
 }
 
-func (s *S3AudioStore) Put(
+func (store *S3AudioStore) Put(
 	ctx context.Context,
 	key string,
 	body []byte,
 	contentType string,
 ) error {
-	_, err := s.client.PutObject(
+	_, err := store.client.PutObject(
 		ctx,
 		&s3.PutObjectInput{
-			Bucket:      aws.String(s.bucket),
+			Bucket:      aws.String(store.bucket),
 			Key:         aws.String(key),
 			Body:        bytes.NewReader(body),
 			ContentType: aws.String(contentType),
@@ -137,14 +137,14 @@ func (s *S3AudioStore) Put(
 	return nil
 }
 
-func (s *S3AudioStore) Get(
+func (store *S3AudioStore) Get(
 	ctx context.Context,
 	key string,
 ) ([]byte, error) {
-	out, err := s.client.GetObject(
+	out, err := store.client.GetObject(
 		ctx,
 		&s3.GetObjectInput{
-			Bucket: aws.String(s.bucket),
+			Bucket: aws.String(store.bucket),
 			Key:    aws.String(key),
 		},
 	)

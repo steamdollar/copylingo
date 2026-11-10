@@ -17,18 +17,18 @@ func newFakeStudySessionStore() *fakeStudySessionStore {
 	return &fakeStudySessionStore{values: make(map[int]*model.StudyActiveSessionState)}
 }
 
-func (f *fakeStudySessionStore) Load(
+func (fake *fakeStudySessionStore) Load(
 	_ context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
-	state, ok := f.values[sessionID]
+	state, ok := fake.values[sessionID]
 	if !ok {
 		return nil, model.ErrSessionStoreNotFound
 	}
 	return snapshotSessionTestState(state)
 }
 
-func (f *fakeStudySessionStore) Save(
+func (fake *fakeStudySessionStore) Save(
 	_ context.Context,
 	sessionID int,
 	state *model.StudyActiveSessionState,
@@ -37,47 +37,47 @@ func (f *fakeStudySessionStore) Save(
 	if err != nil {
 		return err
 	}
-	f.values[sessionID] = snapshot
+	fake.values[sessionID] = snapshot
 	return nil
 }
 
-func (f *fakeStudySessionStore) Delete(
+func (fake *fakeStudySessionStore) Delete(
 	_ context.Context,
 	sessionID int,
 ) error {
 	delete(
-		f.values,
+		fake.values,
 		sessionID,
 	)
 	return nil
 }
 
-type fakeStudyActiveRepo struct {
-	loadFn func(
+type fakeStudyActiveRepository struct {
+	loadFunc func(
 		ctx context.Context,
 		sessionID int,
 	) (*model.StudyActiveSessionState, error)
-	flushFn func(
+	flushFunc func(
 		ctx context.Context,
 		state *model.StudyActiveSessionState,
 	) error
 }
 
-func (f *fakeStudyActiveRepo) LoadStudySessionWithStateBySessionID(
+func (fake *fakeStudyActiveRepository) LoadStudySessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
-	return f.loadFn(
+	return fake.loadFunc(
 		ctx,
 		sessionID,
 	)
 }
 
-func (f *fakeStudyActiveRepo) FlushStudyActiveSession(
+func (fake *fakeStudyActiveRepository) FlushStudyActiveSession(
 	ctx context.Context,
 	state *model.StudyActiveSessionState,
 ) error {
-	return f.flushFn(
+	return fake.flushFunc(
 		ctx,
 		state,
 	)
@@ -87,12 +87,12 @@ type fakeStudySessionStarter struct {
 	started []int
 }
 
-func (f *fakeStudySessionStarter) Start(
+func (fake *fakeStudySessionStarter) Start(
 	ctx context.Context,
 	id int,
 ) error {
-	f.started = append(
-		f.started,
+	fake.started = append(
+		fake.started,
 		id,
 	)
 	return nil
@@ -104,8 +104,8 @@ func TestStudyActiveSessionStartLoadsAndStoresWorkingSet(t *testing.T) {
 	userID := int64(123)
 	store := newFakeStudySessionStore()
 	starter := &fakeStudySessionStarter{}
-	repo := &fakeStudyActiveRepo{
-		loadFn: func(
+	repository := &fakeStudyActiveRepository{
+		loadFunc: func(
 			ctx context.Context,
 			gotSessionID int,
 		) (*model.StudyActiveSessionState, error) {
@@ -123,13 +123,13 @@ func TestStudyActiveSessionStartLoadsAndStoresWorkingSet(t *testing.T) {
 			), nil
 		},
 	}
-	svc := newStudyActiveSessionService(
-		repo,
+	service := newStudyActiveSessionService(
+		repository,
 		starter,
 		store,
 	)
 
-	state, err := svc.Start(
+	state, err := service.Start(
 		ctx,
 		sessionID,
 		userID,
@@ -172,8 +172,8 @@ func TestStudyActiveSessionStartResumesRedisWorkingSet(t *testing.T) {
 	store := newFakeStudySessionStore()
 	starter := &fakeStudySessionStarter{}
 	loadCalls := 0
-	repo := &fakeStudyActiveRepo{
-		loadFn: func(
+	repository := &fakeStudyActiveRepository{
+		loadFunc: func(
 			ctx context.Context,
 			gotSessionID int,
 		) (*model.StudyActiveSessionState, error) {
@@ -185,13 +185,13 @@ func TestStudyActiveSessionStartResumesRedisWorkingSet(t *testing.T) {
 			), nil
 		},
 	}
-	svc := newStudyActiveSessionService(
-		repo,
+	service := newStudyActiveSessionService(
+		repository,
 		starter,
 		store,
 	)
 
-	if _, err := svc.Start(
+	if _, err := service.Start(
 		ctx,
 		sessionID,
 		userID,
@@ -201,7 +201,7 @@ func TestStudyActiveSessionStartResumesRedisWorkingSet(t *testing.T) {
 			err,
 		)
 	}
-	if _, err := svc.MarkStudied(
+	if _, err := service.MarkStudied(
 		ctx,
 		sessionID,
 		userID,
@@ -213,7 +213,7 @@ func TestStudyActiveSessionStartResumesRedisWorkingSet(t *testing.T) {
 		)
 	}
 
-	resumed, err := svc.Start(
+	resumed, err := service.Start(
 		ctx,
 		sessionID,
 		userID,
@@ -258,12 +258,12 @@ func TestStudyActiveSessionMarkStudiedUpdatesRedisOnly(t *testing.T) {
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := newStudyActiveSessionService(
+	service := newStudyActiveSessionService(
 		nil,
 		nil,
 		store,
 	)
-	if err := svc.save(
+	if err := service.save(
 		ctx,
 		studyActiveState(
 			sessionID,
@@ -277,7 +277,7 @@ func TestStudyActiveSessionMarkStudiedUpdatesRedisOnly(t *testing.T) {
 		)
 	}
 
-	state, err := svc.MarkStudied(
+	state, err := service.MarkStudied(
 		ctx,
 		sessionID,
 		userID,
@@ -313,8 +313,8 @@ func TestStudyActiveSessionCompleteFlushesAndDeletesWorkingSet(t *testing.T) {
 	userID := int64(123)
 	store := newFakeStudySessionStore()
 	flushed := false
-	repo := &fakeStudyActiveRepo{
-		flushFn: func(
+	repository := &fakeStudyActiveRepository{
+		flushFunc: func(
 			ctx context.Context,
 			state *model.StudyActiveSessionState,
 		) error {
@@ -328,8 +328,8 @@ func TestStudyActiveSessionCompleteFlushesAndDeletesWorkingSet(t *testing.T) {
 			return nil
 		},
 	}
-	svc := newStudyActiveSessionService(
-		repo,
+	service := newStudyActiveSessionService(
+		repository,
 		nil,
 		store,
 	)
@@ -347,7 +347,7 @@ func TestStudyActiveSessionCompleteFlushesAndDeletesWorkingSet(t *testing.T) {
 		1,
 		now,
 	)
-	if err := svc.save(
+	if err := service.save(
 		ctx,
 		state,
 	); err != nil {
@@ -357,7 +357,7 @@ func TestStudyActiveSessionCompleteFlushesAndDeletesWorkingSet(t *testing.T) {
 		)
 	}
 
-	if err := svc.Complete(
+	if err := service.Complete(
 		ctx,
 		sessionID,
 		userID,
@@ -380,12 +380,12 @@ func TestStudyActiveSessionCompleteRejectsIncomplete(t *testing.T) {
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := newStudyActiveSessionService(
-		&fakeStudyActiveRepo{},
+	service := newStudyActiveSessionService(
+		&fakeStudyActiveRepository{},
 		nil,
 		store,
 	)
-	if err := svc.save(
+	if err := service.save(
 		ctx,
 		studyActiveState(
 			sessionID,
@@ -399,7 +399,7 @@ func TestStudyActiveSessionCompleteRejectsIncomplete(t *testing.T) {
 		)
 	}
 
-	err := svc.Complete(
+	err := service.Complete(
 		ctx,
 		sessionID,
 		userID,
@@ -421,10 +421,10 @@ func TestStudyActiveSessionStartReturnsCompletedEarly(t *testing.T) {
 	userID := int64(123)
 	store := newFakeStudySessionStore()
 	starter := &fakeStudySessionStarter{}
-	repo := &fakeStudyActiveRepo{
-		loadFn: func(
+	repository := &fakeStudyActiveRepository{
+		loadFunc: func(
 			ctx context.Context,
-			sid int,
+			requestedSessionID int,
 		) (*model.StudyActiveSessionState, error) {
 			return studyActiveState(
 				sessionID,
@@ -433,13 +433,13 @@ func TestStudyActiveSessionStartReturnsCompletedEarly(t *testing.T) {
 			), nil
 		},
 	}
-	svc := newStudyActiveSessionService(
-		repo,
+	service := newStudyActiveSessionService(
+		repository,
 		starter,
 		store,
 	)
 
-	state, err := svc.Start(
+	state, err := service.Start(
 		ctx,
 		sessionID,
 		userID,
@@ -469,10 +469,10 @@ func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
 	store := newFakeStudySessionStore()
-	repo := &fakeStudyActiveRepo{
-		loadFn: func(
+	repository := &fakeStudyActiveRepository{
+		loadFunc: func(
 			ctx context.Context,
-			sid int,
+			requestedSessionID int,
 		) (*model.StudyActiveSessionState, error) {
 			return studyActiveState(
 				sessionID,
@@ -481,13 +481,13 @@ func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
 			), nil
 		},
 	}
-	svc := newStudyActiveSessionService(
-		repo,
+	service := newStudyActiveSessionService(
+		repository,
 		&fakeStudySessionStarter{},
 		store,
 	)
 
-	_, err := svc.Start(
+	_, err := service.Start(
 		ctx,
 		sessionID,
 		999,
@@ -506,21 +506,21 @@ func TestStudyActiveSessionStartRejectsUserMismatch(t *testing.T) {
 func TestStudyActiveSessionStartPropagatesLoadError(t *testing.T) {
 	ctx := context.Background()
 	loadErr := errors.New("db load failed")
-	repo := &fakeStudyActiveRepo{
-		loadFn: func(
+	repository := &fakeStudyActiveRepository{
+		loadFunc: func(
 			ctx context.Context,
-			sid int,
+			sessionID int,
 		) (*model.StudyActiveSessionState, error) {
 			return nil, loadErr
 		},
 	}
-	svc := newStudyActiveSessionService(
-		repo,
+	service := newStudyActiveSessionService(
+		repository,
 		nil,
 		newFakeStudySessionStore(),
 	)
 
-	if _, err := svc.Start(
+	if _, err := service.Start(
 		ctx,
 		77,
 		123,
@@ -541,10 +541,10 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateLoadsFromDBOnMiss(t *testin
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore() // empty -> LoadOwnedStudySessionState loads from DB
-	repo := &fakeStudyActiveRepo{
-		loadFn: func(
+	repository := &fakeStudyActiveRepository{
+		loadFunc: func(
 			ctx context.Context,
-			sid int,
+			requestedSessionID int,
 		) (*model.StudyActiveSessionState, error) {
 			return studyActiveState(
 				sessionID,
@@ -553,13 +553,13 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateLoadsFromDBOnMiss(t *testin
 			), nil
 		},
 	}
-	svc := newStudyActiveSessionService(
-		repo,
+	service := newStudyActiveSessionService(
+		repository,
 		nil,
 		store,
 	)
 
-	state, err := svc.LoadOwnedStudySessionState(
+	state, err := service.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -593,12 +593,12 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsUserMismatch(t *test
 	ctx := context.Background()
 	sessionID := 77
 	store := newFakeStudySessionStore()
-	svc := newStudyActiveSessionService(
-		&fakeStudyActiveRepo{},
+	service := newStudyActiveSessionService(
+		&fakeStudyActiveRepository{},
 		nil,
 		store,
 	)
-	if err := svc.save(
+	if err := service.save(
 		ctx,
 		studyActiveState(
 			sessionID,
@@ -612,7 +612,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsUserMismatch(t *test
 		)
 	}
 
-	_, err := svc.LoadOwnedStudySessionState(
+	_, err := service.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		999,
@@ -633,8 +633,8 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *test
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := newStudyActiveSessionService(
-		&fakeStudyActiveRepo{},
+	service := newStudyActiveSessionService(
+		&fakeStudyActiveRepository{},
 		nil,
 		store,
 	)
@@ -645,7 +645,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *test
 		model.SessionInProgress,
 	)
 	state.Session.Mode = model.SessionModeQuiz // wrong mode for a study session
-	if err := svc.save(
+	if err := service.save(
 		ctx,
 		state,
 	); err != nil {
@@ -655,7 +655,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *test
 		)
 	}
 
-	_, err := svc.LoadOwnedStudySessionState(
+	_, err := service.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -676,12 +676,12 @@ func TestStudyActiveSessionMarkStudiedRejectsUnknownOrder(t *testing.T) {
 	sessionID := 77
 	userID := int64(123)
 	store := newFakeStudySessionStore()
-	svc := newStudyActiveSessionService(
+	service := newStudyActiveSessionService(
 		nil,
 		nil,
 		store,
 	)
-	if err := svc.save(
+	if err := service.save(
 		ctx,
 		studyActiveState(
 			sessionID,
@@ -695,7 +695,7 @@ func TestStudyActiveSessionMarkStudiedRejectsUnknownOrder(t *testing.T) {
 		)
 	}
 
-	_, err := svc.MarkStudied(
+	_, err := service.MarkStudied(
 		ctx,
 		sessionID,
 		userID,
@@ -716,12 +716,12 @@ func TestStudyActiveSessionDelete(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
 	store := newFakeStudySessionStore()
-	svc := newStudyActiveSessionService(
+	service := newStudyActiveSessionService(
 		nil,
 		nil,
 		store,
 	)
-	if err := svc.save(
+	if err := service.save(
 		ctx,
 		studyActiveState(
 			sessionID,
@@ -735,7 +735,7 @@ func TestStudyActiveSessionDelete(t *testing.T) {
 		)
 	}
 
-	if err := svc.Delete(
+	if err := service.Delete(
 		ctx,
 		sessionID,
 	); err != nil {

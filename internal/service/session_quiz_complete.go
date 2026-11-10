@@ -20,13 +20,13 @@ type QuizCompletion struct {
 // Word-order IDs are captured first because Delete removes the working set;
 // they are collected only when the caller owns the session, and a failed
 // capture lookup is left for Flush to report.
-func (s *SessionService) CompleteQuiz(
+func (service *SessionService) CompleteQuiz(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) (*QuizCompletion, error) {
 	var wordOrderQuestionIDs []int
-	if state, err := s.quizProgress.Get(
+	if state, err := service.quizProgress.Get(
 		ctx,
 		sessionID,
 	); err == nil && state.Session.UserID == userID {
@@ -40,7 +40,7 @@ func (s *SessionService) CompleteQuiz(
 		}
 	}
 
-	result, err := s.quizProgress.Flush(
+	result, err := service.quizProgress.Flush(
 		ctx,
 		sessionID,
 		userID,
@@ -48,7 +48,7 @@ func (s *SessionService) CompleteQuiz(
 	if err != nil {
 		return nil, err
 	}
-	if err := s.userRepo.UpdateStreak(
+	if err := service.userRepository.UpdateStreak(
 		ctx,
 		userID,
 	); err != nil {
@@ -59,7 +59,7 @@ func (s *SessionService) CompleteQuiz(
 			err,
 		)
 	}
-	if err := s.quizProgress.Delete(
+	if err := service.quizProgress.Delete(
 		ctx,
 		sessionID,
 	); err != nil {

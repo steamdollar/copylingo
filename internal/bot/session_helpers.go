@@ -8,22 +8,22 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-func (sf *SessionFlow) showSessionFetchError(cb *tgbotapi.CallbackQuery) {
-	sf.telegram.EditMessage(
-		cb.Message.Chat.ID,
-		cb.Message.MessageID,
+func (flow *SessionFlow) showSessionFetchError(callbackQuery *tgbotapi.CallbackQuery) {
+	flow.telegram.EditMessage(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.Message.MessageID,
 		botMessagesByLocale[botDefaultLocale].sessionFetchFailed,
 		mainMenuKeyboard(),
 	)
 }
 
-func (sf *SessionFlow) showQuizActiveSessionUnavailable(
+func (flow *SessionFlow) showQuizActiveSessionUnavailable(
 	chatID int64,
 	editMessageID *int,
 ) {
 	text := botMessagesByLocale[botDefaultLocale].activeSessionUnavailable
 	if editMessageID != nil {
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -31,14 +31,14 @@ func (sf *SessionFlow) showQuizActiveSessionUnavailable(
 		)
 		return
 	}
-	sf.telegram.SendMessage(
+	flow.telegram.SendMessage(
 		chatID,
 		text,
 	)
 }
 
 func mainMenuKeyboard() *tgbotapi.InlineKeyboardMarkup {
-	kb := tgbotapi.NewInlineKeyboardMarkup(
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
 				botMessagesByLocale[botDefaultLocale].menuHomeButton,
@@ -46,7 +46,7 @@ func mainMenuKeyboard() *tgbotapi.InlineKeyboardMarkup {
 			),
 		),
 	)
-	return &kb
+	return &keyboard
 }
 
 func formatSessionAnswer(userAnswer *string) string {
@@ -56,9 +56,9 @@ func formatSessionAnswer(userAnswer *string) string {
 	return *userAnswer
 }
 
-func sessionTypeLabel(t string) string {
+func sessionTypeLabel(sessionType string) string {
 	messages := botMessagesByLocale[botDefaultLocale]
-	switch t {
+	switch sessionType {
 	case "morning":
 		return messages.morningStudySessionLabel
 	case "evening":
@@ -70,7 +70,7 @@ func sessionTypeLabel(t string) string {
 	case "study":
 		return messages.middayStudySessionLabel
 	default:
-		return t
+		return sessionType
 	}
 }
 
@@ -93,31 +93,31 @@ func firstStudySession(sessions []model.Session) (model.Session, bool) {
 }
 
 func truncate(
-	s string,
+	text string,
 	maxLen int,
 ) string {
-	runes := []rune(s)
+	runes := []rune(text)
 	if len(runes) <= maxLen {
-		return s
+		return text
 	}
 	return string(runes[:maxLen]) + "..."
 }
 
-func stripHTML(s string) string {
+func stripHTML(text string) string {
 	// Simple tag stripping to avoid Telegram API errors on truncated HTML
 	var result strings.Builder
 	inTag := false
-	for _, r := range s {
-		if r == '<' {
+	for _, character := range text {
+		if character == '<' {
 			inTag = true
 			continue
 		}
-		if r == '>' {
+		if character == '>' {
 			inTag = false
 			continue
 		}
 		if !inTag {
-			result.WriteRune(r)
+			result.WriteRune(character)
 		}
 	}
 	return result.String()

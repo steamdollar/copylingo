@@ -17,22 +17,22 @@ import (
 func TestHandleTextInput(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	mLLM := &mockLLM{}
+	llmMock := &mockLLM{}
 
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{LLM: mLLM},
+				service.SessionDependencies{LLM: llmMock},
 			),
 		},
 	)
 
 	chatID := int64(123)
-	msg := &tgbotapi.Message{
+	message := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: chatID},
 		From: &tgbotapi.User{ID: 1},
 		Text: "apple",
@@ -41,9 +41,9 @@ func TestHandleTextInput(t *testing.T) {
 	t.Run(
 		"no active question state",
 		func(t *testing.T) {
-			if sf.HandleTextInput(
+			if sessionFlow.HandleTextInput(
 				ctx,
-				msg,
+				message,
 			) {
 				t.Error("expected HandleTextInput to return false")
 			}
@@ -57,7 +57,7 @@ func TestHandleTextInput(t *testing.T) {
 			_ = stateStores.SetActiveQuestion(
 				ctx,
 				chatID,
-				model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: 0},
+				model.ActiveQuestionReference{SessionID: sessionID, QuestionIndex: 0},
 			)
 
 			state := &model.QuizActiveSessionState{
@@ -79,9 +79,9 @@ func TestHandleTextInput(t *testing.T) {
 				state,
 			)
 
-			if !sf.HandleTextInput(
+			if !sessionFlow.HandleTextInput(
 				ctx,
-				msg,
+				message,
 			) {
 				t.Error("expected HandleTextInput to return true")
 			}
@@ -94,7 +94,7 @@ func TestHandleTextInput(t *testing.T) {
 			}
 
 			// Verify message sent
-			if len(mAPI.sentMessages) == 0 {
+			if len(mockAPI.sentMessages) == 0 {
 				t.Fatal("expected message sent")
 			}
 		},
@@ -103,15 +103,15 @@ func TestHandleTextInput(t *testing.T) {
 
 func TestProcessAnswerText_Correct(t *testing.T) {
 	stateStores := newTestInteractionStores()
-	mLLM := &mockLLM{}
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	llmMock := &mockLLM{}
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{LLM: mLLM},
+				service.SessionDependencies{LLM: llmMock},
 			),
 		},
 	)
@@ -140,7 +140,7 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 
 	answerByText(
 		t,
-		sf,
+		sessionFlow,
 		stateStores,
 		123,
 		&tgbotapi.User{ID: 1},
@@ -149,47 +149,47 @@ func TestProcessAnswerText_Correct(t *testing.T) {
 		"apple",
 	)
 
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"expected 1 message, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	message := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !strings.Contains(
-		msg.Text,
+		message.Text,
 		"정답!",
 	) {
 		t.Errorf(
 			"wrong text: %s",
-			msg.Text,
+			message.Text,
 		)
 	}
 }
 
 func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 	stateStores := newTestInteractionStores()
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
 		},
 	)
 
 	sessionID := 10
 	questionID := 1
-	trueVal := true
+	trueValue := true
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID, UserID: 1},
 		Items: []model.QuizActiveSessionQuestion{
 			{
-				SessionQuestion: model.SessionQuestion{QuestionID: questionID, IsCorrect: &trueVal},
+				SessionQuestion: model.SessionQuestion{QuestionID: questionID, IsCorrect: &trueValue},
 				Question:        model.Question{ID: questionID},
 			},
 		},
@@ -201,7 +201,7 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 
 	answerByText(
 		t,
-		sf,
+		sessionFlow,
 		stateStores,
 		123,
 		&tgbotapi.User{ID: 1},
@@ -210,23 +210,23 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 		"apple",
 	)
 
-	msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	message := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if strings.Contains(
-		msg.Text,
+		message.Text,
 		"이미 답변한 문제입니다",
 	) {
 		t.Fatalf(
 			"stale answer should not return already-answered error: %s",
-			msg.Text,
+			message.Text,
 		)
 	}
 	if !strings.Contains(
-		msg.Text,
+		message.Text,
 		"모든 문제를 풀었습니다",
 	) {
 		t.Errorf(
 			"expected result redirect, got: %s",
-			msg.Text,
+			message.Text,
 		)
 	}
 }
@@ -234,14 +234,14 @@ func TestProcessAnswerText_AlreadyAnsweredRedirectsToResult(t *testing.T) {
 func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
 		},
 	)
@@ -272,9 +272,9 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 		state,
 	)
 
-	sf.processAnswer(
+	sessionFlow.processAnswer(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"q:11:1:0",
 			123,
 			456,
@@ -285,29 +285,29 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 		0,
 	)
 
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"expected one redirected message, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	msg, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	message, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected edited message, got %T",
-			mAPI.sentMessages[0],
+			mockAPI.sentMessages[0],
 		)
 	}
 	if strings.Contains(
-		msg.Text,
+		message.Text,
 		"이미 답변한 문제입니다",
 	) || !strings.Contains(
-		msg.Text,
+		message.Text,
 		"두 번째 문제",
 	) {
 		t.Fatalf(
 			"expected redirect to next question, got %q",
-			msg.Text,
+			message.Text,
 		)
 	}
 }
@@ -353,50 +353,50 @@ func TestShowHandwritingGraded(t *testing.T) {
 					},
 				)
 				if tt.storeMessage {
-					stateStores.messages[handwritingMessageKey{sessionID, tt.gradedQuestion}] = model.TelegramMessageRef{
+					stateStores.messages[handwritingMessageKey{sessionID, tt.gradedQuestion}] = model.TelegramMessageReference{
 						ChatID:    55,
 						MessageID: 66,
 					}
 				}
-				mAPI := &mockBotAPI{}
-				sf := newTestSessionFlow(
-					mAPI,
+				mockAPI := &mockBotAPI{}
+				sessionFlow := newTestSessionFlow(
+					mockAPI,
 					stateStores,
-					SessionFlowDeps{
+					SessionFlowDependencies{
 						Session: newTestSessionService(
 							stateStores,
-							service.SessionDeps{},
+							service.SessionDependencies{},
 						),
 						PublicBaseURL: publicBaseURL,
 					},
 				)
 
-				sf.ShowHandwritingGraded(
+				sessionFlow.ShowHandwritingGraded(
 					context.Background(),
 					sessionID,
 					tt.gradedQuestion,
 				)
 
 				if !tt.wantEdit {
-					if len(mAPI.sentMessages) != 0 {
+					if len(mockAPI.sentMessages) != 0 {
 						t.Fatalf(
 							"sent %d Telegram calls, want none",
-							len(mAPI.sentMessages),
+							len(mockAPI.sentMessages),
 						)
 					}
 					return
 				}
-				if len(mAPI.sentMessages) != 1 {
+				if len(mockAPI.sentMessages) != 1 {
 					t.Fatalf(
 						"sent %d Telegram calls, want 1",
-						len(mAPI.sentMessages),
+						len(mockAPI.sentMessages),
 					)
 				}
-				edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig)
+				edit, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig)
 				if !ok {
 					t.Fatalf(
 						"sent %T, want EditMessageReplyMarkupConfig",
-						mAPI.sentMessages[0],
+						mockAPI.sentMessages[0],
 					)
 				}
 				if edit.ChatID != 55 || edit.MessageID != 66 {
@@ -445,14 +445,14 @@ func TestShowHandwritingGraded(t *testing.T) {
 func TestHandleAnswerCallback_NonNumericOptionIndexIsIgnored(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
 		},
 	)
@@ -477,9 +477,9 @@ func TestHandleAnswerCallback_NonNumericOptionIndexIsIgnored(t *testing.T) {
 		},
 	)
 
-	sf.HandleAnswerCallback(
+	sessionFlow.HandleAnswerCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			fmt.Sprintf(
 				"q:%d:%d:x",
 				sessionID,
@@ -491,10 +491,10 @@ func TestHandleAnswerCallback_NonNumericOptionIndexIsIgnored(t *testing.T) {
 		),
 	)
 
-	if len(mAPI.sentMessages) != 0 {
+	if len(mockAPI.sentMessages) != 0 {
 		t.Fatalf(
 			"malformed callback produced messages: %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
 	state, err := stateStores.quiz.Load(
@@ -527,7 +527,7 @@ func newResumeTestSessionFlow(
 		)
 	}
 	sessionStore := &mockSessionStore{
-		getSessionsByStatusFn: func(
+		getSessionsByStatusFunc: func(
 			ctx context.Context,
 			userID int64,
 			status model.SessionStatus,
@@ -541,10 +541,10 @@ func newResumeTestSessionFlow(
 	return newTestSessionFlow(
 		api,
 		stores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stores,
-				service.SessionDeps{SessionRepo: sessionStore},
+				service.SessionDependencies{SessionRepository: sessionStore},
 			),
 		},
 	)
@@ -573,7 +573,7 @@ func TestResumeQuizFromTextReportsLastResultAndResendsNextQuestion(t *testing.T)
 			tt.name,
 			func(t *testing.T) {
 				api := &mockBotAPI{}
-				sf := newResumeTestSessionFlow(
+				sessionFlow := newResumeTestSessionFlow(
 					api,
 					[]model.Session{{ID: 10, Mode: model.SessionModeQuiz}},
 					&model.QuizActiveSessionState{
@@ -601,7 +601,7 @@ func TestResumeQuizFromTextReportsLastResultAndResendsNextQuestion(t *testing.T)
 					},
 				)
 
-				resumed := sf.ResumeQuizFromText(
+				resumed := sessionFlow.ResumeQuizFromText(
 					context.Background(),
 					&tgbotapi.Message{
 						Text: "すばらしい",
@@ -647,13 +647,13 @@ func TestResumeQuizFromTextReportsLastResultAndResendsNextQuestion(t *testing.T)
 
 func TestResumeQuizFromTextWithoutInProgressQuizSendsNothing(t *testing.T) {
 	api := &mockBotAPI{}
-	sf := newResumeTestSessionFlow(
+	sessionFlow := newResumeTestSessionFlow(
 		api,
 		nil,
 		nil,
 	)
 
-	if sf.ResumeQuizFromText(
+	if sessionFlow.ResumeQuizFromText(
 		context.Background(),
 		&tgbotapi.Message{
 			Text: "hello",
@@ -673,13 +673,13 @@ func TestResumeQuizFromTextWithoutInProgressQuizSendsNothing(t *testing.T) {
 
 func TestResumeQuizFromTextWithExpiredStateShowsUnavailable(t *testing.T) {
 	api := &mockBotAPI{}
-	sf := newResumeTestSessionFlow(
+	sessionFlow := newResumeTestSessionFlow(
 		api,
 		[]model.Session{{ID: 10, Mode: model.SessionModeQuiz}},
 		nil,
 	)
 
-	if !sf.ResumeQuizFromText(
+	if !sessionFlow.ResumeQuizFromText(
 		context.Background(),
 		&tgbotapi.Message{
 			Text: "hello",

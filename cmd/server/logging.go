@@ -14,54 +14,79 @@ import (
 )
 
 func requestLoggingMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ginContext *gin.Context) {
 		startedAt := time.Now()
 		interactionID := observability.NewInteractionID("http")
-		ctx := observability.WithAttrs(c.Request.Context(),
-			slog.String("interaction_id", interactionID),
-			slog.String("source", "http"),
+		ctx := observability.WithAttributes(
+			ginContext.Request.Context(),
+			slog.String(
+				"interaction_id",
+				interactionID,
+			),
+			slog.String(
+				"source",
+				"http",
+			),
 		)
-		c.Request = c.Request.WithContext(ctx)
-		c.Header("X-Request-ID", interactionID)
+		ginContext.Request = ginContext.Request.WithContext(ctx)
+		ginContext.Header(
+			"X-Request-ID",
+			interactionID,
+		)
 
-		c.Next()
+		ginContext.Next()
 
-		if !shouldLogHTTPRequest(c.Request.URL.Path) {
+		if !shouldLogHTTPRequest(ginContext.Request.URL.Path) {
 			return
 		}
-		slog.InfoContext(ctx, "HTTP request completed",
-			"event", "http.completed",
-			"method", c.Request.Method,
-			"path", matchedRoutePath(c),
-			"status", c.Writer.Status(),
-			"duration_ms", time.Since(startedAt).Milliseconds(),
+		slog.InfoContext(
+			ctx,
+			"HTTP request completed",
+			"event",
+			"http.completed",
+			"method",
+			ginContext.Request.Method,
+			"path",
+			matchedRoutePath(ginContext),
+			"status",
+			ginContext.Writer.Status(),
+			"duration_ms",
+			time.Since(startedAt).Milliseconds(),
 		)
 	}
 }
 
 func structuredRecoveryMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ginContext *gin.Context) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				slog.ErrorContext(c.Request.Context(), "HTTP panic recovered",
-					"event", "http.panic",
-					"error", fmt.Sprint(recovered),
-					"stack", string(debug.Stack()),
+				slog.ErrorContext(
+					ginContext.Request.Context(),
+					"HTTP panic recovered",
+					"event",
+					"http.panic",
+					"error",
+					fmt.Sprint(recovered),
+					"stack",
+					string(debug.Stack()),
 				)
-				c.AbortWithStatus(http.StatusInternalServerError)
+				ginContext.AbortWithStatus(http.StatusInternalServerError)
 			}
 		}()
-		c.Next()
+		ginContext.Next()
 	}
 }
 
 func shouldLogHTTPRequest(path string) bool {
-	return strings.HasPrefix(path, "/api/") || path == "/miniapp/handwriting"
+	return strings.HasPrefix(
+		path,
+		"/api/",
+	) || path == "/miniapp/handwriting"
 }
 
-func matchedRoutePath(c *gin.Context) string {
-	if path := c.FullPath(); path != "" {
+func matchedRoutePath(ginContext *gin.Context) string {
+	if path := ginContext.FullPath(); path != "" {
 		return path
 	}
-	return c.Request.URL.Path
+	return ginContext.Request.URL.Path
 }

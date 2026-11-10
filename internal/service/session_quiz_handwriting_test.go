@@ -10,7 +10,7 @@ import (
 )
 
 type mockLLM struct {
-	gradeHandwritingFn func(
+	gradeHandwritingFunc func(
 		ctx context.Context,
 		prompt,
 		correctAnswer string,
@@ -18,13 +18,13 @@ type mockLLM struct {
 	) (external.GradeResult, error)
 }
 
-func (m *mockLLM) GradeHandwriting(
+func (mock *mockLLM) GradeHandwriting(
 	ctx context.Context,
 	prompt,
 	correctAnswer string,
 	image []byte,
 ) (external.GradeResult, error) {
-	return m.gradeHandwritingFn(
+	return mock.gradeHandwritingFunc(
 		ctx,
 		prompt,
 		correctAnswer,
@@ -36,7 +36,7 @@ func handwritingGradeLLM(
 	result external.GradeResult,
 	err error,
 ) *mockLLM {
-	return &mockLLM{gradeHandwritingFn: func(
+	return &mockLLM{gradeHandwritingFunc: func(
 		context.Context,
 		string,
 		string,
@@ -52,22 +52,22 @@ func TestSubmitHandwriting_Success(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	llm := &mockLLM{gradeHandwritingFn: func(
+	llm := &mockLLM{gradeHandwritingFunc: func(
 		_ context.Context,
 		_,
 		correctAnswer string,
-		img []byte,
+		image []byte,
 	) (external.GradeResult, error) {
-		if correctAnswer != "あ" || string(img) != "fake-image" {
+		if correctAnswer != "あ" || string(image) != "fake-image" {
 			t.Fatalf(
 				"unexpected grade args answer=%q img=%q",
 				correctAnswer,
-				string(img),
+				string(image),
 			)
 		}
 		return external.GradeResult{IsCorrect: true, Feedback: "Correct!"}, nil
 	}}
-	svc, store := newQuizTestSession(
+	sessionService, store := newQuizTestSession(
 		t,
 		handwritingState(
 			userID,
@@ -83,7 +83,7 @@ func TestSubmitHandwriting_Success(t *testing.T) {
 		llm,
 	)
 
-	res, err := svc.SubmitHandwriting(
+	result, err := sessionService.SubmitHandwriting(
 		ctx,
 		HandwritingSubmitRequest{
 			UserID:     userID,
@@ -98,16 +98,16 @@ func TestSubmitHandwriting_Success(t *testing.T) {
 			err,
 		)
 	}
-	if !res.IsCorrect || res.Feedback != "Correct!" {
+	if !result.IsCorrect || result.Feedback != "Correct!" {
 		t.Fatalf(
 			"unexpected grade result: %+v",
-			res,
+			result,
 		)
 	}
-	if res.CorrectAnswer != "あ" || res.Explanation != "hiragana a" {
+	if result.CorrectAnswer != "あ" || result.Explanation != "hiragana a" {
 		t.Fatalf(
 			"unexpected public result: %+v",
-			res,
+			result,
 		)
 	}
 	if recorded := store.values[sessionID].Items[0].SessionQuestion.IsCorrect; recorded == nil || !*recorded {
@@ -124,7 +124,7 @@ func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 	sessionID := 10
 	questionID := 1
 
-	svc, store := newQuizTestSession(
+	sessionService, store := newQuizTestSession(
 		t,
 		handwritingState(
 			userID,
@@ -142,7 +142,7 @@ func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 		),
 	)
 
-	res, err := svc.SubmitHandwriting(
+	result, err := sessionService.SubmitHandwriting(
 		ctx,
 		HandwritingSubmitRequest{
 			UserID:     userID,
@@ -157,7 +157,7 @@ func TestSubmitHandwriting_WrongRecordsIncorrect(t *testing.T) {
 			err,
 		)
 	}
-	if res.IsCorrect {
+	if result.IsCorrect {
 		t.Fatal("expected wrong handwriting result")
 	}
 	if recorded := store.values[sessionID].Items[0].SessionQuestion.IsCorrect; recorded == nil || *recorded {
@@ -175,7 +175,7 @@ func TestSubmitHandwriting_LLMErrorReturnsErrorWithoutRecording(t *testing.T) {
 	llmErr := errors.New("llm unauthorized")
 	userID := int64(123)
 	sessionID := 10
-	svc, store := newQuizTestSession(
+	sessionService, store := newQuizTestSession(
 		t,
 		handwritingState(
 			userID,
@@ -189,7 +189,7 @@ func TestSubmitHandwriting_LLMErrorReturnsErrorWithoutRecording(t *testing.T) {
 		),
 	)
 
-	_, err := svc.SubmitHandwriting(
+	_, err := sessionService.SubmitHandwriting(
 		ctx,
 		HandwritingSubmitRequest{UserID: userID, SessionID: sessionID, QuestionID: 1},
 	)
@@ -243,7 +243,7 @@ func TestSubmitHandwriting_RejectsBeforeGrading(t *testing.T) {
 			tt.name,
 			func(t *testing.T) {
 				// A nil LLM makes any grading attempt panic.
-				svc, _ := newQuizTestSession(
+				sessionService, _ := newQuizTestSession(
 					t,
 					handwritingState(
 						tt.ownerID,
@@ -253,7 +253,7 @@ func TestSubmitHandwriting_RejectsBeforeGrading(t *testing.T) {
 					),
 					nil,
 				)
-				_, err := svc.SubmitHandwriting(
+				_, err := sessionService.SubmitHandwriting(
 					context.Background(),
 					HandwritingSubmitRequest{UserID: 123, SessionID: 10, QuestionID: 1},
 				)
@@ -301,7 +301,7 @@ func TestSubmitHandwriting_UsesCurrentDuplicateOccurrence(t *testing.T) {
 	)
 	state.CurrentIndex = 1
 
-	svc, store := newQuizTestSession(
+	sessionService, store := newQuizTestSession(
 		t,
 		state,
 		handwritingGradeLLM(
@@ -309,7 +309,7 @@ func TestSubmitHandwriting_UsesCurrentDuplicateOccurrence(t *testing.T) {
 			nil,
 		),
 	)
-	if _, err := svc.SubmitHandwriting(
+	if _, err := sessionService.SubmitHandwriting(
 		ctx,
 		HandwritingSubmitRequest{
 			UserID:     userID,

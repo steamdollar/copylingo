@@ -14,38 +14,56 @@ func NewContextHandler(next slog.Handler) *ContextHandler {
 	return &ContextHandler{next: next}
 }
 
-func (h *ContextHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return h.next.Enabled(ctx, level)
+func (handler *ContextHandler) Enabled(
+	ctx context.Context,
+	level slog.Level,
+) bool {
+	return handler.next.Enabled(
+		ctx,
+		level,
+	)
 }
 
-func (h *ContextHandler) Handle(ctx context.Context, record slog.Record) error {
+func (handler *ContextHandler) Handle(
+	ctx context.Context,
+	record slog.Record,
+) error {
 	keys := make(map[string]struct{})
-	record.Attrs(func(attr slog.Attr) bool {
-		keys[attr.Key] = struct{}{}
+	record.Attrs(func(attribute slog.Attr) bool {
+		keys[attribute.Key] = struct{}{}
 		return true
 	})
 
-	for _, attr := range attrsFromContext(ctx) {
-		if _, exists := keys[attr.Key]; exists {
+	for _, attribute := range attributesFromContext(ctx) {
+		if _, exists := keys[attribute.Key]; exists {
 			continue
 		}
-		record.AddAttrs(attr)
-		keys[attr.Key] = struct{}{}
+		record.AddAttrs(attribute)
+		keys[attribute.Key] = struct{}{}
 	}
 	if _, exists := keys["source"]; !exists {
-		record.AddAttrs(slog.String("source", "app"))
+		record.AddAttrs(slog.String(
+			"source",
+			"app",
+		))
 	}
 	if _, exists := keys["event"]; !exists {
-		record.AddAttrs(slog.String("event", "legacy.log"))
+		record.AddAttrs(slog.String(
+			"event",
+			"legacy.log",
+		))
 	}
 
-	return h.next.Handle(ctx, record)
+	return handler.next.Handle(
+		ctx,
+		record,
+	)
 }
 
-func (h *ContextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &ContextHandler{next: h.next.WithAttrs(attrs)}
+func (handler *ContextHandler) WithAttrs(attributes []slog.Attr) slog.Handler {
+	return &ContextHandler{next: handler.next.WithAttrs(attributes)}
 }
 
-func (h *ContextHandler) WithGroup(name string) slog.Handler {
-	return &ContextHandler{next: h.next.WithGroup(name)}
+func (handler *ContextHandler) WithGroup(name string) slog.Handler {
+	return &ContextHandler{next: handler.next.WithGroup(name)}
 }

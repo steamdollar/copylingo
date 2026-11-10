@@ -118,7 +118,7 @@ func TestRunJobLogsFailure(t *testing.T) {
 
 func TestStartRegistersOnlyHalfHourlyUserPush(t *testing.T) {
 	cronScheduler := cron.New()
-	scheduler := New(Deps{
+	scheduler := New(Dependencies{
 		Cron: cronScheduler,
 	})
 
@@ -157,16 +157,16 @@ type onceSchedule struct {
 	fired atomic.Bool
 }
 
-func (s *onceSchedule) Next(t time.Time) time.Time {
-	if s.fired.Swap(true) {
-		return t.Add(24 * time.Hour)
+func (schedule *onceSchedule) Next(now time.Time) time.Time {
+	if schedule.fired.Swap(true) {
+		return now.Add(24 * time.Hour)
 	}
-	return t.Add(time.Millisecond)
+	return now.Add(time.Millisecond)
 }
 
 func TestStopWaitsForRunningJob(t *testing.T) {
 	cronScheduler := cron.New()
-	scheduler := New(Deps{Cron: cronScheduler})
+	scheduler := New(Dependencies{Cron: cronScheduler})
 	running := make(chan struct{})
 	release := make(chan struct{})
 	cronScheduler.Schedule(

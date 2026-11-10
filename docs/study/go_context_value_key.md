@@ -3,7 +3,7 @@
 ## 질문
 
 ```go
-type contextAttrsKey struct{}
+type contextAttributesKey struct{}
 ```
 
 변수도 없는데 이 타입이 어떻게 `context.Context`의 key로 동작하는가?
@@ -11,22 +11,22 @@ type contextAttrsKey struct{}
 ## 핵심
 
 `type` 자체가 key인 것은 아니다.
-실제 key는 `contextAttrsKey{}` 표현식으로 즉석에서 생성한 **값**이다.
+실제 key는 `contextAttributesKey{}` 표현식으로 즉석에서 생성한 **값**이다.
 
 ```go
-type contextAttrsKey struct{}
+type contextAttributesKey struct{}
 
-ctx = context.WithValue(ctx, contextAttrsKey{}, merged)
-attrs := ctx.Value(contextAttrsKey{})
+ctx = context.WithValue(ctx, contextAttributesKey{}, merged)
+attrs := ctx.Value(contextAttributesKey{})
 ```
 
 위 코드를 변수로 풀어 쓰면 다음과 같다.
 
 ```go
-saveKey := contextAttrsKey{}
+saveKey := contextAttributesKey{}
 ctx = context.WithValue(ctx, saveKey, merged)
 
-lookupKey := contextAttrsKey{}
+lookupKey := contextAttributesKey{}
 attrs := ctx.Value(lookupKey)
 ```
 
@@ -56,8 +56,8 @@ func (c *valueCtx) Value(key any) any {
 따라서 같은 타입의 빈 struct 값은 항상 같다.
 
 ```go
-a := contextAttrsKey{}
-b := contextAttrsKey{}
+a := contextAttributesKey{}
+b := contextAttributesKey{}
 
 fmt.Println(a == b) // true
 ```
@@ -74,24 +74,24 @@ context.WithValue(ctx, "attrs", merged)
 
 ```go
 // package observability
-type contextAttrsKey struct{}
+type contextAttributesKey struct{}
 
 // package other
-type contextAttrsKey struct{} // 이름과 모양이 같아도 다른 타입
+type contextAttributesKey struct{} // 이름과 모양이 같아도 다른 타입
 ```
 
 ## 현재 프로젝트 적용 위치
 
 `internal/observability/context.go`는 다음 용도로 이 패턴을 사용한다.
 
-- `WithAttrs`: Context에 `[]slog.Attr` 저장
-- `attrsFromContext`: 동일 key 값으로 attributes 조회
+- `WithAttributes`: Context에 `[]slog.Attr` 저장
+- `attributesFromContext`: 동일 key 값으로 attributes 조회
 - `InteractionID`: 조회한 attributes에서 `interaction_id` 추출
 
 ## 정리
 
-- 타입 정의: `type contextAttrsKey struct{}`
-- 실제 key 값 생성: `contextAttrsKey{}`
+- 타입 정의: `type contextAttributesKey struct{}`
+- 실제 key 값 생성: `contextAttributesKey{}`
 - 조회 방식: 주소가 아니라 key 값의 `==` 비교
 - 빈 struct 사용 이유: 값이 가볍고 같은 타입의 값끼리 항상 동일
 - 전용 타입 사용 이유: 다른 패키지의 Context key와 충돌 방지

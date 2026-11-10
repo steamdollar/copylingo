@@ -69,8 +69,8 @@ func TestSessionServiceFinishStudy(t *testing.T) {
 					state,
 				)
 				flushed := false
-				svc := NewSessionService(SessionDeps{
-					StudyActiveSessionRepo: &fakeStudyActiveRepo{flushFn: func(
+				sessionService := NewSessionService(SessionDependencies{
+					StudyActiveSessionRepository: &fakeStudyActiveRepository{flushFunc: func(
 						context.Context,
 						*model.StudyActiveSessionState,
 					) error {
@@ -80,7 +80,7 @@ func TestSessionServiceFinishStudy(t *testing.T) {
 					Stores: SessionStores{Study: store},
 				})
 
-				err := svc.FinishStudy(
+				err := sessionService.FinishStudy(
 					ctx,
 					sessionID,
 					ownerID,
@@ -124,14 +124,14 @@ func TestSessionServiceFinishStudy(t *testing.T) {
 	}
 }
 
-// slotQuestionRepo and slotMaterialRepo report no content while recording
+// slotQuestionRepository and slotMaterialRepository report no content while recording
 // which builder a slot reached.
-type slotQuestionRepo struct {
-	QuestionRepo
+type slotQuestionRepository struct {
+	QuestionRepository
 	dueLimits []int
 }
 
-func (r *slotQuestionRepo) GetDueReviews(
+func (repository *slotQuestionRepository) GetDueReviews(
 	_ context.Context,
 	_ int64,
 	_,
@@ -141,14 +141,14 @@ func (r *slotQuestionRepo) GetDueReviews(
 	_ int,
 	_ ...model.QuestionCategory,
 ) ([]model.Question, error) {
-	r.dueLimits = append(
-		r.dueLimits,
+	repository.dueLimits = append(
+		repository.dueLimits,
 		limit,
 	)
 	return nil, nil
 }
 
-func (r *slotQuestionRepo) GetNewQuestions(
+func (repository *slotQuestionRepository) GetNewQuestions(
 	context.Context,
 	int64,
 	string,
@@ -161,11 +161,11 @@ func (r *slotQuestionRepo) GetNewQuestions(
 	return nil, nil
 }
 
-type slotMaterialRepo struct {
+type slotMaterialRepository struct {
 	planTotals []int
 }
 
-func (r *slotMaterialRepo) GetMaterialsByPlan(
+func (repository *slotMaterialRepository) GetMaterialsByPlan(
 	_ context.Context,
 	_ int64,
 	_,
@@ -173,8 +173,8 @@ func (r *slotMaterialRepo) GetMaterialsByPlan(
 	_ []string,
 	plan model.StudySessionPlan,
 ) ([]model.Material, error) {
-	r.planTotals = append(
-		r.planTotals,
+	repository.planTotals = append(
+		repository.planTotals,
 		plan.TotalMaterialCount(),
 	)
 	return nil, nil
@@ -200,14 +200,14 @@ func TestSessionServiceBuildForSlot(t *testing.T) {
 		t.Run(
 			string(tt.slot),
 			func(t *testing.T) {
-				questions := &slotQuestionRepo{}
-				materials := &slotMaterialRepo{}
-				svc := NewSessionService(SessionDeps{
-					QuestionRepo: questions,
-					MaterialRepo: materials,
+				questions := &slotQuestionRepository{}
+				materials := &slotMaterialRepository{}
+				sessionService := NewSessionService(SessionDependencies{
+					QuestionRepository: questions,
+					MaterialRepository: materials,
 				})
 
-				session, err := svc.BuildForSlot(
+				session, err := sessionService.BuildForSlot(
 					context.Background(),
 					user,
 					tt.slot,
@@ -245,7 +245,7 @@ func TestSessionServiceBuildForSlot(t *testing.T) {
 		)
 	}
 
-	if _, err := NewSessionService(SessionDeps{}).BuildForSlot(
+	if _, err := NewSessionService(SessionDependencies{}).BuildForSlot(
 		context.Background(),
 		user,
 		model.SessionSlot("night"),

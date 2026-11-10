@@ -34,7 +34,7 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 		},
 	}
 
-	query, args := buildMaterialBatchUpsertQuery(materials)
+	query, arguments := buildMaterialBatchUpsertQuery(materials)
 
 	if !strings.Contains(
 		query,
@@ -81,10 +81,10 @@ func TestBuildMaterialBatchUpsertQuery(t *testing.T) {
 			query,
 		)
 	}
-	if len(args) != 16 {
+	if len(arguments) != 16 {
 		t.Fatalf(
-			"len(args) = %d, want 16",
-			len(args),
+			"len(arguments) = %d, want 16",
+			len(arguments),
 		)
 	}
 }
@@ -156,8 +156,8 @@ func TestMaterialUpsertBatchSetsRowIDsPostgres(t *testing.T) {
 			Difficulty:       1,
 		},
 	}
-	repo := &MaterialRepository{db: tx}
-	if err := repo.UpsertBatch(
+	repository := &MaterialRepository{db: tx}
+	if err := repository.UpsertBatch(
 		ctx,
 		materials,
 	); err != nil {
@@ -328,14 +328,14 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 		}
 	}
 
-	repo := &MaterialRepository{db: tx}
+	repository := &MaterialRepository{db: tx}
 	levels := []string{"N5", "N4"}
 	morning := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, NewCount: 2, ReviewCount: 2},
 		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 1},
 		{Category: model.MaterialCategoryReading, NewCount: 1},
 	}}
-	got, err := repo.GetMaterialsByPlan(
+	got, err := repository.GetMaterialsByPlan(
 		ctx,
 		42,
 		"ja",
@@ -389,7 +389,7 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 		{Category: model.MaterialCategoryGrammar, NewCount: 1, ReviewCount: 3},
 		{Category: model.MaterialCategoryReading, ReviewCount: 2},
 	}}
-	eveningMaterials, err := repo.GetMaterialsByPlan(
+	eveningMaterials, err := repository.GetMaterialsByPlan(
 		ctx,
 		42,
 		"ja",
@@ -486,7 +486,7 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 				t.Run(
 					tt.name,
 					func(t *testing.T) {
-						materials, err := repo.GetMaterialsByPlan(
+						materials, err := repository.GetMaterialsByPlan(
 							ctx,
 							42,
 							"ja",
@@ -562,7 +562,7 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 	fallbackPlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, NewCount: 4},
 	}}
-	fallback, err := repo.GetMaterialsByPlan(
+	fallback, err := repository.GetMaterialsByPlan(
 		ctx,
 		42,
 		"ja",
@@ -605,7 +605,7 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 		{Category: model.MaterialCategoryVocabulary, ReviewCount: 0},
 		{Category: model.MaterialCategoryGrammar, NewCount: 2},
 	}}
-	otherDue, err := repo.GetMaterialsByPlan(
+	otherDue, err := repository.GetMaterialsByPlan(
 		ctx,
 		42,
 		"ja",
@@ -637,7 +637,7 @@ func TestGetMaterialsByPlanPostgres(t *testing.T) {
 	scarcePlan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, ReviewCount: 10},
 	}}
-	scarce, err := repo.GetMaterialsByPlan(
+	scarce, err := repository.GetMaterialsByPlan(
 		ctx,
 		42,
 		"ja",

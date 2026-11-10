@@ -6,7 +6,7 @@ import (
 	"github.com/lsj/copylingo/internal/redisstore"
 )
 
-// botComponents is the Telegram side initApp assembles. It stays inside
+// botComponents is the Telegram side initializeApp assembles. It stays inside
 // cmd/server: each consumer receives only the flow it calls (ADR-059 §8.3).
 type botComponents struct {
 	router      *bot.Bot
@@ -14,59 +14,59 @@ type botComponents struct {
 	studyFlow   *bot.StudyFlow
 }
 
-// initBot creates one Telegram client, each feature flow over the services
+// initializeBot creates one Telegram client, each feature flow over the services
 // and Redis interaction state it uses, and the router over the flows.
-func initBot(
-	cfg *config.Config,
-	svc services,
+func initializeBot(
+	appConfig *config.Config,
+	appServices services,
 	interactions *redisstore.Interactions,
 ) (botComponents, error) {
 	telegram, err := bot.NewTelegramClient(
-		cfg.Telegram.Token,
-		cfg.Telegram.Debug,
+		appConfig.Telegram.Token,
+		appConfig.Telegram.Debug,
 	)
 	if err != nil {
 		return botComponents{}, err
 	}
 
-	studyFlow := bot.NewStudyFlow(bot.StudyFlowDeps{
+	studyFlow := bot.NewStudyFlow(bot.StudyFlowDependencies{
 		Telegram:           telegram,
-		Session:            svc.session,
-		MaterialPreference: svc.materialPreference,
+		Session:            appServices.session,
+		MaterialPreference: appServices.materialPreference,
 		Input:              interactions,
 	})
-	sessionFlow := bot.NewSessionFlow(bot.SessionFlowDeps{
+	sessionFlow := bot.NewSessionFlow(bot.SessionFlowDependencies{
 		Telegram:           telegram,
-		Session:            svc.session,
-		User:               svc.user,
-		MaterialPreference: svc.materialPreference,
+		Session:            appServices.session,
+		User:               appServices.user,
+		MaterialPreference: appServices.materialPreference,
 		Input:              interactions,
 		Drafts:             interactions,
 		Messages:           interactions,
 		Recovery:           interactions,
 		Study:              studyFlow,
-		Audio:              svc.audio,
-		PublicBaseURL:      cfg.Server.PublicBaseURL,
+		Audio:              appServices.audio,
+		PublicBaseURL:      appConfig.Server.PublicBaseURL,
 	})
 
-	router := bot.NewBot(bot.BotDeps{
+	router := bot.NewBot(bot.BotDependencies{
 		Telegram:    telegram,
-		User:        svc.user,
-		Session:     svc.session,
-		Analyzer:    svc.analyzer,
+		User:        appServices.user,
+		Session:     appServices.session,
+		Analyzer:    appServices.analyzer,
 		Input:       interactions,
 		SessionFlow: sessionFlow,
 		StudyFlow:   studyFlow,
-		SettingsFlow: bot.NewSettingsFlow(bot.SettingsFlowDeps{
+		SettingsFlow: bot.NewSettingsFlow(bot.SettingsFlowDependencies{
 			Telegram:           telegram,
-			User:               svc.user,
-			MaterialPreference: svc.materialPreference,
+			User:               appServices.user,
+			MaterialPreference: appServices.materialPreference,
 		}),
-		LLMQuestionFlow: bot.NewLLMQuestionFlow(bot.LLMQuestionFlowDeps{
+		LLMQuestionFlow: bot.NewLLMQuestionFlow(bot.LLMQuestionFlowDependencies{
 			Telegram:    telegram,
-			User:        svc.user,
-			LLMQuestion: svc.llmQuestion,
-			Session:     svc.session,
+			User:        appServices.user,
+			LLMQuestion: appServices.llmQuestion,
+			Session:     appServices.session,
 			Input:       interactions,
 		}),
 	})

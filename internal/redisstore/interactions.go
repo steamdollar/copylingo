@@ -22,19 +22,19 @@ const (
 
 // Interactions shares one Redis client across input, draft, and Mini App state.
 type Interactions struct {
-	rdb redis.Cmdable
+	redisClient redis.Cmdable
 }
 
-func NewInteractions(rdb redis.Cmdable) *Interactions {
-	return &Interactions{rdb: rdb}
+func NewInteractions(redisClient redis.Cmdable) *Interactions {
+	return &Interactions{redisClient: redisClient}
 }
 
-func (s *Interactions) SetLLMPending(
+func (interactions *Interactions) SetLLMPending(
 	ctx context.Context,
 	userID int64,
 	input model.PendingLLMInput,
 ) error {
-	return s.rdb.Set(
+	return interactions.redisClient.Set(
 		ctx,
 		fmt.Sprintf(
 			llmPendingKey,
@@ -45,12 +45,12 @@ func (s *Interactions) SetLLMPending(
 	).Err()
 }
 
-func (s *Interactions) TakeLLMPending(
+func (interactions *Interactions) TakeLLMPending(
 	ctx context.Context,
 	userID int64,
 ) (model.PendingLLMInput, bool, error) {
 	// GETDEL preserves one-shot consumption, including malformed legacy values.
-	raw, err := s.rdb.GetDel(
+	raw, err := interactions.redisClient.GetDel(
 		ctx,
 		fmt.Sprintf(
 			llmPendingKey,
@@ -70,11 +70,11 @@ func (s *Interactions) TakeLLMPending(
 	return decodePendingLLMInput(raw), true, nil
 }
 
-func (s *Interactions) DeleteLLMPending(
+func (interactions *Interactions) DeleteLLMPending(
 	ctx context.Context,
 	userID int64,
 ) error {
-	return s.rdb.Del(
+	return interactions.redisClient.Del(
 		ctx,
 		fmt.Sprintf(
 			llmPendingKey,
@@ -83,11 +83,11 @@ func (s *Interactions) DeleteLLMPending(
 	).Err()
 }
 
-func (s *Interactions) GetActiveQuestion(
+func (interactions *Interactions) GetActiveQuestion(
 	ctx context.Context,
 	chatID int64,
-) (*model.ActiveQuestionRef, error) {
-	raw, err := s.rdb.Get(
+) (*model.ActiveQuestionReference, error) {
+	raw, err := interactions.redisClient.Get(
 		ctx,
 		fmt.Sprintf(
 			activeQuestionKey,
@@ -114,20 +114,20 @@ func (s *Interactions) GetActiveQuestion(
 	// Match the prior caller's permissive Atoi handling for existing marker bytes.
 	sessionID, _ := strconv.Atoi(parts[0])
 	questionIndex, _ := strconv.Atoi(parts[1])
-	return &model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIndex}, nil
+	return &model.ActiveQuestionReference{SessionID: sessionID, QuestionIndex: questionIndex}, nil
 }
 
-func (s *Interactions) SetActiveQuestion(
+func (interactions *Interactions) SetActiveQuestion(
 	ctx context.Context,
 	chatID int64,
-	question model.ActiveQuestionRef,
+	question model.ActiveQuestionReference,
 ) error {
 	value := fmt.Sprintf(
 		"%d:%d",
 		question.SessionID,
 		question.QuestionIndex,
 	)
-	return s.rdb.Set(
+	return interactions.redisClient.Set(
 		ctx,
 		fmt.Sprintf(
 			activeQuestionKey,
@@ -138,11 +138,11 @@ func (s *Interactions) SetActiveQuestion(
 	).Err()
 }
 
-func (s *Interactions) DeleteActiveQuestion(
+func (interactions *Interactions) DeleteActiveQuestion(
 	ctx context.Context,
 	chatID int64,
 ) error {
-	return s.rdb.Del(
+	return interactions.redisClient.Del(
 		ctx,
 		fmt.Sprintf(
 			activeQuestionKey,
@@ -151,7 +151,7 @@ func (s *Interactions) DeleteActiveQuestion(
 	).Err()
 }
 
-func (s *Interactions) ClearInput(
+func (interactions *Interactions) ClearInput(
 	ctx context.Context,
 	chatID int64,
 	userID *int64,
@@ -169,7 +169,7 @@ func (s *Interactions) ClearInput(
 			),
 		)
 	}
-	return s.rdb.Del(
+	return interactions.redisClient.Del(
 		ctx,
 		keys...,
 	).Err()

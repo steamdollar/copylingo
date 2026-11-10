@@ -9,67 +9,67 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type mockAnalyzerUserRepo struct {
-	getByIDFn func(
+type mockAnalyzerUserRepository struct {
+	getByIDFunc func(
 		ctx context.Context,
 		id int64,
 	) (*model.User, error)
 }
 
-func (m *mockAnalyzerUserRepo) GetByID(
+func (mock *mockAnalyzerUserRepository) GetByID(
 	ctx context.Context,
 	id int64,
 ) (*model.User, error) {
-	return m.getByIDFn(
+	return mock.getByIDFunc(
 		ctx,
 		id,
 	)
 }
 
-type mockSessionStatRepo struct {
-	getTodayStatsFn func(
+type mockSessionStatsRepository struct {
+	getTodayStatsFunc func(
 		ctx context.Context,
 		userID int64,
 	) (int, int, error)
-	getCategoryAccuracyFn func(
+	getCategoryAccuracyFunc func(
 		ctx context.Context,
 		userID int64,
 	) (map[string]float64, error)
 }
 
-func (m *mockSessionStatRepo) GetTodayStats(
+func (mock *mockSessionStatsRepository) GetTodayStats(
 	ctx context.Context,
 	userID int64,
 ) (int, int, error) {
-	return m.getTodayStatsFn(
+	return mock.getTodayStatsFunc(
 		ctx,
 		userID,
 	)
 }
-func (m *mockSessionStatRepo) GetCategoryAccuracy(
+func (mock *mockSessionStatsRepository) GetCategoryAccuracy(
 	ctx context.Context,
 	userID int64,
 ) (map[string]float64, error) {
-	return m.getCategoryAccuracyFn(
+	return mock.getCategoryAccuracyFunc(
 		ctx,
 		userID,
 	)
 }
 
-type mockMaterialProgressRepo struct {
-	getLevelProgressFn func(
+type mockMaterialProgressRepository struct {
+	getLevelProgressFunc func(
 		ctx context.Context,
 		userID int64,
 		language string,
 	) ([]model.LevelProgress, error)
 }
 
-func (m *mockMaterialProgressRepo) GetLevelProgress(
+func (mock *mockMaterialProgressRepository) GetLevelProgress(
 	ctx context.Context,
 	userID int64,
 	language string,
 ) ([]model.LevelProgress, error) {
-	return m.getLevelProgressFn(
+	return mock.getLevelProgressFunc(
 		ctx,
 		userID,
 		language,
@@ -80,8 +80,8 @@ func TestGetUserStats_MapsFieldsCorrectly(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
 
-	uRepo := &mockAnalyzerUserRepo{
-		getByIDFn: func(
+	userRepositoryMock := &mockAnalyzerUserRepository{
+		getByIDFunc: func(
 			ctx context.Context,
 			id int64,
 		) (*model.User, error) {
@@ -89,8 +89,8 @@ func TestGetUserStats_MapsFieldsCorrectly(t *testing.T) {
 		},
 	}
 
-	sRepo := &mockSessionStatRepo{
-		getTodayStatsFn: func(
+	statsRepositoryMock := &mockSessionStatsRepository{
+		getTodayStatsFunc: func(
 			ctx context.Context,
 			gotUserID int64,
 		) (int, int, error) {
@@ -103,7 +103,7 @@ func TestGetUserStats_MapsFieldsCorrectly(t *testing.T) {
 			}
 			return 10, 7, nil
 		},
-		getCategoryAccuracyFn: func(
+		getCategoryAccuracyFunc: func(
 			ctx context.Context,
 			gotUserID int64,
 		) (map[string]float64, error) {
@@ -121,8 +121,8 @@ func TestGetUserStats_MapsFieldsCorrectly(t *testing.T) {
 	}
 
 	analyzer := NewAnalyzerService(
-		uRepo,
-		sRepo,
+		userRepositoryMock,
+		statsRepositoryMock,
 		nil,
 	)
 	stats, err := analyzer.GetUserStats(
@@ -160,8 +160,8 @@ func TestGetUserStats_ZeroDivision(t *testing.T) {
 	ctx := context.Background()
 	userID := int64(123)
 
-	uRepo := &mockAnalyzerUserRepo{
-		getByIDFn: func(
+	userRepositoryMock := &mockAnalyzerUserRepository{
+		getByIDFunc: func(
 			ctx context.Context,
 			id int64,
 		) (*model.User, error) {
@@ -169,14 +169,14 @@ func TestGetUserStats_ZeroDivision(t *testing.T) {
 		},
 	}
 
-	sRepo := &mockSessionStatRepo{
-		getTodayStatsFn: func(
+	statsRepositoryMock := &mockSessionStatsRepository{
+		getTodayStatsFunc: func(
 			ctx context.Context,
 			userID int64,
 		) (int, int, error) {
 			return 0, 0, nil
 		},
-		getCategoryAccuracyFn: func(
+		getCategoryAccuracyFunc: func(
 			ctx context.Context,
 			userID int64,
 		) (map[string]float64, error) {
@@ -185,8 +185,8 @@ func TestGetUserStats_ZeroDivision(t *testing.T) {
 	}
 
 	analyzer := NewAnalyzerService(
-		uRepo,
-		sRepo,
+		userRepositoryMock,
+		statsRepositoryMock,
 		nil,
 	)
 	stats, err := analyzer.GetUserStats(
@@ -210,8 +210,8 @@ func TestGetUserStats_ZeroDivision(t *testing.T) {
 
 func TestGetUserStats_UserNotFound(t *testing.T) {
 	ctx := context.Background()
-	uRepo := &mockAnalyzerUserRepo{
-		getByIDFn: func(
+	userRepositoryMock := &mockAnalyzerUserRepository{
+		getByIDFunc: func(
 			ctx context.Context,
 			id int64,
 		) (*model.User, error) {
@@ -220,7 +220,7 @@ func TestGetUserStats_UserNotFound(t *testing.T) {
 	}
 
 	analyzer := NewAnalyzerService(
-		uRepo,
+		userRepositoryMock,
 		nil,
 		nil,
 	)
@@ -235,16 +235,16 @@ func TestGetUserStats_UserNotFound(t *testing.T) {
 }
 
 func TestGetLevelProgress_OrdersJapaneseLevelsFromNZ(t *testing.T) {
-	uRepo := &mockAnalyzerUserRepo{
-		getByIDFn: func(
+	userRepositoryMock := &mockAnalyzerUserRepository{
+		getByIDFunc: func(
 			ctx context.Context,
 			id int64,
 		) (*model.User, error) {
 			return &model.User{ID: id, Language: "ja"}, nil
 		},
 	}
-	mRepo := &mockMaterialProgressRepo{
-		getLevelProgressFn: func(
+	materialProgressRepositoryMock := &mockMaterialProgressRepository{
+		getLevelProgressFunc: func(
 			ctx context.Context,
 			userID int64,
 			language string,
@@ -267,9 +267,9 @@ func TestGetLevelProgress_OrdersJapaneseLevelsFromNZ(t *testing.T) {
 	}
 
 	progress, err := NewAnalyzerService(
-		uRepo,
+		userRepositoryMock,
 		nil,
-		mRepo,
+		materialProgressRepositoryMock,
 	).GetLevelProgress(
 		context.Background(),
 		123,

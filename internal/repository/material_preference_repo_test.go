@@ -37,12 +37,18 @@ func preferenceTestTransaction(t *testing.T) *sqlx.Tx {
 	if dsn == "" {
 		t.Skip("COPYLINGO_TEST_DATABASE_URL is not set")
 	}
-	db, err := sqlx.Open("postgres", dsn)
+	db, err := sqlx.Open(
+		"postgres",
+		dsn,
+	)
 	if err != nil {
 		t.Fatal("open test database failed")
 	}
 	t.Cleanup(func() { db.Close() })
-	tx, err := db.BeginTxx(context.Background(), nil)
+	tx, err := db.BeginTxx(
+		context.Background(),
+		nil,
+	)
 	if err != nil {
 		t.Fatal("begin test transaction failed")
 	}
@@ -84,14 +90,27 @@ func preferenceTestTransaction(t *testing.T) *sqlx.Tx {
 			id integer PRIMARY KEY, session_id integer NOT NULL, material_id integer NOT NULL, studied_at timestamptz
 		) ON COMMIT DROP`,
 	} {
-		mustPreferenceExec(t, tx, statement)
+		mustPreferenceExec(
+			t,
+			tx,
+			statement,
+		)
 	}
 	return tx
 }
 
-func mustPreferenceExec(t *testing.T, tx *sqlx.Tx, query string, args ...any) {
+func mustPreferenceExec(
+	t *testing.T,
+	tx *sqlx.Tx,
+	query string,
+	arguments ...any,
+) {
 	t.Helper()
-	if _, err := tx.ExecContext(context.Background(), query, args...); err != nil {
+	if _, err := tx.ExecContext(
+		context.Background(),
+		query,
+		arguments...,
+	); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -99,7 +118,7 @@ func mustPreferenceExec(t *testing.T, tx *sqlx.Tx, query string, args ...any) {
 func TestMaterialPreferenceRepositoryPostgres(t *testing.T) {
 	tx := preferenceTestTransaction(t)
 	ctx := context.Background()
-	repo := &MaterialPreferenceRepository{db: tx}
+	repository := &MaterialPreferenceRepository{db: tx}
 	mustPreferenceExec(
 		t,
 		tx,
@@ -110,7 +129,11 @@ func TestMaterialPreferenceRepositoryPostgres(t *testing.T) {
 		tx,
 		`INSERT INTO user_material_progress (user_id, material_id, next_review_at) VALUES (42, 1, NOW() - INTERVAL '2 days')`,
 	)
-	mustPreferenceExec(t, tx, `INSERT INTO questions (id, material_id) VALUES (1, 1), (2, 2)`)
+	mustPreferenceExec(
+		t,
+		tx,
+		`INSERT INTO questions (id, material_id) VALUES (1, 1), (2, 2)`,
+	)
 	mustPreferenceExec(
 		t,
 		tx,
@@ -118,65 +141,158 @@ func TestMaterialPreferenceRepositoryPostgres(t *testing.T) {
 	)
 	var historyBefore, historyAfter string
 	const historyQuery = `SELECT (SELECT jsonb_agg(to_jsonb(p)) FROM user_material_progress p)::text || (SELECT jsonb_agg(to_jsonb(p)) FROM user_question_progress p)::text`
-	if err := tx.GetContext(ctx, &historyBefore, historyQuery); err != nil {
+	if err := tx.GetContext(
+		ctx,
+		&historyBefore,
+		historyQuery,
+	); err != nil {
 		t.Fatal(err)
 	}
-	got, err := repo.Get(ctx, 42, 1)
+	got, err := repository.Get(
+		ctx,
+		42,
+		1,
+	)
 	if err != nil || got.ReviewMode != model.MaterialReviewNormal {
-		t.Fatalf("absent preference = %+v, %v", got, err)
+		t.Fatalf(
+			"absent preference = %+v, %v",
+			got,
+			err,
+		)
 	}
 	for _, id := range []int{1, 2} {
-		if err := repo.Set(ctx, 42, id, model.MaterialReviewMaintenance); err != nil {
+		if err := repository.Set(
+			ctx,
+			42,
+			id,
+			model.MaterialReviewMaintenance,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
-	got, err = repo.Get(ctx, 42, 1)
+	got, err = repository.Get(
+		ctx,
+		42,
+		1,
+	)
 	if err != nil || got.CheckIntervalDays != 30 || got.NextCheckAt == nil {
-		t.Fatalf("maintenance = %+v, %v", got, err)
+		t.Fatalf(
+			"maintenance = %+v, %v",
+			got,
+			err,
+		)
 	}
 	if until := time.Until(*got.NextCheckAt); until < 29*24*time.Hour || until > 31*24*time.Hour {
-		t.Fatalf("initial check interval = %s", until)
+		t.Fatalf(
+			"initial check interval = %s",
+			until,
+		)
 	}
 	mustPreferenceExec(
 		t,
 		tx,
 		`UPDATE user_material_preferences SET check_interval_days = 120, next_check_at = NOW() - INTERVAL '1 day', updated_at = NOW() - INTERVAL '2 days' WHERE user_id = 42 AND material_id = 1`,
 	)
-	before, err := repo.Get(ctx, 42, 1)
+	before, err := repository.Get(
+		ctx,
+		42,
+		1,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.Set(ctx, 42, 1, model.MaterialReviewMaintenance); err != nil {
+	if err := repository.Set(
+		ctx,
+		42,
+		1,
+		model.MaterialReviewMaintenance,
+	); err != nil {
 		t.Fatal(err)
 	}
-	after, err := repo.Get(ctx, 42, 1)
-	if err != nil || !reflect.DeepEqual(before, after) {
-		t.Fatalf("same-mode write changed schedule: before=%+v after=%+v err=%v", before, after, err)
+	after, err := repository.Get(
+		ctx,
+		42,
+		1,
+	)
+	if err != nil || !reflect.DeepEqual(
+		before,
+		after,
+	) {
+		t.Fatalf(
+			"same-mode write changed schedule: before=%+v after=%+v err=%v",
+			before,
+			after,
+			err,
+		)
 	}
-	if err := repo.Set(ctx, 99, 1, model.MaterialReviewExcluded); err != nil {
+	if err := repository.Set(
+		ctx,
+		99,
+		1,
+		model.MaterialReviewExcluded,
+	); err != nil {
 		t.Fatal(err)
 	}
-	list, err := repo.List(ctx, 42, 1, 1)
+	list, err := repository.List(
+		ctx,
+		42,
+		1,
+		1,
+	)
 	if err != nil || len(list) != 1 || list[0].MaterialID != 2 || list[0].MaterialTitle != "Second" {
-		t.Fatalf("paged list = %+v, %v", list, err)
+		t.Fatalf(
+			"paged list = %+v, %v",
+			list,
+			err,
+		)
 	}
 	for _, id := range []int{1, 2} {
-		if err := repo.Set(ctx, 42, id, model.MaterialReviewExcluded); err != nil {
+		if err := repository.Set(
+			ctx,
+			42,
+			id,
+			model.MaterialReviewExcluded,
+		); err != nil {
 			t.Fatal(err)
 		}
-		excluded, err := repo.Get(ctx, 42, id)
+		excluded, err := repository.Get(
+			ctx,
+			42,
+			id,
+		)
 		if err != nil || excluded.NextCheckAt != nil {
-			t.Fatalf("excluded = %+v, %v", excluded, err)
+			t.Fatalf(
+				"excluded = %+v, %v",
+				excluded,
+				err,
+			)
 		}
-		if err := repo.Set(ctx, 42, id, model.MaterialReviewNormal); err != nil {
+		if err := repository.Set(
+			ctx,
+			42,
+			id,
+			model.MaterialReviewNormal,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
-	other, err := repo.Get(ctx, 99, 1)
+	other, err := repository.Get(
+		ctx,
+		99,
+		1,
+	)
 	if err != nil || other.ReviewMode != model.MaterialReviewExcluded {
-		t.Fatalf("other user changed: %+v, %v", other, err)
+		t.Fatalf(
+			"other user changed: %+v, %v",
+			other,
+			err,
+		)
 	}
-	if err := tx.GetContext(ctx, &historyAfter, historyQuery); err != nil {
+	if err := tx.GetContext(
+		ctx,
+		&historyAfter,
+		historyQuery,
+	); err != nil {
 		t.Fatal(err)
 	}
 	if historyBefore != historyAfter {
@@ -189,7 +305,11 @@ func TestMaterialPreferenceRepositoryPostgres(t *testing.T) {
 		`SELECT COUNT(*) FROM user_material_progress WHERE user_id=42 AND material_id=2`,
 	); err != nil ||
 		unseen != 0 {
-		t.Fatalf("unseen material gained history: %d, %v", unseen, err)
+		t.Fatalf(
+			"unseen material gained history: %d, %v",
+			unseen,
+			err,
+		)
 	}
 	var questions []model.Question
 	if err := tx.SelectContext(
@@ -207,9 +327,17 @@ func TestMaterialPreferenceRepositoryPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(questions) != 1 || questions[0].ID != 2 {
-		t.Fatalf("normal did not restore unseen quiz: %+v", questions)
+		t.Fatalf(
+			"normal did not restore unseen quiz: %+v",
+			questions,
+		)
 	}
-	if err := repo.Set(ctx, 42, 1, "invalid"); err == nil {
+	if err := repository.Set(
+		ctx,
+		42,
+		1,
+		"invalid",
+	); err == nil {
 		t.Fatal("invalid mode accepted")
 	}
 }
@@ -239,10 +367,18 @@ func TestMaterialPreferenceSelectionPostgres(t *testing.T) {
 		 SELECT 42,id,NOW()-INTERVAL '1 day' FROM questions WHERE id IN (11,21,31,41,42,43,110,120)`,
 		`UPDATE user_question_progress SET next_review_at=NOW()+INTERVAL '1 day' WHERE question_id=110`,
 	} {
-		mustPreferenceExec(t, tx, query)
+		mustPreferenceExec(
+			t,
+			tx,
+			query,
+		)
 	}
 
-	newQuestions := func(userID int64, category string, exclusions []int) []model.Question {
+	newQuestions := func(
+		userID int64,
+		category string,
+		exclusions []int,
+	) []model.Question {
 		t.Helper()
 		var got []model.Question
 		if err := tx.SelectContext(
@@ -261,44 +397,95 @@ func TestMaterialPreferenceSelectionPostgres(t *testing.T) {
 		}
 		return got
 	}
-	assertIDs := func(got []model.Question, want ...int) {
+	assertIDs := func(
+		got []model.Question,
+		want ...int,
+	) {
 		t.Helper()
 		seen := make(map[int]bool)
-		for _, q := range got {
-			seen[q.ID] = true
-			wantMaintenance := q.ID == 41 || q.ID == 101 || q.ID == 120
-			if q.IsMaintenanceCheck != wantMaintenance {
+		for _, question := range got {
+			seen[question.ID] = true
+			wantMaintenance := question.ID == 41 || question.ID == 101 || question.ID == 120
+			if question.IsMaintenanceCheck != wantMaintenance {
 				t.Fatalf(
 					"question %d maintenance selection hint = %v, want %v",
-					q.ID,
-					q.IsMaintenanceCheck,
+					question.ID,
+					question.IsMaintenanceCheck,
 					wantMaintenance,
 				)
 			}
 		}
 		if len(got) != len(want) {
-			t.Fatalf("question IDs=%v, want %v", seen, want)
+			t.Fatalf(
+				"question IDs=%v, want %v",
+				seen,
+				want,
+			)
 		}
 		for _, id := range want {
 			if !seen[id] {
-				t.Fatalf("question IDs=%v, want %v", seen, want)
+				t.Fatalf(
+					"question IDs=%v, want %v",
+					seen,
+					want,
+				)
 			}
 		}
 	}
-	assertIDs(newQuestions(42, "", nil), 10, 90, 101, 130)
-	assertIDs(newQuestions(42, "vocabulary", []int{102}), 10, 90, 130)
-	assertIDs(newQuestions(42, "grammar", nil))
+	assertIDs(
+		newQuestions(
+			42,
+			"",
+			nil,
+		),
+		10,
+		90,
+		101,
+		130,
+	)
+	assertIDs(
+		newQuestions(
+			42,
+			"vocabulary",
+			[]int{102},
+		),
+		10,
+		90,
+		130,
+	)
+	assertIDs(newQuestions(
+		42,
+		"grammar",
+		nil,
+	))
 	// The deterministic representative is in-scope even though its first linked
 	// variant belongs to a higher level; a second call cannot choose a variant.
-	assertIDs(newQuestions(42, "vocabulary", []int{101}), 10, 90, 130)
-	other := newQuestions(99, "vocabulary", nil)
+	assertIDs(
+		newQuestions(
+			42,
+			"vocabulary",
+			[]int{101},
+		),
+		10,
+		90,
+		130,
+	)
+	other := newQuestions(
+		99,
+		"vocabulary",
+		nil,
+	)
 	otherIDs := make(map[int]bool)
-	for _, q := range other {
-		otherIDs[q.ID] = true
+	for _, question := range other {
+		otherIDs[question.ID] = true
 	}
 	for _, id := range []int{20, 21, 30, 31, 40, 41, 101, 102} {
 		if !otherIDs[id] {
-			t.Fatalf("another user's setting/progress blocked question %d: %v", id, otherIDs)
+			t.Fatalf(
+				"another user's setting/progress blocked question %d: %v",
+				id,
+				otherIDs,
+			)
 		}
 	}
 	if otherIDs[90] {
@@ -322,49 +509,89 @@ func TestMaterialPreferenceSelectionPostgres(t *testing.T) {
 		}
 		switch {
 		case len(category) == 0:
-			assertIDs(got, 11, 41, 120)
+			assertIDs(
+				got,
+				11,
+				41,
+				120,
+			)
 		case category[0] == model.CategoryVocabulary:
-			assertIDs(got, 11, 41)
+			assertIDs(
+				got,
+				11,
+				41,
+			)
 		case category[0] == model.CategoryGrammar:
 			assertIDs(got)
 		case category[0] == model.CategoryReading:
-			assertIDs(got, 120)
+			assertIDs(
+				got,
+				120,
+			)
 		}
 	}
 	var count int
-	if err := tx.GetContext(ctx, &count, dueReviewCountQuery, 42, "ja", pq.Array([]string{"N4"})); err != nil {
+	if err := tx.GetContext(
+		ctx,
+		&count,
+		dueReviewCountQuery,
+		42,
+		"ja",
+		pq.Array([]string{"N4"}),
+	); err != nil {
 		t.Fatal(err)
 	}
 	if count != 3 {
-		t.Fatalf("gated due count=%d, want 3", count)
+		t.Fatalf(
+			"gated due count=%d, want 3",
+			count,
+		)
 	}
 	plan := model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
 		{Category: model.MaterialCategoryVocabulary, NewCount: 1, ReviewCount: 20},
 		{Category: model.MaterialCategoryReading, NewCount: 1},
 	}}
-	repo := &MaterialRepository{db: tx}
-	got, err := repo.GetMaterialsByPlan(ctx, 42, "ja", "N4", []string{"N4"}, plan)
+	repository := &MaterialRepository{db: tx}
+	got, err := repository.GetMaterialsByPlan(
+		ctx,
+		42,
+		"ja",
+		"N4",
+		[]string{"N4"},
+		plan,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	seen := make(map[int]bool)
-	for _, m := range got {
-		seen[m.ID] = true
+	for _, material := range got {
+		seen[material.ID] = true
 	}
 	want := []int{1, 5, 6, 7, 9, 11}
 	if len(got) != len(want) {
-		t.Fatalf("study selection=%v, want %v", seen, want)
+		t.Fatalf(
+			"study selection=%v, want %v",
+			seen,
+			want,
+		)
 	}
 	for _, id := range want {
 		if !seen[id] {
-			t.Fatalf("study selection=%v, want %v", seen, want)
+			t.Fatalf(
+				"study selection=%v, want %v",
+				seen,
+				want,
+			)
 		}
 	}
 	// Empty primary buckets still cannot reintroduce excluded/future material
 	// through the due or new-vocabulary top-up paths.
 	for _, id := range []int{2, 3, 4, 8, 10, 12} {
 		if seen[id] {
-			t.Fatalf("study fallback bypassed preference/quiz/SRS gate for %d", id)
+			t.Fatalf(
+				"study fallback bypassed preference/quiz/SRS gate for %d",
+				id,
+			)
 		}
 	}
 }

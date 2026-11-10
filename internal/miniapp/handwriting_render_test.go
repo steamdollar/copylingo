@@ -25,7 +25,7 @@ func TestRenderStrokesPNGSizesCanvasToInk(t *testing.T) {
 		)
 	}
 
-	img, err := png.Decode(bytes.NewReader(imageBytes))
+	canvas, err := png.Decode(bytes.NewReader(imageBytes))
 	if err != nil {
 		t.Fatalf(
 			"png.Decode() error = %v",
@@ -33,11 +33,11 @@ func TestRenderStrokesPNGSizesCanvasToInk(t *testing.T) {
 		)
 	}
 	// 40x30 ink scaled to the 624px draw height is 832px wide, plus 2x72 padding.
-	if img.Bounds().Dx() != 976 || img.Bounds().Dy() != renderHeight {
+	if canvas.Bounds().Dx() != 976 || canvas.Bounds().Dy() != renderHeight {
 		t.Fatalf(
 			"image size = %dx%d, want 976x%d",
-			img.Bounds().Dx(),
-			img.Bounds().Dy(),
+			canvas.Bounds().Dx(),
+			canvas.Bounds().Dy(),
 			renderHeight,
 		)
 	}
@@ -54,7 +54,7 @@ func TestRenderStrokesPNGRejectsEmptyStrokes(t *testing.T) {
 }
 
 func TestRenderStrokesPNGExpandsWidthForHorizontalInput(t *testing.T) {
-	img := renderTestPNG(
+	canvas := renderTestPNG(
 		t,
 		[]Stroke{
 			{
@@ -66,17 +66,17 @@ func TestRenderStrokesPNGExpandsWidthForHorizontalInput(t *testing.T) {
 		},
 	)
 
-	if img.Bounds().Dx() <= img.Bounds().Dy() || img.Bounds().Dx() >= renderMaxWidth {
+	if canvas.Bounds().Dx() <= canvas.Bounds().Dy() || canvas.Bounds().Dx() >= renderMaxWidth {
 		t.Fatalf(
 			"image size = %dx%d, want height < width < max",
-			img.Bounds().Dx(),
-			img.Bounds().Dy(),
+			canvas.Bounds().Dx(),
+			canvas.Bounds().Dy(),
 		)
 	}
 }
 
 func TestRenderStrokesPNGCapsWidth(t *testing.T) {
-	img := renderTestPNG(
+	canvas := renderTestPNG(
 		t,
 		[]Stroke{
 			{
@@ -88,11 +88,11 @@ func TestRenderStrokesPNGCapsWidth(t *testing.T) {
 		},
 	)
 
-	if img.Bounds().Dx() != renderMaxWidth || img.Bounds().Dy() != renderHeight {
+	if canvas.Bounds().Dx() != renderMaxWidth || canvas.Bounds().Dy() != renderHeight {
 		t.Fatalf(
 			"image size = %dx%d, want %dx%d",
-			img.Bounds().Dx(),
-			img.Bounds().Dy(),
+			canvas.Bounds().Dx(),
+			canvas.Bounds().Dy(),
 			renderMaxWidth,
 			renderHeight,
 		)
@@ -100,7 +100,7 @@ func TestRenderStrokesPNGCapsWidth(t *testing.T) {
 }
 
 func TestRenderStrokesPNGPreservesInkAspectRatio(t *testing.T) {
-	img := renderTestPNG(
+	canvas := renderTestPNG(
 		t,
 		[]Stroke{
 			{
@@ -115,7 +115,7 @@ func TestRenderStrokesPNGPreservesInkAspectRatio(t *testing.T) {
 		},
 	)
 
-	ink := inkBounds(img)
+	ink := inkBounds(canvas)
 	got := float64(ink.Dx()) / float64(ink.Dy())
 	if math.Abs(got-2) > 0.1 {
 		t.Fatalf(
@@ -126,7 +126,7 @@ func TestRenderStrokesPNGPreservesInkAspectRatio(t *testing.T) {
 }
 
 func TestRenderStrokesPNGPreservesSeparatedMark(t *testing.T) {
-	img := renderTestPNG(
+	canvas := renderTestPNG(
 		t,
 		[]Stroke{
 			{
@@ -143,7 +143,7 @@ func TestRenderStrokesPNGPreservesSeparatedMark(t *testing.T) {
 		},
 	)
 
-	if got := blackPixelComponentCount(img); got != 2 {
+	if got := blackPixelComponentCount(canvas); got != 2 {
 		t.Fatalf(
 			"black pixel component count = %d, want 2",
 			got,
@@ -153,7 +153,7 @@ func TestRenderStrokesPNGPreservesSeparatedMark(t *testing.T) {
 
 func TestRenderStrokesPNGKeepsBentStrokeConnected(t *testing.T) {
 	// 한 stroke 안에서 급하게 꺾이는 연속 경로(ㄱ 모양). 꺾인 지점에서도 끊기면 안 된다.
-	img := renderTestPNG(
+	canvas := renderTestPNG(
 		t,
 		[]Stroke{
 			{
@@ -166,7 +166,7 @@ func TestRenderStrokesPNGKeepsBentStrokeConnected(t *testing.T) {
 		},
 	)
 
-	if got := blackPixelComponentCount(img); got != 1 {
+	if got := blackPixelComponentCount(canvas); got != 1 {
 		t.Fatalf(
 			"black pixel component count = %d, want 1 (bent stroke must stay connected)",
 			got,
@@ -176,7 +176,7 @@ func TestRenderStrokesPNGKeepsBentStrokeConnected(t *testing.T) {
 
 func TestRenderStrokesPNGDoesNotConnectSeparateStrokes(t *testing.T) {
 	// 서로 떨어진 두 multi-point stroke. 서버가 획 사이를 임의로 잇지 않아야 한다.
-	img := renderTestPNG(
+	canvas := renderTestPNG(
 		t,
 		[]Stroke{
 			{
@@ -194,7 +194,7 @@ func TestRenderStrokesPNGDoesNotConnectSeparateStrokes(t *testing.T) {
 		},
 	)
 
-	if got := blackPixelComponentCount(img); got != 2 {
+	if got := blackPixelComponentCount(canvas); got != 2 {
 		t.Fatalf(
 			"black pixel component count = %d, want 2 (separate strokes must not connect)",
 			got,
@@ -216,25 +216,25 @@ func renderTestPNG(
 		)
 	}
 
-	img, err := png.Decode(bytes.NewReader(imageBytes))
+	canvas, err := png.Decode(bytes.NewReader(imageBytes))
 	if err != nil {
 		t.Fatalf(
 			"png.Decode() error = %v",
 			err,
 		)
 	}
-	return img
+	return canvas
 }
 
-func inkBounds(img image.Image) image.Rectangle {
-	bounds := img.Bounds()
+func inkBounds(canvas image.Image) image.Rectangle {
+	bounds := canvas.Bounds()
 	minX, minY := bounds.Max.X, bounds.Max.Y
 	maxX, maxY := bounds.Min.X, bounds.Min.Y
 
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			if !isBlack(
-				img,
+				canvas,
 				x,
 				y,
 			) {
@@ -263,8 +263,8 @@ func inkBounds(img image.Image) image.Rectangle {
 	)
 }
 
-func blackPixelComponentCount(img image.Image) int {
-	bounds := img.Bounds()
+func blackPixelComponentCount(canvas image.Image) int {
+	bounds := canvas.Bounds()
 	visited := make(map[image.Point]struct{})
 	count := 0
 
@@ -275,7 +275,7 @@ func blackPixelComponentCount(img image.Image) int {
 				y,
 			)
 			if !isBlack(
-				img,
+				canvas,
 				x,
 				y,
 			) {
@@ -310,7 +310,7 @@ func blackPixelComponentCount(img image.Image) int {
 					),
 				} {
 					if !next.In(bounds) || !isBlack(
-						img,
+						canvas,
 						next.X,
 						next.Y,
 					) {
@@ -333,13 +333,13 @@ func blackPixelComponentCount(img image.Image) int {
 }
 
 func isBlack(
-	img image.Image,
+	canvas image.Image,
 	x,
 	y int,
 ) bool {
-	r, g, b, _ := img.At(
+	red, green, blue, _ := canvas.At(
 		x,
 		y,
 	).RGBA()
-	return r == 0 && g == 0 && b == 0
+	return red == 0 && green == 0 && blue == 0
 }

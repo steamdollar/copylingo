@@ -32,9 +32,9 @@ type LevelProgress struct {
 }
 
 // Percent rounds down so a level reads 100% only when every material was studied.
-func (p LevelProgress) Percent() int {
-	if p.TotalMaterials == 0 {
+func (progress LevelProgress) Percent() int {
+	if progress.TotalMaterials == 0 {
 		return 0
 	}
-	return p.StudiedMaterials * 100 / p.TotalMaterials
+	return progress.StudiedMaterials * 100 / progress.TotalMaterials
 }

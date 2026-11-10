@@ -12,10 +12,10 @@ import (
 
 // newTestLLMClient builds a DefaultLLMClient pointed at the given httptest server URL.
 func newTestLLMClient(serverURL string) *DefaultLLMClient {
-	cfg := openai.DefaultConfig("test-api-key")
-	cfg.BaseURL = serverURL + "/v1"
+	clientConfig := openai.DefaultConfig("test-api-key")
+	clientConfig.BaseURL = serverURL + "/v1"
 	return &DefaultLLMClient{
-		client: openai.NewClientWithConfig(cfg),
+		client: openai.NewClientWithConfig(clientConfig),
 		model:  "test-model",
 	}
 }
@@ -27,18 +27,18 @@ func TestNewLLMClient(t *testing.T) {
 		"uses configured model and custom base URL",
 		func(t *testing.T) {
 			t.Parallel()
-			dc := NewLLMClient(LLMOptions{
+			client := NewLLMClient(LLMOptions{
 				APIKey:  "key",
 				BaseURL: "https://example.com/v1",
 				Model:   "my-model",
 			})
-			if dc.model != "my-model" {
+			if client.model != "my-model" {
 				t.Fatalf(
 					"model = %q, want my-model",
-					dc.model,
+					client.model,
 				)
 			}
-			if dc.client == nil {
+			if client.client == nil {
 				t.Fatal("client is nil")
 			}
 		},
@@ -48,11 +48,11 @@ func TestNewLLMClient(t *testing.T) {
 		"empty base URL keeps default and is still usable",
 		func(t *testing.T) {
 			t.Parallel()
-			dc := NewLLMClient(LLMOptions{
+			client := NewLLMClient(LLMOptions{
 				APIKey: "key",
 				Model:  "m",
 			})
-			if dc.client == nil {
+			if client.client == nil {
 				t.Fatal("NewLLMClient with empty base URL produced unusable client")
 			}
 		},
@@ -67,10 +67,10 @@ func TestAnswerLearningQuestion_Errors(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(
-				w http.ResponseWriter,
-				r *http.Request,
+				responseWriter http.ResponseWriter,
+				request *http.Request,
 			) {
-				w.WriteHeader(http.StatusInternalServerError)
+				responseWriter.WriteHeader(http.StatusInternalServerError)
 			}))
 			defer server.Close()
 
@@ -95,14 +95,14 @@ func TestAnswerLearningQuestion_Errors(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(
-				w http.ResponseWriter,
-				r *http.Request,
+				responseWriter http.ResponseWriter,
+				request *http.Request,
 			) {
-				w.Header().Set(
+				responseWriter.Header().Set(
 					"Content-Type",
 					"application/json",
 				)
-				_, _ = w.Write([]byte(`{"choices": []}`))
+				_, _ = responseWriter.Write([]byte(`{"choices": []}`))
 			}))
 			defer server.Close()
 
@@ -131,10 +131,10 @@ func TestGradeHandwriting_Errors(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(
-				w http.ResponseWriter,
-				r *http.Request,
+				responseWriter http.ResponseWriter,
+				request *http.Request,
 			) {
-				w.WriteHeader(http.StatusInternalServerError)
+				responseWriter.WriteHeader(http.StatusInternalServerError)
 			}))
 			defer server.Close()
 
@@ -161,14 +161,14 @@ func TestGradeHandwriting_Errors(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(
-				w http.ResponseWriter,
-				r *http.Request,
+				responseWriter http.ResponseWriter,
+				request *http.Request,
 			) {
-				w.Header().Set(
+				responseWriter.Header().Set(
 					"Content-Type",
 					"application/json",
 				)
-				_, _ = w.Write([]byte(`{"choices": []}`))
+				_, _ = responseWriter.Write([]byte(`{"choices": []}`))
 			}))
 			defer server.Close()
 
@@ -195,14 +195,14 @@ func TestGradeHandwriting_Errors(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 			server := httptest.NewServer(http.HandlerFunc(func(
-				w http.ResponseWriter,
-				r *http.Request,
+				responseWriter http.ResponseWriter,
+				request *http.Request,
 			) {
-				w.Header().Set(
+				responseWriter.Header().Set(
 					"Content-Type",
 					"application/json",
 				)
-				_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"not json"}}]}`))
+				_, _ = responseWriter.Write([]byte(`{"choices":[{"message":{"content":"not json"}}]}`))
 			}))
 			defer server.Close()
 

@@ -79,10 +79,10 @@ func run(
 		)
 	}
 
-	var in parityInput
+	var input parityInput
 	if err := json.Unmarshal(
 		raw,
-		&in,
+		&input,
 	); err != nil {
 		return fmt.Errorf(
 			"parse stroke JSON %s: %w",
@@ -91,7 +91,7 @@ func run(
 		)
 	}
 
-	pngBytes, err := miniapp.RenderStrokesPNG(in.Strokes)
+	pngBytes, err := miniapp.RenderStrokesPNG(input.Strokes)
 	if err != nil {
 		return fmt.Errorf(
 			"render PNG: %w",

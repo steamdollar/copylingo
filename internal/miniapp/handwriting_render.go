@@ -48,22 +48,22 @@ func RenderStrokesPNG(strokes []Stroke) ([]byte, error) {
 	hasPoint := false
 
 	for _, stroke := range strokes {
-		for _, p := range stroke.Points {
+		for _, point := range stroke.Points {
 			minX = math.Min(
 				minX,
-				p.X,
+				point.X,
 			)
 			minY = math.Min(
 				minY,
-				p.Y,
+				point.Y,
 			)
 			maxX = math.Max(
 				maxX,
-				p.X,
+				point.X,
 			)
 			maxY = math.Max(
 				maxY,
-				p.Y,
+				point.Y,
 			)
 			hasPoint = true
 		}
@@ -84,14 +84,14 @@ func RenderStrokesPNG(strokes []Stroke) ([]byte, error) {
 		width,
 		height,
 	)
-	img := image.NewRGBA(image.Rect(
+	canvas := image.NewRGBA(image.Rect(
 		0,
 		0,
 		canvasWidth,
 		renderHeight,
 	))
 	fill(
-		img,
+		canvas,
 		color.RGBA{R: 255, G: 255, B: 255, A: 255},
 	)
 
@@ -106,12 +106,12 @@ func RenderStrokesPNG(strokes []Stroke) ([]byte, error) {
 
 	black := color.RGBA{A: 255}
 	for _, stroke := range strokes {
-		for i, p := range stroke.Points {
-			x := int(math.Round((p.X-minX)*scale + offsetX))
-			y := int(math.Round((p.Y-minY)*scale + offsetY))
+		for i, point := range stroke.Points {
+			x := int(math.Round((point.X-minX)*scale + offsetX))
+			y := int(math.Round((point.Y-minY)*scale + offsetY))
 			if i == 0 {
 				drawBrush(
-					img,
+					canvas,
 					x,
 					y,
 					renderBrush,
@@ -119,13 +119,13 @@ func RenderStrokesPNG(strokes []Stroke) ([]byte, error) {
 				)
 				continue
 			}
-			prev := stroke.Points[i-1]
-			px := int(math.Round((prev.X-minX)*scale + offsetX))
-			py := int(math.Round((prev.Y-minY)*scale + offsetY))
+			previousPoint := stroke.Points[i-1]
+			previousPixelX := int(math.Round((previousPoint.X-minX)*scale + offsetX))
+			previousPixelY := int(math.Round((previousPoint.Y-minY)*scale + offsetY))
 			drawLine(
-				img,
-				px,
-				py,
+				canvas,
+				previousPixelX,
+				previousPixelY,
 				x,
 				y,
 				renderBrush,
@@ -134,14 +134,14 @@ func RenderStrokesPNG(strokes []Stroke) ([]byte, error) {
 		}
 	}
 
-	var buf bytes.Buffer
+	var buffer bytes.Buffer
 	if err := png.Encode(
-		&buf,
-		img,
+		&buffer,
+		canvas,
 	); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	return buffer.Bytes(), nil
 }
 
 func renderCanvasWidth(
@@ -160,81 +160,81 @@ func renderCanvasWidth(
 }
 
 func fill(
-	img *image.RGBA,
-	c color.RGBA,
+	canvas *image.RGBA,
+	fillColor color.RGBA,
 ) {
-	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
-		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-			img.SetRGBA(
+	for y := canvas.Bounds().Min.Y; y < canvas.Bounds().Max.Y; y++ {
+		for x := canvas.Bounds().Min.X; x < canvas.Bounds().Max.X; x++ {
+			canvas.SetRGBA(
 				x,
 				y,
-				c,
+				fillColor,
 			)
 		}
 	}
 }
 
 func drawLine(
-	img *image.RGBA,
-	x0,
-	y0,
-	x1,
-	y1,
+	canvas *image.RGBA,
+	currentX,
+	currentY,
+	targetX,
+	targetY,
 	brush int,
-	c color.RGBA,
+	lineColor color.RGBA,
 ) {
-	dx := int(math.Abs(float64(x1 - x0)))
-	dy := -int(math.Abs(float64(y1 - y0)))
-	sx := -1
-	if x0 < x1 {
-		sx = 1
+	deltaX := int(math.Abs(float64(targetX - currentX)))
+	deltaY := -int(math.Abs(float64(targetY - currentY)))
+	stepX := -1
+	if currentX < targetX {
+		stepX = 1
 	}
-	sy := -1
-	if y0 < y1 {
-		sy = 1
+	stepY := -1
+	if currentY < targetY {
+		stepY = 1
 	}
-	err := dx + dy
+	errorTerm := deltaX + deltaY
 
 	for {
 		drawBrush(
-			img,
-			x0,
-			y0,
+			canvas,
+			currentX,
+			currentY,
 			brush,
-			c,
+			lineColor,
 		)
-		if x0 == x1 && y0 == y1 {
+		if currentX == targetX && currentY == targetY {
 			break
 		}
-		e2 := 2 * err
-		if e2 >= dy {
-			err += dy
-			x0 += sx
+		doubledErrorTerm := 2 * errorTerm
+		if doubledErrorTerm >= deltaY {
+			errorTerm += deltaY
+			currentX += stepX
 		}
-		if e2 <= dx {
-			err += dx
-			y0 += sy
+		if doubledErrorTerm <= deltaX {
+			errorTerm += deltaX
+			currentY += stepY
 		}
 	}
 }
 
 func drawBrush(
-	img *image.RGBA,
-	cx,
-	cy,
+	canvas *image.RGBA,
+	centerX,
+	centerY,
 	radius int,
-	c color.RGBA,
+	brushColor color.RGBA,
 ) {
-	for y := cy - radius; y <= cy+radius; y++ {
-		for x := cx - radius; x <= cx+radius; x++ {
-			if x < 0 || y < 0 || x >= img.Bounds().Dx() || y >= img.Bounds().Dy() {
+	for y := centerY - radius; y <= centerY+radius; y++ {
+		for x := centerX - radius; x <= centerX+radius; x++ {
+			if x < 0 || y < 0 || x >= canvas.Bounds().Dx() || y >= canvas.Bounds().Dy() {
 				continue
 			}
-			if (x-cx)*(x-cx)+(y-cy)*(y-cy) <= radius*radius {
-				img.SetRGBA(
+			if (x-centerX)*(x-centerX)+(y-centerY)*(y-centerY) <= radius*radius {
+				canvas.SetRGBA(
 					x,
 					y,
-					c,
+					brushColor,
 				)
 			}
 		}

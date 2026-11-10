@@ -20,7 +20,7 @@ const (
 // FormatHandwritingNext generates callback data for the "Next Question" button in handwriting tasks.
 func FormatHandwritingNext(
 	sessionID,
-	questionIdx int,
+	questionIndex int,
 	publicBaseURL string,
 ) string {
 	token := MiniAppURLFingerprint(publicBaseURL)
@@ -28,7 +28,7 @@ func FormatHandwritingNext(
 		return fmt.Sprintf(
 			FormatQuestionNext,
 			sessionID,
-			questionIdx,
+			questionIndex,
 		)
 	}
 	return fmt.Sprintf(
@@ -36,7 +36,7 @@ func FormatHandwritingNext(
 		fmt.Sprintf(
 			FormatQuestionNext,
 			sessionID,
-			questionIdx,
+			questionIndex,
 		),
 		token,
 	)
@@ -45,15 +45,15 @@ func FormatHandwritingNext(
 // MiniAppURLFingerprint generates a 8-char hex fingerprint of the host part of a URL.
 // This is used to detect if a callback was generated for a different server instance (e.g. tunnel restart).
 func MiniAppURLFingerprint(rawURL string) string {
-	u, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || u.Host == "" {
+	parsedURL, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsedURL.Host == "" {
 		return ""
 	}
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(strings.ToLower(u.Host)))
+	hasher := fnv.New32a()
+	_, _ = hasher.Write([]byte(strings.ToLower(parsedURL.Host)))
 	return fmt.Sprintf(
 		"%08x",
-		h.Sum32(),
+		hasher.Sum32(),
 	)
 }
 

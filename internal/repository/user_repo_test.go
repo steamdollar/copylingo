@@ -17,13 +17,22 @@ func TestSlotColumn_MapsCorrectly(t *testing.T) {
 		{model.SessionSlotEveningQuiz, "evening_quiz_time"},
 	}
 
-	for _, tc := range tests {
-		got, err := slotColumn(tc.slot)
+	for _, testCase := range tests {
+		got, err := slotColumn(testCase.slot)
 		if err != nil {
-			t.Fatalf("slotColumn(%q) error: %v", tc.slot, err)
+			t.Fatalf(
+				"slotColumn(%q) error: %v",
+				testCase.slot,
+				err,
+			)
 		}
-		if got != tc.want {
-			t.Errorf("slotColumn(%q) = %q, want %q", tc.slot, got, tc.want)
+		if got != testCase.want {
+			t.Errorf(
+				"slotColumn(%q) = %q, want %q",
+				testCase.slot,
+				got,
+				testCase.want,
+			)
 		}
 	}
 

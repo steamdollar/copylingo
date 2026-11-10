@@ -10,7 +10,7 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// newQuery and dueQuery record the arguments of one QuestionRepo call.
+// newQuery and dueQuery record the arguments of one QuestionRepository call.
 type newQuery struct {
 	levels           []string
 	category         string
@@ -28,21 +28,21 @@ type dueQuery struct {
 	categories       []model.QuestionCategory
 }
 
-// builderPool is an in-memory QuestionRepo for the session builder. Due rows
+// builderPool is an in-memory QuestionRepository for the session builder. Due rows
 // are filtered by category and LIMIT; new rows by level scope, category,
-// exclusions and LIMIT, so a selected question is never offered twice. newFn
+// exclusions and LIMIT, so a selected question is never offered twice. newFunc
 // replaces the new-row lookup for tests that need a misbehaving repository.
 // Every call is recorded so tests can assert on the arguments after the build.
 type builderPool struct {
-	QuestionRepo
+	QuestionRepository
 	due        []model.Question
 	new        []model.Question
-	newFn      func(newQuery) []model.Question
+	newFunc    func(newQuery) []model.Question
 	dueQueries []dueQuery
 	newQueries []newQuery
 }
 
-func (p *builderPool) GetDueReviews(
+func (pool *builderPool) GetDueReviews(
 	_ context.Context,
 	userID int64,
 	language,
@@ -52,8 +52,8 @@ func (p *builderPool) GetDueReviews(
 	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
-	p.dueQueries = append(
-		p.dueQueries,
+	pool.dueQueries = append(
+		pool.dueQueries,
 		dueQuery{
 			userID:           userID,
 			language:         language,
@@ -65,24 +65,24 @@ func (p *builderPool) GetDueReviews(
 		},
 	)
 	var rows []model.Question
-	for _, q := range p.due {
+	for _, question := range pool.due {
 		if len(rows) == limit {
 			break
 		}
 		if len(categories) == 0 || slices.Contains(
 			categories,
-			q.Category,
+			question.Category,
 		) {
 			rows = append(
 				rows,
-				q,
+				question,
 			)
 		}
 	}
 	return rows, nil
 }
 
-func (p *builderPool) GetNewQuestions(
+func (pool *builderPool) GetNewQuestions(
 	_ context.Context,
 	_ int64,
 	_ string,
@@ -93,28 +93,28 @@ func (p *builderPool) GetNewQuestions(
 	kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	query := newQuery{levels: levels, category: category, limit: limit, kanjiRecallLimit: kanjiRecallLimit}
-	p.newQueries = append(
-		p.newQueries,
+	pool.newQueries = append(
+		pool.newQueries,
 		query,
 	)
-	if p.newFn != nil {
-		return p.newFn(query), nil
+	if pool.newFunc != nil {
+		return pool.newFunc(query), nil
 	}
 	var rows []model.Question
-	for _, q := range p.new {
+	for _, question := range pool.new {
 		if len(rows) == limit {
 			break
 		}
 		if slices.Contains(
 			levels,
-			q.ProficiencyLevel,
-		) && string(q.Category) == category && !slices.Contains(
+			question.ProficiencyLevel,
+		) && string(question.Category) == category && !slices.Contains(
 			excludeIDs,
-			q.ID,
+			question.ID,
 		) {
 			rows = append(
 				rows,
-				q,
+				question,
 			)
 		}
 	}
@@ -122,9 +122,9 @@ func (p *builderPool) GetNewQuestions(
 }
 
 // generalDueQuery returns the uncategorized due query every build issues once.
-func (p *builderPool) generalDueQuery(t *testing.T) dueQuery {
+func (pool *builderPool) generalDueQuery(t *testing.T) dueQuery {
 	t.Helper()
-	for _, query := range p.dueQueries {
+	for _, query := range pool.dueQueries {
 		if len(query.categories) == 0 {
 			return query
 		}
@@ -136,31 +136,31 @@ func (p *builderPool) generalDueQuery(t *testing.T) dueQuery {
 // builderStores captures what the builder persists. CreateSession assigns ID
 // 10 unless createErr is set; CreateSessionQuestions returns rowsErr.
 type builderStores struct {
-	SessionRepo
+	SessionRepository
 	createErr error
 	rowsErr   error
 	session   *model.Session
 	rows      []model.SessionQuestion
 }
 
-func (s *builderStores) CreateSession(
+func (stores *builderStores) CreateSession(
 	_ context.Context,
 	session *model.Session,
 ) error {
-	if s.createErr != nil {
-		return s.createErr
+	if stores.createErr != nil {
+		return stores.createErr
 	}
 	session.ID = 10
-	s.session = session
+	stores.session = session
 	return nil
 }
 
-func (s *builderStores) CreateSessionQuestions(
+func (stores *builderStores) CreateSessionQuestions(
 	_ context.Context,
 	rows []model.SessionQuestion,
 ) error {
-	s.rows = rows
-	return s.rowsErr
+	stores.rows = rows
+	return stores.rowsErr
 }
 
 func newTestBuilder(pool *builderPool) (*sessionBuilderService, *builderStores) {
@@ -311,7 +311,7 @@ func TestBuildMorningSession_ReservesListeningAndBuildsSeventeenQuestions(t *tes
 	}
 	listening := slices.IndexFunc(
 		pool.newQueries,
-		func(q newQuery) bool { return q.category == string(model.CategoryListening) },
+		func(query newQuery) bool { return query.category == string(model.CategoryListening) },
 	)
 	if listening < 0 || pool.newQueries[listening].limit != 1 {
 		t.Fatalf(
@@ -494,7 +494,7 @@ func TestBuildReviewSession_OnlySRS(t *testing.T) {
 }
 
 func TestBuildReviewSession_CapsKanjiRecallAdmissionAtThree(t *testing.T) {
-	kanjiSkill := model.SkillVocabKanjiRecall
+	kanjiSkill := model.SkillVocabularyKanjiRecall
 	pool := &builderPool{due: []model.Question{
 		{ID: 1, Skill: &kanjiSkill},
 		{ID: 2, Skill: &kanjiSkill},
@@ -540,7 +540,7 @@ func TestBuildReviewSession_CapsKanjiRecallAdmissionAtThree(t *testing.T) {
 }
 
 func TestBuildMorningSession_PassesRemainingKanjiRecallBudgetToNewFetches(t *testing.T) {
-	kanjiSkill := model.SkillVocabKanjiRecall
+	kanjiSkill := model.SkillVocabularyKanjiRecall
 	due := makeQuestions(
 		1,
 		6,
@@ -681,7 +681,7 @@ func TestBuildSession_DeduplicatesQuestionIDs(t *testing.T) {
 		due: []model.Question{{ID: 1, ProficiencyLevel: "N5"}, {ID: 1, ProficiencyLevel: "N5"}},
 		// This repository ignores exclusions, so the builder must drop repeated
 		// and already-selected IDs itself.
-		newFn: func(newQuery) []model.Question {
+		newFunc: func(newQuery) []model.Question {
 			return []model.Question{
 				{ID: 1, ProficiencyLevel: "N5"},
 				{ID: 2, ProficiencyLevel: "N5"},
@@ -726,7 +726,7 @@ func TestBuildSession_CapsReadingAtOne(t *testing.T) {
 		),
 		// A vocabulary query may still return reading rows; appendQuestion must
 		// reject them while admitting other categories.
-		newFn: func(query newQuery) []model.Question {
+		newFunc: func(query newQuery) []model.Question {
 			if query.category != string(model.CategoryVocabulary) {
 				return nil
 			}

@@ -26,18 +26,18 @@ func NewQuestionRepository(db *sqlx.DB) *QuestionRepository {
 }
 
 // UpsertSeedBatch inserts or refreshes seed-owned questions identified by stable question_key.
-func (r *QuestionRepository) UpsertSeedBatch(
+func (repository *QuestionRepository) UpsertSeedBatch(
 	ctx context.Context,
 	questions []*model.Question,
 ) error {
 	if len(questions) == 0 {
 		return nil
 	}
-	for idx, question := range questions {
+	for index, question := range questions {
 		if question.QuestionKey == nil || *question.QuestionKey == "" {
 			return fmt.Errorf(
 				"QuestionRepository.UpsertSeedBatch question_index=%d: missing question_key",
-				idx,
+				index,
 			)
 		}
 	}
@@ -46,14 +46,14 @@ func (r *QuestionRepository) UpsertSeedBatch(
 	// transaction keeps the seed catalog all-or-nothing across statements.
 	return WithinTx(
 		ctx,
-		r.db,
+		repository.db,
 		func(tx *sqlx.Tx) error {
 			for _, batch := range questionUpsertBatches(questions) {
-				query, args := buildQuestionBatchUpsertQuery(batch)
+				query, arguments := buildQuestionBatchUpsertQuery(batch)
 				if _, err := tx.ExecContext(
 					ctx,
 					query,
-					args...,
+					arguments...,
 				); err != nil {
 					return fmt.Errorf(
 						"QuestionRepository.UpsertSeedBatch count=%d batch_size=%d: %w",
@@ -68,16 +68,16 @@ func (r *QuestionRepository) UpsertSeedBatch(
 	)
 }
 
-// postgresMaxBindParams is PostgreSQL's per-statement bind parameter limit.
-const postgresMaxBindParams = 65535
+// postgresMaxBindParameters is PostgreSQL's per-statement bind parameter limit.
+const postgresMaxBindParameters = 65535
 
 // questionBatchColumnCount is the number of bind parameters per question row.
 const questionBatchColumnCount = 15
 
 // questionUpsertBatches splits questions so each multi-row upsert binds at
-// most postgresMaxBindParams parameters.
+// most postgresMaxBindParameters parameters.
 func questionUpsertBatches(questions []*model.Question) [][]*model.Question {
-	const rowsPerStatement = postgresMaxBindParams / questionBatchColumnCount
+	const rowsPerStatement = postgresMaxBindParameters / questionBatchColumnCount
 	batches := make(
 		[][]*model.Question,
 		0,
@@ -96,7 +96,7 @@ func questionUpsertBatches(questions []*model.Question) [][]*model.Question {
 }
 
 // GetNewQuestions returns catalog questions without progress for the user.
-func (r *QuestionRepository) GetNewQuestions(
+func (repository *QuestionRepository) GetNewQuestions(
 	ctx context.Context,
 	userID int64,
 	language string,
@@ -107,7 +107,7 @@ func (r *QuestionRepository) GetNewQuestions(
 	kanjiRecallLimit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
-	err := r.db.SelectContext(
+	err := repository.db.SelectContext(
 		ctx,
 		&questions,
 		newQuestionsForStudiedMaterialsQuery,
@@ -208,13 +208,13 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(
 // pre-generation tool can fill them in bounded batches (ADR-031, ADR-082).
 // audio_file_id is ignored here — the gate is audio_path (the object-store SSOT
 // pointer).
-func (r *QuestionRepository) GetListeningNeedingAudio(
+func (repository *QuestionRepository) GetListeningNeedingAudio(
 	ctx context.Context,
 	language string,
 	limit int,
 ) ([]model.Question, error) {
 	var questions []model.Question
-	err := r.db.SelectContext(
+	err := repository.db.SelectContext(
 		ctx,
 		&questions,
 		fmt.Sprintf(
@@ -238,12 +238,12 @@ func (r *QuestionRepository) GetListeningNeedingAudio(
 // SetAudioPath stores the object-store key produced for a question's audio. A
 // new key means a new clip, so it also clears the Telegram file_id cached for
 // the previous clip; otherwise the bot would keep re-sending the old voice.
-func (r *QuestionRepository) SetAudioPath(
+func (repository *QuestionRepository) SetAudioPath(
 	ctx context.Context,
 	id int,
 	audioPath string,
 ) error {
-	_, err := r.db.ExecContext(
+	_, err := repository.db.ExecContext(
 		ctx,
 		`UPDATE questions SET audio_path = $2, audio_file_id = NULL WHERE id = $1`,
 		id,
@@ -254,12 +254,12 @@ func (r *QuestionRepository) SetAudioPath(
 
 // SetAudioFileID caches the Telegram file_id returned after the first upload so
 // later sends can reuse it (ADR-032). The object store remains the SSOT.
-func (r *QuestionRepository) SetAudioFileID(
+func (repository *QuestionRepository) SetAudioFileID(
 	ctx context.Context,
 	id int,
 	fileID string,
 ) error {
-	_, err := r.db.ExecContext(
+	_, err := repository.db.ExecContext(
 		ctx,
 		`UPDATE questions SET audio_file_id = $2 WHERE id = $1`,
 		id,
@@ -269,7 +269,7 @@ func (r *QuestionRepository) SetAudioFileID(
 }
 
 // GetDueReviews returns questions due for SRS review.
-func (r *QuestionRepository) GetDueReviews(
+func (repository *QuestionRepository) GetDueReviews(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -280,7 +280,7 @@ func (r *QuestionRepository) GetDueReviews(
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
 	var questions []model.Question
-	err := r.db.SelectContext(
+	err := repository.db.SelectContext(
 		ctx,
 		&questions,
 		dueReviewsForStudiedMaterialsQuery,
@@ -355,14 +355,14 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(
 )
 
 // GetDueReviewCount returns the number of questions due for review.
-func (r *QuestionRepository) GetDueReviewCount(
+func (repository *QuestionRepository) GetDueReviewCount(
 	ctx context.Context,
 	userID int64,
 	language string,
 	levels []string,
 ) (int, error) {
 	var count int
-	err := r.db.GetContext(
+	err := repository.db.GetContext(
 		ctx,
 		&count,
 		dueReviewCountQuery,
@@ -390,7 +390,7 @@ var dueReviewCountQuery = `
 	` + quizMaterialPreferenceGate
 
 func buildQuestionBatchUpsertQuery(questions []*model.Question) (string, []any) {
-	query, args := buildQuestionBatchBaseQuery(questions)
+	query, arguments := buildQuestionBatchBaseQuery(questions)
 	query += `
 		ON CONFLICT (question_key) DO UPDATE SET
 			content_id = EXCLUDED.content_id,
@@ -415,7 +415,7 @@ func buildQuestionBatchUpsertQuery(questions []*model.Question) (string, []any) 
 			audio_script = EXCLUDED.audio_script,
 			difficulty = EXCLUDED.difficulty
 	`
-	return query, args
+	return query, arguments
 }
 
 func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
@@ -430,12 +430,12 @@ func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
 		VALUES
 	`)
 
-	args := make(
+	arguments := make(
 		[]any,
 		0,
 		len(questions)*columnCount,
 	)
-	for i, q := range questions {
+	for i, question := range questions {
 		if i > 0 {
 			query.WriteString(",")
 		}
@@ -460,25 +460,25 @@ func buildQuestionBatchBaseQuery(questions []*model.Question) (string, []any) {
 			base+15,
 		))
 
-		args = append(
-			args,
-			q.QuestionKey,
-			q.ContentID,
-			q.MaterialID,
-			q.Type,
-			q.Skill,
-			q.Language,
-			q.ProficiencyLevel,
-			q.Category,
-			q.Prompt,
-			q.Options,
-			q.CorrectAnswer,
-			q.Explanation,
-			q.AudioPath,
-			q.AudioScript,
-			q.Difficulty,
+		arguments = append(
+			arguments,
+			question.QuestionKey,
+			question.ContentID,
+			question.MaterialID,
+			question.Type,
+			question.Skill,
+			question.Language,
+			question.ProficiencyLevel,
+			question.Category,
+			question.Prompt,
+			question.Options,
+			question.CorrectAnswer,
+			question.Explanation,
+			question.AudioPath,
+			question.AudioScript,
+			question.Difficulty,
 		)
 	}
 
-	return query.String(), args
+	return query.String(), arguments
 }

@@ -9,27 +9,27 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// fakeQuestionRepo implements QuestionRepo for review-Quiz tests. The embedded
+// fakeQuestionRepository implements QuestionRepository for review-Quiz tests. The embedded
 // nil interface makes an unexpected repository call panic.
-type fakeQuestionRepo struct {
-	QuestionRepo
+type fakeQuestionRepository struct {
+	QuestionRepository
 	dueCount    int
 	dueCountErr error
 	dueLimit    int
 	dueLevels   []string
 }
 
-func (r *fakeQuestionRepo) GetDueReviewCount(
+func (fake *fakeQuestionRepository) GetDueReviewCount(
 	_ context.Context,
 	_ int64,
 	_ string,
 	levels []string,
 ) (int, error) {
-	r.dueLevels = levels
-	return r.dueCount, r.dueCountErr
+	fake.dueLevels = levels
+	return fake.dueCount, fake.dueCountErr
 }
 
-func (r *fakeQuestionRepo) GetDueReviews(
+func (fake *fakeQuestionRepository) GetDueReviews(
 	_ context.Context,
 	_ int64,
 	_,
@@ -39,7 +39,7 @@ func (r *fakeQuestionRepo) GetDueReviews(
 	_ int,
 	_ ...model.QuestionCategory,
 ) ([]model.Question, error) {
-	r.dueLimit = limit
+	fake.dueLimit = limit
 	questions := make(
 		[]model.Question,
 		limit,
@@ -50,20 +50,20 @@ func (r *fakeQuestionRepo) GetDueReviews(
 	return questions, nil
 }
 
-type fakeStreakRepo struct {
+type fakeStreakRepository struct {
 	userIDs []int64
 	err     error
 }
 
-func (r *fakeStreakRepo) UpdateStreak(
+func (fake *fakeStreakRepository) UpdateStreak(
 	_ context.Context,
 	userID int64,
 ) error {
-	r.userIDs = append(
-		r.userIDs,
+	fake.userIDs = append(
+		fake.userIDs,
 		userID,
 	)
-	return r.err
+	return fake.err
 }
 
 func quizStateWithStatus(
@@ -195,12 +195,12 @@ func TestSessionServiceStartQuiz(t *testing.T) {
 					)
 				}
 				started, reloaded := false, false
-				svc := NewSessionService(SessionDeps{
-					SessionRepo: &fakeSessionRepo{startFn: func(id int) error {
+				sessionService := NewSessionService(SessionDependencies{
+					SessionRepository: &fakeSessionRepository{startFunc: func(id int) error {
 						started = true
 						return tt.startErr
 					}},
-					QuizActiveSessionRepo: &fakeQuizActiveSessionRepo{loadFn: func(
+					QuizActiveSessionRepository: &fakeQuizActiveSessionRepository{loadFunc: func(
 						context.Context,
 						int,
 					) (*model.QuizActiveSessionState, error) {
@@ -218,7 +218,7 @@ func TestSessionServiceStartQuiz(t *testing.T) {
 					Stores: SessionStores{Quiz: store},
 				})
 
-				state, err := svc.StartQuiz(
+				state, err := sessionService.StartQuiz(
 					ctx,
 					sessionID,
 					tt.callerID,
@@ -317,15 +317,15 @@ func TestSessionServiceBuildReviewQuiz(t *testing.T) {
 		t.Run(
 			tt.name,
 			func(t *testing.T) {
-				questions := &fakeQuestionRepo{dueCount: tt.dueCount, dueCountErr: tt.dueCountErr}
-				sessions := &fakeSessionRepo{}
-				svc := NewSessionService(SessionDeps{
-					QuestionRepo:        questions,
-					SessionRepo:         sessions,
-					SessionQuestionRepo: &builderStores{},
+				questions := &fakeQuestionRepository{dueCount: tt.dueCount, dueCountErr: tt.dueCountErr}
+				sessions := &fakeSessionRepository{}
+				sessionService := NewSessionService(SessionDependencies{
+					QuestionRepository:        questions,
+					SessionRepository:         sessions,
+					SessionQuestionRepository: &builderStores{},
 				})
 
-				session, err := svc.BuildReviewQuiz(
+				session, err := sessionService.BuildReviewQuiz(
 					context.Background(),
 					user,
 				)
@@ -399,9 +399,9 @@ func TestSessionServiceShowQuizQuestion(t *testing.T) {
 			err,
 		)
 	}
-	svc := NewSessionService(SessionDeps{Stores: SessionStores{Quiz: store}})
+	sessionService := NewSessionService(SessionDependencies{Stores: SessionStores{Quiz: store}})
 
-	got, err := svc.ShowQuizQuestion(
+	got, err := sessionService.ShowQuizQuestion(
 		ctx,
 		sessionID,
 		1,
@@ -416,7 +416,7 @@ func TestSessionServiceShowQuizQuestion(t *testing.T) {
 	}
 
 	// Past-the-end renders the finish screen without moving the cursor.
-	got, err = svc.ShowQuizQuestion(
+	got, err = sessionService.ShowQuizQuestion(
 		ctx,
 		sessionID,
 		2,
@@ -429,7 +429,7 @@ func TestSessionServiceShowQuizQuestion(t *testing.T) {
 		)
 	}
 
-	if _, err := svc.ShowQuizQuestion(
+	if _, err := sessionService.ShowQuizQuestion(
 		ctx,
 		sessionID,
 		-1,
@@ -476,21 +476,21 @@ func TestSessionServiceCompleteQuiz(t *testing.T) {
 				sessionID,
 				newAnsweredState(),
 			)
-			streak := &fakeStreakRepo{}
+			streak := &fakeStreakRepository{}
 			flushed := false
-			svc := NewSessionService(SessionDeps{
-				QuizActiveSessionRepo: &fakeQuizActiveSessionRepo{flushFn: func(
+			sessionService := NewSessionService(SessionDependencies{
+				QuizActiveSessionRepository: &fakeQuizActiveSessionRepository{flushFunc: func(
 					context.Context,
 					*model.QuizActiveSessionState,
 				) error {
 					flushed = true
 					return nil
 				}},
-				UserRepo: streak,
-				Stores:   SessionStores{Quiz: store},
+				UserRepository: streak,
+				Stores:         SessionStores{Quiz: store},
 			})
 
-			got, err := svc.CompleteQuiz(
+			got, err := sessionService.CompleteQuiz(
 				ctx,
 				sessionID,
 				ownerID,
@@ -536,14 +536,14 @@ func TestSessionServiceCompleteQuiz(t *testing.T) {
 				sessionID,
 				newAnsweredState(),
 			)
-			streak := &fakeStreakRepo{}
-			svc := NewSessionService(SessionDeps{
-				QuizActiveSessionRepo: &fakeQuizActiveSessionRepo{},
-				UserRepo:              streak,
-				Stores:                SessionStores{Quiz: store},
+			streak := &fakeStreakRepository{}
+			sessionService := NewSessionService(SessionDependencies{
+				QuizActiveSessionRepository: &fakeQuizActiveSessionRepository{},
+				UserRepository:              streak,
+				Stores:                      SessionStores{Quiz: store},
 			})
 
-			_, err := svc.CompleteQuiz(
+			_, err := sessionService.CompleteQuiz(
 				ctx,
 				sessionID,
 				ownerID+1,
@@ -572,10 +572,10 @@ func TestSessionServiceCompleteQuiz(t *testing.T) {
 
 // The due count covers the same adjacent-level scope the session draws from.
 func TestSessionServiceDueReviewCountUsesSessionLevels(t *testing.T) {
-	repo := &fakeQuestionRepo{dueCount: 2}
-	svc := NewSessionService(SessionDeps{QuestionRepo: repo})
+	repository := &fakeQuestionRepository{dueCount: 2}
+	sessionService := NewSessionService(SessionDependencies{QuestionRepository: repository})
 
-	got, err := svc.DueReviewCount(
+	got, err := sessionService.DueReviewCount(
 		context.Background(),
 		42,
 		"ja",
@@ -589,12 +589,12 @@ func TestSessionServiceDueReviewCountUsesSessionLevels(t *testing.T) {
 		)
 	}
 	if want := []string{"N5", "N4", "N3"}; !slices.Equal(
-		repo.dueLevels,
+		repository.dueLevels,
 		want,
 	) {
 		t.Fatalf(
 			"levels = %v, want %v",
-			repo.dueLevels,
+			repository.dueLevels,
 			want,
 		)
 	}

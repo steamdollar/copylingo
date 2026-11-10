@@ -30,14 +30,14 @@ func main() {
 		log.Fatal("refusing to reset learning data without -yes")
 	}
 
-	cfg, err := config.Load()
+	appConfig, err := config.Load()
 	if err != nil {
 		log.Fatalf(
 			"Failed to load config: %v",
 			err,
 		)
 	}
-	db, err := bootstrap.OpenDB(cfg.DB)
+	db, err := bootstrap.OpenDB(appConfig.DB)
 	if err != nil {
 		log.Fatalf(
 			"Database connection failed: %v",

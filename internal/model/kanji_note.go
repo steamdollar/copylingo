@@ -10,8 +10,8 @@ const (
 	KanjiNotePictograph    KanjiNoteType = "pictograph"     // 象形
 )
 
-func (t KanjiNoteType) Valid() bool {
-	switch t {
+func (noteType KanjiNoteType) Valid() bool {
+	switch noteType {
 	case KanjiNotePhonoSemantic, KanjiNoteCompound, KanjiNoteIndicative, KanjiNotePictograph:
 		return true
 	default:
@@ -30,8 +30,8 @@ const (
 	KanjiPartForm KanjiPartRole = "form"
 )
 
-func (r KanjiPartRole) Valid() bool {
-	switch r {
+func (role KanjiPartRole) Valid() bool {
+	switch role {
 	case KanjiPartMeaning, KanjiPartSound, KanjiPartForm:
 		return true
 	default:
@@ -44,7 +44,7 @@ func (r KanjiPartRole) Valid() bool {
 // ExplanationKo links the parts' meanings to the kanji's in one sentence and
 // is empty when that link would need its history (ADR-080).
 type KanjiNote struct {
-	Char          string        `json:"char"`
+	Character     string        `json:"char"`
 	Type          KanjiNoteType `json:"type"`
 	Parts         []KanjiPart   `json:"parts"`
 	ExplanationKo string        `json:"explanation_ko"`
@@ -75,8 +75,8 @@ const (
 	KanjiReadingJukuji KanjiReadingType = "jukuji"
 )
 
-func (t KanjiReadingType) Valid() bool {
-	switch t {
+func (readingType KanjiReadingType) Valid() bool {
+	switch readingType {
 	case KanjiReadingOn, KanjiReadingKun, KanjiReadingJukuji:
 		return true
 	default:

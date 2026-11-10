@@ -9,21 +9,35 @@ import (
 
 const MaterialPreferencePageSize = 8
 
-type materialPreferenceRepo interface {
-	Get(ctx context.Context, userID int64, materialID int) (*model.MaterialPreference, error)
-	Set(ctx context.Context, userID int64, materialID int, mode model.MaterialReviewMode) error
-	List(ctx context.Context, userID int64, offset, limit int) ([]model.MaterialPreference, error)
+type materialPreferenceRepository interface {
+	Get(
+		ctx context.Context,
+		userID int64,
+		materialID int,
+	) (*model.MaterialPreference, error)
+	Set(
+		ctx context.Context,
+		userID int64,
+		materialID int,
+		mode model.MaterialReviewMode,
+	) error
+	List(
+		ctx context.Context,
+		userID int64,
+		offset,
+		limit int,
+	) ([]model.MaterialPreference, error)
 }
 
 type MaterialPreferenceService struct {
-	repo materialPreferenceRepo
+	repository materialPreferenceRepository
 }
 
-func NewMaterialPreferenceService(repo materialPreferenceRepo) *MaterialPreferenceService {
-	return &MaterialPreferenceService{repo: repo}
+func NewMaterialPreferenceService(repository materialPreferenceRepository) *MaterialPreferenceService {
+	return &MaterialPreferenceService{repository: repository}
 }
 
-func (s *MaterialPreferenceService) Get(
+func (service *MaterialPreferenceService) Get(
 	ctx context.Context,
 	userID int64,
 	materialID int,
@@ -31,10 +45,14 @@ func (s *MaterialPreferenceService) Get(
 	if userID <= 0 || materialID <= 0 {
 		return nil, fmt.Errorf("MaterialPreferenceService.Get: invalid user or material ID")
 	}
-	return s.repo.Get(ctx, userID, materialID)
+	return service.repository.Get(
+		ctx,
+		userID,
+		materialID,
+	)
 }
 
-func (s *MaterialPreferenceService) Set(
+func (service *MaterialPreferenceService) Set(
 	ctx context.Context,
 	userID int64,
 	materialID int,
@@ -43,11 +61,16 @@ func (s *MaterialPreferenceService) Set(
 	if userID <= 0 || materialID <= 0 || !mode.Valid() {
 		return fmt.Errorf("MaterialPreferenceService.Set: invalid user, material or review mode")
 	}
-	return s.repo.Set(ctx, userID, materialID, mode)
+	return service.repository.Set(
+		ctx,
+		userID,
+		materialID,
+		mode,
+	)
 }
 
 // List fetches one extra row to determine pagination without a separate count.
-func (s *MaterialPreferenceService) List(
+func (service *MaterialPreferenceService) List(
 	ctx context.Context,
 	userID int64,
 	page int,
@@ -56,7 +79,12 @@ func (s *MaterialPreferenceService) List(
 	if userID <= 0 || page < 0 || page > maxPage {
 		return nil, false, fmt.Errorf("MaterialPreferenceService.List: invalid user or page")
 	}
-	items, err := s.repo.List(ctx, userID, page*MaterialPreferencePageSize, MaterialPreferencePageSize+1)
+	items, err := service.repository.List(
+		ctx,
+		userID,
+		page*MaterialPreferencePageSize,
+		MaterialPreferencePageSize+1,
+	)
 	if err != nil {
 		return nil, false, err
 	}

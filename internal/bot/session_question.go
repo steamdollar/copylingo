@@ -15,18 +15,18 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-func (sf *SessionFlow) showQuestion(
+func (flow *SessionFlow) showQuestion(
 	ctx context.Context,
 	chatID int64,
 	editMessageID *int,
 	sessionID,
-	questionIdx int,
+	questionIndex int,
 ) {
-	// Loads the working set and moves its cursor to questionIdx in one call.
-	state, err := sf.session.ShowQuizQuestion(
+	// Loads the working set and moves its cursor to questionIndex in one call.
+	state, err := flow.session.ShowQuizQuestion(
 		ctx,
 		sessionID,
-		questionIdx,
+		questionIndex,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -39,7 +39,7 @@ func (sf *SessionFlow) showQuestion(
 			"error",
 			err,
 		)
-		sf.showQuizActiveSessionUnavailable(
+		flow.showQuizActiveSessionUnavailable(
 			chatID,
 			editMessageID,
 		)
@@ -47,7 +47,7 @@ func (sf *SessionFlow) showQuestion(
 	}
 
 	// All questions answered, show finish button
-	if questionIdx >= len(state.Items) {
+	if questionIndex >= len(state.Items) {
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonData(
@@ -60,14 +60,14 @@ func (sf *SessionFlow) showQuestion(
 			),
 		)
 		if editMessageID != nil {
-			sf.telegram.EditMessage(
+			flow.telegram.EditMessage(
 				chatID,
 				*editMessageID,
 				botMessagesByLocale[botDefaultLocale].questionCompleted,
 				&keyboard,
 			)
 		} else {
-			sf.telegram.SendMessageWithKeyboard(
+			flow.telegram.SendMessageWithKeyboard(
 				chatID,
 				botMessagesByLocale[botDefaultLocale].questionCompleted,
 				keyboard,
@@ -76,17 +76,17 @@ func (sf *SessionFlow) showQuestion(
 		return
 	}
 
-	item := state.Items[questionIdx]
+	item := state.Items[questionIndex]
 	question := item.Question
 
 	// TODO: err handling
 	// render question text and keyboard by question type
-	text, keyboard, done := sf.renderByType(
+	text, keyboard, done := flow.renderByType(
 		ctx,
 		chatID,
 		editMessageID,
 		sessionID,
-		questionIdx,
+		questionIndex,
 		len(state.Items),
 		question,
 		item.SessionQuestion.IsReview,
@@ -117,7 +117,7 @@ func (sf *SessionFlow) showQuestion(
 
 	// err handling after rendering question
 	if editMessageID != nil {
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -125,13 +125,13 @@ func (sf *SessionFlow) showQuestion(
 		)
 	} else {
 		if keyboard != nil {
-			sf.telegram.SendMessageWithKeyboard(
+			flow.telegram.SendMessageWithKeyboard(
 				chatID,
 				text,
 				*keyboard,
 			)
 		} else {
-			sf.telegram.SendMessage(
+			flow.telegram.SendMessage(
 				chatID,
 				text,
 			)
@@ -141,12 +141,12 @@ func (sf *SessionFlow) showQuestion(
 
 // renderByType builds the question text and keyboard for the given question type.
 // Returns (text, keyboard, done): done=true means the message was already sent (or should be skipped) — caller must return.
-func (sf *SessionFlow) renderByType(
+func (flow *SessionFlow) renderByType(
 	ctx context.Context,
 	chatID int64,
 	editMessageID *int,
 	sessionID,
-	questionIdx,
+	questionIndex,
 	totalQuestions int,
 	question model.Question,
 	isReview bool,
@@ -167,7 +167,7 @@ func (sf *SessionFlow) renderByType(
 	}
 	text := fmt.Sprintf(
 		messages.questionFormat,
-		questionIdx+1,
+		questionIndex+1,
 		totalQuestions,
 		levelTag,
 		reviewTag,
@@ -178,7 +178,7 @@ func (sf *SessionFlow) renderByType(
 	case model.QuestionKanaHandwriting:
 		// cells = answer 글자 수(촉음은 다음 글자와 같은 셀). 정답 문자열 자체는 cheat 방지를 위해 client로 보내지 않고, 길이만 전달해 캔버스 폭을 글자 수에 비례시킨다.
 		cells := handwritingCellCount(question.CorrectAnswer)
-		miniAppURL, err := sf.handwritingMiniAppURL(
+		miniAppURL, err := flow.handwritingMiniAppURL(
 			sessionID,
 			question.ID,
 			question.Language,
@@ -192,8 +192,8 @@ func (sf *SessionFlow) renderByType(
 		}
 		nextData := callback.FormatHandwritingNext(
 			sessionID,
-			questionIdx,
-			sf.publicBaseURL,
+			questionIndex,
+			flow.publicBaseURL,
 		)
 		text += messages.handwritingPrompt
 		replyMarkup := webAppKeyboardMarkup{
@@ -226,14 +226,14 @@ func (sf *SessionFlow) renderByType(
 		if editMessageID != nil {
 			// Web App 버튼은 별도 메시지로 두는 편이 Mini App 왕복 흐름을 추적하기 쉽다.
 			// 이전 메시지는 재사용하지 않고 짧은 안내 문구로 축약한다.
-			sf.telegram.EditMessage(
+			flow.telegram.EditMessage(
 				chatID,
 				*editMessageID,
 				messages.handwritingSentNotice,
 				nil,
 			)
 		}
-		msgID, err := sf.telegram.SendMessageWithReplyMarkup(
+		messageID, err := flow.telegram.SendMessageWithReplyMarkup(
 			chatID,
 			text,
 			replyMarkup,
@@ -255,11 +255,11 @@ func (sf *SessionFlow) renderByType(
 			)
 			return "", nil, true
 		}
-		if err := sf.messages.SaveHandwritingMessage(
+		if err := flow.messages.SaveHandwritingMessage(
 			ctx,
 			sessionID,
 			question.ID,
-			model.TelegramMessageRef{ChatID: chatID, MessageID: msgID},
+			model.TelegramMessageReference{ChatID: chatID, MessageID: messageID},
 		); err != nil {
 			slog.ErrorContext(
 				ctx,
@@ -280,7 +280,7 @@ func (sf *SessionFlow) renderByType(
 		// Deliver the audio as a separate voice message, then render the
 		// comprehension question + options through the shared MCQ path (grading
 		// reuses the exact-match option flow — no new grader, ADR-031).
-		if !sf.sendListeningAudio(
+		if !flow.sendListeningAudio(
 			ctx,
 			chatID,
 			&question,
@@ -301,7 +301,7 @@ func (sf *SessionFlow) renderByType(
 		return text + optionList, keyboard, false
 
 	case model.QuestionWordOrder:
-		wordOrderText, keyboard, done := sf.renderWordOrder(
+		wordOrderText, keyboard, done := flow.renderWordOrder(
 			ctx,
 			sessionID,
 			question,
@@ -312,10 +312,10 @@ func (sf *SessionFlow) renderByType(
 		return text + "\n\n" + wordOrderText, keyboard, false
 
 	case model.QuestionFillBlank:
-		_ = sf.input.SetActiveQuestion(
+		_ = flow.input.SetActiveQuestion(
 			ctx,
 			chatID,
-			model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIdx},
+			model.ActiveQuestionReference{SessionID: sessionID, QuestionIndex: questionIndex},
 		)
 		text += messages.chatAnswerPrompt
 		return text, nil, false
@@ -339,8 +339,8 @@ func (sf *SessionFlow) renderByType(
 // not receive a separate slot in the handwriting pad.
 func handwritingCellCount(answer string) int {
 	cells := 0
-	for _, r := range answer {
-		if r == 'っ' || r == 'ッ' {
+	for _, character := range answer {
+		if character == 'っ' || character == 'ッ' {
 			continue
 		}
 		cells++
@@ -363,9 +363,9 @@ func buildMCQ(
 	fitsTwoColumns := true
 	for _, option := range options {
 		width := 0
-		for _, r := range option {
+		for _, character := range option {
 			width++
-			if r > 127 { // Japanese and Korean characters take roughly twice the space.
+			if character > 127 { // Japanese and Korean characters take roughly twice the space.
 				width++
 			}
 		}
@@ -442,20 +442,20 @@ func buildMCQ(
 // message. It prefers the cached file_id and falls back to fetching the object
 // from the store and uploading it, caching the returned file_id (ADR-032).
 // Returns false when audio is unavailable so the caller can degrade gracefully.
-func (sf *SessionFlow) sendListeningAudio(
+func (flow *SessionFlow) sendListeningAudio(
 	ctx context.Context,
 	chatID int64,
-	q *model.Question,
+	question *model.Question,
 ) bool {
-	if q.AudioPath == nil || *q.AudioPath == "" {
+	if question.AudioPath == nil || *question.AudioPath == "" {
 		return false
 	}
 
 	// Fast path: re-send by cached file_id (no store fetch, no re-upload).
-	if q.AudioFileID != nil && *q.AudioFileID != "" {
-		if err := sf.telegram.SendVoiceFileID(
+	if question.AudioFileID != nil && *question.AudioFileID != "" {
+		if err := flow.telegram.SendVoiceFileID(
 			chatID,
-			*q.AudioFileID,
+			*question.AudioFileID,
 		); err == nil {
 			return true
 		}
@@ -466,13 +466,13 @@ func (sf *SessionFlow) sendListeningAudio(
 			"event",
 			"telegram.listening.file_id_stale",
 			"question_id",
-			q.ID,
+			question.ID,
 		)
 	}
 
-	clip, err := sf.audio.GetClip(
+	clip, err := flow.audio.GetClip(
 		ctx,
-		*q.AudioPath,
+		*question.AudioPath,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -481,16 +481,16 @@ func (sf *SessionFlow) sendListeningAudio(
 			"event",
 			"telegram.listening.fetch_failed",
 			"question_id",
-			q.ID,
+			question.ID,
 			"key",
-			*q.AudioPath,
+			*question.AudioPath,
 			"error",
 			err,
 		)
 		return false
 	}
 
-	fileID, err := sf.telegram.SendVoiceBytes(
+	fileID, err := flow.telegram.SendVoiceBytes(
 		chatID,
 		clip,
 	)
@@ -501,7 +501,7 @@ func (sf *SessionFlow) sendListeningAudio(
 			"event",
 			"telegram.listening.send_failed",
 			"question_id",
-			q.ID,
+			question.ID,
 			"error",
 			err,
 		)
@@ -509,9 +509,9 @@ func (sf *SessionFlow) sendListeningAudio(
 	}
 
 	if fileID != "" {
-		if err := sf.audio.CacheFileID(
+		if err := flow.audio.CacheFileID(
 			ctx,
-			q.ID,
+			question.ID,
 			fileID,
 		); err != nil {
 			slog.WarnContext(
@@ -520,7 +520,7 @@ func (sf *SessionFlow) sendListeningAudio(
 				"event",
 				"telegram.listening.cache_failed",
 				"question_id",
-				q.ID,
+				question.ID,
 				"error",
 				err,
 			)
@@ -529,26 +529,26 @@ func (sf *SessionFlow) sendListeningAudio(
 	return true
 }
 
-func (sf *SessionFlow) isQuestionAnswered(
+func (flow *SessionFlow) isQuestionAnswered(
 	ctx context.Context,
 	sessionID,
-	questionIdx int,
+	questionIndex int,
 ) bool {
-	state, err := sf.session.QuizProgress(
+	state, err := flow.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
-	if err != nil || questionIdx < 0 || questionIdx >= len(state.Items) {
+	if err != nil || questionIndex < 0 || questionIndex >= len(state.Items) {
 		return false
 	}
-	return state.Items[questionIdx].SessionQuestion.IsCorrect != nil
+	return state.Items[questionIndex].SessionQuestion.IsCorrect != nil
 }
 
-func (sf *SessionFlow) nextUnansweredQuestionIndex(
+func (flow *SessionFlow) nextUnansweredQuestionIndex(
 	ctx context.Context,
 	sessionID int,
 ) (int, error) {
-	state, err := sf.session.QuizProgress(
+	state, err := flow.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -560,7 +560,7 @@ func (sf *SessionFlow) nextUnansweredQuestionIndex(
 }
 
 // TODO: 이 함수 굳이 이렇게 복잡하게 짜야 함?
-func (sf *SessionFlow) handwritingMiniAppURL(
+func (flow *SessionFlow) handwritingMiniAppURL(
 	sessionID,
 	questionID int,
 	language,
@@ -569,46 +569,46 @@ func (sf *SessionFlow) handwritingMiniAppURL(
 	cells int,
 ) (string, error) {
 	baseURL := strings.TrimRight(
-		sf.publicBaseURL,
+		flow.publicBaseURL,
 		"/",
 	)
 	if baseURL == "" {
 		return "", fmt.Errorf("server public base url is empty")
 	}
-	u, err := url.Parse(baseURL + config.PathHandwritingMiniApp)
+	parsedURL, err := url.Parse(baseURL + config.PathHandwritingMiniApp)
 	if err != nil {
 		return "", err
 	}
-	q := u.Query()
-	q.Set(
+	query := parsedURL.Query()
+	query.Set(
 		"session_id",
 		strconv.Itoa(sessionID),
 	)
-	q.Set(
+	query.Set(
 		"question_id",
 		strconv.Itoa(questionID),
 	)
-	q.Set(
+	query.Set(
 		"language",
 		language,
 	)
-	q.Set(
+	query.Set(
 		"level",
 		level,
 	)
-	q.Set(
+	query.Set(
 		"prompt",
 		prompt,
 	)
 	if cells < 1 {
 		cells = 1
 	}
-	q.Set(
+	query.Set(
 		"cells",
 		strconv.Itoa(cells),
 	)
-	u.RawQuery = q.Encode()
-	return u.String(), nil
+	parsedURL.RawQuery = query.Encode()
+	return parsedURL.String(), nil
 }
 
 func isStaleMiniAppCallback(

@@ -12,8 +12,8 @@ import (
 // requests against provider rate limits.
 const audioGeneratePerCycle = 5
 
-// audioGeneratorRepo is the narrow question-repository contract audioGenerator needs.
-type audioGeneratorRepo interface {
+// audioGeneratorRepository is the narrow question-repository contract audioGenerator needs.
+type audioGeneratorRepository interface {
 	GetListeningNeedingAudio(
 		ctx context.Context,
 		language string,
@@ -52,7 +52,7 @@ type audioObjectStore interface {
 // It lives in this admin tool because nothing else runs it: the server never
 // calls TTS and only serves stored clips through service.AudioService (ADR-082).
 type audioGenerator struct {
-	questions audioGeneratorRepo
+	questions audioGeneratorRepository
 	tts       audioSynthesizer
 	store     audioObjectStore
 	voiceKey  string // both configured voices identify newly generated audio
@@ -61,7 +61,7 @@ type audioGenerator struct {
 // newAudioGenerator wires the generator with its repo, TTS client, object store,
 // and configured voices. The second voice changes the key for future clips only.
 func newAudioGenerator(
-	questions audioGeneratorRepo,
+	questions audioGeneratorRepository,
 	tts audioSynthesizer,
 	store audioObjectStore,
 	voiceA,
@@ -74,11 +74,11 @@ func newAudioGenerator(
 // of the language that still lack it, across every level. Content-addressing
 // dedups identical scripts to one object; a per-question failure is logged and
 // skipped.
-func (g *audioGenerator) TopUpAudio(
+func (generator *audioGenerator) TopUpAudio(
 	ctx context.Context,
 	language string,
 ) error {
-	pending, err := g.questions.GetListeningNeedingAudio(
+	pending, err := generator.questions.GetListeningNeedingAudio(
 		ctx,
 		language,
 		audioGeneratePerCycle,
@@ -91,18 +91,18 @@ func (g *audioGenerator) TopUpAudio(
 	}
 
 	var generated, reused, failed int
-	for _, q := range pending {
-		if q.AudioScript == nil || *q.AudioScript == "" {
+	for _, question := range pending {
+		if question.AudioScript == nil || *question.AudioScript == "" {
 			continue
 		}
-		script := *q.AudioScript
+		script := *question.AudioScript
 		key := external.AudioKey(
-			q.Language,
-			g.voiceKey,
+			question.Language,
+			generator.voiceKey,
 			script,
 		)
 
-		exists, err := g.store.Exists(
+		exists, err := generator.store.Exists(
 			ctx,
 			key,
 		)
@@ -116,7 +116,7 @@ func (g *audioGenerator) TopUpAudio(
 				"source",
 				"service.audio",
 				"question_id",
-				q.ID,
+				question.ID,
 				"key",
 				key,
 				"error",
@@ -126,7 +126,7 @@ func (g *audioGenerator) TopUpAudio(
 		}
 
 		if !exists {
-			ogg, err := g.tts.Synthesize(
+			ogg, err := generator.tts.Synthesize(
 				ctx,
 				script,
 			)
@@ -140,13 +140,13 @@ func (g *audioGenerator) TopUpAudio(
 					"source",
 					"service.audio",
 					"question_id",
-					q.ID,
+					question.ID,
 					"error",
 					err,
 				)
 				continue
 			}
-			if err := g.store.Put(
+			if err := generator.store.Put(
 				ctx,
 				key,
 				ogg,
@@ -161,7 +161,7 @@ func (g *audioGenerator) TopUpAudio(
 					"source",
 					"service.audio",
 					"question_id",
-					q.ID,
+					question.ID,
 					"key",
 					key,
 					"error",
@@ -174,9 +174,9 @@ func (g *audioGenerator) TopUpAudio(
 			reused++
 		}
 
-		if err := g.questions.SetAudioPath(
+		if err := generator.questions.SetAudioPath(
 			ctx,
-			q.ID,
+			question.ID,
 			key,
 		); err != nil {
 			failed++
@@ -188,7 +188,7 @@ func (g *audioGenerator) TopUpAudio(
 				"source",
 				"service.audio",
 				"question_id",
-				q.ID,
+				question.ID,
 				"key",
 				key,
 				"error",

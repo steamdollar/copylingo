@@ -30,13 +30,13 @@ type HandwritingMessageStore interface {
 		ctx context.Context,
 		sessionID,
 		questionID int,
-		ref model.TelegramMessageRef,
+		messageReference model.TelegramMessageReference,
 	) error
 	GetHandwritingMessage(
 		ctx context.Context,
 		sessionID,
 		questionID int,
-	) (*model.TelegramMessageRef, error)
+	) (*model.TelegramMessageReference, error)
 }
 
 type MiniAppRecoveryStore interface {

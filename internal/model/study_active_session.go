@@ -15,86 +15,86 @@ type StudyActiveSessionState struct {
 	UpdatedAt                   time.Time              `json:"updated_at"`
 }
 
-func (s *StudyActiveSessionState) RecountStudied() int {
+func (state *StudyActiveSessionState) RecountStudied() int {
 	count := 0
-	for _, item := range s.Items {
+	for _, item := range state.Items {
 		if item.SessionMaterial.StudiedAt != nil {
 			count++
 		}
 	}
-	s.StudiedCount = count
+	state.StudiedCount = count
 	return count
 }
 
-func (s *StudyActiveSessionState) CaptureInitiallyStudied() {
-	s.InitiallyStudiedMaterialIDs = make(map[int]bool)
-	for _, item := range s.Items {
+func (state *StudyActiveSessionState) CaptureInitiallyStudied() {
+	state.InitiallyStudiedMaterialIDs = make(map[int]bool)
+	for _, item := range state.Items {
 		if item.SessionMaterial.StudiedAt != nil {
-			s.InitiallyStudiedMaterialIDs[item.SessionMaterial.MaterialID] = true
+			state.InitiallyStudiedMaterialIDs[item.SessionMaterial.MaterialID] = true
 		}
 	}
 }
 
-func (s *StudyActiveSessionState) ItemByOrder(materialOrder int) (*StudySessionMaterial, int, bool) {
-	for idx := range s.Items {
-		if s.Items[idx].SessionMaterial.MaterialOrder == materialOrder {
-			return &s.Items[idx], idx, true
+func (state *StudyActiveSessionState) ItemByOrder(materialOrder int) (*StudySessionMaterial, int, bool) {
+	for index := range state.Items {
+		if state.Items[index].SessionMaterial.MaterialOrder == materialOrder {
+			return &state.Items[index], index, true
 		}
 	}
 	return nil, -1, false
 }
 
-func (s *StudyActiveSessionState) ItemByMaterialID(materialID int) (*StudySessionMaterial, bool) {
-	for idx := range s.Items {
-		if s.Items[idx].SessionMaterial.MaterialID == materialID {
-			return &s.Items[idx], true
+func (state *StudyActiveSessionState) ItemByMaterialID(materialID int) (*StudySessionMaterial, bool) {
+	for index := range state.Items {
+		if state.Items[index].SessionMaterial.MaterialID == materialID {
+			return &state.Items[index], true
 		}
 	}
 	return nil, false
 }
 
-func (s *StudyActiveSessionState) ItemAt(idx int) (*StudySessionMaterial, bool) {
-	if idx < 0 || idx >= len(s.Items) {
+func (state *StudyActiveSessionState) ItemAt(index int) (*StudySessionMaterial, bool) {
+	if index < 0 || index >= len(state.Items) {
 		return nil, false
 	}
-	return &s.Items[idx], true
+	return &state.Items[index], true
 }
 
-func (s *StudyActiveSessionState) NextUnstudiedIndex() int {
-	for idx, item := range s.Items {
+func (state *StudyActiveSessionState) NextUnstudiedIndex() int {
+	for index, item := range state.Items {
 		if item.SessionMaterial.StudiedAt == nil {
-			return idx
+			return index
 		}
 	}
-	return len(s.Items)
+	return len(state.Items)
 }
 
-func (s *StudyActiveSessionState) MarkStudied(
+func (state *StudyActiveSessionState) MarkStudied(
 	materialOrder int,
 	studiedAt time.Time,
 ) bool {
-	_, idx, ok := s.ItemByOrder(materialOrder)
-	if !ok || s.Items[idx].SessionMaterial.StudiedAt != nil {
+	_, index, ok := state.ItemByOrder(materialOrder)
+	if !ok || state.Items[index].SessionMaterial.StudiedAt != nil {
 		return false
 	}
-	s.Items[idx].SessionMaterial.StudiedAt = &studiedAt
-	s.CurrentIndex = idx
-	s.UpdatedAt = studiedAt
-	s.RecountStudied()
+	state.Items[index].SessionMaterial.StudiedAt = &studiedAt
+	state.CurrentIndex = index
+	state.UpdatedAt = studiedAt
+	state.RecountStudied()
 	return true
 }
 
-func (s *StudyActiveSessionState) NewlyStudiedMaterialIDs() []int {
+func (state *StudyActiveSessionState) NewlyStudiedMaterialIDs() []int {
 	ids := make(
 		[]int,
 		0,
 	)
-	for _, item := range s.Items {
+	for _, item := range state.Items {
 		if item.SessionMaterial.StudiedAt == nil {
 			continue
 		}
 		materialID := item.SessionMaterial.MaterialID
-		if s.InitiallyStudiedMaterialIDs[materialID] {
+		if state.InitiallyStudiedMaterialIDs[materialID] {
 			continue
 		}
 		ids = append(

@@ -27,55 +27,55 @@ type services struct {
 // newServices creates the repositories and external clients, then the Tier1
 // services over them.
 func newServices(
-	cfg *config.Config,
+	appConfig *config.Config,
 	db *sqlx.DB,
-	rdb *redis.Client,
+	redisClient *redis.Client,
 ) services {
-	repos := repository.NewRepositories(db)
+	repositories := repository.NewRepositories(db)
 
 	// One LLM client serves Quiz grading and learner questions.
 	llm := external.NewLLMClient(external.LLMOptions{
-		APIKey:  cfg.LLM.APIKey,
-		BaseURL: cfg.LLM.BaseURL,
-		Model:   cfg.LLM.Model,
+		APIKey:  appConfig.LLM.APIKey,
+		BaseURL: appConfig.LLM.BaseURL,
+		Model:   appConfig.LLM.Model,
 	})
 
 	// Only the storage implementations know Redis commands and serialized keys.
-	session := service.NewSessionService(service.SessionDeps{
-		QuestionRepo:           repos.Question,
-		SessionRepo:            repos.Session,
-		SessionQuestionRepo:    repos.SessionQuestion,
-		QuizActiveSessionRepo:  repos.QuizActiveSession,
-		StudyActiveSessionRepo: repos.StudyActiveSession,
-		MaterialRepo:           repos.Material,
-		DB:                     db,
-		UserRepo:               repos.User,
+	session := service.NewSessionService(service.SessionDependencies{
+		QuestionRepository:           repositories.Question,
+		SessionRepository:            repositories.Session,
+		SessionQuestionRepository:    repositories.SessionQuestion,
+		QuizActiveSessionRepository:  repositories.QuizActiveSession,
+		StudyActiveSessionRepository: repositories.StudyActiveSession,
+		MaterialRepository:           repositories.Material,
+		DB:                           db,
+		UserRepository:               repositories.User,
 		Stores: service.SessionStores{
-			Quiz:  redisstore.NewQuizSessions(rdb),
-			Study: redisstore.NewStudySessions(rdb),
+			Quiz:  redisstore.NewQuizSessions(redisClient),
+			Study: redisstore.NewStudySessions(redisClient),
 		},
 		LLM: llm,
 	})
 
 	return services{
-		user:               service.NewUserService(repos.User),
+		user:               service.NewUserService(repositories.User),
 		session:            session,
-		materialPreference: service.NewMaterialPreferenceService(repos.MaterialPreference),
+		materialPreference: service.NewMaterialPreferenceService(repositories.MaterialPreference),
 		analyzer: service.NewAnalyzerService(
-			repos.User,
-			repos.SessionQuestion,
-			repos.Material,
+			repositories.User,
+			repositories.SessionQuestion,
+			repositories.Material,
 		),
 		llmQuestion: service.NewLLMQuestionService(
 			llm,
-			repos.Tip,
-			cfg.LLM.Model,
+			repositories.Tip,
+			appConfig.LLM.Model,
 		),
 		// Serves pre-generated listening clips; generation runs in
 		// cmd/admin/generate_listening_audio (ADR-082).
 		audio: service.NewAudioService(
-			repos.Question,
-			bootstrap.NewAudioStore(cfg.Storage),
+			repositories.Question,
+			bootstrap.NewAudioStore(appConfig.Storage),
 		),
 	}
 }

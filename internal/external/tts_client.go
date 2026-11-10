@@ -26,7 +26,7 @@ const (
 // can substitute a fake and avoid the external ffmpeg dependency.
 type transcoder func(
 	ctx context.Context,
-	pcm []byte,
+	pcmAudio []byte,
 ) ([]byte, error)
 
 // GeminiTTSClient calls the Gemini native generateContent AUDIO modality. The
@@ -56,48 +56,48 @@ type TTSOptions struct {
 // NewTTSClient builds a Gemini native TTS client. It reuses the LLM API key and
 // derives the native base URL from the LLM (OpenAI-compat) base URL so a single
 // endpoint swap moves both.
-func NewTTSClient(opts TTSOptions) *GeminiTTSClient {
+func NewTTSClient(options TTSOptions) *GeminiTTSClient {
 	return &GeminiTTSClient{
 		httpClient: &http.Client{Timeout: ttsHTTPTimeout},
-		apiKey:     opts.APIKey,
-		baseURL:    geminiNativeBaseURL(opts.BaseURL),
-		model:      opts.Model,
-		voice:      opts.Voice,
-		voiceB:     opts.VoiceB,
+		apiKey:     options.APIKey,
+		baseURL:    geminiNativeBaseURL(options.BaseURL),
+		model:      options.Model,
+		voice:      options.Voice,
+		voiceB:     options.VoiceB,
 		transcode:  ffmpegPCMToOGG,
 	}
 }
 
 // geminiNativeBaseURL turns the OpenAI-compat base URL
 // (…/v1beta/openai/) into the native base (…/v1beta) that generateContent needs.
-func geminiNativeBaseURL(compatBaseURL string) string {
-	u := strings.TrimRight(
-		strings.TrimSpace(compatBaseURL),
+func geminiNativeBaseURL(compatibleBaseURL string) string {
+	baseURL := strings.TrimRight(
+		strings.TrimSpace(compatibleBaseURL),
 		"/",
 	)
-	u = strings.TrimSuffix(
-		u,
+	baseURL = strings.TrimSuffix(
+		baseURL,
 		"/openai",
 	)
-	if u == "" {
+	if baseURL == "" {
 		return "https://generativelanguage.googleapis.com/v1beta"
 	}
-	return u
+	return baseURL
 }
 
 // Synthesize generates audio for text: native TTS -> raw PCM -> OGG/Opus.
-func (c *GeminiTTSClient) Synthesize(
+func (client *GeminiTTSClient) Synthesize(
 	ctx context.Context,
 	text string,
 ) ([]byte, error) {
-	if c.apiKey == "" || c.model == "" {
+	if client.apiKey == "" || client.model == "" {
 		return nil, ErrTTSConfigMissing
 	}
 	if strings.TrimSpace(text) == "" {
 		return nil, fmt.Errorf("tts synthesize: empty text")
 	}
 
-	pcm, err := c.generatePCM(
+	pcmAudio, err := client.generatePCM(
 		ctx,
 		text,
 	)
@@ -105,9 +105,9 @@ func (c *GeminiTTSClient) Synthesize(
 		return nil, err
 	}
 
-	ogg, err := c.transcode(
+	ogg, err := client.transcode(
 		ctx,
-		pcm,
+		pcmAudio,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -175,15 +175,15 @@ type ttsResponse struct {
 }
 
 // generatePCM performs the native generateContent call and returns decoded raw PCM.
-func (c *GeminiTTSClient) generatePCM(
+func (client *GeminiTTSClient) generatePCM(
 	ctx context.Context,
 	text string,
 ) ([]byte, error) {
 	speechConfig := ttsSpeechConfig{
-		VoiceConfig: &ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: c.voice}},
+		VoiceConfig: &ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: client.voice}},
 	}
 	if turns := dialogueTurns(text); len(turns) > 0 {
-		if c.voiceB == "" {
+		if client.voiceB == "" {
 			return nil, ErrTTSConfigMissing
 		}
 		// Speaker labels match the two configured voices and are instructions, not spoken text.
@@ -206,17 +206,17 @@ func (c *GeminiTTSClient) generatePCM(
 			SpeakerVoiceConfigs: []ttsSpeakerVoiceConfig{
 				{
 					Speaker:     "A",
-					VoiceConfig: ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: c.voice}},
+					VoiceConfig: ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: client.voice}},
 				},
 				{
 					Speaker:     "B",
-					VoiceConfig: ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: c.voiceB}},
+					VoiceConfig: ttsVoiceConfig{PrebuiltVoiceConfig: ttsPrebuiltVoiceConfig{VoiceName: client.voiceB}},
 				},
 			},
 		}}
 	}
 
-	reqBody := ttsRequest{
+	requestBody := ttsRequest{
 		Contents: []ttsContent{{Parts: []ttsPart{{Text: text}}}},
 		GenerationConfig: ttsGenerationConfig{
 			ResponseModalities: []string{"AUDIO"},
@@ -224,7 +224,7 @@ func (c *GeminiTTSClient) generatePCM(
 		},
 	}
 
-	payload, err := json.Marshal(reqBody)
+	payload, err := json.Marshal(requestBody)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"tts marshal request: %w",
@@ -234,10 +234,10 @@ func (c *GeminiTTSClient) generatePCM(
 
 	url := fmt.Sprintf(
 		"%s/models/%s:generateContent",
-		c.baseURL,
-		c.model,
+		client.baseURL,
+		client.model,
 	)
-	req, err := http.NewRequestWithContext(
+	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
 		url,
@@ -249,35 +249,35 @@ func (c *GeminiTTSClient) generatePCM(
 			err,
 		)
 	}
-	req.Header.Set(
+	request.Header.Set(
 		"Content-Type",
 		"application/json",
 	)
-	req.Header.Set(
+	request.Header.Set(
 		"x-goog-api-key",
-		c.apiKey,
+		client.apiKey,
 	)
 
-	resp, err := c.httpClient.Do(req)
+	response, err := client.httpClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"tts request failed: %w",
 			err,
 		)
 	}
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"tts read response: %w",
 			err,
 		)
 	}
-	if resp.StatusCode != http.StatusOK {
+	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf(
 			"tts request status %d: %s",
-			resp.StatusCode,
+			response.StatusCode,
 			strings.TrimSpace(string(body)),
 		)
 	}
@@ -293,18 +293,18 @@ func (c *GeminiTTSClient) generatePCM(
 		)
 	}
 
-	b64 := extractTTSAudioData(parsed)
-	if b64 == "" {
+	encoded := extractTTSAudioData(parsed)
+	if encoded == "" {
 		return nil, fmt.Errorf("tts response contained no audio data")
 	}
-	pcm, err := base64.StdEncoding.DecodeString(b64)
+	pcmAudio, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"tts decode base64 audio: %w",
 			err,
 		)
 	}
-	return pcm, nil
+	return pcmAudio, nil
 }
 
 // Only wholly quoted, alternating turns are treated as a two-person dialogue.
@@ -344,9 +344,9 @@ func dialogueTurns(script string) []string {
 }
 
 // extractTTSAudioData pulls the first inline audio payload out of the response.
-func extractTTSAudioData(resp ttsResponse) string {
-	for _, cand := range resp.Candidates {
-		for _, part := range cand.Content.Parts {
+func extractTTSAudioData(response ttsResponse) string {
+	for _, candidate := range response.Candidates {
+		for _, part := range candidate.Content.Parts {
 			if part.InlineData != nil && part.InlineData.Data != "" {
 				return part.InlineData.Data
 			}
@@ -360,13 +360,13 @@ func extractTTSAudioData(resp ttsResponse) string {
 // dependency (ADR-031: no mature pure-Go Opus encoder).
 func ffmpegPCMToOGG(
 	ctx context.Context,
-	pcm []byte,
+	pcmAudio []byte,
 ) ([]byte, error) {
-	if len(pcm) == 0 {
+	if len(pcmAudio) == 0 {
 		return nil, fmt.Errorf("ffmpeg: empty pcm input")
 	}
 
-	cmd := exec.CommandContext(
+	command := exec.CommandContext(
 		ctx,
 		"ffmpeg",
 		"-hide_banner",
@@ -390,11 +390,11 @@ func ffmpegPCMToOGG(
 	)
 
 	var out, stderr bytes.Buffer
-	cmd.Stdin = bytes.NewReader(pcm)
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
+	command.Stdin = bytes.NewReader(pcmAudio)
+	command.Stdout = &out
+	command.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	if err := command.Run(); err != nil {
 		return nil, fmt.Errorf(
 			"ffmpeg: %w (%s)",
 			err,

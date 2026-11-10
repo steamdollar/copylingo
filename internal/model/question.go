@@ -22,8 +22,8 @@ const (
 	QuestionTranslation QuestionType = "translation"
 	// QuestionListening - 청해 문제
 	QuestionListening QuestionType = "listening"
-	// QuestionReadingComp - 독해 문제
-	QuestionReadingComp QuestionType = "reading_comp"
+	// QuestionReadingComprehension - 독해 문제
+	QuestionReadingComprehension QuestionType = "reading_comp"
 	// QuestionWordOrder - 단어 배열 (어순 교정)
 	QuestionWordOrder QuestionType = "word_order"
 )
@@ -34,23 +34,23 @@ type Skill string
 
 const (
 	// App-owned beginner taxonomy used by current kana/vocabulary seeders.
-	SkillKanaReading      Skill = "kana_reading"
-	SkillKanaRecall       Skill = "kana_recall"
-	SkillKanaHandwriting  Skill = "kana_handwriting"
-	SkillVocabMeaning     Skill = "vocab_meaning"
-	SkillVocabRecall      Skill = "vocab_recall"
-	SkillVocabKanjiRecall Skill = "vocab_kanji_recall"
-	SkillVocabHandwriting Skill = "vocab_handwriting"
+	SkillKanaReading           Skill = "kana_reading"
+	SkillKanaRecall            Skill = "kana_recall"
+	SkillKanaHandwriting       Skill = "kana_handwriting"
+	SkillVocabularyMeaning     Skill = "vocab_meaning"
+	SkillVocabularyRecall      Skill = "vocab_recall"
+	SkillVocabularyKanjiRecall Skill = "vocab_kanji_recall"
+	SkillVocabularyHandwriting Skill = "vocab_handwriting"
 
 	// JLPT official-style taxonomy.
 	SkillKanjiReading Skill = "kanji_reading"
-	// SkillVocabKanjiReading is the N4/JLPT vocabulary kanji-reading item type.
+	// SkillVocabularyKanjiReading is the N4/JLPT vocabulary kanji-reading item type.
 	// It is intentionally distinct from the legacy app-owned vocab_kanji_recall.
-	SkillVocabKanjiReading      Skill = "vocab_kanji_reading"
-	SkillVocabOrthography       Skill = "vocab_orthography"
-	SkillVocabContext           Skill = "vocab_context"
-	SkillVocabParaphrase        Skill = "vocab_paraphrase"
-	SkillVocabUsage             Skill = "vocab_usage"
+	SkillVocabularyKanjiReading Skill = "vocab_kanji_reading"
+	SkillVocabularyOrthography  Skill = "vocab_orthography"
+	SkillVocabularyContext      Skill = "vocab_context"
+	SkillVocabularyParaphrase   Skill = "vocab_paraphrase"
+	SkillVocabularyUsage        Skill = "vocab_usage"
 	SkillGrammarForm            Skill = "grammar_form"
 	SkillSentenceComposition    Skill = "sentence_composition"
 	SkillGrammarText            Skill = "grammar_text"
@@ -71,7 +71,7 @@ const (
 	SkillListeningIntegrated    Skill = "listening_integrated"
 )
 
-func SkillPtr(skill Skill) *Skill {
+func SkillPointer(skill Skill) *Skill {
 	return &skill
 }
 
@@ -114,55 +114,55 @@ type Question struct {
 }
 
 // GetOptions parses the JSONB options field into a string slice.
-func (q *Question) GetOptions() ([]string, error) {
-	var opts []string
+func (question *Question) GetOptions() ([]string, error) {
+	var options []string
 	if err := json.Unmarshal(
-		q.Options,
-		&opts,
+		question.Options,
+		&options,
 	); err != nil {
 		return nil, err
 	}
-	return opts, nil
+	return options, nil
 }
 
 // ShuffleOptions deterministically shuffles the question options using a seed derived from sessionID and Question.ID.
 // If options contains 1 or fewer elements, or is empty/nil, it does nothing and returns nil.
-func (q *Question) ShuffleOptions(sessionID int) error {
-	if len(q.Options) == 0 {
+func (question *Question) ShuffleOptions(sessionID int) error {
+	if len(question.Options) == 0 {
 		return nil
 	}
-	var opts []string
+	var options []string
 	if err := json.Unmarshal(
-		q.Options,
-		&opts,
+		question.Options,
+		&options,
 	); err != nil {
 		return err
 	}
-	if len(opts) <= 1 {
+	if len(options) <= 1 {
 		return nil
 	}
 
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(fmt.Sprintf(
+	hasher := fnv.New64a()
+	_, _ = hasher.Write([]byte(fmt.Sprintf(
 		"%d:%d",
 		sessionID,
-		q.ID,
+		question.ID,
 	)))
-	rng := rand.New(rand.NewSource(int64(h.Sum64())))
-	rng.Shuffle(
-		len(opts),
+	random := rand.New(rand.NewSource(int64(hasher.Sum64())))
+	random.Shuffle(
+		len(options),
 		func(
 			i,
 			j int,
 		) {
-			opts[i], opts[j] = opts[j], opts[i]
+			options[i], options[j] = options[j], options[i]
 		},
 	)
 
-	shuffledJSON, err := json.Marshal(opts)
+	shuffledJSON, err := json.Marshal(options)
 	if err != nil {
 		return err
 	}
-	q.Options = shuffledJSON
+	question.Options = shuffledJSON
 	return nil
 }

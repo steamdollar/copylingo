@@ -19,13 +19,19 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 	if dsn == "" {
 		t.Skip("COPYLINGO_TEST_DATABASE_URL is not set")
 	}
-	db, err := sqlx.Open("postgres", dsn)
+	db, err := sqlx.Open(
+		"postgres",
+		dsn,
+	)
 	if err != nil {
 		t.Fatal("open test database failed")
 	}
 	defer db.Close()
 	ctx := context.Background()
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.BeginTxx(
+		ctx,
+		nil,
+	)
 	if err != nil {
 		t.Fatal("begin test transaction failed")
 	}
@@ -65,7 +71,10 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 			(30, 600, 'vocab_kanji_recall'), (31, 700, 'vocab_kanji_recall'), (32, 800, 'vocab_kanji_recall')`,
 		`INSERT INTO user_question_progress (user_id, question_id) VALUES (42, 10)`,
 	} {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
+		if _, err := tx.ExecContext(
+			ctx,
+			statement,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -82,41 +91,89 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 		{"reading requires this user's study", "reading", nil, 10, []int{13}},
 		{"listening requires audio", "listening", nil, 10, []int{12}},
 	} {
-		t.Run(tt.name, func(t *testing.T) {
-			var got []model.Question
-			if err := tx.SelectContext(ctx, &got, newQuestionsForStudiedMaterialsQuery,
-				42, "ja", pq.Array([]string{"N4"}), tt.category, pq.Array(tt.exclude), tt.limit, 0); err != nil {
-				t.Fatal(err)
-			}
-			ids := make([]int, len(got))
-			for i, q := range got {
-				ids[i] = q.ID
-			}
-			if !reflect.DeepEqual(ids, tt.wantIDs) {
-				t.Fatalf("question IDs = %v, want %v", ids, tt.wantIDs)
-			}
-		})
+		t.Run(
+			tt.name,
+			func(t *testing.T) {
+				var got []model.Question
+				if err := tx.SelectContext(
+					ctx,
+					&got,
+					newQuestionsForStudiedMaterialsQuery,
+					42,
+					"ja",
+					pq.Array([]string{"N4"}),
+					tt.category,
+					pq.Array(tt.exclude),
+					tt.limit,
+					0,
+				); err != nil {
+					t.Fatal(err)
+				}
+				ids := make(
+					[]int,
+					len(got),
+				)
+				for i, question := range got {
+					ids[i] = question.ID
+				}
+				if !reflect.DeepEqual(
+					ids,
+					tt.wantIDs,
+				) {
+					t.Fatalf(
+						"question IDs = %v, want %v",
+						ids,
+						tt.wantIDs,
+					)
+				}
+			},
+		)
 	}
 
-	t.Run("new kanji recall respects remaining budget", func(t *testing.T) {
-		var got []model.Question
-		if err := tx.SelectContext(ctx, &got, newQuestionsForStudiedMaterialsQuery,
-			42, "ja", pq.Array([]string{"N4"}), "vocabulary", pq.Array([]int{30}), 50, 1); err != nil {
-			t.Fatal(err)
-		}
-		var recallIDs []int
-		for _, q := range got {
-			if q.Skill != nil && *q.Skill == model.SkillVocabKanjiRecall {
-				recallIDs = append(recallIDs, q.ID)
+	t.Run(
+		"new kanji recall respects remaining budget",
+		func(t *testing.T) {
+			var got []model.Question
+			if err := tx.SelectContext(
+				ctx,
+				&got,
+				newQuestionsForStudiedMaterialsQuery,
+				42,
+				"ja",
+				pq.Array([]string{"N4"}),
+				"vocabulary",
+				pq.Array([]int{30}),
+				50,
+				1,
+			); err != nil {
+				t.Fatal(err)
 			}
-			if q.ID == 8 || q.ID == 9 || q.ID == 10 || q.ID == 30 {
-				t.Fatalf("selected excluded, served, or wrong-scope question %d", q.ID)
+			var recallIDs []int
+			for _, question := range got {
+				if question.Skill != nil && *question.Skill == model.SkillVocabularyKanjiRecall {
+					recallIDs = append(
+						recallIDs,
+						question.ID,
+					)
+				}
+				if question.ID == 8 || question.ID == 9 || question.ID == 10 || question.ID == 30 {
+					t.Fatalf(
+						"selected excluded, served, or wrong-scope question %d",
+						question.ID,
+					)
+				}
 			}
-		}
-		if !reflect.DeepEqual(recallIDs, []int{31}) {
-			t.Fatalf("recall IDs = %v, want [31]", recallIDs)
-		}
-	})
+			if !reflect.DeepEqual(
+				recallIDs,
+				[]int{31},
+			) {
+				t.Fatalf(
+					"recall IDs = %v, want [31]",
+					recallIDs,
+				)
+			}
+		},
+	)
 
 	for _, statement := range []string{
 		`INSERT INTO questions (id, material_id, proficiency_level) VALUES
@@ -130,7 +187,10 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 			(99, 105, NOW() - INTERVAL '30 days'), (42, 106, NOW() - INTERVAL '30 days'),
 			(42, 107, NOW() - INTERVAL '1 day'), (42, 108, NOW() - INTERVAL '30 days')`,
 	} {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
+		if _, err := tx.ExecContext(
+			ctx,
+			statement,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -141,7 +201,47 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 		{"N4", []int{103, 101, 102}},
 		{"N5", []int{102, 103, 101}},
 	} {
-		t.Run("due prioritizes current level "+tt.level, func(t *testing.T) {
+		t.Run(
+			"due prioritizes current level "+tt.level,
+			func(t *testing.T) {
+				var got []model.Question
+				if err := tx.SelectContext(
+					ctx,
+					&got,
+					dueReviewsForStudiedMaterialsQuery,
+					42,
+					"ja",
+					pq.Array([]string{"N5", "N4"}),
+					10,
+					0,
+					tt.level,
+					pq.Array([]model.QuestionCategory{}),
+				); err != nil {
+					t.Fatal(err)
+				}
+				ids := make(
+					[]int,
+					len(got),
+				)
+				for i, question := range got {
+					ids[i] = question.ID
+				}
+				if !reflect.DeepEqual(
+					ids,
+					tt.wantIDs,
+				) {
+					t.Fatalf(
+						"due IDs = %v, want %v",
+						ids,
+						tt.wantIDs,
+					)
+				}
+			},
+		)
+	}
+	t.Run(
+		"due recall cap preserves current level priority",
+		func(t *testing.T) {
 			var got []model.Question
 			if err := tx.SelectContext(
 				ctx,
@@ -151,38 +251,24 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 				"ja",
 				pq.Array([]string{"N5", "N4"}),
 				10,
-				0,
-				tt.level,
+				1,
+				"N4",
 				pq.Array([]model.QuestionCategory{}),
 			); err != nil {
 				t.Fatal(err)
 			}
-			ids := make([]int, len(got))
-			for i, q := range got {
-				ids[i] = q.ID
+			found := false
+			for _, question := range got {
+				if question.ID == 108 {
+					t.Fatal("older adjacent-level recall displaced current-level recall")
+				}
+				found = found || question.ID == 107
 			}
-			if !reflect.DeepEqual(ids, tt.wantIDs) {
-				t.Fatalf("due IDs = %v, want %v", ids, tt.wantIDs)
+			if !found {
+				t.Fatal("current-level recall missing")
 			}
-		})
-	}
-	t.Run("due recall cap preserves current level priority", func(t *testing.T) {
-		var got []model.Question
-		if err := tx.SelectContext(ctx, &got, dueReviewsForStudiedMaterialsQuery,
-			42, "ja", pq.Array([]string{"N5", "N4"}), 10, 1, "N4", pq.Array([]model.QuestionCategory{})); err != nil {
-			t.Fatal(err)
-		}
-		found := false
-		for _, q := range got {
-			if q.ID == 108 {
-				t.Fatal("older adjacent-level recall displaced current-level recall")
-			}
-			found = found || q.ID == 107
-		}
-		if !found {
-			t.Fatal("current-level recall missing")
-		}
-	})
+		},
+	)
 
 	for _, statement := range []string{
 		`INSERT INTO questions (id, material_id, category, audio_path) VALUES
@@ -194,7 +280,10 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 		`INSERT INTO user_question_progress (user_id, question_id, next_review_at)
 			SELECT 42, id, NOW() - INTERVAL '5 days' FROM questions WHERE id BETWEEN 300 AND 329`,
 	} {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
+		if _, err := tx.ExecContext(
+			ctx,
+			statement,
+		); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -205,7 +294,50 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 		{model.CategoryReading, 201},
 		{model.CategoryListening, 202},
 	} {
-		t.Run("reserved due category bypasses vocabulary backlog "+string(tt.category), func(t *testing.T) {
+		t.Run(
+			"reserved due category bypasses vocabulary backlog "+string(tt.category),
+			func(t *testing.T) {
+				var got []model.Question
+				if err := tx.SelectContext(
+					ctx,
+					&got,
+					dueReviewsForStudiedMaterialsQuery,
+					42,
+					"ja",
+					pq.Array([]string{"N5", "N4"}),
+					5,
+					3,
+					"N4",
+					pq.Array([]model.QuestionCategory{tt.category}),
+				); err != nil {
+					t.Fatal(err)
+				}
+				if len(got) != 1 || got[0].ID != tt.wantID {
+					t.Fatalf(
+						"reserved due selection = %v, want only %d",
+						got,
+						tt.wantID,
+					)
+				}
+			},
+		)
+	}
+	t.Run(
+		"reading cap applies before the bounded due pool",
+		func(t *testing.T) {
+			for _, statement := range []string{
+				`INSERT INTO questions (id, material_id, category)
+			 SELECT id, 100, 'reading' FROM generate_series(500, 529) AS id`,
+				`INSERT INTO user_question_progress (user_id, question_id, next_review_at)
+			 SELECT 42, id, NOW() - INTERVAL '10 days' FROM questions WHERE id BETWEEN 500 AND 529`,
+			} {
+				if _, err := tx.ExecContext(
+					ctx,
+					statement,
+				); err != nil {
+					t.Fatal(err)
+				}
+			}
 			var got []model.Question
 			if err := tx.SelectContext(
 				ctx,
@@ -214,42 +346,26 @@ func TestQuestionSelectionPostgres(t *testing.T) {
 				42,
 				"ja",
 				pq.Array([]string{"N5", "N4"}),
-				5,
+				17,
 				3,
 				"N4",
-				pq.Array([]model.QuestionCategory{tt.category}),
+				pq.Array([]model.QuestionCategory{}),
 			); err != nil {
 				t.Fatal(err)
 			}
-			if len(got) != 1 || got[0].ID != tt.wantID {
-				t.Fatalf("reserved due selection = %v, want only %d", got, tt.wantID)
+			reading := 0
+			for _, question := range got {
+				if question.Category == model.CategoryReading {
+					reading++
+				}
 			}
-		})
-	}
-	t.Run("reading cap applies before the bounded due pool", func(t *testing.T) {
-		for _, statement := range []string{
-			`INSERT INTO questions (id, material_id, category)
-			 SELECT id, 100, 'reading' FROM generate_series(500, 529) AS id`,
-			`INSERT INTO user_question_progress (user_id, question_id, next_review_at)
-			 SELECT 42, id, NOW() - INTERVAL '10 days' FROM questions WHERE id BETWEEN 500 AND 529`,
-		} {
-			if _, err := tx.ExecContext(ctx, statement); err != nil {
-				t.Fatal(err)
+			if len(got) != 17 || reading != 1 {
+				t.Fatalf(
+					"due pool size/reading = %d/%d, want 17/1",
+					len(got),
+					reading,
+				)
 			}
-		}
-		var got []model.Question
-		if err := tx.SelectContext(ctx, &got, dueReviewsForStudiedMaterialsQuery,
-			42, "ja", pq.Array([]string{"N5", "N4"}), 17, 3, "N4", pq.Array([]model.QuestionCategory{})); err != nil {
-			t.Fatal(err)
-		}
-		reading := 0
-		for _, q := range got {
-			if q.Category == model.CategoryReading {
-				reading++
-			}
-		}
-		if len(got) != 17 || reading != 1 {
-			t.Fatalf("due pool size/reading = %d/%d, want 17/1", len(got), reading)
-		}
-	})
+		},
+	)
 }

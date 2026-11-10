@@ -51,12 +51,12 @@ type studySessionWithStateRow struct {
 	MaterialCreatedAt time.Time              `db:"material_created_at"`
 }
 
-func (r *StudyActiveSessionRepository) LoadStudySessionWithStateBySessionID(
+func (repository *StudyActiveSessionRepository) LoadStudySessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
 	var rows []studySessionWithStateRow
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&rows,
 		`
@@ -148,11 +148,11 @@ func studySessionFromRow(row studySessionWithStateRow) model.Session {
 	}
 }
 
-func (r *StudyActiveSessionRepository) FlushStudyActiveSession(
+func (repository *StudyActiveSessionRepository) FlushStudyActiveSession(
 	ctx context.Context,
 	state *model.StudyActiveSessionState,
 ) error {
-	tx, err := r.db.BeginTxx(
+	tx, err := repository.db.BeginTxx(
 		ctx,
 		nil,
 	)
@@ -279,7 +279,7 @@ func markStudySessionCompleted(
 	tx *sqlx.Tx,
 	state *model.StudyActiveSessionState,
 ) (bool, error) {
-	res, err := tx.ExecContext(
+	result, err := tx.ExecContext(
 		ctx,
 		`
 		UPDATE sessions
@@ -297,7 +297,7 @@ func markStudySessionCompleted(
 		)
 	}
 
-	rows, err := res.RowsAffected()
+	rows, err := result.RowsAffected()
 	if err != nil {
 		return false, fmt.Errorf(
 			"StudyActiveSessionRepository.markStudySessionCompleted rows session_id=%d: %w",
@@ -331,7 +331,7 @@ func flushStudySessionMaterials(
 	}
 
 	var values strings.Builder
-	args := make(
+	arguments := make(
 		[]any,
 		0,
 		len(studied)*2,
@@ -346,8 +346,8 @@ func flushStudySessionMaterials(
 			base+1,
 			base+2,
 		))
-		args = append(
-			args,
+		arguments = append(
+			arguments,
 			item.ID,
 			item.StudiedAt,
 		)
@@ -365,7 +365,7 @@ func flushStudySessionMaterials(
 	if _, err := tx.ExecContext(
 		ctx,
 		query,
-		args...,
+		arguments...,
 	); err != nil {
 		return fmt.Errorf(
 			"StudyActiveSessionRepository.flushStudySessionMaterials count=%d: %w",
@@ -387,13 +387,13 @@ func flushUserMaterialProgress(
 	}
 
 	var values strings.Builder
-	args := make(
+	arguments := make(
 		[]any,
 		0,
 		len(materialIDs)+1,
 	)
-	args = append(
-		args,
+	arguments = append(
+		arguments,
 		state.Session.UserID,
 	)
 	for i, materialID := range materialIDs {
@@ -405,8 +405,8 @@ func flushUserMaterialProgress(
 			"($%d)",
 			placeholder,
 		))
-		args = append(
-			args,
+		arguments = append(
+			arguments,
 			materialID,
 		)
 	}
@@ -444,7 +444,7 @@ func flushUserMaterialProgress(
 	if _, err := tx.ExecContext(
 		ctx,
 		query,
-		args...,
+		arguments...,
 	); err != nil {
 		return fmt.Errorf(
 			"StudyActiveSessionRepository.flushUserMaterialProgress count=%d: %w",

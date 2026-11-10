@@ -29,7 +29,7 @@ func newQuizTestSession(
 			err,
 		)
 	}
-	return NewSessionService(SessionDeps{
+	return NewSessionService(SessionDependencies{
 		Stores: SessionStores{Quiz: store},
 		LLM:    llm,
 	}), store
@@ -48,11 +48,11 @@ func recordedAnswer(
 	store *fakeQuizSessionStore,
 ) (string, *bool) {
 	t.Helper()
-	sq := store.values[10].Items[0].SessionQuestion
-	if sq.UserAnswer == nil {
-		return "", sq.IsCorrect
+	sessionQuestion := store.values[10].Items[0].SessionQuestion
+	if sessionQuestion.UserAnswer == nil {
+		return "", sessionQuestion.IsCorrect
 	}
-	return *sq.UserAnswer, sq.IsCorrect
+	return *sessionQuestion.UserAnswer, sessionQuestion.IsCorrect
 }
 
 func TestSessionServiceSubmitQuizOption(t *testing.T) {
@@ -66,12 +66,12 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 	t.Run(
 		"records graded option",
 		func(t *testing.T) {
-			svc, store := newQuizTestSession(
+			sessionService, store := newQuizTestSession(
 				t,
 				submitTestState(question),
 				nil,
 			)
-			got, err := svc.SubmitQuizOption(
+			got, err := sessionService.SubmitQuizOption(
 				context.Background(),
 				1,
 				10,
@@ -104,16 +104,21 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 	)
 
 	tests := []struct {
-		name       string
-		answered   bool
-		questionID int
-		optionIdx  int
-		wantErr    error
+		name        string
+		answered    bool
+		questionID  int
+		optionIndex int
+		wantErr     error
 	}{
-		{name: "option out of range", questionID: 1, optionIdx: 2, wantErr: ErrQuizInvalidOption},
-		{name: "negative option", questionID: 1, optionIdx: -1, wantErr: ErrQuizInvalidOption},
-		{name: "already answered is stale", answered: true, questionID: 1, optionIdx: 0, wantErr: ErrQuizAnswerStale},
-		{name: "question not in session", questionID: 99, optionIdx: 0, wantErr: ErrQuizActiveSessionQuestionNotFound},
+		{name: "option out of range", questionID: 1, optionIndex: 2, wantErr: ErrQuizInvalidOption},
+		{name: "negative option", questionID: 1, optionIndex: -1, wantErr: ErrQuizInvalidOption},
+		{name: "already answered is stale", answered: true, questionID: 1, optionIndex: 0, wantErr: ErrQuizAnswerStale},
+		{
+			name:        "question not in session",
+			questionID:  99,
+			optionIndex: 0,
+			wantErr:     ErrQuizActiveSessionQuestionNotFound,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(
@@ -124,17 +129,17 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 					correct := true
 					state.Items[0].SessionQuestion.IsCorrect = &correct
 				}
-				svc, _ := newQuizTestSession(
+				sessionService, _ := newQuizTestSession(
 					t,
 					state,
 					nil,
 				)
-				_, err := svc.SubmitQuizOption(
+				_, err := sessionService.SubmitQuizOption(
 					context.Background(),
 					1,
 					10,
 					tt.questionID,
-					tt.optionIdx,
+					tt.optionIndex,
 				)
 				if !errors.Is(
 					err,
@@ -161,12 +166,12 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 				state.Items,
 				second,
 			)
-			svc, _ := newQuizTestSession(
+			sessionService, _ := newQuizTestSession(
 				t,
 				state,
 				nil,
 			)
-			_, err := svc.SubmitQuizOption(
+			_, err := sessionService.SubmitQuizOption(
 				context.Background(),
 				1,
 				10,
@@ -189,16 +194,16 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 		"missing working set is unavailable",
 		func(t *testing.T) {
 			// Neither Redis nor the DB has the session.
-			svc := NewSessionService(SessionDeps{
+			sessionService := NewSessionService(SessionDependencies{
 				Stores: SessionStores{Quiz: newFakeQuizSessionStore()},
-				QuizActiveSessionRepo: &fakeQuizActiveSessionRepo{loadFn: func(
+				QuizActiveSessionRepository: &fakeQuizActiveSessionRepository{loadFunc: func(
 					context.Context,
 					int,
 				) (*model.QuizActiveSessionState, error) {
 					return nil, sql.ErrNoRows
 				}},
 			})
-			_, err := svc.SubmitQuizOption(
+			_, err := sessionService.SubmitQuizOption(
 				context.Background(),
 				1,
 				10,
@@ -222,12 +227,12 @@ func TestSessionServiceSubmitQuizText(t *testing.T) {
 	t.Run(
 		"fill-blank is trimmed and lowercased",
 		func(t *testing.T) {
-			svc, store := newQuizTestSession(
+			sessionService, store := newQuizTestSession(
 				t,
 				submitTestState(model.Question{ID: 1, Type: model.QuestionFillBlank, CorrectAnswer: "ka"}),
 				nil,
 			)
-			got, err := svc.SubmitQuizText(
+			got, err := sessionService.SubmitQuizText(
 				context.Background(),
 				QuizTextAnswer{UserID: 1, SessionID: 10, QuestionIndex: 0, Text: "  KA "},
 			)
@@ -253,12 +258,12 @@ func TestSessionServiceSubmitQuizText(t *testing.T) {
 	t.Run(
 		"index out of range is question not found",
 		func(t *testing.T) {
-			svc, _ := newQuizTestSession(
+			sessionService, _ := newQuizTestSession(
 				t,
 				submitTestState(model.Question{ID: 1, Type: model.QuestionFillBlank, CorrectAnswer: "ka"}),
 				nil,
 			)
-			_, err := svc.SubmitQuizText(
+			_, err := sessionService.SubmitQuizText(
 				context.Background(),
 				QuizTextAnswer{UserID: 1, SessionID: 10, QuestionIndex: 1, Text: "x"},
 			)
@@ -283,13 +288,13 @@ func TestSessionServiceSubmitQuizWordOrder(t *testing.T) {
 		Options:       json.RawMessage(`["がくせい","わたしは"]`),
 	}
 
-	svc, store := newQuizTestSession(
+	sessionService, store := newQuizTestSession(
 		t,
 		submitTestState(question),
 		nil,
 	)
 	for _, selection := range [][]int{{1}, {1, 1}, {1, 2}} {
-		if _, err := svc.SubmitQuizWordOrder(
+		if _, err := sessionService.SubmitQuizWordOrder(
 			context.Background(),
 			1,
 			10,
@@ -307,7 +312,7 @@ func TestSessionServiceSubmitQuizWordOrder(t *testing.T) {
 		}
 	}
 
-	got, err := svc.SubmitQuizWordOrder(
+	got, err := sessionService.SubmitQuizWordOrder(
 		context.Background(),
 		1,
 		10,
@@ -338,7 +343,7 @@ func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
 	tests := []struct {
 		name     string
 		question model.Question
-		submit   func(svc *SessionService) error
+		submit   func(sessionService *SessionService) error
 	}{
 		{
 			name: "option",
@@ -348,8 +353,8 @@ func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
 				CorrectAnswer: "a",
 				Options:       json.RawMessage(`["a","b"]`),
 			},
-			submit: func(svc *SessionService) error {
-				_, err := svc.SubmitQuizOption(
+			submit: func(sessionService *SessionService) error {
+				_, err := sessionService.SubmitQuizOption(
 					context.Background(),
 					otherUserID,
 					10,
@@ -367,8 +372,8 @@ func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
 				CorrectAnswer: "わたしはがくせい",
 				Options:       json.RawMessage(`["がくせい","わたしは"]`),
 			},
-			submit: func(svc *SessionService) error {
-				_, err := svc.SubmitQuizWordOrder(
+			submit: func(sessionService *SessionService) error {
+				_, err := sessionService.SubmitQuizWordOrder(
 					context.Background(),
 					otherUserID,
 					10,
@@ -381,8 +386,8 @@ func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
 		{
 			name:     "text",
 			question: model.Question{ID: 1, Type: model.QuestionFillBlank, CorrectAnswer: "ka"},
-			submit: func(svc *SessionService) error {
-				_, err := svc.SubmitQuizText(
+			submit: func(sessionService *SessionService) error {
+				_, err := sessionService.SubmitQuizText(
 					context.Background(),
 					QuizTextAnswer{UserID: otherUserID, SessionID: 10, QuestionIndex: 0, Text: "ka"},
 				)
@@ -394,12 +399,12 @@ func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
 		t.Run(
 			tt.name,
 			func(t *testing.T) {
-				svc, store := newQuizTestSession(
+				sessionService, store := newQuizTestSession(
 					t,
 					submitTestState(tt.question),
 					nil,
 				)
-				err := tt.submit(svc)
+				err := tt.submit(sessionService)
 				if !errors.Is(
 					err,
 					ErrQuizActiveSessionUserMismatch,
@@ -426,7 +431,7 @@ func TestSessionServiceSubmitQuizRejectsOtherUser(t *testing.T) {
 
 // A working-set save failure must surface to the caller, not report a result.
 func TestSessionServiceSubmitQuizOptionSaveFailure(t *testing.T) {
-	svc, store := newQuizTestSession(
+	sessionService, store := newQuizTestSession(
 		t,
 		submitTestState(model.Question{
 			ID:            1,
@@ -439,7 +444,7 @@ func TestSessionServiceSubmitQuizOptionSaveFailure(t *testing.T) {
 	saveErr := errors.New("redis unavailable")
 	store.setErr = saveErr
 
-	result, err := svc.SubmitQuizOption(
+	result, err := sessionService.SubmitQuizOption(
 		context.Background(),
 		1,
 		10,

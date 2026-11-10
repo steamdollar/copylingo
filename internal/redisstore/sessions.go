@@ -8,9 +8,9 @@ import (
 
 // NewQuizSessions selects the Quiz state type and key for the shared store.
 // The caller must provide an initialized Redis client.
-func NewQuizSessions(rdb sessionRedis) *SessionStore[model.QuizActiveSessionState] {
+func NewQuizSessions(redisClient sessionRedis) *SessionStore[model.QuizActiveSessionState] {
 	return newSessionStore[model.QuizActiveSessionState](
-		rdb,
+		redisClient,
 		func(sessionID int) string {
 			return fmt.Sprintf(
 				"session:%d:working_set",
@@ -29,9 +29,9 @@ func NewQuizSessions(rdb sessionRedis) *SessionStore[model.QuizActiveSessionStat
 
 // NewStudySessions selects the Study state type and key for the shared store.
 // The caller must provide an initialized Redis client.
-func NewStudySessions(rdb sessionRedis) *SessionStore[model.StudyActiveSessionState] {
+func NewStudySessions(redisClient sessionRedis) *SessionStore[model.StudyActiveSessionState] {
 	return newSessionStore[model.StudyActiveSessionState](
-		rdb,
+		redisClient,
 		func(sessionID int) string {
 			return fmt.Sprintf(
 				"study_session:%d:working_set",

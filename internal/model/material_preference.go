@@ -14,8 +14,8 @@ const (
 	MaxMaintenanceDays     = 180
 )
 
-func (m MaterialReviewMode) Valid() bool {
-	return m == MaterialReviewNormal || m == MaterialReviewMaintenance || m == MaterialReviewExcluded
+func (mode MaterialReviewMode) Valid() bool {
+	return mode == MaterialReviewNormal || mode == MaterialReviewMaintenance || mode == MaterialReviewExcluded
 }
 
 // MaterialPreference is stored separately from observed Study/Quiz progress.

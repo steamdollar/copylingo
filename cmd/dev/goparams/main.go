@@ -72,9 +72,9 @@ func formatPass(source []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	fset := token.NewFileSet()
+	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(
-		fset,
+		fileSet,
 		"stdin.go",
 		formatted,
 		parser.ParseComments,
@@ -94,8 +94,8 @@ func formatPass(source []byte) ([]byte, error) {
 		lists = append(
 			lists,
 			parameterList{
-				open:  fset.Position(open).Offset,
-				close: fset.Position(close).Offset,
+				open:  fileSet.Position(open).Offset,
+				close: fileSet.Position(close).Offset,
 				count: count,
 			},
 		)

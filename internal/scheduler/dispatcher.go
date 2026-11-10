@@ -57,7 +57,7 @@ func newSessionDispatcher(
 	}
 }
 
-func (d *sessionDispatcher) dispatchBatch(
+func (dispatcher *sessionDispatcher) dispatchBatch(
 	ctx context.Context,
 	slot model.SessionSlot,
 	users []model.User,
@@ -71,34 +71,34 @@ func (d *sessionDispatcher) dispatchBatch(
 		chan pushJob,
 		len(users),
 	)
-	for _, u := range users {
+	for _, user := range users {
 		count := 0
 		if unfinishedCounts != nil {
-			count = unfinishedCounts[u.ID]
+			count = unfinishedCounts[user.ID]
 		}
-		jobs <- pushJob{user: u, slot: slot, unfinishedCount: count}
+		jobs <- pushJob{user: user, slot: slot, unfinishedCount: count}
 	}
 	close(jobs)
 
-	numWorkers := d.workers
-	if len(users) < numWorkers {
-		numWorkers = len(users)
+	workerCount := dispatcher.workers
+	if len(users) < workerCount {
+		workerCount = len(users)
 	}
 
 	var wg sync.WaitGroup
 	var errOnce sync.Once
 	var firstErr error
 
-	for i := 0; i < numWorkers; i++ {
+	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				if err := d.limiter.Wait(ctx); err != nil {
+				if err := dispatcher.limiter.Wait(ctx); err != nil {
 					return
 				}
 
-				if err := d.dispatchUser(
+				if err := dispatcher.dispatchUser(
 					ctx,
 					job.user,
 					job.slot,
@@ -128,7 +128,7 @@ func (d *sessionDispatcher) dispatchBatch(
 	return firstErr
 }
 
-func (d *sessionDispatcher) dispatchUser(
+func (dispatcher *sessionDispatcher) dispatchUser(
 	ctx context.Context,
 	user model.User,
 	slot model.SessionSlot,
@@ -136,7 +136,7 @@ func (d *sessionDispatcher) dispatchUser(
 ) error {
 	// Claim today's user/slot dispatch through the narrow scheduler storage contract.
 	today := time.Now().Format("2006-01-02")
-	acquired, err := d.claims.TryClaim(
+	acquired, err := dispatcher.claims.TryClaim(
 		ctx,
 		user.ID,
 		slot,
@@ -171,7 +171,7 @@ func (d *sessionDispatcher) dispatchUser(
 
 	// Each user with three unfinished sessions gets a reminder before another session is built.
 	if unfinishedCount >= maxUnfinishedSessions {
-		reminded, err := d.remindUnfinishedSession(
+		reminded, err := dispatcher.remindUnfinishedSession(
 			ctx,
 			user.ID,
 		)
@@ -184,7 +184,7 @@ func (d *sessionDispatcher) dispatchUser(
 	}
 
 	// 3. Build & push session
-	session, err := d.session.BuildForSlot(
+	session, err := dispatcher.session.BuildForSlot(
 		ctx,
 		user,
 		slot,
@@ -210,7 +210,7 @@ func (d *sessionDispatcher) dispatchUser(
 		)
 		return nil
 	}
-	return d.pushBuiltSession(
+	return dispatcher.pushBuiltSession(
 		ctx,
 		user.ID,
 		session,
@@ -218,13 +218,13 @@ func (d *sessionDispatcher) dispatchUser(
 }
 
 // pushBuiltSession sends a freshly built session with the push matching its mode.
-func (d *sessionDispatcher) pushBuiltSession(
+func (dispatcher *sessionDispatcher) pushBuiltSession(
 	ctx context.Context,
 	userID int64,
 	session *model.Session,
 ) error {
 	if session.Mode == model.SessionModeStudy {
-		if err := d.study.PushSession(
+		if err := dispatcher.study.PushSession(
 			ctx,
 			userID,
 			session.ID,
@@ -251,7 +251,7 @@ func (d *sessionDispatcher) pushBuiltSession(
 		return nil
 	}
 
-	if err := d.quiz.PushSession(
+	if err := dispatcher.quiz.PushSession(
 		ctx,
 		userID,
 		session.ID,
@@ -281,11 +281,11 @@ func (d *sessionDispatcher) pushBuiltSession(
 	return nil
 }
 
-func (d *sessionDispatcher) remindUnfinishedSession(
+func (dispatcher *sessionDispatcher) remindUnfinishedSession(
 	ctx context.Context,
 	userID int64,
 ) (bool, error) {
-	session, err := d.session.OldestUnfinished(
+	session, err := dispatcher.session.OldestUnfinished(
 		ctx,
 		userID,
 	)
@@ -302,7 +302,7 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 
 	switch session.Mode {
 	case model.SessionModeStudy:
-		if err := d.study.PushSession(
+		if err := dispatcher.study.PushSession(
 			ctx,
 			userID,
 			session.ID,
@@ -326,7 +326,7 @@ func (d *sessionDispatcher) remindUnfinishedSession(
 		)
 		return true, nil
 	case model.SessionModeQuiz, "":
-		if err := d.quiz.PushSession(
+		if err := dispatcher.quiz.PushSession(
 			ctx,
 			userID,
 			session.ID,
@@ -364,20 +364,20 @@ type rateLimiter struct {
 	ticker *time.Ticker
 }
 
-func newRateLimiter(ratePerSec int) *rateLimiter {
-	interval := time.Second / time.Duration(ratePerSec)
+func newRateLimiter(ratePerSecond int) *rateLimiter {
+	interval := time.Second / time.Duration(ratePerSecond)
 	return &rateLimiter{ticker: time.NewTicker(interval)}
 }
 
-func (r *rateLimiter) Wait(ctx context.Context) error {
+func (limiter *rateLimiter) Wait(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-r.ticker.C:
+	case <-limiter.ticker.C:
 		return nil
 	}
 }
 
-func (r *rateLimiter) Stop() {
-	r.ticker.Stop()
+func (limiter *rateLimiter) Stop() {
+	limiter.ticker.Stop()
 }

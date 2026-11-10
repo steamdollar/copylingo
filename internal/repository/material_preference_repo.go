@@ -12,9 +12,23 @@ import (
 )
 
 type materialPreferenceDB interface {
-	GetContext(context.Context, any, string, ...any) error
-	SelectContext(context.Context, any, string, ...any) error
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	GetContext(
+		context.Context,
+		any,
+		string,
+		...any,
+	) error
+	SelectContext(
+		context.Context,
+		any,
+		string,
+		...any,
+	) error
+	ExecContext(
+		context.Context,
+		string,
+		...any,
+	) (sql.Result, error)
 }
 
 type MaterialPreferenceRepository struct {
@@ -25,19 +39,28 @@ func NewMaterialPreferenceRepository(db *sqlx.DB) *MaterialPreferenceRepository 
 	return &MaterialPreferenceRepository{db: db}
 }
 
-func (r *MaterialPreferenceRepository) Get(
+func (repository *MaterialPreferenceRepository) Get(
 	ctx context.Context,
 	userID int64,
 	materialID int,
 ) (*model.MaterialPreference, error) {
 	var preference model.MaterialPreference
-	if err := r.db.GetContext(ctx, &preference, `
+	if err := repository.db.GetContext(
+		ctx,
+		&preference,
+		`
 		SELECT p.*, m.title AS material_title
 		FROM user_material_preferences p
 		JOIN materials m ON m.id = p.material_id
 		WHERE p.user_id = $1 AND p.material_id = $2
-	`, userID, materialID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	`,
+		userID,
+		materialID,
+	); err != nil {
+		if errors.Is(
+			err,
+			sql.ErrNoRows,
+		) {
 			return &model.MaterialPreference{
 				UserID: userID, MaterialID: materialID, ReviewMode: model.MaterialReviewNormal,
 				CheckIntervalDays: model.InitialMaintenanceDays,
@@ -55,7 +78,7 @@ func (r *MaterialPreferenceRepository) Get(
 
 // Set changes only the user's preference; catalog and learning history stay intact.
 // Repeating the current mode must not postpone a maintenance check.
-func (r *MaterialPreferenceRepository) Set(
+func (repository *MaterialPreferenceRepository) Set(
 	ctx context.Context,
 	userID int64,
 	materialID int,
@@ -64,14 +87,16 @@ func (r *MaterialPreferenceRepository) Set(
 	var err error
 	switch mode {
 	case model.MaterialReviewNormal:
-		_, err = r.db.ExecContext(
+		_, err = repository.db.ExecContext(
 			ctx,
 			`DELETE FROM user_material_preferences WHERE user_id = $1 AND material_id = $2`,
 			userID,
 			materialID,
 		)
 	case model.MaterialReviewMaintenance, model.MaterialReviewExcluded:
-		_, err = r.db.ExecContext(ctx, `
+		_, err = repository.db.ExecContext(
+			ctx,
+			`
 			INSERT INTO user_material_preferences (user_id, material_id, review_mode, next_check_at, check_interval_days)
 			VALUES ($1, $2, $3, CASE WHEN $3 = 'maintenance' THEN NOW() + $4 * INTERVAL '1 day' END, $4)
 			ON CONFLICT (user_id, material_id) DO UPDATE SET
@@ -80,7 +105,12 @@ func (r *MaterialPreferenceRepository) Set(
 				check_interval_days = EXCLUDED.check_interval_days,
 				updated_at = NOW()
 			WHERE user_material_preferences.review_mode <> EXCLUDED.review_mode
-		`, userID, materialID, mode, model.InitialMaintenanceDays)
+		`,
+			userID,
+			materialID,
+			mode,
+			model.InitialMaintenanceDays,
+		)
 	default:
 		return fmt.Errorf(
 			"MaterialPreferenceRepository.Set user_id=%d material_id=%d: invalid review_mode=%q",
@@ -101,20 +131,28 @@ func (r *MaterialPreferenceRepository) Set(
 	return nil
 }
 
-func (r *MaterialPreferenceRepository) List(
+func (repository *MaterialPreferenceRepository) List(
 	ctx context.Context,
 	userID int64,
-	offset, limit int,
+	offset,
+	limit int,
 ) ([]model.MaterialPreference, error) {
 	var preferences []model.MaterialPreference
-	if err := r.db.SelectContext(ctx, &preferences, `
+	if err := repository.db.SelectContext(
+		ctx,
+		&preferences,
+		`
 		SELECT p.*, m.title AS material_title
 		FROM user_material_preferences p
 		JOIN materials m ON m.id = p.material_id
 		WHERE p.user_id = $1
 		ORDER BY p.material_id
 		OFFSET $2 LIMIT $3
-	`, userID, offset, limit); err != nil {
+	`,
+		userID,
+		offset,
+		limit,
+	); err != nil {
 		return nil, fmt.Errorf(
 			"MaterialPreferenceRepository.List user_id=%d offset=%d limit=%d: %w",
 			userID,
@@ -132,7 +170,8 @@ func (r *MaterialPreferenceRepository) List(
 // Admission is shared with Study so unread passages and missing audio can fall
 // back to a Study card instead of permanently blocking a maintenance check.
 func maintenanceQuizCandidatesCTE(levelsPlaceholder string) string {
-	return fmt.Sprintf(`maintenance_quiz_candidates AS (
+	return fmt.Sprintf(
+		`maintenance_quiz_candidates AS (
 	SELECT q.id, q.material_id, q.language, q.proficiency_level,
 		ROW_NUMBER() OVER (
 			PARTITION BY q.material_id
@@ -151,7 +190,9 @@ func maintenanceQuizCandidatesCTE(levelsPlaceholder string) string {
 		AND (uqp.question_id IS NULL OR uqp.next_review_at <= NOW())
 		AND (q.category <> 'listening' OR q.audio_path IS NOT NULL)
 		AND (q.category <> 'reading' OR ump.material_id IS NOT NULL)
-)`, levelsPlaceholder)
+)`,
+		levelsPlaceholder,
+	)
 }
 
 const quizMaterialPreferenceGate = `

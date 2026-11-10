@@ -27,14 +27,14 @@ type quizSession interface {
 	ShowQuizQuestion(
 		ctx context.Context,
 		sessionID,
-		questionIdx int,
+		questionIndex int,
 	) (*model.QuizActiveSessionState, error)
 	SubmitQuizOption(
 		ctx context.Context,
 		userID int64,
 		sessionID,
 		questionID,
-		optionIdx int,
+		optionIndex int,
 	) (*service.QuizAnswerResult, error)
 	SubmitQuizText(
 		ctx context.Context,
@@ -97,11 +97,11 @@ type quizInputStore interface {
 	GetActiveQuestion(
 		ctx context.Context,
 		chatID int64,
-	) (*model.ActiveQuestionRef, error)
+	) (*model.ActiveQuestionReference, error)
 	SetActiveQuestion(
 		ctx context.Context,
 		chatID int64,
-		question model.ActiveQuestionRef,
+		question model.ActiveQuestionReference,
 	) error
 	DeleteActiveQuestion(
 		ctx context.Context,
@@ -114,9 +114,9 @@ type quizInputStore interface {
 	) error
 }
 
-// SessionFlowDeps wires SessionFlow. Audio may be left nil (see listeningAudio);
+// SessionFlowDependencies wires SessionFlow. Audio may be left nil (see listeningAudio);
 // every other dependency is required.
-type SessionFlowDeps struct {
+type SessionFlowDependencies struct {
 	Telegram           *TelegramClient
 	Session            quizSession
 	User               userReader
@@ -146,31 +146,31 @@ type SessionFlow struct {
 	publicBaseURL      string
 }
 
-func NewSessionFlow(deps SessionFlowDeps) *SessionFlow {
+func NewSessionFlow(dependencies SessionFlowDependencies) *SessionFlow {
 	return &SessionFlow{
-		telegram:           deps.Telegram,
-		session:            deps.Session,
-		user:               deps.User,
-		materialPreference: deps.MaterialPreference,
-		audio:              deps.Audio,
-		input:              deps.Input,
-		drafts:             deps.Drafts,
-		messages:           deps.Messages,
-		recovery:           deps.Recovery,
-		study:              deps.Study,
-		publicBaseURL:      deps.PublicBaseURL,
+		telegram:           dependencies.Telegram,
+		session:            dependencies.Session,
+		user:               dependencies.User,
+		materialPreference: dependencies.MaterialPreference,
+		audio:              dependencies.Audio,
+		input:              dependencies.Input,
+		drafts:             dependencies.Drafts,
+		messages:           dependencies.Messages,
+		recovery:           dependencies.Recovery,
+		study:              dependencies.Study,
+		publicBaseURL:      dependencies.PublicBaseURL,
 	}
 }
 
 // StartStudy begins a new study session or resumes a pending one.
-func (sf *SessionFlow) StartStudy(
+func (flow *SessionFlow) StartStudy(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
 	// get in-progess session for user, if exists, and resume
-	resumed, err := sf.getInProgressSessions(
+	resumed, err := flow.getInProgressSessions(
 		ctx,
-		cb,
+		callbackQuery,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -179,11 +179,11 @@ func (sf *SessionFlow) StartStudy(
 			"event",
 			"telegram.session.in_progress_lookup_failed",
 			"user_id",
-			cb.From.ID,
+			callbackQuery.From.ID,
 			"error",
 			err,
 		)
-		sf.showSessionFetchError(cb)
+		flow.showSessionFetchError(callbackQuery)
 		return
 	}
 	if resumed {
@@ -191,9 +191,9 @@ func (sf *SessionFlow) StartStudy(
 	}
 
 	// get pending session for user, if exists, and show start button
-	if err := sf.getPendingSessions(
+	if err := flow.getPendingSessions(
 		ctx,
-		cb,
+		callbackQuery,
 	); err != nil {
 		slog.ErrorContext(
 			ctx,
@@ -201,31 +201,31 @@ func (sf *SessionFlow) StartStudy(
 			"event",
 			"telegram.session.pending_lookup_failed",
 			"user_id",
-			cb.From.ID,
+			callbackQuery.From.ID,
 			"error",
 			err,
 		)
-		sf.showSessionFetchError(cb)
+		flow.showSessionFetchError(callbackQuery)
 	}
 }
 
-func (sf *SessionFlow) getPendingSessions(
+func (flow *SessionFlow) getPendingSessions(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) error {
-	chatID := cb.Message.Chat.ID
-	sessions, err := sf.session.ListByStatus(
+	chatID := callbackQuery.Message.Chat.ID
+	sessions, err := flow.session.ListByStatus(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		model.SessionPending,
 	)
 	if err != nil {
 		return err
 	}
 	if len(sessions) == 0 {
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
-			cb.Message.MessageID,
+			callbackQuery.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].pendingSessionsEmpty,
 			mainMenuKeyboard(),
 		)
@@ -253,9 +253,9 @@ func (sf *SessionFlow) getPendingSessions(
 			botMessagesByLocale[botDefaultLocale].studySessionReadyFormat,
 			studySession.TotalQuestions,
 		)
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
-			cb.Message.MessageID,
+			callbackQuery.Message.MessageID,
 			text,
 			&keyboard,
 		)
@@ -263,9 +263,9 @@ func (sf *SessionFlow) getPendingSessions(
 	}
 	session, ok := firstQuizSession(sessions)
 	if !ok {
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
-			cb.Message.MessageID,
+			callbackQuery.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].pendingSessionsEmpty,
 			mainMenuKeyboard(),
 		)
@@ -293,32 +293,32 @@ func (sf *SessionFlow) getPendingSessions(
 		session.TotalQuestions,
 		sessionTypeLabel(string(session.Type)),
 	)
-	sf.telegram.EditMessage(
+	flow.telegram.EditMessage(
 		chatID,
-		cb.Message.MessageID,
+		callbackQuery.Message.MessageID,
 		text,
 		&keyboard,
 	)
 	return nil
 }
 
-func (sf *SessionFlow) getInProgressSessions(
+func (flow *SessionFlow) getInProgressSessions(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) (bool, error) {
-	chatID := cb.Message.Chat.ID
-	inProgressSessions, err := sf.session.ListByStatus(
+	chatID := callbackQuery.Message.Chat.ID
+	inProgressSessions, err := flow.session.ListByStatus(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		model.SessionInProgress,
 	)
 	if err != nil {
 		return false, err
 	}
 	if studySession, ok := firstStudySession(inProgressSessions); ok {
-		sf.study.startSession(
+		flow.study.startSession(
 			ctx,
-			cb,
+			callbackQuery,
 			studySession.ID,
 		)
 		return true, nil
@@ -328,7 +328,7 @@ func (sf *SessionFlow) getInProgressSessions(
 		return false, nil
 	}
 
-	nextIdx, err := sf.nextUnansweredQuestionIndex(
+	nextIndex, err := flow.nextUnansweredQuestionIndex(
 		ctx,
 		session.ID,
 	)
@@ -343,47 +343,47 @@ func (sf *SessionFlow) getInProgressSessions(
 			"error",
 			err,
 		)
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
-			cb.Message.MessageID,
+			callbackQuery.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].activeSessionUnavailable,
 			mainMenuKeyboard(),
 		)
 		return true, nil
 	}
-	editMessageID := cb.Message.MessageID
-	sf.showQuestion(
+	editMessageID := callbackQuery.Message.MessageID
+	flow.showQuestion(
 		ctx,
 		chatID,
 		&editMessageID,
 		session.ID,
-		nextIdx,
+		nextIndex,
 	)
 	return true, nil
 }
 
 // StartReview starts an on-demand review session.
-func (sf *SessionFlow) StartReview(
+func (flow *SessionFlow) StartReview(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
-	userID := cb.From.ID
-	chatID := cb.Message.Chat.ID
+	userID := callbackQuery.From.ID
+	chatID := callbackQuery.Message.Chat.ID
 
-	user, err := sf.user.GetUser(
+	user, err := flow.user.GetUser(
 		ctx,
 		userID,
-		cb.From.UserName,
+		callbackQuery.From.UserName,
 	)
 	if err != nil {
-		sf.telegram.SendMessage(
+		flow.telegram.SendMessage(
 			chatID,
 			botMessagesByLocale[botDefaultLocale].reviewUserLoadFailed,
 		)
 		return
 	}
 
-	session, err := sf.session.BuildReviewQuiz(
+	session, err := flow.session.BuildReviewQuiz(
 		ctx,
 		*user,
 	)
@@ -391,16 +391,16 @@ func (sf *SessionFlow) StartReview(
 		err,
 		service.ErrNoDueReviews,
 	) {
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
-			cb.Message.MessageID,
+			callbackQuery.Message.MessageID,
 			botMessagesByLocale[botDefaultLocale].noReviewQuestions,
 			mainMenuKeyboard(),
 		)
 		return
 	}
 	if err != nil || session == nil {
-		sf.telegram.SendMessage(
+		flow.telegram.SendMessage(
 			chatID,
 			botMessagesByLocale[botDefaultLocale].reviewSessionBuildFailed,
 		)
@@ -424,22 +424,22 @@ func (sf *SessionFlow) StartReview(
 		session.TotalQuestions,
 	)
 
-	sf.telegram.EditMessage(
+	flow.telegram.EditMessage(
 		chatID,
-		cb.Message.MessageID,
+		callbackQuery.Message.MessageID,
 		text,
 		&keyboard,
 	)
 }
 
 // HandleSessionCallback handles session-level callbacks (start, finish).
-func (sf *SessionFlow) HandleSessionCallback(
+func (flow *SessionFlow) HandleSessionCallback(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
 	// e.g. session:50:start
 	parts := strings.Split(
-		cb.Data,
+		callbackQuery.Data,
 		":",
 	)
 	if len(parts) < 3 {
@@ -460,28 +460,28 @@ func (sf *SessionFlow) HandleSessionCallback(
 
 	switch action {
 	case callbackActionStart:
-		sf.startSession(
+		flow.startSession(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 		)
 	case callbackActionFinish:
-		sf.finishSession(
+		flow.finishSession(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 		)
 	}
 }
 
 // HandleAnswerCallback handles question answer callbacks.
-func (sf *SessionFlow) HandleAnswerCallback(
+func (flow *SessionFlow) HandleAnswerCallback(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
 	// Format: q:{sessionID}:{questionID}:{optionIndex} or q:{sessionID}:next:{currentIndex}
 	parts := strings.Split(
-		cb.Data,
+		callbackQuery.Data,
 		":",
 	)
 	if len(parts) < 4 {
@@ -494,83 +494,83 @@ func (sf *SessionFlow) HandleAnswerCallback(
 	}
 
 	if parts[2] == callbackActionWordOrder {
-		sf.handleWordOrderCallback(
+		flow.handleWordOrderCallback(
 			ctx,
-			cb,
+			callbackQuery,
 		)
 		return
 	}
 
 	if parts[2] == callback.QuestionActionNext {
-		if cb.Message == nil {
+		if callbackQuery.Message == nil {
 			return
 		}
-		currentIdx, err := strconv.Atoi(parts[3])
+		currentIndex, err := strconv.Atoi(parts[3])
 		if err != nil {
 			return
 		}
-		if !sf.isQuestionAnswered(
+		if !flow.isQuestionAnswered(
 			ctx,
 			sessionID,
-			currentIdx,
+			currentIndex,
 		) {
 			if isStaleMiniAppCallback(
 				parts,
-				sf.publicBaseURL,
+				flow.publicBaseURL,
 			) {
-				sf.telegram.ClearInlineKeyboard(
-					cb.Message.Chat.ID,
-					cb.Message.MessageID,
+				flow.telegram.ClearInlineKeyboard(
+					callbackQuery.Message.Chat.ID,
+					callbackQuery.Message.MessageID,
 				)
-				sf.telegram.SendMessage(
-					cb.Message.Chat.ID,
+				flow.telegram.SendMessage(
+					callbackQuery.Message.Chat.ID,
 					botMessagesByLocale[botDefaultLocale].handwritingLinkExpired,
 				)
-				sf.showQuestion(
+				flow.showQuestion(
 					ctx,
-					cb.Message.Chat.ID,
+					callbackQuery.Message.Chat.ID,
 					nil,
 					sessionID,
-					currentIdx,
+					currentIndex,
 				)
 				return
 			}
-			sf.telegram.SendMessage(
-				cb.Message.Chat.ID,
+			flow.telegram.SendMessage(
+				callbackQuery.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].handwritingSubmitFirst,
 			)
 			return
 		}
 		// 같은 손글씨 제출 결과로 다음 문제를 중복 진행하지 못하게 먼저 버튼을 제거한다.
-		sf.telegram.ClearInlineKeyboard(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+		flow.telegram.ClearInlineKeyboard(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 		)
 		// 손글씨 문항은 Mini App HTTP로 제출되므로 원래 메시지 맥락을 남기고,
 		// 다음 문제는 새 Telegram 메시지로 렌더링한다.
-		sf.showQuestion(
+		flow.showQuestion(
 			ctx,
-			cb.Message.Chat.ID,
+			callbackQuery.Message.Chat.ID,
 			nil,
 			sessionID,
-			currentIdx+1,
+			currentIndex+1,
 		)
 		return
 	}
 
 	if parts[2] == callbackActionAsk {
-		sf.handleAskLLMQuestion(
+		flow.handleAskLLMQuestion(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 			parts[3],
 		)
 		return
 	}
 	if parts[2] == callback.QuestionActionPolicy || parts[2] == callbackActionExclude {
-		sf.handleQuizMaterialPreference(
+		flow.handleQuizMaterialPreference(
 			ctx,
-			cb,
+			callbackQuery,
 			parts,
 		)
 		return
@@ -580,43 +580,43 @@ func (sf *SessionFlow) HandleAnswerCallback(
 	if err != nil {
 		return
 	}
-	optionIdx, err := strconv.Atoi(parts[3])
+	optionIndex, err := strconv.Atoi(parts[3])
 	if err != nil {
 		return
 	}
 
-	sf.processAnswer(
+	flow.processAnswer(
 		ctx,
-		cb,
+		callbackQuery,
 		sessionID,
 		questionID,
-		optionIdx,
+		optionIndex,
 	)
 }
 
 // handleAskLLMQuestion arms one-shot LLM mode scoped to a just-answered question.
 // The next plain-text message is answered with that question's context (see handleLLMQuestion).
-func (sf *SessionFlow) handleAskLLMQuestion(
+func (flow *SessionFlow) handleAskLLMQuestion(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID int,
-	questionIDStr string,
+	questionIDText string,
 ) {
-	if cb.Message == nil {
+	if callbackQuery.Message == nil {
 		return
 	}
 	// owner gate를 callback에서도 재검증한다 (버튼은 owner에게만 렌더되지만 callback은 위조 가능).
-	if !isLLMAllowed(cb.From) {
+	if !isLLMAllowed(callbackQuery.From) {
 		return
 	}
-	questionID, err := strconv.Atoi(questionIDStr)
+	questionID, err := strconv.Atoi(questionIDText)
 	if err != nil {
 		return
 	}
 	input := model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion, SessionID: sessionID, QuestionID: questionID}
-	if err := sf.input.SetLLMPending(
+	if err := flow.input.SetLLMPending(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		input,
 	); err != nil {
 		slog.ErrorContext(
@@ -631,28 +631,28 @@ func (sf *SessionFlow) handleAskLLMQuestion(
 			"error",
 			err,
 		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].llmQuestionActivationFailed,
 		)
 		return
 	}
-	sf.telegram.SendMessageWithKeyboard(
-		cb.Message.Chat.ID,
+	flow.telegram.SendMessageWithKeyboard(
+		callbackQuery.Message.Chat.ID,
 		botMessagesByLocale[botDefaultLocale].quizLLMQuestionPrompt,
 		llmCancelKeyboard(),
 	)
 }
 
-func (sf *SessionFlow) startSession(
+func (flow *SessionFlow) startSession(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
-	state, err := sf.session.StartQuiz(
+	state, err := flow.session.StartQuiz(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	)
 	if err != nil {
 		switch {
@@ -668,7 +668,7 @@ func (sf *SessionFlow) startSession(
 				"session_id",
 				sessionID,
 				"user_id",
-				cb.From.ID,
+				callbackQuery.From.ID,
 			)
 		case errors.Is(
 			err,
@@ -684,8 +684,8 @@ func (sf *SessionFlow) startSession(
 				"error",
 				err,
 			)
-			sf.telegram.SendMessage(
-				cb.Message.Chat.ID,
+			flow.telegram.SendMessage(
+				callbackQuery.Message.Chat.ID,
 				botMessagesByLocale[botDefaultLocale].sessionStatePrepareFailed,
 			)
 		default:
@@ -703,25 +703,25 @@ func (sf *SessionFlow) startSession(
 		return
 	}
 
-	editMessageID := cb.Message.MessageID
-	sf.showQuestion(
+	editMessageID := callbackQuery.Message.MessageID
+	flow.showQuestion(
 		ctx,
-		cb.Message.Chat.ID,
+		callbackQuery.Message.Chat.ID,
 		&editMessageID,
 		sessionID,
 		state.NextUnansweredIndex(),
 	)
 }
 
-func (sf *SessionFlow) finishSession(
+func (flow *SessionFlow) finishSession(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
-	result, err := sf.session.CompleteQuiz(
+	result, err := flow.session.CompleteQuiz(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -738,7 +738,7 @@ func (sf *SessionFlow) finishSession(
 	}
 	// Word-order drafts are ephemeral and must not survive a finished session.
 	for _, questionID := range result.WordOrderQuestionIDs {
-		sf.deleteWordOrderDraft(
+		flow.deleteWordOrderDraft(
 			ctx,
 			sessionID,
 			questionID,
@@ -754,31 +754,31 @@ func (sf *SessionFlow) finishSession(
 	wrongSummary := ""
 	if len(result.WrongAnswers) > 0 {
 		wrongSummary = botMessagesByLocale[botDefaultLocale].sessionCompletionWrongAnswerHeading
-		for _, wa := range result.WrongAnswers {
-			if wa.SessionQuestion.IsCorrect == nil || *wa.SessionQuestion.IsCorrect {
+		for _, wrongAnswer := range result.WrongAnswers {
+			if wrongAnswer.SessionQuestion.IsCorrect == nil || *wrongAnswer.SessionQuestion.IsCorrect {
 				continue
 			}
-			q := wa.Question
-			if q.Type == model.QuestionKanaHandwriting {
+			question := wrongAnswer.Question
+			if question.Type == model.QuestionKanaHandwriting {
 				wrongSummary += fmt.Sprintf(
 					botMessagesByLocale[botDefaultLocale].sessionCompletionKanaAnswerFormat,
 					truncate(
-						stripHTML(q.Prompt),
+						stripHTML(question.Prompt),
 						30,
 					),
-					q.CorrectAnswer,
+					question.CorrectAnswer,
 				)
 				continue
 			}
-			answer := formatSessionAnswer(wa.SessionQuestion.UserAnswer)
+			answer := formatSessionAnswer(wrongAnswer.SessionQuestion.UserAnswer)
 			wrongSummary += fmt.Sprintf(
 				botMessagesByLocale[botDefaultLocale].sessionCompletionAnswerFormat,
 				truncate(
-					stripHTML(q.Prompt),
+					stripHTML(question.Prompt),
 					30,
 				),
 				answer,
-				q.CorrectAnswer,
+				question.CorrectAnswer,
 			)
 		}
 	}
@@ -791,15 +791,15 @@ func (sf *SessionFlow) finishSession(
 		wrongSummary,
 	)
 
-	sf.telegram.EditMessage(
-		cb.Message.Chat.ID,
-		cb.Message.MessageID,
+	flow.telegram.EditMessage(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.Message.MessageID,
 		text,
 		mainMenuKeyboard(),
 	)
 }
 
-func (sf *SessionFlow) PushSession(
+func (flow *SessionFlow) PushSession(
 	ctx context.Context,
 	chatID int64,
 	sessionID int,
@@ -834,7 +834,7 @@ func (sf *SessionFlow) PushSession(
 	)
 
 	// 위해서 만든 keyboard를 send
-	return sf.telegram.SendMessageWithKeyboard(
+	return flow.telegram.SendMessageWithKeyboard(
 		chatID,
 		text,
 		keyboard,

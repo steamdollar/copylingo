@@ -117,6 +117,8 @@ When writing/changing code, migrations, or config, follow [`docs/CONVENTIONS.md`
 
 - **Realistic cases only** (also a review criterion) — add validation, error branches, and tests only for cases that can actually happen in operation at the §4 scale; never for states the code itself rules out. Details: [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md#realistic-cases-only).
 
+- Avoid Abbreviation: avoid abbrevation when you name variables, parameters or functions so that user can easily infer roles of their name. (using single letter for them is worst way.)
+
 ---
 
 ## 6. Reference docs

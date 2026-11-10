@@ -10,14 +10,14 @@ import (
 )
 
 // SessionStores groups the typed Redis working-set stores for Quiz and Study.
-// They stay separate instances (ADR-059 §8.6) and travel as one Deps field.
+// They stay separate instances (ADR-059 §8.6) and travel as one SessionDependencies field.
 type SessionStores struct {
 	Quiz  QuizSessionStore
 	Study StudySessionStore
 }
 
-// QuestionRepo is the question-bank boundary used for Quiz selection and SRS counts.
-type QuestionRepo interface {
+// QuestionRepository is the question-bank boundary used for Quiz selection and SRS counts.
+type QuestionRepository interface {
 	GetNewQuestions(
 		ctx context.Context,
 		userID int64,
@@ -46,11 +46,11 @@ type QuestionRepo interface {
 	) (int, error)
 }
 
-// SessionRepo is the sessions-table boundary shared by both session modes.
-type SessionRepo interface {
+// SessionRepository is the sessions-table boundary shared by both session modes.
+type SessionRepository interface {
 	CreateSession(
 		ctx context.Context,
-		s *model.Session,
+		session *model.Session,
 	) error
 	Start(
 		ctx context.Context,
@@ -83,16 +83,16 @@ type SessionRepo interface {
 	) error
 }
 
-// SessionQuestionRepo stores the ordered question list of a new Quiz session.
-type SessionQuestionRepo interface {
+// SessionQuestionRepository stores the ordered question list of a new Quiz session.
+type SessionQuestionRepository interface {
 	CreateSessionQuestions(
 		ctx context.Context,
-		sqs []model.SessionQuestion,
+		sessionQuestions []model.SessionQuestion,
 	) error
 }
 
-// QuizActiveSessionRepo loads a Quiz working set from DB and flushes it back on completion.
-type QuizActiveSessionRepo interface {
+// QuizActiveSessionRepository loads a Quiz working set from DB and flushes it back on completion.
+type QuizActiveSessionRepository interface {
 	LoadQuestionSessionWithStateBySessionID(
 		ctx context.Context,
 		sessionID int,
@@ -103,8 +103,8 @@ type QuizActiveSessionRepo interface {
 	) error
 }
 
-// StudyActiveSessionRepo loads a Study working set from DB and flushes it back on completion.
-type StudyActiveSessionRepo interface {
+// StudyActiveSessionRepository loads a Study working set from DB and flushes it back on completion.
+type StudyActiveSessionRepository interface {
 	LoadStudySessionWithStateBySessionID(
 		ctx context.Context,
 		sessionID int,
@@ -115,8 +115,8 @@ type StudyActiveSessionRepo interface {
 	) error
 }
 
-// MaterialRepo selects Study materials for a session plan.
-type MaterialRepo interface {
+// MaterialRepository selects Study materials for a session plan.
+type MaterialRepository interface {
 	GetMaterialsByPlan(
 		ctx context.Context,
 		userID int64,
@@ -137,25 +137,25 @@ type QuizGradingLLM interface {
 	) (external.GradeResult, error)
 }
 
-// SessionUserRepo updates user-level learning records on Quiz completion.
-type SessionUserRepo interface {
+// SessionUserRepository updates user-level learning records on Quiz completion.
+type SessionUserRepository interface {
 	UpdateStreak(
 		ctx context.Context,
 		userID int64,
 	) error
 }
 
-// SessionDeps lists every external boundary SessionService touches (ADR-059 §8.3).
-type SessionDeps struct {
-	QuestionRepo           QuestionRepo
-	SessionRepo            SessionRepo
-	SessionQuestionRepo    SessionQuestionRepo
-	QuizActiveSessionRepo  QuizActiveSessionRepo
-	StudyActiveSessionRepo StudyActiveSessionRepo
-	MaterialRepo           MaterialRepo
-	UserRepo               SessionUserRepo
-	Stores                 SessionStores
-	LLM                    QuizGradingLLM
+// SessionDependencies lists every external boundary SessionService touches (ADR-059 §8.3).
+type SessionDependencies struct {
+	QuestionRepository           QuestionRepository
+	SessionRepository            SessionRepository
+	SessionQuestionRepository    SessionQuestionRepository
+	QuizActiveSessionRepository  QuizActiveSessionRepository
+	StudyActiveSessionRepository StudyActiveSessionRepository
+	MaterialRepository           MaterialRepository
+	UserRepository               SessionUserRepository
+	Stores                       SessionStores
+	LLM                          QuizGradingLLM
 	// DB lets Study creation own its transaction boundary (ADR-061).
 	DB *sqlx.DB
 }
@@ -165,41 +165,41 @@ type SessionDeps struct {
 // internal collaborators built here. Grading happens inline in the submit
 // methods: exact match for text/option answers, the LLM for handwriting.
 type SessionService struct {
-	sessionRepo   SessionRepo
-	userRepo      SessionUserRepo
-	selection     *sessionBuilderService
-	quizProgress  *quizActiveSessionService
-	questionRepo  QuestionRepo
-	llm           QuizGradingLLM
-	studyBuilder  *studySessionService
-	studyProgress *studyActiveSessionService
+	sessionRepository  SessionRepository
+	userRepository     SessionUserRepository
+	selection          *sessionBuilderService
+	quizProgress       *quizActiveSessionService
+	questionRepository QuestionRepository
+	llm                QuizGradingLLM
+	studyBuilder       *studySessionService
+	studyProgress      *studyActiveSessionService
 }
 
-func NewSessionService(deps SessionDeps) *SessionService {
+func NewSessionService(dependencies SessionDependencies) *SessionService {
 	quizProgress := newQuizActiveSessionService(
-		deps.QuizActiveSessionRepo,
-		deps.Stores.Quiz,
+		dependencies.QuizActiveSessionRepository,
+		dependencies.Stores.Quiz,
 	)
 	return &SessionService{
-		sessionRepo: deps.SessionRepo,
-		userRepo:    deps.UserRepo,
+		sessionRepository: dependencies.SessionRepository,
+		userRepository:    dependencies.UserRepository,
 		selection: newSessionBuilderService(
-			deps.QuestionRepo,
-			deps.SessionRepo,
-			deps.SessionQuestionRepo,
+			dependencies.QuestionRepository,
+			dependencies.SessionRepository,
+			dependencies.SessionQuestionRepository,
 		),
-		quizProgress: quizProgress,
-		questionRepo: deps.QuestionRepo,
-		llm:          deps.LLM,
+		quizProgress:       quizProgress,
+		questionRepository: dependencies.QuestionRepository,
+		llm:                dependencies.LLM,
 		studyBuilder: newStudySessionService(
-			deps.MaterialRepo,
-			deps.SessionRepo,
-			deps.DB,
+			dependencies.MaterialRepository,
+			dependencies.SessionRepository,
+			dependencies.DB,
 		),
 		studyProgress: newStudyActiveSessionService(
-			deps.StudyActiveSessionRepo,
-			deps.SessionRepo,
-			deps.Stores.Study,
+			dependencies.StudyActiveSessionRepository,
+			dependencies.SessionRepository,
+			dependencies.Stores.Study,
 		),
 	}
 }

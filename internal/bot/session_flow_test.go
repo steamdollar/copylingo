@@ -13,24 +13,24 @@ import (
 func TestMiniAppURLFingerprint(t *testing.T) {
 	t.Parallel()
 
-	a := callback.MiniAppURLFingerprint("https://example.trycloudflare.com")
-	b := callback.MiniAppURLFingerprint("https://EXAMPLE.trycloudflare.com/path")
-	c := callback.MiniAppURLFingerprint("https://other.trycloudflare.com")
+	lowercaseHostFingerprint := callback.MiniAppURLFingerprint("https://example.trycloudflare.com")
+	uppercaseHostFingerprint := callback.MiniAppURLFingerprint("https://EXAMPLE.trycloudflare.com/path")
+	otherHostFingerprint := callback.MiniAppURLFingerprint("https://other.trycloudflare.com")
 
-	if a == "" {
+	if lowercaseHostFingerprint == "" {
 		t.Fatal("expected fingerprint")
 	}
-	if a != b {
+	if lowercaseHostFingerprint != uppercaseHostFingerprint {
 		t.Fatalf(
 			"expected host-only case-insensitive fingerprint, got %q and %q",
-			a,
-			b,
+			lowercaseHostFingerprint,
+			uppercaseHostFingerprint,
 		)
 	}
-	if a == c {
+	if lowercaseHostFingerprint == otherHostFingerprint {
 		t.Fatalf(
 			"expected different hosts to produce different fingerprints, got %q",
-			a,
+			lowercaseHostFingerprint,
 		)
 	}
 	if got := callback.MiniAppURLFingerprint("not a url"); got != "" {
@@ -132,7 +132,7 @@ func TestIsStaleMiniAppCallback(t *testing.T) {
 func TestSessionFlowUsesQuizActiveSessionProgress(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77
-	trueVal := true
+	trueValue := true
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{
@@ -140,7 +140,7 @@ func TestSessionFlowUsesQuizActiveSessionProgress(t *testing.T) {
 		},
 		Items: []model.QuizActiveSessionQuestion{
 			{
-				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &trueVal},
+				SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &trueValue},
 				Question:        model.Question{ID: 1},
 			},
 			{
@@ -154,18 +154,18 @@ func TestSessionFlowUsesQuizActiveSessionProgress(t *testing.T) {
 		stateStores,
 		state,
 	)
-	sf := newTestSessionFlow(
+	sessionFlow := newTestSessionFlow(
 		nil,
 		nil,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
 		},
 	)
 
-	idx, err := sf.nextUnansweredQuestionIndex(
+	index, err := sessionFlow.nextUnansweredQuestionIndex(
 		ctx,
 		sessionID,
 	)
@@ -175,20 +175,20 @@ func TestSessionFlowUsesQuizActiveSessionProgress(t *testing.T) {
 			err,
 		)
 	}
-	if idx != 1 {
+	if index != 1 {
 		t.Fatalf(
 			"expected next unanswered index 1, got %d",
-			idx,
+			index,
 		)
 	}
-	if !sf.isQuestionAnswered(
+	if !sessionFlow.isQuestionAnswered(
 		ctx,
 		sessionID,
 		0,
 	) {
 		t.Fatal("expected first question to be answered")
 	}
-	if sf.isQuestionAnswered(
+	if sessionFlow.isQuestionAnswered(
 		ctx,
 		sessionID,
 		1,

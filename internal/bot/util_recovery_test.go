@@ -17,52 +17,52 @@ type sessionListStore struct {
 	inProgress []model.Session
 }
 
-func (s *sessionListStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
-	return s.inProgress, nil
+func (store *sessionListStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
+	return store.inProgress, nil
 }
 
 func TestRefreshStaleMiniAppMessages_EmptyBaseURL(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{},
+		SessionFlowDependencies{},
 	) // PublicBaseURL empty
 
-	sf.RefreshStaleMiniAppMessages(ctx)
+	sessionFlow.RefreshStaleMiniAppMessages(ctx)
 
-	if len(mAPI.sentMessages) != 0 {
+	if len(mockAPI.sentMessages) != 0 {
 		t.Errorf(
 			"expected no messages when base URL empty, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
 }
 
 func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	store := &sessionListStore{inProgress: nil}
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{SessionRepo: store},
+				service.SessionDependencies{SessionRepository: store},
 			),
 			PublicBaseURL: "https://x.trycloudflare.com",
 		},
 	)
 
-	sf.RefreshStaleMiniAppMessages(ctx)
+	sessionFlow.RefreshStaleMiniAppMessages(ctx)
 
-	if len(mAPI.sentMessages) != 0 {
+	if len(mockAPI.sentMessages) != 0 {
 		t.Errorf(
 			"expected no messages with no in-progress sessions, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
 }
@@ -74,27 +74,27 @@ type fingerprintSpy struct {
 	lookups int
 }
 
-func (s *fingerprintSpy) GetMiniAppFingerprint(
+func (spy *fingerprintSpy) GetMiniAppFingerprint(
 	context.Context,
 	int,
 ) (string, error) {
-	s.lookups++
+	spy.lookups++
 	return "", nil
 }
 
 func TestRefreshStaleMiniAppMessages_StopsWhenContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	recovery := &fingerprintSpy{}
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{SessionRepo: &sessionListStore{
+				service.SessionDependencies{SessionRepository: &sessionListStore{
 					inProgress: []model.Session{{ID: 1, UserID: 2, Mode: model.SessionModeQuiz}},
 				}},
 			),
@@ -103,23 +103,23 @@ func TestRefreshStaleMiniAppMessages_StopsWhenContextCancelled(t *testing.T) {
 		},
 	)
 
-	sf.RefreshStaleMiniAppMessages(ctx)
+	sessionFlow.RefreshStaleMiniAppMessages(ctx)
 
-	if recovery.lookups != 0 || len(mAPI.sentMessages) != 0 {
+	if recovery.lookups != 0 || len(mockAPI.sentMessages) != 0 {
 		t.Fatalf(
 			"lookups = %d, sent = %d; want no per-session work after shutdown",
 			recovery.lookups,
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
 }
 
-// emptyQuestionFetcher has no new questions; due-review calls come from mockSRSRepo.
+// emptyQuestionFetcher has no new questions; due-review calls come from mockSRSRepository.
 type emptyQuestionFetcher struct {
-	mockSRSRepo
+	mockSRSRepository
 }
 
-func (e *emptyQuestionFetcher) GetNewQuestions(
+func (fetcher *emptyQuestionFetcher) GetNewQuestions(
 	ctx context.Context,
 	userID int64,
 	language string,
@@ -134,9 +134,9 @@ func (e *emptyQuestionFetcher) GetNewQuestions(
 
 func TestHandleTest_NoQuestions(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
-	userSvc := service.NewUserService(&mockUserRepo{
-		getOrCreateFn: func(
+	mockAPI := &mockBotAPI{}
+	userService := service.NewUserService(&mockUserRepository{
+		getOrCreateFunc: func(
 			ctx context.Context,
 			id int64,
 			username string,
@@ -144,29 +144,29 @@ func TestHandleTest_NoQuestions(t *testing.T) {
 			return &model.User{ID: id, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	})
-	b := newTestBot(
-		mAPI,
+	bot := newTestBot(
+		mockAPI,
 		nil,
 		&testServices{
-			User: userSvc,
+			User: userService,
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{
-					QuestionRepo:        &emptyQuestionFetcher{},
-					SessionRepo:         &sessionListStore{},
-					SessionQuestionRepo: &mockSessionQuestionStore{},
+				service.SessionDependencies{
+					QuestionRepository:        &emptyQuestionFetcher{},
+					SessionRepository:         &sessionListStore{},
+					SessionQuestionRepository: &mockSessionQuestionStore{},
 				},
 			),
 		},
 	)
 
-	msg := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
-	b.handleTest(
+	message := &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 1}, From: &tgbotapi.User{ID: 2}}
+	bot.handleTest(
 		ctx,
-		msg,
+		message,
 	)
 
-	text := collectText(mAPI.sentMessages)
+	text := collectText(mockAPI.sentMessages)
 	if !strings.Contains(
 		text,
 		"사용 가능한 문제가 없습니다",

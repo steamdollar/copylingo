@@ -32,15 +32,15 @@ type DBConfig struct {
 	SSLMode  string `mapstructure:"sslmode"`
 }
 
-func (c DBConfig) DSN() string {
+func (config DBConfig) DSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Host,
-		c.Port,
-		c.User,
-		c.Password,
-		c.DBName,
-		c.SSLMode,
+		config.Host,
+		config.Port,
+		config.User,
+		config.Password,
+		config.DBName,
+		config.SSLMode,
 	)
 }
 
@@ -79,32 +79,32 @@ type StorageConfig struct {
 }
 
 type LoggingConfig struct {
-	Dir           string `mapstructure:"dir"`
+	Directory     string `mapstructure:"dir"`
 	Level         string `mapstructure:"level"`
 	RetentionDays int    `mapstructure:"retention_days"`
 	Timezone      string `mapstructure:"timezone"`
 }
 
-func (c *Config) validate() error {
-	if c.Telegram.Token == "" {
+func (config *Config) validate() error {
+	if config.Telegram.Token == "" {
 		return fmt.Errorf("telegram.token is required")
 	}
-	if c.LLM.APIKey == "" {
+	if config.LLM.APIKey == "" {
 		return fmt.Errorf("llm.api_key is required")
 	}
-	if strings.TrimSpace(c.Logging.Dir) == "" {
+	if strings.TrimSpace(config.Logging.Directory) == "" {
 		return fmt.Errorf("logging.dir is required")
 	}
-	switch strings.ToUpper(strings.TrimSpace(c.Logging.Level)) {
+	switch strings.ToUpper(strings.TrimSpace(config.Logging.Level)) {
 	case "DEBUG", "INFO", "WARN", "ERROR":
-		log.Println("log level: " + c.Logging.Level)
+		log.Println("log level: " + config.Logging.Level)
 	default:
 		return fmt.Errorf("logging.level must be one of DEBUG, INFO, WARN, ERROR")
 	}
-	if c.Logging.RetentionDays < 1 {
+	if config.Logging.RetentionDays < 1 {
 		return fmt.Errorf("logging.retention_days must be positive")
 	}
-	if _, err := time.LoadLocation(c.Logging.Timezone); err != nil {
+	if _, err := time.LoadLocation(config.Logging.Timezone); err != nil {
 		return fmt.Errorf(
 			"logging.timezone is invalid: %w",
 			err,

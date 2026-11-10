@@ -44,11 +44,11 @@ func NewInitDataVerifier(
 	}
 }
 
-func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
+func (verifier *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 	if initData == "" {
 		return nil, ErrInitDataMissing
 	}
-	if v.botToken == "" {
+	if verifier.botToken == "" {
 		return nil, fmt.Errorf("telegram bot token is empty")
 	}
 
@@ -68,13 +68,13 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 	values.Del("hash")
 
 	var pairs []string
-	for key, vals := range values {
-		if len(vals) == 0 {
+	for key, fieldValues := range values {
+		if len(fieldValues) == 0 {
 			continue
 		}
 		pairs = append(
 			pairs,
-			key+"="+vals[0],
+			key+"="+fieldValues[0],
 		)
 	}
 	sort.Strings(pairs)
@@ -85,7 +85,7 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 
 	secret := hmacSHA256(
 		[]byte("WebAppData"),
-		[]byte(v.botToken),
+		[]byte(verifier.botToken),
 	)
 	expected := hmacSHA256(
 		secret,
@@ -102,7 +102,7 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 		return nil, ErrInitDataInvalid
 	}
 
-	if v.maxAge > 0 {
+	if verifier.maxAge > 0 {
 		authDateRaw := values.Get("auth_date")
 		authDate, err := strconv.ParseInt(
 			authDateRaw,
@@ -112,10 +112,10 @@ func (v *InitDataVerifier) Verify(initData string) (*TelegramUser, error) {
 		if err != nil {
 			return nil, ErrInitDataInvalid
 		}
-		if v.now().Sub(time.Unix(
+		if verifier.now().Sub(time.Unix(
 			authDate,
 			0,
-		)) > v.maxAge {
+		)) > verifier.maxAge {
 			return nil, ErrInitDataExpired
 		}
 	}
@@ -146,10 +146,10 @@ func hmacSHA256(
 	key,
 	data []byte,
 ) []byte {
-	mac := hmac.New(
+	hmacHasher := hmac.New(
 		sha256.New,
 		key,
 	)
-	mac.Write(data)
-	return mac.Sum(nil)
+	hmacHasher.Write(data)
+	return hmacHasher.Sum(nil)
 }

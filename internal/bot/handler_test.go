@@ -11,30 +11,30 @@ import (
 )
 
 func TestHandleExit(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	mRdb := newTestInteractionStores()
+	mockAPI := &mockBotAPI{}
+	interactionStores := newTestInteractionStores()
 	chatID := int64(12345)
-	_ = mRdb.SetActiveQuestion(
+	_ = interactionStores.SetActiveQuestion(
 		context.Background(),
 		chatID,
-		model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 2},
+		model.ActiveQuestionReference{SessionID: 10, QuestionIndex: 2},
 	)
-	b := &Bot{
-		telegram: newTelegramClient(mAPI),
-		input:    mRdb,
+	bot := &Bot{
+		telegram: newTelegramClient(mockAPI),
+		input:    interactionStores,
 	}
 
-	msg := &tgbotapi.Message{
+	message := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: chatID},
 	}
 
 	ctx := context.Background()
-	b.handleExit(
+	bot.handleExit(
 		ctx,
-		msg,
+		message,
 	)
 
-	if question, _ := mRdb.GetActiveQuestion(
+	if question, _ := interactionStores.GetActiveQuestion(
 		context.Background(),
 		chatID,
 	); question != nil {
@@ -42,30 +42,30 @@ func TestHandleExit(t *testing.T) {
 	}
 
 	// Verify message sent
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected a message to be sent, but none were")
 	}
 
-	sentMsg, ok := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	sentMessage, ok := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !ok {
 		t.Fatal("expected sent message to be tgbotapi.MessageConfig")
 	}
 
 	expectedText := "🚪 현재 입력을 취소했습니다. /menu 에서 언제든 이어서 진행할 수 있어요."
-	if sentMsg.Text != expectedText {
+	if sentMessage.Text != expectedText {
 		t.Errorf(
 			"expected message text %q, got %q",
 			expectedText,
-			sentMsg.Text,
+			sentMessage.Text,
 		)
 	}
 }
 
 func TestClearInlineKeyboardOmitsReplyMarkup(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
+	mockAPI := &mockBotAPI{}
+	bot := &Bot{telegram: newTelegramClient(mockAPI)}
 
-	if err := b.telegram.ClearInlineKeyboard(
+	if err := bot.telegram.ClearInlineKeyboard(
 		12345,
 		678,
 	); err != nil {
@@ -75,18 +75,18 @@ func TestClearInlineKeyboardOmitsReplyMarkup(t *testing.T) {
 		)
 	}
 
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"sent messages = %d, want 1",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
 
-	edit, ok := mAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig)
+	edit, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageReplyMarkupConfig)
 	if !ok {
 		t.Fatalf(
 			"sent message type = %T, want EditMessageReplyMarkupConfig",
-			mAPI.sentMessages[0],
+			mockAPI.sentMessages[0],
 		)
 	}
 	if edit.ChatID != 12345 || edit.MessageID != 678 {
@@ -113,13 +113,13 @@ type blockingUpdatesAPI struct {
 	release chan struct{}
 }
 
-func (a *blockingUpdatesAPI) GetUpdatesChan(tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
-	return a.updates
+func (api *blockingUpdatesAPI) GetUpdatesChan(tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
+	return api.updates
 }
 
-func (a *blockingUpdatesAPI) Send(tgbotapi.Chattable) (tgbotapi.Message, error) {
-	close(a.sending)
-	<-a.release
+func (api *blockingUpdatesAPI) Send(tgbotapi.Chattable) (tgbotapi.Message, error) {
+	close(api.sending)
+	<-api.release
 	return tgbotapi.Message{MessageID: 1}, nil
 }
 
@@ -132,8 +132,8 @@ func TestStopWaitsForInFlightUpdateHandler(t *testing.T) {
 		sending: make(chan struct{}),
 		release: make(chan struct{}),
 	}
-	b := NewBot(BotDeps{Telegram: newTelegramClient(api)})
-	go b.Start()
+	bot := NewBot(BotDependencies{Telegram: newTelegramClient(api)})
+	go bot.Start()
 
 	// /help sends one message, which blocks in Send until release.
 	api.updates <- tgbotapi.Update{
@@ -155,7 +155,7 @@ func TestStopWaitsForInFlightUpdateHandler(t *testing.T) {
 		chan error,
 		1,
 	)
-	go func() { stopErr <- b.Stop(context.Background()) }()
+	go func() { stopErr <- bot.Stop(context.Background()) }()
 	select {
 	case err := <-stopErr:
 		t.Fatalf(

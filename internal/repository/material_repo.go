@@ -39,7 +39,7 @@ func NewMaterialRepository(db *sqlx.DB) *MaterialRepository {
 // review quotas in plan. New materials prefer the current level, while due
 // reviews remain ordered by oldest due time. Remaining slots are filled with
 // additional new vocabulary after eligible due reviews are exhausted.
-func (r *MaterialRepository) GetMaterialsByPlan(
+func (repository *MaterialRepository) GetMaterialsByPlan(
 	ctx context.Context,
 	userID int64,
 	language string,
@@ -63,7 +63,7 @@ func (r *MaterialRepository) GetMaterialsByPlan(
 	}
 
 	var materials []model.Material
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&materials,
 		studySessionMaterialsQuery,
@@ -300,13 +300,13 @@ var studySessionMaterialsQuery = `
 // GetLevelProgress counts, per level of language, all materials and the ones
 // the user has studied at least once. Levels come back in lexical order; the
 // caller applies the language's proficiency order.
-func (r *MaterialRepository) GetLevelProgress(
+func (repository *MaterialRepository) GetLevelProgress(
 	ctx context.Context,
 	userID int64,
 	language string,
 ) ([]model.LevelProgress, error) {
 	var progress []model.LevelProgress
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&progress,
 		`
@@ -339,7 +339,7 @@ func (r *MaterialRepository) GetLevelProgress(
 // UpsertBatch inserts or refreshes materials identified by their stable
 // material key and sets each material's ID to its row ID, so callers can link
 // questions without a second lookup.
-func (r *MaterialRepository) UpsertBatch(
+func (repository *MaterialRepository) UpsertBatch(
 	ctx context.Context,
 	materials []*model.Material,
 ) error {
@@ -347,16 +347,16 @@ func (r *MaterialRepository) UpsertBatch(
 		return nil
 	}
 
-	query, args := buildMaterialBatchUpsertQuery(materials)
+	query, arguments := buildMaterialBatchUpsertQuery(materials)
 	var rows []struct {
 		ID          int    `db:"id"`
 		MaterialKey string `db:"material_key"`
 	}
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&rows,
 		query,
-		args...,
+		arguments...,
 	); err != nil {
 		return fmt.Errorf(
 			"MaterialRepository.UpsertBatch count=%d: %w",
@@ -389,7 +389,7 @@ func buildMaterialBatchUpsertQuery(materials []*model.Material) (string, []any) 
 		VALUES
 	`)
 
-	args := make(
+	arguments := make(
 		[]any,
 		0,
 		len(materials)*columnCount,
@@ -411,8 +411,8 @@ func buildMaterialBatchUpsertQuery(materials []*model.Material) (string, []any) 
 			base+7,
 			base+8,
 		))
-		args = append(
-			args,
+		arguments = append(
+			arguments,
 			material.MaterialKey,
 			material.ContentID,
 			material.Category,
@@ -436,5 +436,5 @@ func buildMaterialBatchUpsertQuery(materials []*model.Material) (string, []any) 
 		RETURNING id, material_key
 	`)
 
-	return query.String(), args
+	return query.String(), arguments
 }

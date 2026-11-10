@@ -38,14 +38,14 @@ const (
 )
 
 const (
-	callbackActionStart   = "start"
-	callbackActionFinish  = "finish"
-	callbackActionPrev    = "prev"
-	callbackActionAsk     = "ask"
-	callbackActionExclude = "exclude"
-	callbackActionCard    = "card"
-	callbackActionKanji   = "kanji"
-	callbackActionClose   = "close"
+	callbackActionStart    = "start"
+	callbackActionFinish   = "finish"
+	callbackActionPrevious = "prev"
+	callbackActionAsk      = "ask"
+	callbackActionExclude  = "exclude"
+	callbackActionCard     = "card"
+	callbackActionKanji    = "kanji"
+	callbackActionClose    = "close"
 
 	callbackActionWordOrder       = "wo"
 	callbackActionWordOrderSelect = "a"
@@ -89,7 +89,7 @@ const (
 
 	formatStudyStart     = callbackPrefixStudy + "%d:" + callbackActionStart
 	formatStudyNext      = callbackPrefixStudy + "%d:" + callback.QuestionActionNext + ":%d"
-	formatStudyPrev      = callbackPrefixStudy + "%d:" + callbackActionPrev + ":%d"
+	formatStudyPrevious  = callbackPrefixStudy + "%d:" + callbackActionPrevious + ":%d"
 	formatStudyFinish    = callbackPrefixStudy + "%d:" + callbackActionFinish + ":%d"
 	formatStudyAskLLM    = callbackPrefixStudy + "%d:" + callbackActionAsk + ":%d"
 	formatStudyPolicy    = callbackPrefixStudy + "%d:" + callback.QuestionActionPolicy + ":%d"

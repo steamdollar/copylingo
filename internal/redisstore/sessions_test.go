@@ -24,17 +24,17 @@ func newFakeSessionRedis() *fakeSessionRedis {
 	return &fakeSessionRedis{values: make(map[string]string), expiration: make(map[string]time.Duration)}
 }
 
-func (f *fakeSessionRedis) Get(
+func (fake *fakeSessionRedis) Get(
 	_ context.Context,
 	key string,
 ) *redis.StringCmd {
-	if f.getErr != nil {
+	if fake.getErr != nil {
 		return redis.NewStringResult(
 			"",
-			f.getErr,
+			fake.getErr,
 		)
 	}
-	value, ok := f.values[key]
+	value, ok := fake.values[key]
 	if !ok {
 		return redis.NewStringResult(
 			"",
@@ -47,48 +47,48 @@ func (f *fakeSessionRedis) Get(
 	)
 }
 
-func (f *fakeSessionRedis) Set(
+func (fake *fakeSessionRedis) Set(
 	_ context.Context,
 	key string,
 	value any,
 	expiration time.Duration,
 ) *redis.StatusCmd {
-	if f.setErr != nil {
+	if fake.setErr != nil {
 		return redis.NewStatusResult(
 			"",
-			f.setErr,
+			fake.setErr,
 		)
 	}
 	switch value := value.(type) {
 	case []byte:
-		f.values[key] = string(value)
+		fake.values[key] = string(value)
 	case string:
-		f.values[key] = value
+		fake.values[key] = value
 	default:
-		f.values[key] = fmt.Sprint(value)
+		fake.values[key] = fmt.Sprint(value)
 	}
-	f.expiration[key] = expiration
+	fake.expiration[key] = expiration
 	return redis.NewStatusResult(
 		"OK",
 		nil,
 	)
 }
 
-func (f *fakeSessionRedis) Del(
+func (fake *fakeSessionRedis) Del(
 	_ context.Context,
 	keys ...string,
 ) *redis.IntCmd {
-	if f.delErr != nil {
+	if fake.delErr != nil {
 		return redis.NewIntResult(
 			0,
-			f.delErr,
+			fake.delErr,
 		)
 	}
 	var deleted int64
 	for _, key := range keys {
-		if _, ok := f.values[key]; ok {
+		if _, ok := fake.values[key]; ok {
 			delete(
-				f.values,
+				fake.values,
 				key,
 			)
 			deleted++
@@ -102,8 +102,8 @@ func (f *fakeSessionRedis) Del(
 
 func TestQuizSessionsSaveLoadAndDelete(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeSessionRedis()
-	store := NewQuizSessions(rdb)
+	redisClient := newFakeSessionRedis()
+	store := NewQuizSessions(redisClient)
 	state := &model.QuizActiveSessionState{Version: model.QuizActiveSessionStateVersion, Session: model.Session{ID: 41}}
 	key := "session:41:working_set"
 
@@ -117,7 +117,7 @@ func TestQuizSessionsSaveLoadAndDelete(t *testing.T) {
 			err,
 		)
 	}
-	if got := rdb.expiration[key]; got != sessionWorkingSetTTL {
+	if got := redisClient.expiration[key]; got != sessionWorkingSetTTL {
 		t.Fatalf(
 			"TTL = %s, want %s",
 			got,
@@ -167,8 +167,8 @@ func TestQuizSessionsSaveLoadAndDelete(t *testing.T) {
 
 func TestStudySessionsUsesExistingKeyAndTTL(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeSessionRedis()
-	store := NewStudySessions(rdb)
+	redisClient := newFakeSessionRedis()
+	store := NewStudySessions(redisClient)
 	key := "study_session:77:working_set"
 	state := &model.StudyActiveSessionState{Session: model.Session{ID: 77}}
 
@@ -182,10 +182,10 @@ func TestStudySessionsUsesExistingKeyAndTTL(t *testing.T) {
 			err,
 		)
 	}
-	if rdb.values[key] == "" {
+	if redisClient.values[key] == "" {
 		t.Fatal("expected the existing study working-set key to be written")
 	}
-	if got := rdb.expiration[key]; got != sessionWorkingSetTTL {
+	if got := redisClient.expiration[key]; got != sessionWorkingSetTTL {
 		t.Fatalf(
 			"TTL = %s, want %s",
 			got,
@@ -196,12 +196,12 @@ func TestStudySessionsUsesExistingKeyAndTTL(t *testing.T) {
 
 func TestSessionLoadCorruptJSONDeletesAndPreservesDeleteError(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeSessionRedis()
+	redisClient := newFakeSessionRedis()
 	deleteErr := errors.New("redis delete failed")
 	key := "session:12:working_set"
-	rdb.values[key] = "{broken"
-	rdb.delErr = deleteErr
-	store := NewQuizSessions(rdb)
+	redisClient.values[key] = "{broken"
+	redisClient.delErr = deleteErr
+	store := NewQuizSessions(redisClient)
 
 	_, err := store.Load(
 		ctx,
@@ -219,17 +219,17 @@ func TestSessionLoadCorruptJSONDeletesAndPreservesDeleteError(t *testing.T) {
 			err,
 		)
 	}
-	if _, ok := rdb.values[key]; !ok {
+	if _, ok := redisClient.values[key]; !ok {
 		t.Fatal("expected corrupt key to remain when deletion fails")
 	}
 }
 
 func TestSessionLoadNullDeletesCorruptState(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeSessionRedis()
+	redisClient := newFakeSessionRedis()
 	key := "session:13:working_set"
-	rdb.values[key] = "null"
-	store := NewQuizSessions(rdb)
+	redisClient.values[key] = "null"
+	store := NewQuizSessions(redisClient)
 
 	if _, err := store.Load(
 		ctx,
@@ -243,16 +243,16 @@ func TestSessionLoadNullDeletesCorruptState(t *testing.T) {
 			err,
 		)
 	}
-	if _, ok := rdb.values[key]; ok {
+	if _, ok := redisClient.values[key]; ok {
 		t.Fatal("corrupt null JSON should be deleted")
 	}
 }
 
 func TestSessionLoadInvalidStateDeletesKey(t *testing.T) {
 	ctx := context.Background()
-	rdb := newFakeSessionRedis()
-	quizStore := NewQuizSessions(rdb)
-	studyStore := NewStudySessions(rdb)
+	redisClient := newFakeSessionRedis()
+	quizStore := NewQuizSessions(redisClient)
+	studyStore := NewStudySessions(redisClient)
 	quizKey := "session:14:working_set"
 	studyKey := "study_session:15:working_set"
 
@@ -300,10 +300,10 @@ func TestSessionLoadInvalidStateDeletesKey(t *testing.T) {
 			err,
 		)
 	}
-	if _, ok := rdb.values[quizKey]; ok {
+	if _, ok := redisClient.values[quizKey]; ok {
 		t.Fatal("invalid Quiz key should be deleted")
 	}
-	if _, ok := rdb.values[studyKey]; ok {
+	if _, ok := redisClient.values[studyKey]; ok {
 		t.Fatal("invalid Study key should be deleted")
 	}
 }

@@ -34,25 +34,25 @@ var defaultCategoryOrder = []model.QuestionCategory{
 
 // sessionBuilderService creates learning sessions with appropriate question mix.
 type sessionBuilderService struct {
-	questionRepo        QuestionRepo
-	sessionRepo         SessionRepo
-	sessionQuestionRepo SessionQuestionRepo
+	questionRepository        QuestionRepository
+	sessionRepository         SessionRepository
+	sessionQuestionRepository SessionQuestionRepository
 }
 
 func newSessionBuilderService(
-	questionRepo QuestionRepo,
-	sessionRepo SessionRepo,
-	sessionQuestionRepo SessionQuestionRepo,
+	questionRepository QuestionRepository,
+	sessionRepository SessionRepository,
+	sessionQuestionRepository SessionQuestionRepository,
 ) *sessionBuilderService {
 	return &sessionBuilderService{
-		questionRepo:        questionRepo,
-		sessionRepo:         sessionRepo,
-		sessionQuestionRepo: sessionQuestionRepo,
+		questionRepository:        questionRepository,
+		sessionRepository:         sessionRepository,
+		sessionQuestionRepository: sessionQuestionRepository,
 	}
 }
 
 // BuildMorningSession creates a 17-question session, normally starting with 6 reviews.
-func (s *sessionBuilderService) BuildMorningSession(
+func (service *sessionBuilderService) BuildMorningSession(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -61,7 +61,7 @@ func (s *sessionBuilderService) BuildMorningSession(
 	const totalQuestions = 17
 	const reviewCount = 6
 
-	return s.buildSession(
+	return service.buildSession(
 		ctx,
 		userID,
 		language,
@@ -74,7 +74,7 @@ func (s *sessionBuilderService) BuildMorningSession(
 
 // BuildEveningSession creates an evening session with vocabulary and listening reservations, total 17 questions.
 // It matches the morning size so new quiz questions keep pace with daily Study (ADR-078).
-func (s *sessionBuilderService) BuildEveningSession(
+func (service *sessionBuilderService) BuildEveningSession(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -83,7 +83,7 @@ func (s *sessionBuilderService) BuildEveningSession(
 	const totalQuestions = 17
 	const reviewCount = 6
 
-	return s.buildSession(
+	return service.buildSession(
 		ctx,
 		userID,
 		language,
@@ -95,14 +95,14 @@ func (s *sessionBuilderService) BuildEveningSession(
 }
 
 // BuildReviewSession creates an on-demand review session from SRS due items.
-func (s *sessionBuilderService) BuildReviewSession(
+func (service *sessionBuilderService) BuildReviewSession(
 	ctx context.Context,
 	userID int64,
 	language,
 	level string,
 	limit int,
 ) (*model.Session, error) {
-	return s.buildSession(
+	return service.buildSession(
 		ctx,
 		userID,
 		language,
@@ -113,7 +113,7 @@ func (s *sessionBuilderService) BuildReviewSession(
 	)
 }
 
-func (s *sessionBuilderService) buildSession(
+func (service *sessionBuilderService) buildSession(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -142,44 +142,45 @@ func (s *sessionBuilderService) buildSession(
 	currentCategories := make(map[model.QuestionCategory]int)
 
 	appendQuestion := func(
-		q model.Question,
+		question model.Question,
 		isReview bool,
 	) bool {
 		// Queries with different level/category scopes can nominate different
 		// variants. Keep the maintenance cap across the entire assembled session.
-		if q.IsMaintenanceCheck && q.MaterialID != nil && selectedMaintenanceMaterials[*q.MaterialID] {
+		if question.IsMaintenanceCheck && question.MaterialID != nil &&
+			selectedMaintenanceMaterials[*question.MaterialID] {
 			return false
 		}
-		if len(sessionQuestions) >= totalQuestions || selectedIDs[q.ID] ||
-			(isKanjiRecallQuestion(q) && kanjiCount >= maxKanjiRecallPerSession) ||
-			(q.Category == model.CategoryReading && readingCount >= maxReadingPerSession) {
+		if len(sessionQuestions) >= totalQuestions || selectedIDs[question.ID] ||
+			(isKanjiRecallQuestion(question) && kanjiCount >= maxKanjiRecallPerSession) ||
+			(question.Category == model.CategoryReading && readingCount >= maxReadingPerSession) {
 			return false
 		}
-		selectedIDs[q.ID] = true
-		if q.IsMaintenanceCheck && q.MaterialID != nil {
-			selectedMaintenanceMaterials[*q.MaterialID] = true
+		selectedIDs[question.ID] = true
+		if question.IsMaintenanceCheck && question.MaterialID != nil {
+			selectedMaintenanceMaterials[*question.MaterialID] = true
 		}
 		excludeIDs = append(
 			excludeIDs,
-			q.ID,
+			question.ID,
 		)
 		sessionQuestions = append(
 			sessionQuestions,
 			model.SessionQuestion{
-				QuestionID: q.ID, QuestionOrder: len(sessionQuestions), IsReview: isReview,
+				QuestionID: question.ID, QuestionOrder: len(sessionQuestions), IsReview: isReview,
 			},
 		)
-		if isKanjiRecallQuestion(q) {
+		if isKanjiRecallQuestion(question) {
 			kanjiCount++
 		}
-		if q.Category == model.CategoryReading {
+		if question.Category == model.CategoryReading {
 			readingCount++
 		}
 		if isCurrentLevelQuestion(
-			q,
+			question,
 			level,
 		) {
-			currentCategories[q.Category]++
+			currentCategories[question.Category]++
 		}
 		return true
 	}
@@ -187,7 +188,7 @@ func (s *sessionBuilderService) buildSession(
 		limit int,
 		categories ...model.QuestionCategory,
 	) []model.Question {
-		questions, err := s.questionRepo.GetDueReviews(
+		questions, err := service.questionRepository.GetDueReviews(
 			ctx,
 			userID,
 			language,
@@ -208,9 +209,9 @@ func (s *sessionBuilderService) buildSession(
 	}
 
 	if sessionType == model.SessionReview {
-		for _, q := range loadDue(totalQuestions) {
+		for _, question := range loadDue(totalQuestions) {
 			appendQuestion(
-				q,
+				question,
 				true,
 			)
 		}
@@ -233,15 +234,15 @@ func (s *sessionBuilderService) buildSession(
 		// hide current listening/reading beyond the general pool's LIMIT.
 		reservedDueCount := 0
 		for _, category := range []model.QuestionCategory{model.CategoryListening, model.CategoryReading} {
-			for _, q := range loadDue(
+			for _, question := range loadDue(
 				1,
 				category,
 			) {
 				if isCurrentLevelQuestion(
-					q,
+					question,
 					level,
-				) && q.Category == category && appendQuestion(
-					q,
+				) && question.Category == category && appendQuestion(
+					question,
 					true,
 				) {
 					reservedDueCount++
@@ -256,21 +257,21 @@ func (s *sessionBuilderService) buildSession(
 			goal int,
 			accept func(model.Question) bool,
 		) {
-			for _, q := range due {
+			for _, question := range due {
 				if len(sessionQuestions) >= goal {
 					break
 				}
-				if accept(q) {
+				if accept(question) {
 					appendQuestion(
-						q,
+						question,
 						true,
 					)
 				}
 			}
 		}
-		isCurrent := func(q model.Question) bool {
+		isCurrent := func(question model.Question) bool {
 			return isCurrentLevelQuestion(
-				q,
+				question,
 				level,
 			)
 		}
@@ -307,7 +308,7 @@ func (s *sessionBuilderService) buildSession(
 			if count <= 0 || exhausted[key] {
 				return 0
 			}
-			questions, err := s.questionRepo.GetNewQuestions(
+			questions, err := service.questionRepository.GetNewQuestions(
 				ctx,
 				userID,
 				language,
@@ -329,12 +330,12 @@ func (s *sessionBuilderService) buildSession(
 			// category again during current/adjacent shortage handling.
 			exhausted[key] = len(questions) < count
 			added := 0
-			for _, q := range questions {
+			for _, question := range questions {
 				if added >= count {
 					break
 				}
 				if appendQuestion(
-					q,
+					question,
 					false,
 				) {
 					added++
@@ -434,9 +435,9 @@ func (s *sessionBuilderService) buildSession(
 		)
 		appendDue(
 			totalQuestions,
-			func(q model.Question) bool {
+			func(question model.Question) bool {
 				return isLowerAdjacentQuestion(
-					q,
+					question,
 					language,
 					level,
 				)
@@ -474,7 +475,7 @@ func (s *sessionBuilderService) buildSession(
 		UserID: userID, Type: sessionType, Mode: model.SessionModeQuiz,
 		Status: model.SessionPending, TotalQuestions: len(sessionQuestions),
 	}
-	if err := s.sessionRepo.CreateSession(
+	if err := service.sessionRepository.CreateSession(
 		ctx,
 		session,
 	); err != nil {
@@ -483,7 +484,7 @@ func (s *sessionBuilderService) buildSession(
 	for i := range sessionQuestions {
 		sessionQuestions[i].SessionID = session.ID
 	}
-	if err := s.sessionQuestionRepo.CreateSessionQuestions(
+	if err := service.sessionQuestionRepository.CreateSessionQuestions(
 		ctx,
 		sessionQuestions,
 	); err != nil {
@@ -493,7 +494,7 @@ func (s *sessionBuilderService) buildSession(
 }
 
 func isKanjiRecallQuestion(question model.Question) bool {
-	return question.Skill != nil && *question.Skill == model.SkillVocabKanjiRecall
+	return question.Skill != nil && *question.Skill == model.SkillVocabularyKanjiRecall
 }
 
 func divideRoundingUp(

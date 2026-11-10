@@ -60,8 +60,8 @@ type studyInputStore interface {
 	) error
 }
 
-// StudyFlowDeps wires StudyFlow; every dependency is required.
-type StudyFlowDeps struct {
+// StudyFlowDependencies wires StudyFlow; every dependency is required.
+type StudyFlowDependencies struct {
 	Telegram           *TelegramClient
 	Session            studySession
 	MaterialPreference materialPreferences
@@ -76,16 +76,16 @@ type StudyFlow struct {
 	input              studyInputStore
 }
 
-func NewStudyFlow(deps StudyFlowDeps) *StudyFlow {
+func NewStudyFlow(dependencies StudyFlowDependencies) *StudyFlow {
 	return &StudyFlow{
-		telegram:           deps.Telegram,
-		session:            deps.Session,
-		materialPreference: deps.MaterialPreference,
-		input:              deps.Input,
+		telegram:           dependencies.Telegram,
+		session:            dependencies.Session,
+		materialPreference: dependencies.MaterialPreference,
+		input:              dependencies.Input,
 	}
 }
 
-func (sf *StudyFlow) PushSession(
+func (flow *StudyFlow) PushSession(
 	ctx context.Context,
 	chatID int64,
 	sessionID int,
@@ -102,24 +102,25 @@ func (sf *StudyFlow) PushSession(
 			),
 		),
 	)
-	return sf.telegram.SendMessageWithKeyboard(
+	return flow.telegram.SendMessageWithKeyboard(
 		chatID,
 		message.sessionPush,
 		keyboard,
 	)
 }
 
-func (sf *StudyFlow) HandleCallback(
+func (flow *StudyFlow) HandleCallback(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
-	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
+	if callbackQuery == nil || callbackQuery.From == nil || callbackQuery.Message == nil ||
+		callbackQuery.Message.Chat == nil {
 		return
 	}
 
 	// e.g. "study:42:next:3"
 	parts := strings.Split(
-		cb.Data,
+		callbackQuery.Data,
 		":",
 	)
 	if len(parts) < 3 {
@@ -141,24 +142,24 @@ func (sf *StudyFlow) HandleCallback(
 
 	switch parts[2] {
 	case callback.QuestionActionPolicy, callbackActionCard:
-		sf.handleMaterialPreference(
+		flow.handleMaterialPreference(
 			ctx,
-			cb,
+			callbackQuery,
 			parts,
 		)
 	case callbackActionStart:
-		sf.startSession(
+		flow.startSession(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 		)
 	case callbackActionKanji:
 		if len(parts) != 4 {
 			return
 		}
-		sf.showKanjiNotes(
+		flow.showKanjiNotes(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 			parts[3],
 		)
@@ -166,9 +167,9 @@ func (sf *StudyFlow) HandleCallback(
 		if len(parts) < 4 {
 			return
 		}
-		sf.handleAskLLMQuestion(
+		flow.handleAskLLMQuestion(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 			parts[3],
 		)
@@ -180,13 +181,13 @@ func (sf *StudyFlow) HandleCallback(
 		if err != nil {
 			return
 		}
-		sf.nextMaterial(
+		flow.nextMaterial(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 			currentOrder,
 		)
-	case callbackActionPrev:
+	case callbackActionPrevious:
 		if len(parts) < 4 {
 			return
 		}
@@ -194,9 +195,9 @@ func (sf *StudyFlow) HandleCallback(
 		if err != nil {
 			return
 		}
-		sf.prevMaterial(
+		flow.previousMaterial(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 			currentOrder,
 		)
@@ -208,25 +209,25 @@ func (sf *StudyFlow) HandleCallback(
 		if err != nil {
 			return
 		}
-		sf.finishSession(
+		flow.finishSession(
 			ctx,
-			cb,
+			callbackQuery,
 			sessionID,
 			currentOrder,
 		)
 	}
 }
 
-func (sf *StudyFlow) startSession(
+func (flow *StudyFlow) startSession(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	state, err := sf.session.StartStudy(
+	state, err := flow.session.StartStudy(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -239,18 +240,18 @@ func (sf *StudyFlow) startSession(
 			"error",
 			err,
 		)
-		sf.telegram.EditMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+		flow.telegram.EditMessage(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 			messages.startFailed,
 			mainMenuKeyboard(),
 		)
 		return
 	}
 	if state.Session.Status == model.SessionCompleted {
-		sf.telegram.EditMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+		flow.telegram.EditMessage(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 			messages.alreadyCompleted,
 			mainMenuKeyboard(),
 		)
@@ -258,27 +259,27 @@ func (sf *StudyFlow) startSession(
 	}
 
 	nextOrder := nextUnstudiedMaterialOrder(state)
-	sf.showMaterial(
+	flow.showMaterial(
 		ctx,
-		cb.Message.Chat.ID,
-		&cb.Message.MessageID,
+		callbackQuery.Message.Chat.ID,
+		&callbackQuery.Message.MessageID,
 		state,
 		nextOrder,
 	)
 }
 
-func (sf *StudyFlow) nextMaterial(
+func (flow *StudyFlow) nextMaterial(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID,
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
 	// update study proceeding state
-	state, err := sf.session.MarkStudied(
+	state, err := flow.session.MarkStudied(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		currentOrder,
 	)
 	if err != nil {
@@ -294,34 +295,34 @@ func (sf *StudyFlow) nextMaterial(
 			"error",
 			err,
 		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			messages.saveProgressFailed,
 		)
 		return
 	}
 
-	sf.showMaterial(
+	flow.showMaterial(
 		ctx,
-		cb.Message.Chat.ID,
-		&cb.Message.MessageID,
+		callbackQuery.Message.Chat.ID,
+		&callbackQuery.Message.MessageID,
 		state,
 		currentOrder+1,
 	)
 }
 
-// prevMaterial re-shows an already-seen card; it never mutates studied state.
-func (sf *StudyFlow) prevMaterial(
+// previousMaterial re-shows an already-seen card; it never mutates studied state.
+func (flow *StudyFlow) previousMaterial(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID,
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	state, err := sf.session.StudyProgress(
+	state, err := flow.session.StudyProgress(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -336,33 +337,33 @@ func (sf *StudyFlow) prevMaterial(
 			"error",
 			err,
 		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			messages.loadProgressFailed,
 		)
 		return
 	}
 
-	sf.showMaterial(
+	flow.showMaterial(
 		ctx,
-		cb.Message.Chat.ID,
-		&cb.Message.MessageID,
+		callbackQuery.Message.Chat.ID,
+		&callbackQuery.Message.MessageID,
 		state,
 		currentOrder-1,
 	)
 }
 
-func (sf *StudyFlow) finishSession(
+func (flow *StudyFlow) finishSession(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID,
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if err := sf.session.FinishStudy(
+	if err := flow.session.FinishStudy(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		currentOrder,
 	); err != nil {
 		if errors.Is(
@@ -381,8 +382,8 @@ func (sf *StudyFlow) finishSession(
 				"error",
 				err,
 			)
-			sf.telegram.SendMessage(
-				cb.Message.Chat.ID,
+			flow.telegram.SendMessage(
+				callbackQuery.Message.Chat.ID,
 				messages.saveCompletionFailed,
 			)
 			return
@@ -397,22 +398,22 @@ func (sf *StudyFlow) finishSession(
 			"error",
 			err,
 		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			messages.completeFailed,
 		)
 		return
 	}
 
-	sf.telegram.EditMessage(
-		cb.Message.Chat.ID,
-		cb.Message.MessageID,
+	flow.telegram.EditMessage(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.Message.MessageID,
 		messages.sessionCompleted,
 		mainMenuKeyboard(),
 	)
 }
 
-func (sf *StudyFlow) showMaterial(
+func (flow *StudyFlow) showMaterial(
 	ctx context.Context,
 	chatID int64,
 	editMessageID *int,
@@ -422,7 +423,7 @@ func (sf *StudyFlow) showMaterial(
 	messages := botMessagesByLocale[botDefaultLocale]
 	items := state.Items
 	if len(items) == 0 {
-		sf.telegram.SendMessage(
+		flow.telegram.SendMessage(
 			chatID,
 			messages.noMaterials,
 		)
@@ -432,7 +433,7 @@ func (sf *StudyFlow) showMaterial(
 		materialOrder = 0
 	}
 	if materialOrder >= len(items) {
-		if err := sf.session.CompleteStudy(
+		if err := flow.session.CompleteStudy(
 			ctx,
 			state.Session.ID,
 			state.Session.UserID,
@@ -448,17 +449,17 @@ func (sf *StudyFlow) showMaterial(
 				err,
 			)
 		}
-		sf.telegram.SendMessage(
+		flow.telegram.SendMessage(
 			chatID,
 			messages.autoCompleted,
 		)
 		return
 	}
-	idx := studyMaterialIndexByOrder(
+	index := studyMaterialIndexByOrder(
 		items,
 		materialOrder,
 	)
-	if idx == -1 {
+	if index == -1 {
 		slog.WarnContext(
 			ctx,
 			"Study material order not found",
@@ -469,24 +470,24 @@ func (sf *StudyFlow) showMaterial(
 			"material_order",
 			materialOrder,
 		)
-		sf.telegram.SendMessage(
+		flow.telegram.SendMessage(
 			chatID,
 			messages.materialOrderNotFound,
 		)
 		return
 	}
 
-	item := items[idx]
+	item := items[index]
 	text := renderStudyMaterial(
 		item.Material,
-		idx,
+		index,
 		len(items),
 	)
 	keyboard := studyMaterialKeyboard(
 		state.Session.ID,
 		item.SessionMaterial.MaterialOrder,
-		idx == 0,
-		idx == len(items)-1,
+		index == 0,
+		index == len(items)-1,
 		isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
 	)
 	// The kanji button exists only when the payload carries notes or
@@ -524,7 +525,7 @@ func (sf *StudyFlow) showMaterial(
 	)
 
 	if editMessageID != nil {
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -532,7 +533,7 @@ func (sf *StudyFlow) showMaterial(
 		)
 		return
 	}
-	sf.telegram.SendMessageWithKeyboard(
+	flow.telegram.SendMessageWithKeyboard(
 		chatID,
 		text,
 		keyboard,
@@ -558,7 +559,7 @@ func studyMaterialKeyboard(
 			tgbotapi.NewInlineKeyboardButtonData(
 				messages.previousButton,
 				fmt.Sprintf(
-					formatStudyPrev,
+					formatStudyPrevious,
 					sessionID,
 					materialOrder,
 				),
@@ -614,24 +615,24 @@ func studyMaterialKeyboard(
 // handleAskLLMQuestion arms one contextual LLM question for a Study material.
 // Ownership and material membership are checked before accepting the callback;
 // they are checked again when resolving the context after the text reply.
-func (sf *StudyFlow) handleAskLLMQuestion(
+func (flow *StudyFlow) handleAskLLMQuestion(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID int,
-	materialOrderStr string,
+	materialOrderText string,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if cb.Message == nil || !isLLMAllowed(cb.From) {
+	if callbackQuery.Message == nil || !isLLMAllowed(callbackQuery.From) {
 		return
 	}
-	materialOrder, err := strconv.Atoi(materialOrderStr)
+	materialOrder, err := strconv.Atoi(materialOrderText)
 	if err != nil {
 		return
 	}
-	state, err := sf.session.StudyProgress(
+	state, err := flow.session.StudyProgress(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	)
 	if err != nil || state.Session.Status == model.SessionCompleted {
 		slog.WarnContext(
@@ -646,15 +647,15 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 			"error",
 			err,
 		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			messages.currentMaterialQuestionUnavailable,
 		)
 		return
 	}
 	if _, _, ok := state.ItemByOrder(materialOrder); !ok {
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			messages.materialNotFound,
 		)
 		return
@@ -665,9 +666,9 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 		SessionID:     sessionID,
 		MaterialOrder: materialOrder,
 	}
-	if err := sf.input.SetLLMPending(
+	if err := flow.input.SetLLMPending(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		input,
 	); err != nil {
 		slog.ErrorContext(
@@ -682,14 +683,14 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 			"error",
 			err,
 		)
-		sf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			messages.llmQuestionActivationFailed,
 		)
 		return
 	}
-	sf.telegram.SendMessageWithKeyboard(
-		cb.Message.Chat.ID,
+	flow.telegram.SendMessageWithKeyboard(
+		callbackQuery.Message.Chat.ID,
 		messages.llmQuestionPrompt,
 		llmCancelKeyboard(),
 	)
@@ -697,21 +698,21 @@ func (sf *StudyFlow) handleAskLLMQuestion(
 
 // showKanjiNotes replaces the card with its kanji notes and a button back to
 // the card. Like the settings menu, it never marks the material studied.
-func (sf *StudyFlow) showKanjiNotes(
+func (flow *StudyFlow) showKanjiNotes(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID int,
-	materialIDStr string,
+	materialIDText string,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	materialID, err := strconv.Atoi(materialIDStr)
+	materialID, err := strconv.Atoi(materialIDText)
 	if err != nil {
 		return
 	}
-	state, err := sf.session.StudyProgress(
+	state, err := flow.session.StudyProgress(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	)
 	if err != nil {
 		slog.WarnContext(
@@ -726,27 +727,27 @@ func (sf *StudyFlow) showKanjiNotes(
 			"error",
 			err,
 		)
-		sf.telegram.AnswerCallbackAlert(
-			cb.ID,
+		flow.telegram.AnswerCallbackAlert(
+			callbackQuery.ID,
 			messages.kanjiNotesUnavailable,
 		)
 		return
 	}
 	item, ok := state.ItemByMaterialID(materialID)
 	if !ok {
-		sf.telegram.AnswerCallbackAlert(
-			cb.ID,
+		flow.telegram.AnswerCallbackAlert(
+			callbackQuery.ID,
 			messages.materialNotInSession,
 		)
 		return
 	}
-	var vocab vocabularyStudyPayload
+	var vocabulary vocabularyStudyPayload
 	if err := json.Unmarshal(
 		item.Material.Payload,
-		&vocab,
-	); err != nil || len(vocab.KanjiNotes)+len(vocab.KanjiReadings) == 0 {
-		sf.telegram.AnswerCallbackAlert(
-			cb.ID,
+		&vocabulary,
+	); err != nil || len(vocabulary.KanjiNotes)+len(vocabulary.KanjiReadings) == 0 {
+		flow.telegram.AnswerCallbackAlert(
+			callbackQuery.ID,
 			messages.kanjiNotesUnavailable,
 		)
 		return
@@ -763,10 +764,10 @@ func (sf *StudyFlow) showKanjiNotes(
 			),
 		),
 	)
-	sf.telegram.EditMessage(
-		cb.Message.Chat.ID,
-		cb.Message.MessageID,
-		renderKanjiNotes(vocab),
+	flow.telegram.EditMessage(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.Message.MessageID,
+		renderKanjiNotes(vocabulary),
 		&keyboard,
 	)
 }
@@ -775,20 +776,20 @@ func studyMaterialIndexByOrder(
 	items []model.StudySessionMaterial,
 	materialOrder int,
 ) int {
-	for idx, item := range items {
+	for index, item := range items {
 		if item.SessionMaterial.MaterialOrder == materialOrder {
-			return idx
+			return index
 		}
 	}
 	return -1
 }
 
 func nextUnstudiedMaterialOrder(state *model.StudyActiveSessionState) int {
-	idx := state.NextUnstudiedIndex()
-	if idx >= len(state.Items) {
+	index := state.NextUnstudiedIndex()
+	if index >= len(state.Items) {
 		return len(state.Items)
 	}
-	return state.Items[idx].SessionMaterial.MaterialOrder
+	return state.Items[index].SessionMaterial.MaterialOrder
 }
 
 type vocabularyStudyPayload struct {
@@ -802,7 +803,7 @@ type vocabularyStudyPayload struct {
 
 func renderStudyMaterial(
 	material model.Material,
-	idx,
+	index,
 	total int,
 ) string {
 	// Study sessions mix adjacent levels like quiz sessions (ADR-046), so the
@@ -816,7 +817,7 @@ func renderStudyMaterial(
 	}
 	header := fmt.Sprintf(
 		"📚 <b>Study Session</b>\n\n<b>%d/%d%s · %s</b>\n\n",
-		idx+1,
+		index+1,
 		total,
 		levelTag,
 		escapeHTML(materialCategoryLabel(material.Category)),
@@ -840,10 +841,10 @@ func renderStudyMaterial(
 
 func renderVocabularyPayload(payload json.RawMessage) string {
 	messages := botMessagesByLocale[botDefaultLocale]
-	var vocab vocabularyStudyPayload
+	var vocabulary vocabularyStudyPayload
 	if err := json.Unmarshal(
 		payload,
-		&vocab,
+		&vocabulary,
 	); err != nil {
 		return renderGenericPayload(payload)
 	}
@@ -853,39 +854,39 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 		0,
 		4,
 	)
-	if strings.TrimSpace(vocab.Kana) != "" {
+	if strings.TrimSpace(vocabulary.Kana) != "" {
 		lines = append(
 			lines,
 			fmt.Sprintf(
 				messages.vocabularyReadingFormat,
-				escapeHTML(vocab.Kana),
+				escapeHTML(vocabulary.Kana),
 			),
 		)
 	}
-	if strings.TrimSpace(vocab.Kanji) != "" {
+	if strings.TrimSpace(vocabulary.Kanji) != "" {
 		lines = append(
 			lines,
 			fmt.Sprintf(
 				messages.vocabularyWritingFormat,
-				escapeHTML(vocab.Kanji),
+				escapeHTML(vocabulary.Kanji),
 			),
 		)
 	}
-	if strings.TrimSpace(vocab.MeaningKo) != "" {
+	if strings.TrimSpace(vocabulary.MeaningKo) != "" {
 		lines = append(
 			lines,
 			fmt.Sprintf(
 				messages.meaningFormat,
-				escapeHTML(vocab.MeaningKo),
+				escapeHTML(vocabulary.MeaningKo),
 			),
 		)
 	}
-	if strings.TrimSpace(vocab.PartOfSpeech) != "" {
+	if strings.TrimSpace(vocabulary.PartOfSpeech) != "" {
 		lines = append(
 			lines,
 			fmt.Sprintf(
 				messages.partOfSpeechFormat,
-				escapeHTML(vocab.PartOfSpeech),
+				escapeHTML(vocabulary.PartOfSpeech),
 			),
 		)
 	}
@@ -904,14 +905,14 @@ func hasKanjiDetail(material model.Material) bool {
 	if material.Category != model.MaterialCategoryVocabulary {
 		return false
 	}
-	var vocab vocabularyStudyPayload
+	var vocabulary vocabularyStudyPayload
 	if err := json.Unmarshal(
 		material.Payload,
-		&vocab,
+		&vocabulary,
 	); err != nil {
 		return false
 	}
-	return len(vocab.KanjiNotes)+len(vocab.KanjiReadings) > 0
+	return len(vocabulary.KanjiNotes)+len(vocabulary.KanjiReadings) > 0
 }
 
 // renderKanjiNotes shows one block per kanji in word order: its title with
@@ -920,30 +921,30 @@ func hasKanjiDetail(material model.Material) bool {
 // other words (ADR-074, ADR-076). A note whose kanji has no reading entry,
 // such as one inside a jukuji group, follows the others without 훈음 or
 // reading lines.
-func renderKanjiNotes(vocab vocabularyStudyPayload) string {
+func renderKanjiNotes(vocabulary vocabularyStudyPayload) string {
 	messages := botMessagesByLocale[botDefaultLocale]
 	unrenderedNotes := make(
 		map[string]model.KanjiNote,
-		len(vocab.KanjiNotes),
+		len(vocabulary.KanjiNotes),
 	)
-	for _, note := range vocab.KanjiNotes {
-		unrenderedNotes[note.Char] = note
+	for _, note := range vocabulary.KanjiNotes {
+		unrenderedNotes[note.Character] = note
 	}
 
 	blocks := make(
 		[]string,
 		0,
-		len(vocab.KanjiReadings)+len(vocab.KanjiNotes)+1,
+		len(vocabulary.KanjiReadings)+len(vocabulary.KanjiNotes)+1,
 	)
 	blocks = append(
 		blocks,
 		fmt.Sprintf(
 			messages.kanjiNotesHeadingFormat,
-			escapeHTML(vocab.Kanji),
-			escapeHTML(vocab.Kana),
+			escapeHTML(vocabulary.Kanji),
+			escapeHTML(vocabulary.Kana),
 		),
 	)
-	for _, reading := range vocab.KanjiReadings {
+	for _, reading := range vocabulary.KanjiReadings {
 		lines := []string{
 			kanjiTitle(
 				reading.Text,
@@ -972,8 +973,8 @@ func renderKanjiNotes(vocab vocabularyStudyPayload) string {
 			),
 		)
 	}
-	for _, note := range vocab.KanjiNotes {
-		if _, ok := unrenderedNotes[note.Char]; ok {
+	for _, note := range vocabulary.KanjiNotes {
+		if _, ok := unrenderedNotes[note.Character]; ok {
 			blocks = append(
 				blocks,
 				strings.Join(
@@ -1031,7 +1032,7 @@ func kanjiNoteLines(
 ) []string {
 	lines := []string{
 		kanjiTitle(
-			note.Char,
+			note.Character,
 			hunEum,
 			note.Type,
 		),
@@ -1285,43 +1286,43 @@ func renderReadingPayload(payload json.RawMessage) string {
 			),
 		)
 	}
-	vocabLines := make(
+	vocabularyLines := make(
 		[]string,
 		0,
 		len(reading.KeyVocabulary),
 	)
-	for _, vocab := range reading.KeyVocabulary {
-		if strings.TrimSpace(vocab.Surface) == "" {
+	for _, vocabulary := range reading.KeyVocabulary {
+		if strings.TrimSpace(vocabulary.Surface) == "" {
 			continue
 		}
 		line := fmt.Sprintf(
 			"・<b>%s</b>",
-			escapeHTML(vocab.Surface),
+			escapeHTML(vocabulary.Surface),
 		)
-		if strings.TrimSpace(vocab.Reading) != "" && vocab.Reading != vocab.Surface {
+		if strings.TrimSpace(vocabulary.Reading) != "" && vocabulary.Reading != vocabulary.Surface {
 			line += fmt.Sprintf(
 				" (%s)",
-				escapeHTML(vocab.Reading),
+				escapeHTML(vocabulary.Reading),
 			)
 		}
-		if strings.TrimSpace(vocab.MeaningKo) != "" {
+		if strings.TrimSpace(vocabulary.MeaningKo) != "" {
 			line += fmt.Sprintf(
 				" — %s",
-				escapeHTML(vocab.MeaningKo),
+				escapeHTML(vocabulary.MeaningKo),
 			)
 		}
-		vocabLines = append(
-			vocabLines,
+		vocabularyLines = append(
+			vocabularyLines,
 			line,
 		)
 	}
-	if len(vocabLines) > 0 {
+	if len(vocabularyLines) > 0 {
 		sections = append(
 			sections,
 			fmt.Sprintf(
 				messages.keyVocabularyFormat,
 				strings.Join(
-					vocabLines,
+					vocabularyLines,
 					"\n",
 				),
 			),
@@ -1369,6 +1370,6 @@ func materialCategoryLabel(category model.MaterialCategory) string {
 	}
 }
 
-func escapeHTML(s string) string {
-	return html.EscapeString(s)
+func escapeHTML(text string) string {
+	return html.EscapeString(text)
 }

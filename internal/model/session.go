@@ -21,8 +21,8 @@ const (
 	SessionModeStudy SessionMode = "study"
 )
 
-func (m SessionMode) IsValid() bool {
-	return m == SessionModeQuiz || m == SessionModeStudy
+func (mode SessionMode) IsValid() bool {
+	return mode == SessionModeQuiz || mode == SessionModeStudy
 }
 
 // SessionStatus defines the current state of a session.

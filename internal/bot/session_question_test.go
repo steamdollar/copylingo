@@ -27,17 +27,17 @@ func TestIsStaleMiniAppCallbackWrapper(t *testing.T) {
 
 func TestHandwritingMiniAppURL(t *testing.T) {
 	t.Parallel()
-	sf := newTestSessionFlow(
+	sessionFlow := newTestSessionFlow(
 		nil,
 		nil,
-		SessionFlowDeps{},
+		SessionFlowDependencies{},
 	)
 
 	t.Run(
 		"empty base url",
 		func(t *testing.T) {
-			sf.publicBaseURL = ""
-			_, err := sf.handwritingMiniAppURL(
+			sessionFlow.publicBaseURL = ""
+			_, err := sessionFlow.handwritingMiniAppURL(
 				1,
 				1,
 				"jp",
@@ -54,9 +54,9 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 	t.Run(
 		"valid url",
 		func(t *testing.T) {
-			sf.publicBaseURL = "https://api.example.com/"
+			sessionFlow.publicBaseURL = "https://api.example.com/"
 			prompt := "뜻 <b>'학교'</b>에 해당하는 일본어 단어를 손글씨로 쓰세요"
-			got, err := sf.handwritingMiniAppURL(
+			got, err := sessionFlow.handwritingMiniAppURL(
 				123,
 				456,
 				"jp",
@@ -88,21 +88,21 @@ func TestHandwritingMiniAppURL(t *testing.T) {
 					got,
 				)
 			}
-			u, err := url.Parse(got)
+			parsedURL, err := url.Parse(got)
 			if err != nil {
 				t.Fatalf(
 					"parse url: %v",
 					err,
 				)
 			}
-			if gotPrompt := u.Query().Get("prompt"); gotPrompt != prompt {
+			if gotPrompt := parsedURL.Query().Get("prompt"); gotPrompt != prompt {
 				t.Errorf(
 					"prompt = %q, want %q",
 					gotPrompt,
 					prompt,
 				)
 			}
-			if gotCells := u.Query().Get("cells"); gotCells != "2" {
+			if gotCells := parsedURL.Query().Get("cells"); gotCells != "2" {
 				t.Errorf(
 					"cells = %q, want %q",
 					gotCells,
@@ -144,23 +144,23 @@ func TestHandwritingCellCountExcludesSokuon(t *testing.T) {
 func TestQuestionNavigation(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	sf := newTestSessionFlow(
+	sessionFlow := newTestSessionFlow(
 		nil,
 		nil,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
 		},
 	)
 
-	trueVal := true
+	trueValue := true
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: 10},
 		Items: []model.QuizActiveSessionQuestion{
-			{SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &trueVal}},
+			{SessionQuestion: model.SessionQuestion{QuestionID: 1, IsCorrect: &trueValue}},
 			{SessionQuestion: model.SessionQuestion{QuestionID: 2}},
 			{SessionQuestion: model.SessionQuestion{QuestionID: 3}},
 		},
@@ -173,21 +173,21 @@ func TestQuestionNavigation(t *testing.T) {
 	t.Run(
 		"isQuestionAnswered",
 		func(t *testing.T) {
-			if !sf.isQuestionAnswered(
+			if !sessionFlow.isQuestionAnswered(
 				ctx,
 				10,
 				0,
 			) {
 				t.Error("expected index 0 to be answered")
 			}
-			if sf.isQuestionAnswered(
+			if sessionFlow.isQuestionAnswered(
 				ctx,
 				10,
 				1,
 			) {
 				t.Error("expected index 1 to be unanswered")
 			}
-			if sf.isQuestionAnswered(
+			if sessionFlow.isQuestionAnswered(
 				ctx,
 				10,
 				5,
@@ -200,7 +200,7 @@ func TestQuestionNavigation(t *testing.T) {
 	t.Run(
 		"nextUnansweredQuestionIndex",
 		func(t *testing.T) {
-			idx, err := sf.nextUnansweredQuestionIndex(
+			index, err := sessionFlow.nextUnansweredQuestionIndex(
 				ctx,
 				10,
 			)
@@ -210,10 +210,10 @@ func TestQuestionNavigation(t *testing.T) {
 					err,
 				)
 			}
-			if idx != 1 {
+			if index != 1 {
 				t.Errorf(
 					"expected idx 1, got %d",
-					idx,
+					index,
 				)
 			}
 		},
@@ -322,12 +322,12 @@ func TestBuildMCQLayout(t *testing.T) {
 
 func TestRenderByType(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			PublicBaseURL: "https://ex.com",
 		},
 	)
@@ -335,19 +335,19 @@ func TestRenderByType(t *testing.T) {
 	t.Run(
 		"MultipleChoice",
 		func(t *testing.T) {
-			q := model.Question{
+			question := model.Question{
 				Type:    model.QuestionMultipleChoice,
 				Prompt:  "Choose one",
 				Options: json.RawMessage(`["A", "B", "C"]`),
 			}
-			text, kb, done := sf.renderByType(
+			text, keyboard, done := sessionFlow.renderByType(
 				ctx,
 				1,
 				nil,
 				10,
 				0,
 				5,
-				q,
+				question,
 				false,
 			)
 			if done {
@@ -362,10 +362,10 @@ func TestRenderByType(t *testing.T) {
 					text,
 				)
 			}
-			if kb == nil || len(kb.InlineKeyboard) != 2 {
+			if keyboard == nil || len(keyboard.InlineKeyboard) != 2 {
 				t.Fatalf(
 					"expected 2 rows for 3 options, got %v",
-					kb,
+					keyboard,
 				)
 			}
 		},
@@ -390,20 +390,20 @@ func TestRenderByType(t *testing.T) {
 				t.Run(
 					tt.name,
 					func(t *testing.T) {
-						q := model.Question{
+						question := model.Question{
 							Type:             model.QuestionMultipleChoice,
 							ProficiencyLevel: tt.level,
 							Prompt:           "Choose one",
 							Options:          json.RawMessage(`["A", "B"]`),
 						}
-						text, _, done := sf.renderByType(
+						text, _, done := sessionFlow.renderByType(
 							ctx,
 							1,
 							nil,
 							10,
 							0,
 							5,
-							q,
+							question,
 							tt.isReview,
 						)
 						if done {
@@ -428,28 +428,28 @@ func TestRenderByType(t *testing.T) {
 	t.Run(
 		"FillBlank",
 		func(t *testing.T) {
-			q := model.Question{
+			question := model.Question{
 				Type:   model.QuestionFillBlank,
 				Prompt: "Write something",
 			}
-			_, kb, done := sf.renderByType(
+			_, keyboard, done := sessionFlow.renderByType(
 				ctx,
 				123,
 				nil,
 				10,
 				0,
 				5,
-				q,
+				question,
 				false,
 			)
 			if done {
 				t.Fatal("expected not done")
 			}
-			if kb != nil {
+			if keyboard != nil {
 				t.Error("expected no keyboard for fill-blank")
 			}
 			if got, ok := stateStores.active[123]; !ok ||
-				got != (model.ActiveQuestionRef{SessionID: 10, QuestionIndex: 0}) {
+				got != (model.ActiveQuestionReference{SessionID: 10, QuestionIndex: 0}) {
 				t.Errorf(
 					"active question = %+v, want session 10 index 0",
 					got,
@@ -461,28 +461,28 @@ func TestRenderByType(t *testing.T) {
 	t.Run(
 		"Handwriting",
 		func(t *testing.T) {
-			q := model.Question{
+			question := model.Question{
 				ID:   456,
 				Type: model.QuestionKanaHandwriting,
 			}
-			mAPI.sentMessages = nil
-			_, _, done := sf.renderByType(
+			mockAPI.sentMessages = nil
+			_, _, done := sessionFlow.renderByType(
 				ctx,
 				123,
 				nil,
 				10,
 				0,
 				5,
-				q,
+				question,
 				false,
 			)
 			if !done {
 				t.Fatal("expected done for handwriting (it sends message internally)")
 			}
-			if len(mAPI.sentMessages) != 1 {
+			if len(mockAPI.sentMessages) != 1 {
 				t.Fatalf(
 					"expected 1 message sent, got %d",
-					len(mAPI.sentMessages),
+					len(mockAPI.sentMessages),
 				)
 			}
 		},
@@ -491,18 +491,18 @@ func TestRenderByType(t *testing.T) {
 
 // --- listening render fakes (structurally satisfy service.NewAudioService deps) ---
 
-type fakeAudioRepo struct {
-	setFileID  int
-	setFileVal string
+type fakeAudioRepository struct {
+	setFileID    int
+	setFileValue string
 }
 
-func (f *fakeAudioRepo) SetAudioFileID(
+func (fake *fakeAudioRepository) SetAudioFileID(
 	_ context.Context,
 	id int,
 	fileID string,
 ) error {
-	f.setFileID = id
-	f.setFileVal = fileID
+	fake.setFileID = id
+	fake.setFileValue = fileID
 	return nil
 }
 
@@ -511,62 +511,60 @@ type fakeStore struct {
 	bytes    []byte
 }
 
-func (f *fakeStore) Get(
+func (fake *fakeStore) Get(
 	_ context.Context,
 	_ string,
 ) ([]byte, error) {
-	f.getCalls++
-	return f.bytes, nil
+	fake.getCalls++
+	return fake.bytes, nil
 }
-
-func strPtr(s string) *string { return &s }
 
 func TestRenderByType_Listening(t *testing.T) {
 	ctx := context.Background()
-	repo := &fakeAudioRepo{}
+	repository := &fakeAudioRepository{}
 	store := &fakeStore{bytes: []byte("ogg-bytes")}
 	audio := service.NewAudioService(
-		repo,
+		repository,
 		store,
 	)
 
 	t.Run(
 		"cached file_id fast path",
 		func(t *testing.T) {
-			mAPI := &mockBotAPI{}
-			sf := newTestSessionFlow(
-				mAPI,
+			mockAPI := &mockBotAPI{}
+			sessionFlow := newTestSessionFlow(
+				mockAPI,
 				nil,
-				SessionFlowDeps{
+				SessionFlowDependencies{
 					Input: newTestInteractionStores(),
 					Audio: audio,
 				},
 			)
-			q := model.Question{
+			question := model.Question{
 				ID:          5,
 				Type:        model.QuestionListening,
 				Prompt:      "何をしますか?",
 				Options:     json.RawMessage(`["A","B"]`),
-				AudioPath:   strPtr("tts/ja/kore/abc.ogg"),
-				AudioFileID: strPtr("cached-fid"),
+				AudioPath:   stringPointer("tts/ja/kore/abc.ogg"),
+				AudioFileID: stringPointer("cached-fid"),
 			}
-			text, kb, done := sf.renderByType(
+			text, keyboard, done := sessionFlow.renderByType(
 				ctx,
 				1,
 				nil,
 				10,
 				0,
 				5,
-				q,
+				question,
 				false,
 			)
 			if done {
 				t.Fatal("expected not done")
 			}
-			if kb == nil || len(kb.InlineKeyboard) != 1 {
+			if keyboard == nil || len(keyboard.InlineKeyboard) != 1 {
 				t.Fatalf(
 					"expected 1 option row, got %v",
-					kb,
+					keyboard,
 				)
 			}
 			if !strings.Contains(
@@ -584,16 +582,16 @@ func TestRenderByType_Listening(t *testing.T) {
 					store.getCalls,
 				)
 			}
-			if len(mAPI.sentMessages) != 1 {
+			if len(mockAPI.sentMessages) != 1 {
 				t.Fatalf(
 					"expected 1 voice message, got %d",
-					len(mAPI.sentMessages),
+					len(mockAPI.sentMessages),
 				)
 			}
-			if _, ok := mAPI.sentMessages[0].(tgbotapi.VoiceConfig); !ok {
+			if _, ok := mockAPI.sentMessages[0].(tgbotapi.VoiceConfig); !ok {
 				t.Errorf(
 					"expected a VoiceConfig, got %T",
-					mAPI.sentMessages[0],
+					mockAPI.sentMessages[0],
 				)
 			}
 		},
@@ -603,30 +601,30 @@ func TestRenderByType_Listening(t *testing.T) {
 		"no file_id fetches store, uploads, caches file_id",
 		func(t *testing.T) {
 			store.getCalls = 0
-			mAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
-			sf := newTestSessionFlow(
-				mAPI,
+			mockAPI := &mockBotAPI{returnVoiceFileID: "new-fid"}
+			sessionFlow := newTestSessionFlow(
+				mockAPI,
 				nil,
-				SessionFlowDeps{
+				SessionFlowDependencies{
 					Input: newTestInteractionStores(),
 					Audio: audio,
 				},
 			)
-			q := model.Question{
+			question := model.Question{
 				ID:        9,
 				Type:      model.QuestionListening,
 				Prompt:    "?",
 				Options:   json.RawMessage(`["A","B"]`),
-				AudioPath: strPtr("tts/ja/kore/def.ogg"),
+				AudioPath: stringPointer("tts/ja/kore/def.ogg"),
 			}
-			_, _, done := sf.renderByType(
+			_, _, done := sessionFlow.renderByType(
 				ctx,
 				1,
 				nil,
 				10,
 				0,
 				5,
-				q,
+				question,
 				false,
 			)
 			if done {
@@ -638,11 +636,11 @@ func TestRenderByType_Listening(t *testing.T) {
 					store.getCalls,
 				)
 			}
-			if repo.setFileID != 9 || repo.setFileVal != "new-fid" {
+			if repository.setFileID != 9 || repository.setFileValue != "new-fid" {
 				t.Errorf(
 					"expected file_id cached for q9=new-fid, got id=%d val=%q",
-					repo.setFileID,
-					repo.setFileVal,
+					repository.setFileID,
+					repository.setFileValue,
 				)
 			}
 		},
@@ -651,36 +649,36 @@ func TestRenderByType_Listening(t *testing.T) {
 	t.Run(
 		"no audio available degrades softly",
 		func(t *testing.T) {
-			mAPI := &mockBotAPI{}
-			sf := newTestSessionFlow(
-				mAPI,
+			mockAPI := &mockBotAPI{}
+			sessionFlow := newTestSessionFlow(
+				mockAPI,
 				nil,
-				SessionFlowDeps{
+				SessionFlowDependencies{
 					Audio: audio,
 					Input: newTestInteractionStores(),
 				},
 			)
-			q := model.Question{
+			question := model.Question{
 				ID:      1,
 				Type:    model.QuestionListening,
 				Prompt:  "?",
 				Options: json.RawMessage(`["A","B"]`),
 				// AudioPath nil => unavailable
 			}
-			text, kb, done := sf.renderByType(
+			text, keyboard, done := sessionFlow.renderByType(
 				ctx,
 				1,
 				nil,
 				10,
 				0,
 				5,
-				q,
+				question,
 				false,
 			)
 			if done {
 				t.Fatal("expected not done (soft degrade still returns text)")
 			}
-			if kb != nil {
+			if keyboard != nil {
 				t.Error("expected no keyboard when audio is unavailable")
 			}
 			if !strings.Contains(
@@ -698,15 +696,15 @@ func TestRenderByType_Listening(t *testing.T) {
 
 func TestShowQuestion_Finish(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
 		},
 	)
@@ -722,7 +720,7 @@ func TestShowQuestion_Finish(t *testing.T) {
 	)
 
 	// Index 1 on 1 item session -> should show finish
-	sf.showQuestion(
+	sessionFlow.showQuestion(
 		ctx,
 		123,
 		nil,
@@ -730,20 +728,20 @@ func TestShowQuestion_Finish(t *testing.T) {
 		1,
 	)
 
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"expected 1 message, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	message := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !strings.Contains(
-		msg.Text,
+		message.Text,
 		"모든 문제를 풀었습니다",
 	) {
 		t.Errorf(
 			"wrong text: %s",
-			msg.Text,
+			message.Text,
 		)
 	}
 }

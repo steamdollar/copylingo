@@ -24,17 +24,17 @@ type settingsUser interface {
 		ctx context.Context,
 		userID int64,
 		slot model.SessionSlot,
-		timeVal *string,
+		timeValue *string,
 	) error
 	UpdateTimezone(
 		ctx context.Context,
 		userID int64,
-		tz string,
+		timezone string,
 	) error
 }
 
-// SettingsFlowDeps wires SettingsFlow; every dependency is required.
-type SettingsFlowDeps struct {
+// SettingsFlowDependencies wires SettingsFlow; every dependency is required.
+type SettingsFlowDependencies struct {
 	Telegram           *TelegramClient
 	User               settingsUser
 	MaterialPreference materialPreferenceList
@@ -48,23 +48,23 @@ type SettingsFlow struct {
 	materialPreference materialPreferenceList
 }
 
-func NewSettingsFlow(deps SettingsFlowDeps) *SettingsFlow {
+func NewSettingsFlow(dependencies SettingsFlowDependencies) *SettingsFlow {
 	return &SettingsFlow{
-		telegram:           deps.Telegram,
-		user:               deps.User,
-		materialPreference: deps.MaterialPreference,
+		telegram:           dependencies.Telegram,
+		user:               dependencies.User,
+		materialPreference: dependencies.MaterialPreference,
 	}
 }
 
 // handleSettingsCommand handles /settings command by displaying the schedule configuration menu.
-func (sf *SettingsFlow) handleSettingsCommand(
+func (flow *SettingsFlow) handleSettingsCommand(
 	ctx context.Context,
-	msg *tgbotapi.Message,
+	message *tgbotapi.Message,
 ) {
-	user, err := sf.user.GetUser(
+	user, err := flow.user.GetUser(
 		ctx,
-		msg.From.ID,
-		msg.From.UserName,
+		message.From.ID,
+		message.From.UserName,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -75,8 +75,8 @@ func (sf *SettingsFlow) handleSettingsCommand(
 				err,
 			),
 		)
-		sf.telegram.SendMessage(
-			msg.Chat.ID,
+		flow.telegram.SendMessage(
+			message.Chat.ID,
 			botMessagesByLocale[botDefaultLocale].settingsLoadFailed,
 		)
 		return
@@ -84,36 +84,37 @@ func (sf *SettingsFlow) handleSettingsCommand(
 
 	text := buildSettingsOverviewText(user)
 	keyboard := buildSettingsKeyboard(user)
-	sf.telegram.SendMessageWithKeyboard(
-		msg.Chat.ID,
+	flow.telegram.SendMessageWithKeyboard(
+		message.Chat.ID,
 		text,
 		keyboard,
 	)
 }
 
 // handleSettingsCallback routes callbacks related to push schedule & timezone settings.
-func (sf *SettingsFlow) handleSettingsCallback(
+func (flow *SettingsFlow) handleSettingsCallback(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
-	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
+	if callbackQuery == nil || callbackQuery.From == nil || callbackQuery.Message == nil ||
+		callbackQuery.Message.Chat == nil {
 		return
 	}
 	parts := strings.Split(
-		cb.Data,
+		callbackQuery.Data,
 		":",
 	)
 	if len(parts) >= 2 && (parts[1] == callbackActionMaterials || parts[1] == callbackActionRestore) {
-		sf.handleMaterialPreferencesCallback(
+		flow.handleMaterialPreferencesCallback(
 			ctx,
-			cb,
+			callbackQuery,
 		)
 		return
 	}
-	user, err := sf.user.GetUser(
+	user, err := flow.user.GetUser(
 		ctx,
-		cb.From.ID,
-		cb.From.UserName,
+		callbackQuery.From.ID,
+		callbackQuery.From.UserName,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -124,26 +125,26 @@ func (sf *SettingsFlow) handleSettingsCallback(
 				err,
 			),
 		)
-		sf.telegram.AnswerCallbackAlert(
-			cb.ID,
+		flow.telegram.AnswerCallbackAlert(
+			callbackQuery.ID,
 			botMessagesByLocale[botDefaultLocale].settingsUserLoadFailed,
 		)
 		return
 	}
 
-	data := cb.Data
+	data := callbackQuery.Data
 	switch {
 	case data == callbackMenuSettings || data == callbackSettingsView:
-		sf.renderSettingsView(
+		flow.renderSettingsView(
 			ctx,
-			cb,
+			callbackQuery,
 			user,
 		)
 
 	case data == callbackSettingsTimezone:
-		sf.renderTimezoneView(
+		flow.renderTimezoneView(
 			ctx,
-			cb,
+			callbackQuery,
 			user,
 		)
 
@@ -151,41 +152,41 @@ func (sf *SettingsFlow) handleSettingsCallback(
 		data,
 		callbackPrefixSettingsTimezone,
 	):
-		tz := strings.TrimPrefix(
+		timezone := strings.TrimPrefix(
 			data,
 			callbackPrefixSettingsTimezone,
 		)
-		if err := sf.user.UpdateTimezone(
+		if err := flow.user.UpdateTimezone(
 			ctx,
 			user.ID,
-			tz,
+			timezone,
 		); err != nil {
 			slog.ErrorContext(
 				ctx,
 				"Failed to update timezone",
 				slog.String(
 					"tz",
-					tz,
+					timezone,
 				),
 				slog.Any(
 					"error",
 					err,
 				),
 			)
-			sf.telegram.AnswerCallbackAlert(
-				cb.ID,
+			flow.telegram.AnswerCallbackAlert(
+				callbackQuery.ID,
 				botMessagesByLocale[botDefaultLocale].settingsTimezoneInvalid,
 			)
 			return
 		}
-		user.Timezone = tz
-		sf.telegram.AnswerCallback(
-			cb.ID,
+		user.Timezone = timezone
+		flow.telegram.AnswerCallback(
+			callbackQuery.ID,
 			botMessagesByLocale[botDefaultLocale].settingsTimezoneChanged,
 		)
-		sf.renderSettingsView(
+		flow.renderSettingsView(
 			ctx,
-			cb,
+			callbackQuery,
 			user,
 		)
 
@@ -193,36 +194,36 @@ func (sf *SettingsFlow) handleSettingsCallback(
 		data,
 		callbackPrefixSettingsSlot,
 	):
-		slotStr := strings.TrimPrefix(
+		slotText := strings.TrimPrefix(
 			data,
 			callbackPrefixSettingsSlot,
 		)
 		isAll := false
 		if strings.HasSuffix(
-			slotStr,
+			slotText,
 			":"+callbackActionAllTimes,
 		) {
 			isAll = true
-			slotStr = strings.TrimSuffix(
-				slotStr,
+			slotText = strings.TrimSuffix(
+				slotText,
 				":"+callbackActionAllTimes,
 			)
 		}
-		slot := model.SessionSlot(slotStr)
+		slot := model.SessionSlot(slotText)
 		if !isValidSlot(slot) {
 			slog.WarnContext(
 				ctx,
 				"Invalid slot in callback",
 				slog.String(
 					"slot",
-					slotStr,
+					slotText,
 				),
 			)
 			return
 		}
-		sf.renderSlotPickerView(
+		flow.renderSlotPickerView(
 			ctx,
-			cb,
+			callbackQuery,
 			user,
 			slot,
 			isAll,
@@ -253,7 +254,7 @@ func (sf *SettingsFlow) handleSettingsCallback(
 			return
 		}
 		slot := model.SessionSlot(parts[0])
-		timeVal := parts[1]
+		timeValue := parts[1]
 		if !isValidSlot(slot) {
 			slog.WarnContext(
 				ctx,
@@ -266,8 +267,8 @@ func (sf *SettingsFlow) handleSettingsCallback(
 			return
 		}
 
-		if timeVal == callbackActionOff {
-			if err := sf.user.UpdateSlotTime(
+		if timeValue == callbackActionOff {
+			if err := flow.user.UpdateSlotTime(
 				ctx,
 				user.ID,
 				slot,
@@ -285,8 +286,8 @@ func (sf *SettingsFlow) handleSettingsCallback(
 						err,
 					),
 				)
-				sf.telegram.AnswerCallbackAlert(
-					cb.ID,
+				flow.telegram.AnswerCallbackAlert(
+					callbackQuery.ID,
 					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
 				)
 				return
@@ -296,16 +297,16 @@ func (sf *SettingsFlow) handleSettingsCallback(
 				slot,
 				nil,
 			)
-			sf.telegram.AnswerCallback(
-				cb.ID,
+			flow.telegram.AnswerCallback(
+				callbackQuery.ID,
 				botMessagesByLocale[botDefaultLocale].settingsNotificationsDisabled,
 			)
 		} else {
-			if err := sf.user.UpdateSlotTime(
+			if err := flow.user.UpdateSlotTime(
 				ctx,
 				user.ID,
 				slot,
-				&timeVal,
+				&timeValue,
 			); err != nil {
 				slog.ErrorContext(
 					ctx,
@@ -316,15 +317,15 @@ func (sf *SettingsFlow) handleSettingsCallback(
 					),
 					slog.String(
 						"time",
-						timeVal,
+						timeValue,
 					),
 					slog.Any(
 						"error",
 						err,
 					),
 				)
-				sf.telegram.AnswerCallbackAlert(
-					cb.ID,
+				flow.telegram.AnswerCallbackAlert(
+					callbackQuery.ID,
 					botMessagesByLocale[botDefaultLocale].settingsChangeFailed,
 				)
 				return
@@ -332,97 +333,97 @@ func (sf *SettingsFlow) handleSettingsCallback(
 			setUserSlotTime(
 				user,
 				slot,
-				&timeVal,
+				&timeValue,
 			)
-			sf.telegram.AnswerCallback(
-				cb.ID,
+			flow.telegram.AnswerCallback(
+				callbackQuery.ID,
 				fmt.Sprintf(
 					botMessagesByLocale[botDefaultLocale].settingsNotificationTimeSetFormat,
-					timeVal,
+					timeValue,
 				),
 			)
 		}
-		sf.renderSettingsView(
+		flow.renderSettingsView(
 			ctx,
-			cb,
+			callbackQuery,
 			user,
 		)
 	}
 }
 
-func (sf *SettingsFlow) renderSettingsView(
+func (flow *SettingsFlow) renderSettingsView(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
-	u *model.User,
+	callbackQuery *tgbotapi.CallbackQuery,
+	user *model.User,
 ) {
-	text := buildSettingsOverviewText(u)
-	keyboard := buildSettingsKeyboard(u)
-	if cb.Message != nil {
-		sf.telegram.EditMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+	text := buildSettingsOverviewText(user)
+	keyboard := buildSettingsKeyboard(user)
+	if callbackQuery.Message != nil {
+		flow.telegram.EditMessage(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 			text,
 			&keyboard,
 		)
 	}
 }
 
-func (sf *SettingsFlow) renderTimezoneView(
+func (flow *SettingsFlow) renderTimezoneView(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
-	u *model.User,
+	callbackQuery *tgbotapi.CallbackQuery,
+	user *model.User,
 ) {
-	text := buildTimezoneText(u)
+	text := buildTimezoneText(user)
 	keyboard := buildTimezoneKeyboard()
-	if cb.Message != nil {
-		sf.telegram.EditMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+	if callbackQuery.Message != nil {
+		flow.telegram.EditMessage(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 			text,
 			&keyboard,
 		)
 	}
 }
 
-func (sf *SettingsFlow) renderSlotPickerView(
+func (flow *SettingsFlow) renderSlotPickerView(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
-	u *model.User,
+	callbackQuery *tgbotapi.CallbackQuery,
+	user *model.User,
 	slot model.SessionSlot,
 	isAll bool,
 ) {
 	text := buildSlotPickerText(
-		u,
+		user,
 		slot,
 	)
 	keyboard := buildSlotPickerKeyboard(
 		slot,
 		isAll,
 	)
-	if cb.Message != nil {
-		sf.telegram.EditMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+	if callbackQuery.Message != nil {
+		flow.telegram.EditMessage(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 			text,
 			&keyboard,
 		)
 	}
 }
 
-func buildSettingsOverviewText(u *model.User) string {
+func buildSettingsOverviewText(user *model.User) string {
 	messages := botMessagesByLocale[botDefaultLocale]
-	tz := u.Timezone
-	if tz == "" {
-		tz = "Asia/Seoul"
+	timezone := user.Timezone
+	if timezone == "" {
+		timezone = "Asia/Seoul"
 	}
-	mStudy := formatSlotTime(u.MorningStudyTime)
-	mQuiz := formatSlotTime(u.MorningQuizTime)
-	eStudy := formatSlotTime(u.EveningStudyTime)
-	eQuiz := formatSlotTime(u.EveningQuizTime)
+	mStudy := formatSlotTime(user.MorningStudyTime)
+	mQuiz := formatSlotTime(user.MorningQuizTime)
+	eStudy := formatSlotTime(user.EveningStudyTime)
+	eQuiz := formatSlotTime(user.EveningQuizTime)
 
 	return fmt.Sprintf(
 		messages.settingsOverviewFormat,
-		tz,
+		timezone,
 		messages.settingsMorningStudyLabel,
 		mStudy,
 		messages.settingsMorningQuizLabel,
@@ -434,12 +435,12 @@ func buildSettingsOverviewText(u *model.User) string {
 	)
 }
 
-func buildSettingsKeyboard(u *model.User) tgbotapi.InlineKeyboardMarkup {
+func buildSettingsKeyboard(user *model.User) tgbotapi.InlineKeyboardMarkup {
 	messages := botMessagesByLocale[botDefaultLocale]
-	mStudy := formatSlotTime(u.MorningStudyTime)
-	mQuiz := formatSlotTime(u.MorningQuizTime)
-	eStudy := formatSlotTime(u.EveningStudyTime)
-	eQuiz := formatSlotTime(u.EveningQuizTime)
+	mStudy := formatSlotTime(user.MorningStudyTime)
+	mQuiz := formatSlotTime(user.MorningQuizTime)
+	eStudy := formatSlotTime(user.EveningStudyTime)
+	eQuiz := formatSlotTime(user.EveningQuizTime)
 
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -523,13 +524,13 @@ func buildSettingsKeyboard(u *model.User) tgbotapi.InlineKeyboardMarkup {
 }
 
 func buildSlotPickerText(
-	u *model.User,
+	user *model.User,
 	slot model.SessionSlot,
 ) string {
 	icon := slotDisplayIcon(slot)
 	name := slotDisplayName(slot)
-	curr := formatSlotTime(getUserSlotTime(
-		u,
+	current := formatSlotTime(getUserSlotTime(
+		user,
 		slot,
 	))
 
@@ -537,7 +538,7 @@ func buildSlotPickerText(
 		botMessagesByLocale[botDefaultLocale].settingsSlotPickerFormat,
 		icon,
 		name,
-		curr,
+		current,
 	)
 }
 
@@ -573,16 +574,16 @@ func buildSlotPickerKeyboard(
 			0,
 			48,
 		)
-		for h := 0; h < 24; h++ {
+		for hour := 0; hour < 24; hour++ {
 			times = append(
 				times,
 				fmt.Sprintf(
 					"%02d:00",
-					h,
+					hour,
 				),
 				fmt.Sprintf(
 					"%02d:30",
-					h,
+					hour,
 				),
 			)
 		}
@@ -596,17 +597,17 @@ func buildSlotPickerKeyboard(
 			end = len(times)
 		}
 		var row []tgbotapi.InlineKeyboardButton
-		for _, t := range times[i:end] {
-			cbData := fmt.Sprintf(
+		for _, slotTime := range times[i:end] {
+			callbackData := fmt.Sprintf(
 				formatSettingsSet,
 				slot,
-				t,
+				slotTime,
 			)
 			row = append(
 				row,
 				tgbotapi.NewInlineKeyboardButtonData(
-					t,
-					cbData,
+					slotTime,
+					callbackData,
 				),
 			)
 		}
@@ -632,10 +633,10 @@ func buildSlotPickerKeyboard(
 	)
 
 	// Navigation row
-	var navRow []tgbotapi.InlineKeyboardButton
+	var navigationRow []tgbotapi.InlineKeyboardButton
 	if !isAll {
-		navRow = append(
-			navRow,
+		navigationRow = append(
+			navigationRow,
 			tgbotapi.NewInlineKeyboardButtonData(
 				botMessagesByLocale[botDefaultLocale].settingsAllTimesButton,
 				fmt.Sprintf(
@@ -645,8 +646,8 @@ func buildSlotPickerKeyboard(
 			),
 		)
 	} else {
-		navRow = append(
-			navRow,
+		navigationRow = append(
+			navigationRow,
 			tgbotapi.NewInlineKeyboardButtonData(
 				botMessagesByLocale[botDefaultLocale].settingsDefaultTimesButton,
 				fmt.Sprintf(
@@ -656,8 +657,8 @@ func buildSlotPickerKeyboard(
 			),
 		)
 	}
-	navRow = append(
-		navRow,
+	navigationRow = append(
+		navigationRow,
 		tgbotapi.NewInlineKeyboardButtonData(
 			botMessagesByLocale[botDefaultLocale].settingsBackButton,
 			callbackSettingsView,
@@ -665,20 +666,20 @@ func buildSlotPickerKeyboard(
 	)
 	rows = append(
 		rows,
-		navRow,
+		navigationRow,
 	)
 
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-func buildTimezoneText(u *model.User) string {
-	curr := u.Timezone
-	if curr == "" {
-		curr = "Asia/Seoul"
+func buildTimezoneText(user *model.User) string {
+	current := user.Timezone
+	if current == "" {
+		current = "Asia/Seoul"
 	}
 	return fmt.Sprintf(
 		botMessagesByLocale[botDefaultLocale].settingsTimezoneFormat,
-		curr,
+		current,
 	)
 }
 
@@ -741,17 +742,17 @@ func buildTimezoneKeyboard() tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
-func formatSlotTime(t *string) string {
-	if t == nil || *t == "" {
+func formatSlotTime(slotTime *string) string {
+	if slotTime == nil || *slotTime == "" {
 		return botMessagesByLocale[botDefaultLocale].settingsDisabledSlotLabel
 	}
 	if parsed, err := time.Parse(
 		time.RFC3339,
-		*t,
+		*slotTime,
 	); err == nil {
 		return parsed.Format("15:04")
 	}
-	return *t
+	return *slotTime
 }
 
 func slotDisplayName(slot model.SessionSlot) string {
@@ -786,42 +787,42 @@ func slotDisplayIcon(slot model.SessionSlot) string {
 }
 
 func getUserSlotTime(
-	u *model.User,
+	user *model.User,
 	slot model.SessionSlot,
 ) *string {
 	switch slot {
 	case model.SessionSlotMorningStudy:
-		return u.MorningStudyTime
+		return user.MorningStudyTime
 	case model.SessionSlotMorningQuiz:
-		return u.MorningQuizTime
+		return user.MorningQuizTime
 	case model.SessionSlotEveningStudy:
-		return u.EveningStudyTime
+		return user.EveningStudyTime
 	case model.SessionSlotEveningQuiz:
-		return u.EveningQuizTime
+		return user.EveningQuizTime
 	default:
 		return nil
 	}
 }
 
 func setUserSlotTime(
-	u *model.User,
+	user *model.User,
 	slot model.SessionSlot,
-	t *string,
+	slotTime *string,
 ) {
 	switch slot {
 	case model.SessionSlotMorningStudy:
-		u.MorningStudyTime = t
+		user.MorningStudyTime = slotTime
 	case model.SessionSlotMorningQuiz:
-		u.MorningQuizTime = t
+		user.MorningQuizTime = slotTime
 	case model.SessionSlotEveningStudy:
-		u.EveningStudyTime = t
+		user.EveningStudyTime = slotTime
 	case model.SessionSlotEveningQuiz:
-		u.EveningQuizTime = t
+		user.EveningQuizTime = slotTime
 	}
 }
 
-func isValidSlot(s model.SessionSlot) bool {
-	switch s {
+func isValidSlot(slot model.SessionSlot) bool {
+	switch slot {
 	case model.SessionSlotMorningStudy,
 		model.SessionSlotMorningQuiz,
 		model.SessionSlotEveningStudy,

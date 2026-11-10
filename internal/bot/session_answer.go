@@ -14,14 +14,14 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-func (sf *SessionFlow) processAnswer(
+func (flow *SessionFlow) processAnswer(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	sessionID,
 	questionID int,
-	optionIdx int,
+	optionIndex int,
 ) {
-	ctx = observability.WithAttrs(
+	ctx = observability.WithAttributes(
 		ctx,
 		slog.Int(
 			"session_id",
@@ -32,27 +32,27 @@ func (sf *SessionFlow) processAnswer(
 			questionID,
 		),
 	)
-	editMessageID := cb.Message.MessageID
-	result, err := sf.session.SubmitQuizOption(
+	editMessageID := callbackQuery.Message.MessageID
+	result, err := flow.session.SubmitQuizOption(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		sessionID,
 		questionID,
-		optionIdx,
+		optionIndex,
 	)
 	if err != nil {
-		sf.handleQuizAnswerError(
+		flow.handleQuizAnswerError(
 			ctx,
-			cb.Message.Chat.ID,
+			callbackQuery.Message.Chat.ID,
 			sessionID,
 			&editMessageID,
 			err,
 		)
 		return
 	}
-	sf.renderQuizAnswerResult(
-		cb.Message.Chat.ID,
-		cb.From,
+	flow.renderQuizAnswerResult(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.From,
 		sessionID,
 		result,
 		&editMessageID,
@@ -62,37 +62,37 @@ func (sf *SessionFlow) processAnswer(
 // HandleTextInput intercepts text messages if there is an active text question.
 // It returns false (message not consumed) when the active question can no
 // longer be resolved from the Quiz working set.
-func (sf *SessionFlow) HandleTextInput(
+func (flow *SessionFlow) HandleTextInput(
 	ctx context.Context,
-	msg *tgbotapi.Message,
+	message *tgbotapi.Message,
 ) bool {
-	activeQuestion, err := sf.input.GetActiveQuestion(
+	activeQuestion, err := flow.input.GetActiveQuestion(
 		ctx,
-		msg.Chat.ID,
+		message.Chat.ID,
 	)
 	if err != nil || activeQuestion == nil {
 		return false
 	}
-	_ = sf.input.DeleteActiveQuestion(
+	_ = flow.input.DeleteActiveQuestion(
 		ctx,
-		msg.Chat.ID,
+		message.Chat.ID,
 	)
 
 	sessionID := activeQuestion.SessionID
-	ctx = observability.WithAttrs(
+	ctx = observability.WithAttributes(
 		ctx,
 		slog.Int(
 			"session_id",
 			sessionID,
 		),
 	)
-	result, err := sf.session.SubmitQuizText(
+	result, err := flow.session.SubmitQuizText(
 		ctx,
 		service.QuizTextAnswer{
-			UserID:        msg.From.ID,
+			UserID:        message.From.ID,
 			SessionID:     sessionID,
 			QuestionIndex: activeQuestion.QuestionIndex,
-			Text:          msg.Text,
+			Text:          message.Text,
 		},
 	)
 	if errors.Is(
@@ -105,18 +105,18 @@ func (sf *SessionFlow) HandleTextInput(
 		return false
 	}
 	if err != nil {
-		sf.handleQuizAnswerError(
+		flow.handleQuizAnswerError(
 			ctx,
-			msg.Chat.ID,
+			message.Chat.ID,
 			sessionID,
 			nil,
 			err,
 		)
 		return true
 	}
-	sf.renderQuizAnswerResult(
-		msg.Chat.ID,
-		msg.From,
+	flow.renderQuizAnswerResult(
+		message.Chat.ID,
+		message.From,
 		sessionID,
 		result,
 		nil,
@@ -130,16 +130,16 @@ func (sf *SessionFlow) HandleTextInput(
 // to continue and every retyped answer was dropped. Instead, it reports the
 // last answered question and re-sends the next unanswered one, the same screen
 // the menu resume shows (ADR-071). It returns false when no Quiz is in progress.
-func (sf *SessionFlow) ResumeQuizFromText(
+func (flow *SessionFlow) ResumeQuizFromText(
 	ctx context.Context,
-	msg *tgbotapi.Message,
+	message *tgbotapi.Message,
 ) bool {
-	if msg.From == nil {
+	if message.From == nil {
 		return false
 	}
-	sessions, err := sf.session.ListByStatus(
+	sessions, err := flow.session.ListByStatus(
 		ctx,
-		msg.From.ID,
+		message.From.ID,
 		model.SessionInProgress,
 	)
 	if err != nil {
@@ -158,7 +158,7 @@ func (sf *SessionFlow) ResumeQuizFromText(
 		return false
 	}
 
-	ctx = observability.WithAttrs(
+	ctx = observability.WithAttributes(
 		ctx,
 		slog.Int(
 			"session_id",
@@ -166,33 +166,33 @@ func (sf *SessionFlow) ResumeQuizFromText(
 		),
 	)
 	messages := botMessagesByLocale[botDefaultLocale]
-	state, err := sf.session.QuizProgress(
+	state, err := flow.session.QuizProgress(
 		ctx,
 		session.ID,
 	)
 	if err != nil {
 		// The working set expired, so there is no position to resume from.
-		sf.telegram.SendMessageWithKeyboard(
-			msg.Chat.ID,
+		flow.telegram.SendMessageWithKeyboard(
+			message.Chat.ID,
 			messages.activeSessionUnavailable,
 			*mainMenuKeyboard(),
 		)
 		return true
 	}
-	nextIdx := state.NextUnansweredIndex()
-	sf.telegram.SendMessage(
-		msg.Chat.ID,
+	nextIndex := state.NextUnansweredIndex()
+	flow.telegram.SendMessage(
+		message.Chat.ID,
 		quizResumeNotice(
 			state,
-			nextIdx,
+			nextIndex,
 		),
 	)
-	sf.showQuestion(
+	flow.showQuestion(
 		ctx,
-		msg.Chat.ID,
+		message.Chat.ID,
 		nil,
 		session.ID,
-		nextIdx,
+		nextIndex,
 	)
 	slog.InfoContext(
 		ctx,
@@ -200,7 +200,7 @@ func (sf *SessionFlow) ResumeQuizFromText(
 		"event",
 		"telegram.session.resumed_from_text",
 		"question_index",
-		nextIdx,
+		nextIndex,
 	)
 	return true
 }
@@ -209,24 +209,24 @@ func (sf *SessionFlow) ResumeQuizFromText(
 // message that carried it may never have reached the user.
 func quizResumeNotice(
 	state *model.QuizActiveSessionState,
-	nextIdx int,
+	nextIndex int,
 ) string {
 	messages := botMessagesByLocale[botDefaultLocale]
-	lastIdx := nextIdx - 1
-	if lastIdx < 0 {
+	lastIndex := nextIndex - 1
+	if lastIndex < 0 {
 		return messages.quizResumeNotice
 	}
-	last := state.Items[lastIdx]
+	last := state.Items[lastIndex]
 	if last.SessionQuestion.IsCorrect != nil && *last.SessionQuestion.IsCorrect {
 		return messages.quizResumeNotice + fmt.Sprintf(
 			messages.quizResumeLastCorrectFormat,
-			lastIdx+1,
+			lastIndex+1,
 			len(state.Items),
 		)
 	}
 	return messages.quizResumeNotice + fmt.Sprintf(
 		messages.quizResumeLastWrongFormat,
-		lastIdx+1,
+		lastIndex+1,
 		len(state.Items),
 		last.Question.CorrectAnswer,
 	)
@@ -235,7 +235,7 @@ func quizResumeNotice(
 // handleQuizAnswerError maps a rejected answer to its screen: a stale answer
 // re-renders the next unanswered question, unexpected grading failures are
 // logged, and unresolvable targets are ignored.
-func (sf *SessionFlow) handleQuizAnswerError(
+func (flow *SessionFlow) handleQuizAnswerError(
 	ctx context.Context,
 	chatID int64,
 	sessionID int,
@@ -247,7 +247,7 @@ func (sf *SessionFlow) handleQuizAnswerError(
 		err,
 		service.ErrQuizAnswerStale,
 	):
-		sf.redirectToNextUnansweredQuestion(
+		flow.redirectToNextUnansweredQuestion(
 			ctx,
 			chatID,
 			sessionID,
@@ -290,7 +290,7 @@ func (sf *SessionFlow) handleQuizAnswerError(
 	}
 }
 
-func (sf *SessionFlow) renderQuizAnswerResult(
+func (flow *SessionFlow) renderQuizAnswerResult(
 	chatID int64,
 	from *tgbotapi.User,
 	sessionID int,
@@ -299,7 +299,7 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 ) {
 	question := result.Question
 	questionID := question.ID
-	currentIdx := result.QuestionIndex
+	currentIndex := result.QuestionIndex
 
 	// 원본 문제 메시지는 editMessage로 덮어써지므로, 결과에 문제 원문을 다시 실어 맥락을 보존한다.
 	messages := botMessagesByLocale[botDefaultLocale]
@@ -323,12 +323,12 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 	}
 
 	nextLabel := messages.nextQuestionButton
-	if currentIdx+1 >= result.TotalQuestions {
+	if currentIndex+1 >= result.TotalQuestions {
 		nextLabel = messages.resultsButton
 	}
 
 	var nextData string
-	if currentIdx+1 >= result.TotalQuestions {
+	if currentIndex+1 >= result.TotalQuestions {
 		nextData = fmt.Sprintf(
 			formatSessionFinish,
 			sessionID,
@@ -337,7 +337,7 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 		nextData = fmt.Sprintf(
 			callback.FormatQuestionNext,
 			sessionID,
-			currentIdx,
+			currentIndex,
 		)
 	}
 
@@ -380,7 +380,7 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 	}
 
 	if editMessageID != nil {
-		sf.telegram.EditMessage(
+		flow.telegram.EditMessage(
 			chatID,
 			*editMessageID,
 			text,
@@ -388,7 +388,7 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 		)
 	} else {
 		// 텍스트 답변은 사용자 메시지로 들어오므로 편집할 봇 문제 메시지가 없다.
-		sf.telegram.SendMessageWithKeyboard(
+		flow.telegram.SendMessageWithKeyboard(
 			chatID,
 			text,
 			keyboard,
@@ -400,12 +400,12 @@ func (sf *SessionFlow) renderQuizAnswerResult(
 // once the Mini App has graded it: "next question" plus the linked-material
 // action. The Mini App calls it in the background, so failures are logged
 // under handwriting.cleanup.* instead of returned.
-func (sf *SessionFlow) ShowHandwritingGraded(
+func (flow *SessionFlow) ShowHandwritingGraded(
 	ctx context.Context,
 	sessionID,
 	questionID int,
 ) {
-	message, err := sf.messages.GetHandwritingMessage(
+	message, err := flow.messages.GetHandwritingMessage(
 		ctx,
 		sessionID,
 		questionID,
@@ -413,7 +413,7 @@ func (sf *SessionFlow) ShowHandwritingGraded(
 	if err != nil {
 		if errors.Is(
 			err,
-			model.ErrInvalidTelegramMessageRef,
+			model.ErrInvalidTelegramMessageReference,
 		) {
 			slog.ErrorContext(
 				ctx,
@@ -441,7 +441,7 @@ func (sf *SessionFlow) ShowHandwritingGraded(
 
 	// The "next" callback carries the question position, so re-read progress
 	// instead of trusting the Mini App request.
-	state, err := sf.session.QuizProgress(
+	state, err := flow.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
@@ -456,7 +456,7 @@ func (sf *SessionFlow) ShowHandwritingGraded(
 		)
 		return
 	}
-	item, questionIdx, ok := state.CurrentItemByQuestionID(questionID)
+	item, questionIndex, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		slog.WarnContext(
 			ctx,
@@ -467,12 +467,12 @@ func (sf *SessionFlow) ShowHandwritingGraded(
 		return
 	}
 
-	markup := sf.handwritingGradedKeyboard(
+	markup := flow.handwritingGradedKeyboard(
 		sessionID,
-		questionIdx,
+		questionIndex,
 		item.Question,
 	)
-	if err := sf.telegram.EditMessageReplyMarkup(
+	if err := flow.telegram.EditMessageReplyMarkup(
 		message.ChatID,
 		message.MessageID,
 		markup,
@@ -494,9 +494,9 @@ func (sf *SessionFlow) ShowHandwritingGraded(
 
 // handwritingGradedKeyboard replaces the Mini App answer button after
 // grading. The linked-material action stays available.
-func (sf *SessionFlow) handwritingGradedKeyboard(
+func (flow *SessionFlow) handwritingGradedKeyboard(
 	sessionID,
-	questionIdx int,
+	questionIndex int,
 	question model.Question,
 ) tgbotapi.InlineKeyboardMarkup {
 	messages := botMessagesByLocale[botDefaultLocale]
@@ -506,8 +506,8 @@ func (sf *SessionFlow) handwritingGradedKeyboard(
 				messages.nextQuestionButton,
 				callback.FormatHandwritingNext(
 					sessionID,
-					questionIdx,
-					sf.publicBaseURL,
+					questionIndex,
+					flow.publicBaseURL,
 				),
 			),
 		),
@@ -533,28 +533,28 @@ func (sf *SessionFlow) handwritingGradedKeyboard(
 // redirectToNextUnansweredQuestion repairs delayed answer callbacks by
 // rendering the current working-set position. When every item is answered,
 // showQuestion renders the existing result button.
-func (sf *SessionFlow) redirectToNextUnansweredQuestion(
+func (flow *SessionFlow) redirectToNextUnansweredQuestion(
 	ctx context.Context,
 	chatID int64,
 	sessionID int,
 	editMessageID *int,
 ) {
-	nextIdx, err := sf.nextUnansweredQuestionIndex(
+	nextIndex, err := flow.nextUnansweredQuestionIndex(
 		ctx,
 		sessionID,
 	)
 	if err != nil {
-		sf.showQuizActiveSessionUnavailable(
+		flow.showQuizActiveSessionUnavailable(
 			chatID,
 			editMessageID,
 		)
 		return
 	}
-	sf.showQuestion(
+	flow.showQuestion(
 		ctx,
 		chatID,
 		editMessageID,
 		sessionID,
-		nextIdx,
+		nextIndex,
 	)
 }

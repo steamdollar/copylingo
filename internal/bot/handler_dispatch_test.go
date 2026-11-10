@@ -16,35 +16,39 @@ import (
 	"github.com/lsj/copylingo/internal/testutil"
 )
 
-type mockUserRepo struct {
-	getOrCreateFn func(
+type mockUserRepository struct {
+	getOrCreateFunc func(
 		ctx context.Context,
 		id int64,
 		username string,
 	) (*model.User, error)
 }
 
-func (m *mockUserRepo) GetOrCreate(
+func (mock *mockUserRepository) GetOrCreate(
 	ctx context.Context,
 	id int64,
 	username string,
 ) (*model.User, error) {
-	return m.getOrCreateFn(
+	return mock.getOrCreateFunc(
 		ctx,
 		id,
 		username,
 	)
 }
-func (m *mockUserRepo) GetByID(
+func (mock *mockUserRepository) GetByID(
 	ctx context.Context,
 	id int64,
 ) (*model.User, error) {
 	return nil, nil
 }
-func (m *mockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error)    { return nil, nil }
-func (m *mockUserRepo) GetActiveTimezones(ctx context.Context) ([]string, error) { return nil, nil }
+func (mock *mockUserRepository) GetAllUsers(ctx context.Context) ([]model.User, error) {
+	return nil, nil
+}
+func (mock *mockUserRepository) GetActiveTimezones(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
 
-func (m *mockUserRepo) GetUsersBySlot(
+func (mock *mockUserRepository) GetUsersBySlot(
 	ctx context.Context,
 	slot model.SessionSlot,
 	localTime string,
@@ -53,15 +57,15 @@ func (m *mockUserRepo) GetUsersBySlot(
 	return nil, nil
 }
 
-func (m *mockUserRepo) UpdateSlotTime(
+func (mock *mockUserRepository) UpdateSlotTime(
 	ctx context.Context,
 	userID int64,
 	slot model.SessionSlot,
-	timeVal *string,
+	timeValue *string,
 ) error {
 	return nil
 }
-func (m *mockUserRepo) UpdateTimezone(
+func (mock *mockUserRepository) UpdateTimezone(
 	ctx context.Context,
 	userID int64,
 	timezone string,
@@ -69,13 +73,13 @@ func (m *mockUserRepo) UpdateTimezone(
 	return nil
 }
 
-// mockSRSRepo serves due-review queries; the embedded nil QuestionRepo makes
+// mockSRSRepository serves due-review queries; the embedded nil QuestionRepository makes
 // any other question-bank call panic.
-type mockSRSRepo struct {
-	service.QuestionRepo
+type mockSRSRepository struct {
+	service.QuestionRepository
 }
 
-func (m *mockSRSRepo) GetDueReviews(
+func (mock *mockSRSRepository) GetDueReviews(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -88,7 +92,7 @@ func (m *mockSRSRepo) GetDueReviews(
 	return nil, nil
 }
 
-func (m *mockSRSRepo) GetDueReviewCount(
+func (mock *mockSRSRepository) GetDueReviewCount(
 	ctx context.Context,
 	userID int64,
 	language string,
@@ -106,7 +110,7 @@ type commandStudyMaterialStore struct {
 	limit     int
 }
 
-func (s *commandStudyMaterialStore) GetMaterialsByPlan(
+func (store *commandStudyMaterialStore) GetMaterialsByPlan(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -114,53 +118,53 @@ func (s *commandStudyMaterialStore) GetMaterialsByPlan(
 	levels []string,
 	plan model.StudySessionPlan,
 ) ([]model.Material, error) {
-	s.userID = userID
-	s.language = language
+	store.userID = userID
+	store.language = language
 	_ = level
-	s.levels = append(
+	store.levels = append(
 		[]string(nil),
 		levels...,
 	)
-	s.limit = plan.TotalMaterialCount()
-	if s.err != nil {
-		return nil, s.err
+	store.limit = plan.TotalMaterialCount()
+	if store.err != nil {
+		return nil, store.err
 	}
-	return s.materials, nil
+	return store.materials, nil
 }
 
 // commandStudySessionStore records Study creation; the embedded nil
-// SessionRepo makes any other sessions-table call panic.
+// SessionRepository makes any other sessions-table call panic.
 type commandStudySessionStore struct {
-	service.SessionRepo
+	service.SessionRepository
 	nextID             int
 	created            []*model.Session
 	createdMaterialIDs []int
 	err                error
 }
 
-func (s *commandStudySessionStore) CreateSessionInTx(
+func (store *commandStudySessionStore) CreateSessionInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	session *model.Session,
 ) (int, error) {
-	if s.err != nil {
-		return 0, s.err
+	if store.err != nil {
+		return 0, store.err
 	}
-	s.created = append(
-		s.created,
+	store.created = append(
+		store.created,
 		session,
 	)
-	return s.nextID, nil
+	return store.nextID, nil
 }
 
-func (s *commandStudySessionStore) CreateSessionMaterialsInTx(
+func (store *commandStudySessionStore) CreateSessionMaterialsInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	sessionID int,
 	materialIDs []int,
 ) error {
-	s.createdMaterialIDs = append(
-		s.createdMaterialIDs,
+	store.createdMaterialIDs = append(
+		store.createdMaterialIDs,
 		materialIDs...,
 	)
 	return nil
@@ -174,15 +178,15 @@ type llmTipCandidateStore struct {
 	err     error
 }
 
-func (s *llmTipCandidateStore) CreateCandidate(
+func (store *llmTipCandidateStore) CreateCandidate(
 	ctx context.Context,
 	candidate *model.TipCandidate,
 ) error {
-	if s.err != nil {
-		return s.err
+	if store.err != nil {
+		return store.err
 	}
-	s.created = append(
-		s.created,
+	store.created = append(
+		store.created,
 		candidate,
 	)
 	return nil
@@ -213,9 +217,9 @@ func TestLanguageDisplayName(t *testing.T) {
 }
 
 func TestHandleUpdate_Dispatch(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	b := newTestBot(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	bot := newTestBot(
+		mockAPI,
 		nil,
 		nil,
 	)
@@ -232,8 +236,8 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 					Chat: &tgbotapi.Chat{ID: 123},
 				},
 			}
-			b.handleUpdate(update)
-			if len(mAPI.sentMessages) == 0 {
+			bot.handleUpdate(update)
+			if len(mockAPI.sentMessages) == 0 {
 				t.Fatal("expected message sent for /start")
 			}
 		},
@@ -242,7 +246,7 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 	t.Run(
 		"Callback update",
 		func(t *testing.T) {
-			mAPI.sentMessages = nil
+			mockAPI.sentMessages = nil
 			update := tgbotapi.Update{
 				CallbackQuery: &tgbotapi.CallbackQuery{
 					ID:   "1",
@@ -255,8 +259,8 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 			}
 
 			// Setup dependencies for showMainMenu
-			mUserRepo := &mockUserRepo{
-				getOrCreateFn: func(
+			userRepositoryMock := &mockUserRepository{
+				getOrCreateFunc: func(
 					ctx context.Context,
 					id int64,
 					username string,
@@ -264,21 +268,21 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 					return &model.User{ID: id, Language: "jp", ProficiencyLevel: "n5"}, nil
 				},
 			}
-			mSRSRepo := &mockSRSRepo{}
-			b := newTestBot(
-				mAPI,
+			srsRepositoryMock := &mockSRSRepository{}
+			bot := newTestBot(
+				mockAPI,
 				nil,
 				&testServices{
-					User: service.NewUserService(mUserRepo),
+					User: service.NewUserService(userRepositoryMock),
 					Session: newTestSessionService(
 						nil,
-						service.SessionDeps{QuestionRepo: mSRSRepo},
+						service.SessionDependencies{QuestionRepository: srsRepositoryMock},
 					),
 				},
 			)
 
-			b.handleUpdate(update)
-			if len(mAPI.sentMessages) == 0 {
+			bot.handleUpdate(update)
+			if len(mockAPI.sentMessages) == 0 {
 				t.Fatal("expected message sent for callback menu:main")
 			}
 		},
@@ -286,25 +290,25 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 }
 
 func TestHandleHelp(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	b := &Bot{telegram: newTelegramClient(mAPI)}
+	mockAPI := &mockBotAPI{}
+	bot := &Bot{telegram: newTelegramClient(mockAPI)}
 	ctx := context.Background()
-	msg := &tgbotapi.Message{
+	message := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: 123},
 	}
 
-	b.handleHelp(
+	bot.handleHelp(
 		ctx,
-		msg,
+		message,
 	)
 
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"expected 1 message, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	sent := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !strings.Contains(
 		sent.Text,
 		"도움말",
@@ -317,14 +321,14 @@ func TestHandleHelp(t *testing.T) {
 }
 
 func TestHandleMessage_UnknownCommand(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	b := newTestBot(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	bot := newTestBot(
+		mockAPI,
 		nil,
 		nil,
 	)
 	ctx := context.Background()
-	msg := &tgbotapi.Message{
+	message := &tgbotapi.Message{
 		Chat: &tgbotapi.Chat{ID: 123},
 		Text: "/unknown",
 		Entities: []tgbotapi.MessageEntity{
@@ -332,12 +336,12 @@ func TestHandleMessage_UnknownCommand(t *testing.T) {
 		},
 	}
 
-	b.handleMessage(
+	bot.handleMessage(
 		ctx,
-		msg,
+		message,
 	)
 
-	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	sent := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !strings.Contains(
 		sent.Text,
 		"알 수 없는 명령어",
@@ -352,14 +356,14 @@ func TestHandleMessage_UnknownCommand(t *testing.T) {
 func TestHandleLLMCommandAllowedActivatesMode(t *testing.T) {
 	api := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		stateStores,
 		nil,
 	)
 
 	allowedUserID := llmAllowedTelegramUserIDs[0]
-	b.handleMessage(
+	bot.handleMessage(
 		context.Background(),
 		commandMessage(
 			"/llm",
@@ -417,13 +421,13 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 		otherUserID,
 		model.PendingLLMInput{Kind: model.PendingLLMPlain},
 	)
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		stateStores,
 		nil,
 	)
 
-	b.handleCallback(
+	bot.handleCallback(
 		context.Background(),
 		&tgbotapi.CallbackQuery{
 			ID:   "cancel-llm",
@@ -471,13 +475,13 @@ func TestHandleLLMCancelRemovesOnlyInvokingUserPendingMode(t *testing.T) {
 func TestHandleLLMCommandUnauthorizedReturnsWithoutMessage(t *testing.T) {
 	api := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		stateStores,
 		nil,
 	)
 
-	b.handleMessage(
+	bot.handleMessage(
 		context.Background(),
 		commandMessage(
 			"/llm",
@@ -511,8 +515,8 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 		model.PendingLLMInput{Kind: model.PendingLLMPlain},
 	)
 	tipStore := &llmTipCandidateStore{}
-	userRepo := &mockUserRepo{
-		getOrCreateFn: func(
+	userRepository := &mockUserRepository{
+		getOrCreateFunc: func(
 			ctx context.Context,
 			id int64,
 			username string,
@@ -529,14 +533,14 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 		},
 	}
 	var gotQuestion string
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		stateStores,
 		&testServices{
-			User: service.NewUserService(userRepo),
+			User: service.NewUserService(userRepository),
 			LLMQuestion: service.NewLLMQuestionService(
 				&mockLLM{
-					answerFn: func(
+					answerFunc: func(
 						ctx context.Context,
 						question string,
 					) (string, error) {
@@ -550,7 +554,7 @@ func TestHandleLLMQuestionAnswersAndCreatesTipCandidateWithUserLevel(t *testing.
 		},
 	)
 
-	b.handleMessage(
+	bot.handleMessage(
 		context.Background(),
 		plainMessage(
 			"hi, honowo의 차이가 뭐야?",
@@ -617,8 +621,8 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 		allowedUserID,
 		model.PendingLLMInput{Kind: model.PendingLLMPlain},
 	)
-	userRepo := &mockUserRepo{
-		getOrCreateFn: func(
+	userRepository := &mockUserRepository{
+		getOrCreateFunc: func(
 			ctx context.Context,
 			id int64,
 			username string,
@@ -626,14 +630,14 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 			return &model.User{ID: id, Username: username, Language: "ja", ProficiencyLevel: "N5"}, nil
 		},
 	}
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		stateStores,
 		&testServices{
-			User: service.NewUserService(userRepo),
+			User: service.NewUserService(userRepository),
 			LLMQuestion: service.NewLLMQuestionService(
 				&mockLLM{
-					answerFn: func(
+					answerFunc: func(
 						ctx context.Context,
 						question string,
 					) (string, error) {
@@ -646,7 +650,7 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 		},
 	)
 
-	b.handleMessage(
+	bot.handleMessage(
 		context.Background(),
 		plainMessage(
 			"honoo가 뭐야?",
@@ -680,8 +684,8 @@ func TestHandleLLMQuestionConsumesModeOnAnswerFailure(t *testing.T) {
 func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 	ctx := context.Background()
 	api := &mockBotAPI{}
-	userRepo := &mockUserRepo{
-		getOrCreateFn: func(
+	userRepository := &mockUserRepository{
+		getOrCreateFunc: func(
 			ctx context.Context,
 			id int64,
 			username string,
@@ -703,23 +707,23 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 		},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		nil,
 		&testServices{
-			User: service.NewUserService(userRepo),
+			User: service.NewUserService(userRepository),
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{
-					MaterialRepo: materialStore,
-					SessionRepo:  sessionStore,
-					DB:           botTestDB,
+				service.SessionDependencies{
+					MaterialRepository: materialStore,
+					SessionRepository:  sessionStore,
+					DB:                 botTestDB,
 				},
 			),
 		},
 	)
 
-	b.handleMessage(
+	bot.handleMessage(
 		ctx,
 		commandMessage(
 			"/study",
@@ -774,7 +778,7 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 			len(api.sentMessages),
 		)
 	}
-	msg, ok := api.sentMessages[0].(tgbotapi.MessageConfig)
+	message, ok := api.sentMessages[0].(tgbotapi.MessageConfig)
 	if !ok {
 		t.Fatalf(
 			"sent message type = %T, want MessageConfig",
@@ -782,27 +786,27 @@ func TestHandleMessage_StudyCommandBuildsAndPushesStudySession(t *testing.T) {
 		)
 	}
 	if !strings.Contains(
-		msg.Text,
+		message.Text,
 		"Study Session이 도착했습니다",
 	) {
 		t.Fatalf(
 			"message text = %q",
-			msg.Text,
+			message.Text,
 		)
 	}
 	if got := onlyMessageCallbackData(
 		t,
-		msg,
+		message,
 	); got != "study:321:start" {
 		t.Fatalf(
 			"callback data = %q, want study:321:start",
 			got,
 		)
 	}
-	if msg.ChatID != 456 {
+	if message.ChatID != 456 {
 		t.Fatalf(
 			"chat ID = %d, want 456",
-			msg.ChatID,
+			message.ChatID,
 		)
 	}
 }
@@ -816,14 +820,14 @@ func TestHandleStudyCommandUsesRequestedLimit(t *testing.T) {
 		},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(
+	bot := botWithStudyCommandDependencies(
 		api,
 		nil,
 		materialStore,
 		sessionStore,
 	)
 
-	b.handleStudy(
+	bot.handleStudy(
 		context.Background(),
 		commandMessage(
 			"/study 20",
@@ -853,14 +857,14 @@ func TestHandleStudyCommandRejectsInvalidLimit(t *testing.T) {
 		materials: []model.Material{{ID: 10, Category: model.MaterialCategoryVocabulary}},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(
+	bot := botWithStudyCommandDependencies(
 		api,
 		nil,
 		materialStore,
 		sessionStore,
 	)
 
-	b.handleStudy(
+	bot.handleStudy(
 		context.Background(),
 		commandMessage(
 			"/study 999",
@@ -897,14 +901,14 @@ func TestHandleStudyCommandRejectsInvalidLimit(t *testing.T) {
 func TestHandleStudyCommandNoMaterials(t *testing.T) {
 	api := &mockBotAPI{}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(
+	bot := botWithStudyCommandDependencies(
 		api,
 		nil,
 		&commandStudyMaterialStore{},
 		sessionStore,
 	)
 
-	b.handleStudy(
+	bot.handleStudy(
 		context.Background(),
 		commandMessage(
 			"/study",
@@ -934,14 +938,14 @@ func TestHandleStudyCommandNoMaterials(t *testing.T) {
 
 func TestHandleStudyCommandUserLookupFailure(t *testing.T) {
 	api := &mockBotAPI{}
-	b := botWithStudyCommandDeps(
+	bot := botWithStudyCommandDependencies(
 		api,
 		errors.New("lookup failed"),
 		&commandStudyMaterialStore{},
 		nil,
 	)
 
-	b.handleStudy(
+	bot.handleStudy(
 		context.Background(),
 		commandMessage(
 			"/study",
@@ -966,14 +970,14 @@ func TestHandleStudyCommandUserLookupFailure(t *testing.T) {
 func TestHandleStudyCommandBuildFailure(t *testing.T) {
 	api := &mockBotAPI{}
 	materialStore := &commandStudyMaterialStore{err: errors.New("material failed")}
-	b := botWithStudyCommandDeps(
+	bot := botWithStudyCommandDependencies(
 		api,
 		nil,
 		materialStore,
 		nil,
 	)
 
-	b.handleStudy(
+	bot.handleStudy(
 		context.Background(),
 		commandMessage(
 			"/study",
@@ -1003,14 +1007,14 @@ func TestHandleStudyCommandPushFailure(t *testing.T) {
 		},
 	}
 	sessionStore := &commandStudySessionStore{nextID: 321}
-	b := botWithStudyCommandDeps(
+	bot := botWithStudyCommandDependencies(
 		api,
 		nil,
 		materialStore,
 		sessionStore,
 	)
 
-	b.handleStudy(
+	bot.handleStudy(
 		context.Background(),
 		commandMessage(
 			"/study",
@@ -1038,7 +1042,7 @@ func TestHandleStudyCommandPushFailure(t *testing.T) {
 	}
 }
 
-func botWithStudyCommandDeps(
+func botWithStudyCommandDependencies(
 	api *mockBotAPI,
 	userErr error,
 	materialStore *commandStudyMaterialStore,
@@ -1050,8 +1054,8 @@ func botWithStudyCommandDeps(
 	if sessionStore == nil {
 		sessionStore = &commandStudySessionStore{nextID: 321}
 	}
-	userRepo := &mockUserRepo{
-		getOrCreateFn: func(
+	userRepository := &mockUserRepository{
+		getOrCreateFunc: func(
 			ctx context.Context,
 			id int64,
 			username string,
@@ -1066,13 +1070,13 @@ func botWithStudyCommandDeps(
 		api,
 		nil,
 		&testServices{
-			User: service.NewUserService(userRepo),
+			User: service.NewUserService(userRepository),
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{
-					MaterialRepo: materialStore,
-					SessionRepo:  sessionStore,
-					DB:           botTestDB,
+				service.SessionDependencies{
+					MaterialRepository: materialStore,
+					SessionRepository:  sessionStore,
+					DB:                 botTestDB,
 				},
 			),
 		},
@@ -1086,11 +1090,11 @@ func commandMessage(
 	username string,
 ) *tgbotapi.Message {
 	commandLength := len(text)
-	if idx := strings.IndexByte(
+	if index := strings.IndexByte(
 		text,
 		' ',
-	); idx >= 0 {
-		commandLength = idx
+	); index >= 0 {
+		commandLength = index
 	}
 	return &tgbotapi.Message{
 		Text: text,
@@ -1117,14 +1121,14 @@ func plainMessage(
 
 func onlyMessageCallbackData(
 	t *testing.T,
-	msg tgbotapi.MessageConfig,
+	message tgbotapi.MessageConfig,
 ) string {
 	t.Helper()
-	markup, ok := msg.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
+	markup, ok := message.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
 	if !ok {
 		t.Fatalf(
 			"reply markup type = %T, want InlineKeyboardMarkup",
-			msg.ReplyMarkup,
+			message.ReplyMarkup,
 		)
 	}
 	if len(markup.InlineKeyboard) != 1 || len(markup.InlineKeyboard[0]) != 1 {

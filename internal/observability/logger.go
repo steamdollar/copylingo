@@ -10,7 +10,7 @@ import (
 )
 
 type LoggerOptions struct {
-	Dir           string
+	Directory     string
 	Level         string
 	RetentionDays int
 	Timezone      string
@@ -26,7 +26,11 @@ func NewLogger(options LoggerOptions) (*slog.Logger, func(), error) {
 	}
 	location, err := time.LoadLocation(options.Timezone)
 	if err != nil {
-		return nil, nil, fmt.Errorf("load logging timezone %q: %w", options.Timezone, err)
+		return nil, nil, fmt.Errorf(
+			"load logging timezone %q: %w",
+			options.Timezone,
+			err,
+		)
 	}
 	if options.Stdout == nil {
 		options.Stdout = os.Stdout
@@ -38,31 +42,51 @@ func NewLogger(options LoggerOptions) (*slog.Logger, func(), error) {
 	output := options.Stdout
 	closeWriter := func() {}
 	dailyWriter, err := NewDailyWriter(DailyWriterOptions{
-		Dir:           options.Dir,
+		Directory:     options.Directory,
 		RetentionDays: options.RetentionDays,
 		Location:      location,
 		Stderr:        options.Stderr,
 	})
 	if err != nil {
-		fmt.Fprintf(options.Stderr, "[copylingo logging] file sink unavailable; using stdout only: %v\n", err)
+		fmt.Fprintf(
+			options.Stderr,
+			"[copylingo logging] file sink unavailable; using stdout only: %v\n",
+			err,
+		)
 	} else {
-		output = io.MultiWriter(options.Stdout, dailyWriter)
+		output = io.MultiWriter(
+			options.Stdout,
+			dailyWriter,
+		)
 		closeWriter = func() {
 			if err := dailyWriter.Close(); err != nil {
-				fmt.Fprintf(options.Stderr, "[copylingo logging] close daily log file: %v\n", err)
+				fmt.Fprintf(
+					options.Stderr,
+					"[copylingo logging] close daily log file: %v\n",
+					err,
+				)
 			}
 		}
 	}
 
-	handler := slog.NewJSONHandler(output, &slog.HandlerOptions{
-		Level: level,
-		ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
-			if attr.Key == slog.TimeKey && attr.Value.Kind() == slog.KindTime {
-				return slog.Time(attr.Key, attr.Value.Time().In(location))
-			}
-			return attr
+	handler := slog.NewJSONHandler(
+		output,
+		&slog.HandlerOptions{
+			Level: level,
+			ReplaceAttr: func(
+				_ []string,
+				attribute slog.Attr,
+			) slog.Attr {
+				if attribute.Key == slog.TimeKey && attribute.Value.Kind() == slog.KindTime {
+					return slog.Time(
+						attribute.Key,
+						attribute.Value.Time().In(location),
+					)
+				}
+				return attribute
+			},
 		},
-	})
+	)
 	return slog.New(NewContextHandler(handler)), closeWriter, nil
 }
 
@@ -77,6 +101,9 @@ func ParseLevel(raw string) (slog.Level, error) {
 	case "ERROR":
 		return slog.LevelError, nil
 	default:
-		return 0, fmt.Errorf("unsupported logging level %q", raw)
+		return 0, fmt.Errorf(
+			"unsupported logging level %q",
+			raw,
+		)
 	}
 }

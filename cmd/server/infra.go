@@ -12,23 +12,23 @@ import (
 	"github.com/lsj/copylingo/internal/config"
 )
 
-// initInfra opens the shared DB and Redis connections. If Redis fails, the
+// initializeInfrastructure opens the shared DB and Redis connections. If Redis fails, the
 // DB connection is closed before returning.
-func initInfra(cfg *config.Config) (*sqlx.DB, *redis.Client, error) {
-	db, err := initDB(cfg)
+func initializeInfrastructure(appConfig *config.Config) (*sqlx.DB, *redis.Client, error) {
+	db, err := initializeDB(appConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	rdb, err := initRedis(cfg)
+	redisClient, err := initializeRedis(appConfig)
 	if err != nil {
 		db.Close()
 		return nil, nil, err
 	}
-	return db, rdb, nil
+	return db, redisClient, nil
 }
 
-func initDB(cfg *config.Config) (*sqlx.DB, error) {
-	db, err := bootstrap.OpenDB(cfg.DB)
+func initializeDB(appConfig *config.Config) (*sqlx.DB, error) {
+	db, err := bootstrap.OpenDB(appConfig.DB)
 	if err != nil {
 		return nil, err
 	}
@@ -41,11 +41,11 @@ func initDB(cfg *config.Config) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func initRedis(cfg *config.Config) (*redis.Client, error) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     cfg.Redis.Addr,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
+func initializeRedis(appConfig *config.Config) (*redis.Client, error) {
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     appConfig.Redis.Addr,
+		Password: appConfig.Redis.Password,
+		DB:       appConfig.Redis.DB,
 	})
 
 	ctx, cancel := context.WithTimeout(
@@ -54,10 +54,10 @@ func initRedis(cfg *config.Config) (*redis.Client, error) {
 	)
 	defer cancel()
 
-	if err := rdb.Ping(ctx).Err(); err != nil {
+	if err := redisClient.Ping(ctx).Err(); err != nil {
 		return nil, err
 	}
 
 	log.Println("Connected to Redis")
-	return rdb, nil
+	return redisClient, nil
 }

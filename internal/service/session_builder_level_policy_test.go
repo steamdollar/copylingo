@@ -130,39 +130,39 @@ func TestDailyQuizCurrentLevelPolicy(t *testing.T) {
 					}
 
 					byID := make(map[int]model.Question)
-					for _, q := range append(
+					for _, question := range append(
 						slices.Clone(tt.due),
 						tt.new...,
 					) {
-						byID[q.ID] = q
+						byID[question.ID] = question
 					}
 					current, reading, audio := 0, 0, 0
 					seen := make(map[int]bool)
 					for _, row := range stores.rows {
-						q := byID[row.QuestionID]
-						if seen[q.ID] {
+						question := byID[row.QuestionID]
+						if seen[question.ID] {
 							t.Fatalf(
 								"duplicate question %d",
-								q.ID,
+								question.ID,
 							)
 						}
-						seen[q.ID] = true
-						if q.ProficiencyLevel == tt.level {
+						seen[question.ID] = true
+						if question.ProficiencyLevel == tt.level {
 							current++
 						} else if !row.IsReview || !isLowerAdjacentQuestion(
-							q,
+							question,
 							"ja",
 							tt.level,
 						) {
 							t.Fatalf(
 								"non-current question admitted despite sufficient current supply: %+v",
-								q,
+								question,
 							)
 						}
-						if q.ProficiencyLevel == tt.level && q.Category == model.CategoryReading {
+						if question.ProficiencyLevel == tt.level && question.Category == model.CategoryReading {
 							reading++
 						}
-						if q.ProficiencyLevel == tt.level && q.Category == model.CategoryListening {
+						if question.ProficiencyLevel == tt.level && question.Category == model.CategoryListening {
 							audio++
 						}
 					}

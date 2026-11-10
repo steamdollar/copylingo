@@ -8,41 +8,51 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-type preferenceRepoStub struct {
+type preferenceRepositoryStub struct {
 	calls, offset, limit int
 	userID               int64
 	items                []model.MaterialPreference
 	err                  error
 }
 
-func (r *preferenceRepoStub) Get(_ context.Context, userID int64, materialID int) (*model.MaterialPreference, error) {
-	r.calls++
+func (stub *preferenceRepositoryStub) Get(
+	_ context.Context,
+	userID int64,
+	materialID int,
+) (*model.MaterialPreference, error) {
+	stub.calls++
 	return &model.MaterialPreference{
 		UserID:     userID,
 		MaterialID: materialID,
 		ReviewMode: model.MaterialReviewNormal,
-	}, r.err
+	}, stub.err
 }
 
-func (r *preferenceRepoStub) Set(_ context.Context, userID int64, materialID int, mode model.MaterialReviewMode) error {
-	r.calls++
-	r.userID = userID
-	return r.err
-}
-
-func (r *preferenceRepoStub) List(
+func (stub *preferenceRepositoryStub) Set(
 	_ context.Context,
 	userID int64,
-	offset, limit int,
+	materialID int,
+	mode model.MaterialReviewMode,
+) error {
+	stub.calls++
+	stub.userID = userID
+	return stub.err
+}
+
+func (stub *preferenceRepositoryStub) List(
+	_ context.Context,
+	userID int64,
+	offset,
+	limit int,
 ) ([]model.MaterialPreference, error) {
-	r.calls++
-	r.userID, r.offset, r.limit = userID, offset, limit
-	return r.items, r.err
+	stub.calls++
+	stub.userID, stub.offset, stub.limit = userID, offset, limit
+	return stub.items, stub.err
 }
 
 func TestMaterialPreferenceRejectsInvalidRequests(t *testing.T) {
-	r := &preferenceRepoStub{}
-	s := NewMaterialPreferenceService(r)
+	repository := &preferenceRepositoryStub{}
+	service := NewMaterialPreferenceService(repository)
 	ctx := context.Background()
 	for _, input := range []struct {
 		userID int64
@@ -53,40 +63,93 @@ func TestMaterialPreferenceRejectsInvalidRequests(t *testing.T) {
 		{1, 0, model.MaterialReviewNormal},
 		{1, 1, "unknown"},
 	} {
-		if err := s.Set(ctx, input.userID, input.id, input.mode); err == nil {
-			t.Fatalf("invalid set accepted: %+v", input)
+		if err := service.Set(
+			ctx,
+			input.userID,
+			input.id,
+			input.mode,
+		); err == nil {
+			t.Fatalf(
+				"invalid set accepted: %+v",
+				input,
+			)
 		}
 	}
-	if _, err := s.Get(ctx, 1, -1); err == nil {
+	if _, err := service.Get(
+		ctx,
+		1,
+		-1,
+	); err == nil {
 		t.Fatal("invalid material accepted")
 	}
 	for _, page := range []int{-1, int(^uint(0) >> 1)} {
-		if _, _, err := s.List(ctx, 1, page); err == nil {
-			t.Fatalf("invalid page %d accepted", page)
+		if _, _, err := service.List(
+			ctx,
+			1,
+			page,
+		); err == nil {
+			t.Fatalf(
+				"invalid page %d accepted",
+				page,
+			)
 		}
 	}
-	if r.calls != 0 {
+	if repository.calls != 0 {
 		t.Fatal("invalid requests reached repository")
 	}
 }
 
 func TestMaterialPreferencePaginationPreservesUserScope(t *testing.T) {
-	r := &preferenceRepoStub{items: make([]model.MaterialPreference, MaterialPreferencePageSize+1)}
-	s := NewMaterialPreferenceService(r)
-	items, more, err := s.List(context.Background(), 42, 2)
+	repository := &preferenceRepositoryStub{items: make(
+		[]model.MaterialPreference,
+		MaterialPreferencePageSize+1,
+	)}
+	service := NewMaterialPreferenceService(repository)
+	items, more, err := service.List(
+		context.Background(),
+		42,
+		2,
+	)
 	if err != nil || !more || len(items) != MaterialPreferencePageSize {
-		t.Fatalf("page len=%d more=%v err=%v", len(items), more, err)
+		t.Fatalf(
+			"page len=%d more=%v err=%v",
+			len(items),
+			more,
+			err,
+		)
 	}
-	if r.userID != 42 || r.offset != 16 || r.limit != 9 {
-		t.Fatalf("query scope: %+v", r)
+	if repository.userID != 42 || repository.offset != 16 || repository.limit != 9 {
+		t.Fatalf(
+			"query scope: %+v",
+			repository,
+		)
 	}
-	r.items = r.items[:3]
-	items, more, err = s.List(context.Background(), 42, 3)
+	repository.items = repository.items[:3]
+	items, more, err = service.List(
+		context.Background(),
+		42,
+		3,
+	)
 	if err != nil || more || len(items) != 3 {
-		t.Fatalf("last page len=%d more=%v err=%v", len(items), more, err)
+		t.Fatalf(
+			"last page len=%d more=%v err=%v",
+			len(items),
+			more,
+			err,
+		)
 	}
-	r.err = errors.New("repository unavailable")
-	if _, _, err = s.List(context.Background(), 42, 0); !errors.Is(err, r.err) {
-		t.Fatalf("repository error lost: %v", err)
+	repository.err = errors.New("repository unavailable")
+	if _, _, err = service.List(
+		context.Background(),
+		42,
+		0,
+	); !errors.Is(
+		err,
+		repository.err,
+	) {
+		t.Fatalf(
+			"repository error lost: %v",
+			err,
+		)
 	}
 }

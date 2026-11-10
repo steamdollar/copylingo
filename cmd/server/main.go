@@ -23,7 +23,7 @@ func main() {
 
 func run() error {
 	// load config
-	cfg, err := config.Load()
+	appConfig, err := config.Load()
 	if err != nil {
 		return fmt.Errorf(
 			"failed to load config: %w",
@@ -33,10 +33,10 @@ func run() error {
 
 	// set logger
 	logger, closeLogger, err := observability.NewLogger(observability.LoggerOptions{
-		Dir:           cfg.Logging.Dir,
-		Level:         cfg.Logging.Level,
-		RetentionDays: cfg.Logging.RetentionDays,
-		Timezone:      cfg.Logging.Timezone,
+		Directory:     appConfig.Logging.Directory,
+		Level:         appConfig.Logging.Level,
+		RetentionDays: appConfig.Logging.RetentionDays,
+		Timezone:      appConfig.Logging.Timezone,
 	})
 	if err != nil {
 		return fmt.Errorf(
@@ -48,7 +48,7 @@ func run() error {
 	slog.SetDefault(logger)
 
 	// init app
-	app, err := initApp(cfg)
+	app, err := initializeApp(appConfig)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to init app: %w",

@@ -15,7 +15,7 @@ import (
 )
 
 type mockStudyMaterialStore struct {
-	getMaterialsByPlanFn func(
+	getMaterialsByPlanFunc func(
 		ctx context.Context,
 		userID int64,
 		language,
@@ -25,7 +25,7 @@ type mockStudyMaterialStore struct {
 	) ([]model.Material, error)
 }
 
-func (m *mockStudyMaterialStore) GetMaterialsByPlan(
+func (mock *mockStudyMaterialStore) GetMaterialsByPlan(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -33,7 +33,7 @@ func (m *mockStudyMaterialStore) GetMaterialsByPlan(
 	levels []string,
 	plan model.StudySessionPlan,
 ) ([]model.Material, error) {
-	return m.getMaterialsByPlanFn(
+	return mock.getMaterialsByPlanFunc(
 		ctx,
 		userID,
 		language,
@@ -44,35 +44,35 @@ func (m *mockStudyMaterialStore) GetMaterialsByPlan(
 }
 
 // mockStudySessionStore implements the transactional session inserts. The
-// embedded nil interface makes any other SessionRepo call panic.
+// embedded nil interface makes any other SessionRepository call panic.
 type mockStudySessionStore struct {
-	SessionRepo
-	createSessionFn   func(session *model.Session) (int, error)
-	createMaterialsFn func(
+	SessionRepository
+	createSessionFunc   func(session *model.Session) (int, error)
+	createMaterialsFunc func(
 		sessionID int,
 		materialIDs []int,
 	) error
 }
 
-func (m *mockStudySessionStore) CreateSessionInTx(
+func (mock *mockStudySessionStore) CreateSessionInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	session *model.Session,
 ) (int, error) {
-	if m.createSessionFn != nil {
-		return m.createSessionFn(session)
+	if mock.createSessionFunc != nil {
+		return mock.createSessionFunc(session)
 	}
 	return 99, nil
 }
 
-func (m *mockStudySessionStore) CreateSessionMaterialsInTx(
+func (mock *mockStudySessionStore) CreateSessionMaterialsInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	sessionID int,
 	materialIDs []int,
 ) error {
-	if m.createMaterialsFn != nil {
-		return m.createMaterialsFn(
+	if mock.createMaterialsFunc != nil {
+		return mock.createMaterialsFunc(
 			sessionID,
 			materialIDs,
 		)
@@ -87,7 +87,7 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 	userID := int64(123)
 
 	materialStore := &mockStudyMaterialStore{
-		getMaterialsByPlanFn: func(
+		getMaterialsByPlanFunc: func(
 			ctx context.Context,
 			gotUserID int64,
 			language,
@@ -123,7 +123,7 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 		},
 	}
 	sessionStore := &mockStudySessionStore{
-		createSessionFn: func(session *model.Session) (int, error) {
+		createSessionFunc: func(session *model.Session) (int, error) {
 			if session.UserID != userID ||
 				session.Type != model.SessionStudy ||
 				session.Mode != model.SessionModeStudy ||
@@ -136,7 +136,7 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 			}
 			return 99, nil
 		},
-		createMaterialsFn: func(
+		createMaterialsFunc: func(
 			sessionID int,
 			materialIDs []int,
 		) error {
@@ -159,12 +159,12 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 		},
 	}
 
-	svc := newStudySessionService(
+	service := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
 	)
-	session, err := svc.BuildStudySession(
+	session, err := service.BuildStudySession(
 		ctx,
 		userID,
 		"ja",
@@ -188,7 +188,7 @@ func TestBuildStudySessionCreatesOrderedMaterials(t *testing.T) {
 
 func TestBuildStudySessionDoesNotPublishIDWhenMaterialInsertFails(t *testing.T) {
 	materialStore := &mockStudyMaterialStore{
-		getMaterialsByPlanFn: func(
+		getMaterialsByPlanFunc: func(
 			_ context.Context,
 			_ int64,
 			_,
@@ -201,11 +201,11 @@ func TestBuildStudySessionDoesNotPublishIDWhenMaterialInsertFails(t *testing.T) 
 	}
 	var createdSession *model.Session
 	sessionStore := &mockStudySessionStore{
-		createSessionFn: func(session *model.Session) (int, error) {
+		createSessionFunc: func(session *model.Session) (int, error) {
 			createdSession = session
 			return 99, nil
 		},
-		createMaterialsFn: func(
+		createMaterialsFunc: func(
 			sessionID int,
 			materialIDs []int,
 		) error {
@@ -245,7 +245,7 @@ func TestBuildStudySessionDoesNotPublishIDWhenMaterialInsertFails(t *testing.T) 
 
 func TestBuildStudySessionUsesAdjacentJapaneseLevelScope(t *testing.T) {
 	materialStore := &mockStudyMaterialStore{
-		getMaterialsByPlanFn: func(
+		getMaterialsByPlanFunc: func(
 			_ context.Context,
 			_ int64,
 			language,
@@ -296,7 +296,7 @@ func TestBuildStudySessionUsesRequestedLimit(t *testing.T) {
 	userID := int64(123)
 
 	materialStore := &mockStudyMaterialStore{
-		getMaterialsByPlanFn: func(
+		getMaterialsByPlanFunc: func(
 			ctx context.Context,
 			gotUserID int64,
 			language,
@@ -333,13 +333,13 @@ func TestBuildStudySessionUsesRequestedLimit(t *testing.T) {
 	}
 	sessionStore := &mockStudySessionStore{}
 
-	svc := newStudySessionService(
+	service := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
 	)
 	// A limit equal to the morning total scales back to the morning plan itself.
-	session, err := svc.BuildStudySession(
+	session, err := service.BuildStudySession(
 		ctx,
 		userID,
 		"ja",
@@ -362,14 +362,14 @@ func TestBuildStudySessionUsesRequestedLimit(t *testing.T) {
 }
 
 func TestBuildStudySessionRejectsOutOfRangeLimit(t *testing.T) {
-	svc := newStudySessionService(
+	service := newStudySessionService(
 		nil,
 		nil,
 		nil,
 	)
 
 	for _, limit := range []int{-1, MaxStudySessionMaterialCount + 1} {
-		_, err := svc.BuildStudySession(
+		_, err := service.BuildStudySession(
 			context.Background(),
 			123,
 			"ja",
@@ -437,8 +437,8 @@ func TestBuildStudySessionUsesFixedPlan(t *testing.T) {
 			),
 			func(t *testing.T) {
 				var got model.StudySessionPlan
-				svc := newPlanCaptureStudySessionService(&got)
-				session, err := svc.BuildStudySession(
+				service := newPlanCaptureStudySessionService(&got)
+				session, err := service.BuildStudySession(
 					context.Background(),
 					123,
 					"ja",
@@ -471,12 +471,12 @@ func TestBuildStudySessionUsesFixedPlan(t *testing.T) {
 }
 
 func TestBuildStudySessionRejectsUnknownProfile(t *testing.T) {
-	svc := newStudySessionService(
+	service := newStudySessionService(
 		nil,
 		nil,
 		nil,
 	)
-	_, err := svc.BuildStudySession(
+	_, err := service.BuildStudySession(
 		context.Background(),
 		123,
 		"ja",
@@ -558,8 +558,8 @@ func TestBuildStudySessionScalesMorningPlan(t *testing.T) {
 			),
 			func(t *testing.T) {
 				var got model.StudySessionPlan
-				svc := newPlanCaptureStudySessionService(&got)
-				if _, err := svc.BuildStudySession(
+				service := newPlanCaptureStudySessionService(&got)
+				if _, err := service.BuildStudySession(
 					context.Background(),
 					123,
 					"ja",
@@ -601,15 +601,15 @@ func TestBuildStudySessionScalesMorningPlan(t *testing.T) {
 }
 
 func studyPlan(
-	vocabNew,
-	vocabReview,
+	vocabularyNew,
+	vocabularyReview,
 	grammarNew,
 	grammarReview,
 	readingNew,
 	readingReview int,
 ) model.StudySessionPlan {
 	return model.StudySessionPlan{Quotas: []model.StudyMaterialQuota{
-		{Category: model.MaterialCategoryVocabulary, NewCount: vocabNew, ReviewCount: vocabReview},
+		{Category: model.MaterialCategoryVocabulary, NewCount: vocabularyNew, ReviewCount: vocabularyReview},
 		{Category: model.MaterialCategoryGrammar, NewCount: grammarNew, ReviewCount: grammarReview},
 		{Category: model.MaterialCategoryReading, NewCount: readingNew, ReviewCount: readingReview},
 	}}
@@ -617,7 +617,7 @@ func studyPlan(
 
 func newPlanCaptureStudySessionService(capture *model.StudySessionPlan) *studySessionService {
 	return newStudySessionService(
-		&mockStudyMaterialStore{getMaterialsByPlanFn: func(
+		&mockStudyMaterialStore{getMaterialsByPlanFunc: func(
 			_ context.Context,
 			_ int64,
 			_,
@@ -636,7 +636,7 @@ func newPlanCaptureStudySessionService(capture *model.StudySessionPlan) *studySe
 func TestBuildStudySessionNoMaterialsReturnsNil(t *testing.T) {
 	ctx := context.Background()
 	materialStore := &mockStudyMaterialStore{
-		getMaterialsByPlanFn: func(
+		getMaterialsByPlanFunc: func(
 			ctx context.Context,
 			userID int64,
 			language,
@@ -648,17 +648,17 @@ func TestBuildStudySessionNoMaterialsReturnsNil(t *testing.T) {
 		},
 	}
 	sessionStore := &mockStudySessionStore{
-		createSessionFn: func(session *model.Session) (int, error) {
+		createSessionFunc: func(session *model.Session) (int, error) {
 			t.Fatal("CreateSessionInTx should not be called")
 			return 0, nil
 		},
 	}
-	svc := newStudySessionService(
+	service := newStudySessionService(
 		materialStore,
 		sessionStore,
 		studyTestDB,
 	)
-	session, err := svc.BuildStudySession(
+	session, err := service.BuildStudySession(
 		ctx,
 		123,
 		"ja",
@@ -683,7 +683,7 @@ func TestBuildStudySessionNoMaterialsReturnsNil(t *testing.T) {
 func TestBuildStudySessionWrapsMaterialError(t *testing.T) {
 	ctx := context.Background()
 	materialStore := &mockStudyMaterialStore{
-		getMaterialsByPlanFn: func(
+		getMaterialsByPlanFunc: func(
 			ctx context.Context,
 			userID int64,
 			language,
@@ -694,13 +694,13 @@ func TestBuildStudySessionWrapsMaterialError(t *testing.T) {
 			return nil, errors.New("db down")
 		},
 	}
-	svc := newStudySessionService(
+	service := newStudySessionService(
 		materialStore,
 		nil,
 		nil,
 	)
 
-	_, err := svc.BuildStudySession(
+	_, err := service.BuildStudySession(
 		ctx,
 		123,
 		"ja",

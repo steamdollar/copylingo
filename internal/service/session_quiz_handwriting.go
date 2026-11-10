@@ -38,12 +38,12 @@ type HandwritingSubmitResult struct {
 // SubmitHandwriting grades a Mini App handwriting submission for the current
 // question. An AI grading failure is returned as an error and nothing is
 // recorded, so the user can resubmit.
-func (s *SessionService) SubmitHandwriting(
+func (service *SessionService) SubmitHandwriting(
 	ctx context.Context,
-	req HandwritingSubmitRequest,
+	request HandwritingSubmitRequest,
 ) (*HandwritingSubmitResult, error) {
 	startedAt := time.Now()
-	ctx = observability.WithAttrs(
+	ctx = observability.WithAttributes(
 		ctx,
 		slog.String(
 			"source",
@@ -51,21 +51,21 @@ func (s *SessionService) SubmitHandwriting(
 		),
 		slog.Int64(
 			"user_id",
-			req.UserID,
+			request.UserID,
 		),
 		slog.Int(
 			"session_id",
-			req.SessionID,
+			request.SessionID,
 		),
 		slog.Int(
 			"question_id",
-			req.QuestionID,
+			request.QuestionID,
 		),
 	)
 
-	state, err := s.quizProgress.Get(
+	state, err := service.quizProgress.Get(
 		ctx,
-		req.SessionID,
+		request.SessionID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -73,11 +73,11 @@ func (s *SessionService) SubmitHandwriting(
 			err,
 		)
 	}
-	if state.Session.UserID != req.UserID {
+	if state.Session.UserID != request.UserID {
 		return nil, ErrHandwritingUnauthorized
 	}
 
-	item, _, ok := state.CurrentItemByQuestionID(req.QuestionID)
+	item, _, ok := state.CurrentItemByQuestionID(request.QuestionID)
 	if !ok {
 		return nil, ErrHandwritingQuestionMismatch
 	}
@@ -91,11 +91,11 @@ func (s *SessionService) SubmitHandwriting(
 
 	llmStartedAt := time.Now()
 	// An LLM failure returns before recording, so the learner can resubmit.
-	result, err := s.llm.GradeHandwriting(
+	result, err := service.llm.GradeHandwriting(
 		ctx,
 		question.Prompt,
 		question.CorrectAnswer,
-		req.Image,
+		request.Image,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -107,10 +107,10 @@ func (s *SessionService) SubmitHandwriting(
 
 	// RecordAnswer re-reads the state, so an answer recorded while the LLM
 	// was grading is rejected here instead of overwritten.
-	if err := s.quizProgress.RecordAnswer(
+	if err := service.quizProgress.RecordAnswer(
 		ctx,
-		req.SessionID,
-		req.QuestionID,
+		request.SessionID,
+		request.QuestionID,
 		"handwriting:submitted",
 		result.IsCorrect,
 	); err != nil {
@@ -137,7 +137,7 @@ func (s *SessionService) SubmitHandwriting(
 		"record_duration_ms",
 		time.Since(gradedAt).Milliseconds(),
 		"image_bytes",
-		len(req.Image),
+		len(request.Image),
 		"is_correct",
 		result.IsCorrect,
 	)

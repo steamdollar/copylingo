@@ -84,8 +84,8 @@ func assertLogFields(
 func TestHandleUpdateLogsTelegramCorrelationWithoutMessageBody(t *testing.T) {
 	output := captureJSONLogs(t)
 
-	b := &Bot{telegram: newTelegramClient(&mockBotAPI{})}
-	b.handleUpdate(tgbotapi.Update{
+	bot := &Bot{telegram: newTelegramClient(&mockBotAPI{})}
+	bot.handleUpdate(tgbotapi.Update{
 		UpdateID: 42,
 		Message: &tgbotapi.Message{
 			Text: "/start secret-payload",
@@ -124,8 +124,8 @@ func TestHandleUpdateLogsTelegramCorrelationWithoutMessageBody(t *testing.T) {
 	}
 }
 
-func TestTelegramUpdateAttrsExtractCallbackIDsWithoutRawData(t *testing.T) {
-	attrs := telegramUpdateAttrs(tgbotapi.Update{
+func TestTelegramUpdateAttributesExtractCallbackIDsWithoutRawData(t *testing.T) {
+	attributes := telegramUpdateAttributes(tgbotapi.Update{
 		UpdateID: 43,
 		CallbackQuery: &tgbotapi.CallbackQuery{
 			Data: "q:7:11:3",
@@ -137,8 +137,8 @@ func TestTelegramUpdateAttrsExtractCallbackIDsWithoutRawData(t *testing.T) {
 	})
 
 	got := make(map[string]any)
-	for _, attr := range attrs {
-		got[attr.Key] = attr.Value.Any()
+	for _, attribute := range attributes {
+		got[attribute.Key] = attribute.Value.Any()
 	}
 	for key, want := range map[string]any{
 		"interaction_id": "tg-43",
@@ -148,7 +148,7 @@ func TestTelegramUpdateAttrsExtractCallbackIDsWithoutRawData(t *testing.T) {
 	} {
 		if value := got[key]; value != want {
 			t.Fatalf(
-				"attrs[%q] = %#v, want %#v",
+				"attributes[%q] = %#v, want %#v",
 				key,
 				value,
 				want,
@@ -225,7 +225,7 @@ func TestHandleMessageLogsPlainTextWithoutPendingInput(t *testing.T) {
 	api := &mockBotAPI{}
 	stores := newTestInteractionStores()
 	noSessions := &mockSessionStore{
-		getSessionsByStatusFn: func(
+		getSessionsByStatusFunc: func(
 			ctx context.Context,
 			userID int64,
 			status model.SessionStatus,
@@ -233,19 +233,19 @@ func TestHandleMessageLogsPlainTextWithoutPendingInput(t *testing.T) {
 			return nil, nil
 		},
 	}
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		stores,
 		&testServices{
 			Session: newTestSessionService(
 				stores,
-				service.SessionDeps{SessionRepo: noSessions},
+				service.SessionDependencies{SessionRepository: noSessions},
 			),
 		},
 	)
 
-	b.handleMessage(
-		observability.WithAttrs(
+	bot.handleMessage(
+		observability.WithAttributes(
 			context.Background(),
 			slog.String(
 				"interaction_id",
@@ -301,7 +301,7 @@ func TestHandleMessageResumesInProgressQuizInsteadOfIgnoring(t *testing.T) {
 		},
 	)
 	inProgressQuiz := &mockSessionStore{
-		getSessionsByStatusFn: func(
+		getSessionsByStatusFunc: func(
 			ctx context.Context,
 			userID int64,
 			status model.SessionStatus,
@@ -309,18 +309,18 @@ func TestHandleMessageResumesInProgressQuizInsteadOfIgnoring(t *testing.T) {
 			return []model.Session{{ID: 10, Mode: model.SessionModeQuiz}}, nil
 		},
 	}
-	b := newTestBot(
+	bot := newTestBot(
 		api,
 		stores,
 		&testServices{
 			Session: newTestSessionService(
 				stores,
-				service.SessionDeps{SessionRepo: inProgressQuiz},
+				service.SessionDependencies{SessionRepository: inProgressQuiz},
 			),
 		},
 	)
 
-	b.handleMessage(
+	bot.handleMessage(
 		context.Background(),
 		&tgbotapi.Message{
 			Text: "hello",

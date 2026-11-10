@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnv(t *testing.T) {
+func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnvironment(t *testing.T) {
 	t.Setenv(
 		"COPYLINGO_TELEGRAM_TOKEN",
 		"test-token",
@@ -20,8 +20,8 @@ func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnv(t *testing.T) {
 		"https://old.trycloudflare.com",
 	)
 
-	tmpDir := t.TempDir()
-	t.Chdir(tmpDir)
+	temporaryDirectory := t.TempDir()
+	t.Chdir(temporaryDirectory)
 
 	if err := os.WriteFile(
 		".env",
@@ -34,7 +34,7 @@ func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnv(t *testing.T) {
 		)
 	}
 
-	cfg, err := Load()
+	appConfig, err := Load()
 	if err != nil {
 		t.Fatalf(
 			"Load() error = %v",
@@ -42,7 +42,7 @@ func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnv(t *testing.T) {
 		)
 	}
 
-	if got, want := cfg.Server.PublicBaseURL, "https://fresh.trycloudflare.com"; got != want {
+	if got, want := appConfig.Server.PublicBaseURL, "https://fresh.trycloudflare.com"; got != want {
 		t.Fatalf(
 			"PublicBaseURL = %q, want %q",
 			got,
@@ -51,7 +51,7 @@ func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnv(t *testing.T) {
 	}
 }
 
-func TestLoadUsesEnvPublicBaseURLWhenDotEnvMissing(t *testing.T) {
+func TestLoadUsesEnvironmentPublicBaseURLWhenDotEnvMissing(t *testing.T) {
 	t.Setenv(
 		"COPYLINGO_TELEGRAM_TOKEN",
 		"test-token",
@@ -67,7 +67,7 @@ func TestLoadUsesEnvPublicBaseURLWhenDotEnvMissing(t *testing.T) {
 
 	t.Chdir(t.TempDir())
 
-	cfg, err := Load()
+	appConfig, err := Load()
 	if err != nil {
 		t.Fatalf(
 			"Load() error = %v",
@@ -75,7 +75,7 @@ func TestLoadUsesEnvPublicBaseURLWhenDotEnvMissing(t *testing.T) {
 		)
 	}
 
-	if got, want := cfg.Server.PublicBaseURL, "https://env.trycloudflare.com"; got != want {
+	if got, want := appConfig.Server.PublicBaseURL, "https://env.trycloudflare.com"; got != want {
 		t.Fatalf(
 			"PublicBaseURL = %q, want %q",
 			got,
@@ -95,35 +95,35 @@ func TestLoadLoggingDefaults(t *testing.T) {
 	)
 	t.Chdir(t.TempDir())
 
-	cfg, err := Load()
+	appConfig, err := Load()
 	if err != nil {
 		t.Fatalf(
 			"Load() error = %v",
 			err,
 		)
 	}
-	if got, want := cfg.Logging.Dir, "./logs"; got != want {
+	if got, want := appConfig.Logging.Directory, "./logs"; got != want {
 		t.Fatalf(
 			"Logging.Dir = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.Logging.Level, "INFO"; got != want {
+	if got, want := appConfig.Logging.Level, "INFO"; got != want {
 		t.Fatalf(
 			"Logging.Level = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.Logging.RetentionDays, 30; got != want {
+	if got, want := appConfig.Logging.RetentionDays, 30; got != want {
 		t.Fatalf(
 			"Logging.RetentionDays = %d, want %d",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.Logging.Timezone, "Asia/Seoul"; got != want {
+	if got, want := appConfig.Logging.Timezone, "Asia/Seoul"; got != want {
 		t.Fatalf(
 			"Logging.Timezone = %q, want %q",
 			got,
@@ -143,35 +143,35 @@ func TestLoadLLMDefaults(t *testing.T) {
 	)
 	t.Chdir(t.TempDir())
 
-	cfg, err := Load()
+	appConfig, err := Load()
 	if err != nil {
 		t.Fatalf(
 			"Load() error = %v",
 			err,
 		)
 	}
-	if got, want := cfg.LLM.Model, "gemini-3.5-flash-lite"; got != want {
+	if got, want := appConfig.LLM.Model, "gemini-3.5-flash-lite"; got != want {
 		t.Fatalf(
 			"LLM.Model = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.LLM.TTSModel, "gemini-2.5-flash-preview-tts"; got != want {
+	if got, want := appConfig.LLM.TTSModel, "gemini-2.5-flash-preview-tts"; got != want {
 		t.Fatalf(
 			"LLM.TTSModel = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.LLM.TTSVoiceName, "Kore"; got != want {
+	if got, want := appConfig.LLM.TTSVoiceName, "Kore"; got != want {
 		t.Fatalf(
 			"LLM.TTSVoiceName = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.LLM.TTSVoiceNameB, "Puck"; got != want {
+	if got, want := appConfig.LLM.TTSVoiceNameB, "Puck"; got != want {
 		t.Fatalf(
 			"LLM.TTSVoiceNameB = %q, want %q",
 			got,
@@ -180,7 +180,7 @@ func TestLoadLLMDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadLLMTTSEnvOverrides(t *testing.T) {
+func TestLoadLLMTTSEnvironmentOverrides(t *testing.T) {
 	t.Setenv(
 		"COPYLINGO_TELEGRAM_TOKEN",
 		"test-token",
@@ -203,28 +203,28 @@ func TestLoadLLMTTSEnvOverrides(t *testing.T) {
 	)
 	t.Chdir(t.TempDir())
 
-	cfg, err := Load()
+	appConfig, err := Load()
 	if err != nil {
 		t.Fatalf(
 			"Load() error = %v",
 			err,
 		)
 	}
-	if got, want := cfg.LLM.TTSModel, "test-tts-model"; got != want {
+	if got, want := appConfig.LLM.TTSModel, "test-tts-model"; got != want {
 		t.Fatalf(
 			"LLM.TTSModel = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.LLM.TTSVoiceName, "Puck"; got != want {
+	if got, want := appConfig.LLM.TTSVoiceName, "Puck"; got != want {
 		t.Fatalf(
 			"LLM.TTSVoiceName = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.LLM.TTSVoiceNameB, "Zephyr"; got != want {
+	if got, want := appConfig.LLM.TTSVoiceNameB, "Zephyr"; got != want {
 		t.Fatalf(
 			"LLM.TTSVoiceNameB = %q, want %q",
 			got,
@@ -233,7 +233,7 @@ func TestLoadLLMTTSEnvOverrides(t *testing.T) {
 	}
 }
 
-func TestLoadLoggingEnvOverrides(t *testing.T) {
+func TestLoadLoggingEnvironmentOverrides(t *testing.T) {
 	t.Setenv(
 		"COPYLINGO_TELEGRAM_TOKEN",
 		"test-token",
@@ -260,35 +260,35 @@ func TestLoadLoggingEnvOverrides(t *testing.T) {
 	)
 	t.Chdir(t.TempDir())
 
-	cfg, err := Load()
+	appConfig, err := Load()
 	if err != nil {
 		t.Fatalf(
 			"Load() error = %v",
 			err,
 		)
 	}
-	if got, want := cfg.Logging.Dir, "./custom-logs"; got != want {
+	if got, want := appConfig.Logging.Directory, "./custom-logs"; got != want {
 		t.Fatalf(
 			"Logging.Dir = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.Logging.Level, "DEBUG"; got != want {
+	if got, want := appConfig.Logging.Level, "DEBUG"; got != want {
 		t.Fatalf(
 			"Logging.Level = %q, want %q",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.Logging.RetentionDays, 14; got != want {
+	if got, want := appConfig.Logging.RetentionDays, 14; got != want {
 		t.Fatalf(
 			"Logging.RetentionDays = %d, want %d",
 			got,
 			want,
 		)
 	}
-	if got, want := cfg.Logging.Timezone, "UTC"; got != want {
+	if got, want := appConfig.Logging.Timezone, "UTC"; got != want {
 		t.Fatalf(
 			"Logging.Timezone = %q, want %q",
 			got,

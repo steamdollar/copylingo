@@ -15,7 +15,7 @@ const (
 	testVoiceKey = "Kore-Puck"
 )
 
-type mockAudioRepo struct {
+type mockAudioRepository struct {
 	pending     []model.Question
 	pendingErr  error
 	setPathErr  error
@@ -25,24 +25,24 @@ type mockAudioRepo struct {
 	}
 }
 
-func (m *mockAudioRepo) GetListeningNeedingAudio(
+func (mock *mockAudioRepository) GetListeningNeedingAudio(
 	_ context.Context,
 	_ string,
 	_ int,
 ) ([]model.Question, error) {
-	return m.pending, m.pendingErr
+	return mock.pending, mock.pendingErr
 }
 
-func (m *mockAudioRepo) SetAudioPath(
+func (mock *mockAudioRepository) SetAudioPath(
 	_ context.Context,
 	id int,
 	key string,
 ) error {
-	if m.setPathErr != nil {
-		return m.setPathErr
+	if mock.setPathErr != nil {
+		return mock.setPathErr
 	}
-	m.setPathCall = append(
-		m.setPathCall,
+	mock.setPathCall = append(
+		mock.setPathCall,
 		struct {
 			id  int
 			key string
@@ -51,18 +51,18 @@ func (m *mockAudioRepo) SetAudioPath(
 	return nil
 }
 
-type mockSynth struct {
-	calls    int
-	synthErr error
+type mockSynthesizer struct {
+	calls          int
+	synthesizerErr error
 }
 
-func (m *mockSynth) Synthesize(
+func (mock *mockSynthesizer) Synthesize(
 	_ context.Context,
 	_ string,
 ) ([]byte, error) {
-	m.calls++
-	if m.synthErr != nil {
-		return nil, m.synthErr
+	mock.calls++
+	if mock.synthesizerErr != nil {
+		return nil, mock.synthesizerErr
 	}
 	return []byte("ogg-bytes"), nil
 }
@@ -74,51 +74,51 @@ type mockStore struct {
 	putErr   error
 }
 
-func (m *mockStore) Exists(
+func (mock *mockStore) Exists(
 	_ context.Context,
 	key string,
 ) (bool, error) {
-	if m.existErr != nil {
-		return false, m.existErr
+	if mock.existErr != nil {
+		return false, mock.existErr
 	}
-	return m.existing[key], nil
+	return mock.existing[key], nil
 }
 
-func (m *mockStore) Put(
+func (mock *mockStore) Put(
 	_ context.Context,
 	key string,
 	_ []byte,
 	_ string,
 ) error {
-	if m.putErr != nil {
-		return m.putErr
+	if mock.putErr != nil {
+		return mock.putErr
 	}
-	m.putKeys = append(
-		m.putKeys,
+	mock.putKeys = append(
+		mock.putKeys,
 		key,
 	)
 	return nil
 }
 
-func scriptPtr(s string) *string { return &s }
+func scriptPointer(value string) *string { return &value }
 
 // New object → Synthesize + Put + SetAudioPath with the content-addressed key.
 func TestTopUpAudio_GeneratesMissing(t *testing.T) {
 	script := "すみません、駅はどこですか。"
-	repo := &mockAudioRepo{pending: []model.Question{
-		{ID: 7, Language: "ja", AudioScript: scriptPtr(script)},
+	repository := &mockAudioRepository{pending: []model.Question{
+		{ID: 7, Language: "ja", AudioScript: scriptPointer(script)},
 	}}
-	synth := &mockSynth{}
+	synthesizer := &mockSynthesizer{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := newAudioGenerator(
-		repo,
-		synth,
+	generator := newAudioGenerator(
+		repository,
+		synthesizer,
 		store,
 		testVoice,
 		testVoiceB,
 	)
 
-	if err := s.TopUpAudio(
+	if err := generator.TopUpAudio(
 		context.Background(),
 		"ja",
 	); err != nil {
@@ -133,10 +133,10 @@ func TestTopUpAudio_GeneratesMissing(t *testing.T) {
 		testVoiceKey,
 		script,
 	)
-	if synth.calls != 1 {
+	if synthesizer.calls != 1 {
 		t.Errorf(
 			"expected 1 synth call, got %d",
-			synth.calls,
+			synthesizer.calls,
 		)
 	}
 	if len(store.putKeys) != 1 || store.putKeys[0] != wantKey {
@@ -146,10 +146,11 @@ func TestTopUpAudio_GeneratesMissing(t *testing.T) {
 			wantKey,
 		)
 	}
-	if len(repo.setPathCall) != 1 || repo.setPathCall[0].id != 7 || repo.setPathCall[0].key != wantKey {
+	if len(repository.setPathCall) != 1 || repository.setPathCall[0].id != 7 ||
+		repository.setPathCall[0].key != wantKey {
 		t.Errorf(
 			"setPath = %+v, want id=7 key=%s",
-			repo.setPathCall,
+			repository.setPathCall,
 			wantKey,
 		)
 	}
@@ -163,20 +164,20 @@ func TestTopUpAudio_DedupSkipsSynthesis(t *testing.T) {
 		testVoiceKey,
 		script,
 	)
-	repo := &mockAudioRepo{pending: []model.Question{
-		{ID: 1, Language: "ja", AudioScript: scriptPtr(script)},
+	repository := &mockAudioRepository{pending: []model.Question{
+		{ID: 1, Language: "ja", AudioScript: scriptPointer(script)},
 	}}
-	synth := &mockSynth{}
+	synthesizer := &mockSynthesizer{}
 	store := &mockStore{existing: map[string]bool{key: true}}
-	s := newAudioGenerator(
-		repo,
-		synth,
+	generator := newAudioGenerator(
+		repository,
+		synthesizer,
 		store,
 		testVoice,
 		testVoiceB,
 	)
 
-	if err := s.TopUpAudio(
+	if err := generator.TopUpAudio(
 		context.Background(),
 		"ja",
 	); err != nil {
@@ -185,10 +186,10 @@ func TestTopUpAudio_DedupSkipsSynthesis(t *testing.T) {
 			err,
 		)
 	}
-	if synth.calls != 0 {
+	if synthesizer.calls != 0 {
 		t.Errorf(
 			"expected 0 synth calls on dedup, got %d",
-			synth.calls,
+			synthesizer.calls,
 		)
 	}
 	if len(store.putKeys) != 0 {
@@ -197,31 +198,31 @@ func TestTopUpAudio_DedupSkipsSynthesis(t *testing.T) {
 			store.putKeys,
 		)
 	}
-	if len(repo.setPathCall) != 1 || repo.setPathCall[0].key != key {
+	if len(repository.setPathCall) != 1 || repository.setPathCall[0].key != key {
 		t.Errorf(
 			"expected audio_path set to existing key, got %+v",
-			repo.setPathCall,
+			repository.setPathCall,
 		)
 	}
 }
 
 // A synth failure on one question does not abort the batch or return an error.
 func TestTopUpAudio_PerQuestionFailureIsolated(t *testing.T) {
-	repo := &mockAudioRepo{pending: []model.Question{
-		{ID: 1, Language: "ja", AudioScript: scriptPtr("a")},
-		{ID: 2, Language: "ja", AudioScript: scriptPtr("b")},
+	repository := &mockAudioRepository{pending: []model.Question{
+		{ID: 1, Language: "ja", AudioScript: scriptPointer("a")},
+		{ID: 2, Language: "ja", AudioScript: scriptPointer("b")},
 	}}
-	synth := &mockSynth{synthErr: errors.New("tts down")}
+	synthesizer := &mockSynthesizer{synthesizerErr: errors.New("tts down")}
 	store := &mockStore{existing: map[string]bool{}}
-	s := newAudioGenerator(
-		repo,
-		synth,
+	generator := newAudioGenerator(
+		repository,
+		synthesizer,
 		store,
 		testVoice,
 		testVoiceB,
 	)
 
-	if err := s.TopUpAudio(
+	if err := generator.TopUpAudio(
 		context.Background(),
 		"ja",
 	); err != nil {
@@ -230,37 +231,37 @@ func TestTopUpAudio_PerQuestionFailureIsolated(t *testing.T) {
 			err,
 		)
 	}
-	if synth.calls != 2 {
+	if synthesizer.calls != 2 {
 		t.Errorf(
 			"expected both questions attempted, got %d synth calls",
-			synth.calls,
+			synthesizer.calls,
 		)
 	}
-	if len(repo.setPathCall) != 0 {
+	if len(repository.setPathCall) != 0 {
 		t.Errorf(
 			"expected no audio_path set when synth fails, got %+v",
-			repo.setPathCall,
+			repository.setPathCall,
 		)
 	}
 }
 
 // Questions with no script are skipped entirely.
 func TestTopUpAudio_SkipsEmptyScript(t *testing.T) {
-	repo := &mockAudioRepo{pending: []model.Question{
+	repository := &mockAudioRepository{pending: []model.Question{
 		{ID: 1, Language: "ja", AudioScript: nil},
-		{ID: 2, Language: "ja", AudioScript: scriptPtr("")},
+		{ID: 2, Language: "ja", AudioScript: scriptPointer("")},
 	}}
-	synth := &mockSynth{}
+	synthesizer := &mockSynthesizer{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := newAudioGenerator(
-		repo,
-		synth,
+	generator := newAudioGenerator(
+		repository,
+		synthesizer,
 		store,
 		testVoice,
 		testVoiceB,
 	)
 
-	if err := s.TopUpAudio(
+	if err := generator.TopUpAudio(
 		context.Background(),
 		"ja",
 	); err != nil {
@@ -269,28 +270,28 @@ func TestTopUpAudio_SkipsEmptyScript(t *testing.T) {
 			err,
 		)
 	}
-	if synth.calls != 0 {
+	if synthesizer.calls != 0 {
 		t.Errorf(
 			"expected 0 synth calls for empty scripts, got %d",
-			synth.calls,
+			synthesizer.calls,
 		)
 	}
 }
 
 // Empty backlog → no-op, no error.
 func TestTopUpAudio_EmptyPending(t *testing.T) {
-	repo := &mockAudioRepo{pending: nil}
-	synth := &mockSynth{}
+	repository := &mockAudioRepository{pending: nil}
+	synthesizer := &mockSynthesizer{}
 	store := &mockStore{existing: map[string]bool{}}
-	s := newAudioGenerator(
-		repo,
-		synth,
+	generator := newAudioGenerator(
+		repository,
+		synthesizer,
 		store,
 		testVoice,
 		testVoiceB,
 	)
 
-	if err := s.TopUpAudio(
+	if err := generator.TopUpAudio(
 		context.Background(),
 		"ja",
 	); err != nil {
@@ -299,10 +300,10 @@ func TestTopUpAudio_EmptyPending(t *testing.T) {
 			err,
 		)
 	}
-	if synth.calls != 0 {
+	if synthesizer.calls != 0 {
 		t.Errorf(
 			"expected 0 synth calls on empty pending, got %d",
-			synth.calls,
+			synthesizer.calls,
 		)
 	}
 }

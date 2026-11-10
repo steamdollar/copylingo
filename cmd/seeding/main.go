@@ -91,7 +91,7 @@ func setup() (string, *sqlx.DB) {
 			entry.Name(),
 		)
 	}
-	language, err := parseLanguageArg(
+	language, err := parseLanguageArgument(
 		os.Args[1:],
 		languages,
 	)
@@ -108,14 +108,14 @@ func setup() (string, *sqlx.DB) {
 		os.Exit(2)
 	}
 
-	cfg, err := config.Load()
+	appConfig, err := config.Load()
 	if err != nil {
 		log.Fatalf(
 			"Failed to load config: %v",
 			err,
 		)
 	}
-	db, err := bootstrap.OpenDB(cfg.DB)
+	db, err := bootstrap.OpenDB(appConfig.DB)
 	if err != nil {
 		log.Fatalf(
 			"Database connection failed: %v",
@@ -125,19 +125,19 @@ func setup() (string, *sqlx.DB) {
 	return language, db
 }
 
-// parseLanguageArg takes the one positional argument, which must name an
+// parseLanguageArgument takes the one positional argument, which must name an
 // embedded data directory exactly, without case or space normalization.
-func parseLanguageArg(
-	args []string,
+func parseLanguageArgument(
+	arguments []string,
 	languages []string,
 ) (string, error) {
-	if len(args) != 1 {
+	if len(arguments) != 1 {
 		return "", fmt.Errorf(
 			"expected one language argument, got %d",
-			len(args),
+			len(arguments),
 		)
 	}
-	language := args[0]
+	language := arguments[0]
 	if !slices.Contains(
 		languages,
 		language,
@@ -216,7 +216,7 @@ func loadRecords(language string) ([]*materialRecord, []*model.Question, error) 
 // material IDs that nested questions link to, then every question.
 func seedRecords(
 	ctx context.Context,
-	repos *repository.Repositories,
+	repositories *repository.Repositories,
 	materials []*materialRecord,
 	looseQuestions []*model.Question,
 ) error {
@@ -227,7 +227,7 @@ func seedRecords(
 	for i, material := range materials {
 		materialRows[i] = &material.Material
 	}
-	if err := repos.Material.UpsertBatch(
+	if err := repositories.Material.UpsertBatch(
 		ctx,
 		materialRows,
 	); err != nil {
@@ -245,7 +245,7 @@ func seedRecords(
 		materials,
 		looseQuestions,
 	)
-	if err := repos.Question.UpsertSeedBatch(
+	if err := repositories.Question.UpsertSeedBatch(
 		ctx,
 		questions,
 	); err != nil {

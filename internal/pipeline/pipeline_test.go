@@ -17,18 +17,21 @@ type mockNHKClient struct {
 	bodyErr  error
 }
 
-func (m *mockNHKClient) FetchArticleList(ctx context.Context) (map[string][]external.NHKArticleMeta, error) {
-	if m.fetchErr != nil {
-		return nil, m.fetchErr
+func (mock *mockNHKClient) FetchArticleList(ctx context.Context) (map[string][]external.NHKArticleMeta, error) {
+	if mock.fetchErr != nil {
+		return nil, mock.fetchErr
 	}
-	return m.articles, nil
+	return mock.articles, nil
 }
 
-func (m *mockNHKClient) FetchArticleBody(ctx context.Context, newsID string) (string, error) {
-	if m.bodyErr != nil {
-		return "", m.bodyErr
+func (mock *mockNHKClient) FetchArticleBody(
+	ctx context.Context,
+	newsID string,
+) (string, error) {
+	if mock.bodyErr != nil {
+		return "", mock.bodyErr
 	}
-	body, ok := m.bodies[newsID]
+	body, ok := mock.bodies[newsID]
 	if !ok {
 		return "", errors.New("not found")
 	}
@@ -42,9 +45,9 @@ type mockFetcher struct {
 	err      error
 }
 
-func (m *mockFetcher) Name() string { return m.name }
-func (m *mockFetcher) Fetch(ctx context.Context) ([]RawContent, error) {
-	return m.contents, m.err
+func (mock *mockFetcher) Name() string { return mock.name }
+func (mock *mockFetcher) Fetch(ctx context.Context) ([]RawContent, error) {
+	return mock.contents, mock.err
 }
 
 // Mock Processor
@@ -52,16 +55,22 @@ type mockProcessor struct {
 	err error
 }
 
-func (m *mockProcessor) Process(ctx context.Context, raw []RawContent) ([]model.Content, error) {
-	if m.err != nil {
-		return nil, m.err
+func (mock *mockProcessor) Process(
+	ctx context.Context,
+	raw []RawContent,
+) ([]model.Content, error) {
+	if mock.err != nil {
+		return nil, mock.err
 	}
-	contents := make([]model.Content, len(raw))
-	for i, r := range raw {
+	contents := make(
+		[]model.Content,
+		len(raw),
+	)
+	for i, rawContent := range raw {
 		contents[i] = model.Content{
-			SourceURL: r.SourceURL,
-			Title:     r.Title,
-			Body:      r.Body,
+			SourceURL: rawContent.SourceURL,
+			Title:     rawContent.Title,
+			Body:      rawContent.Body,
 		}
 	}
 	return contents, nil
@@ -73,8 +82,11 @@ type mockSaver struct {
 	err    error
 }
 
-func (m *mockSaver) Save(ctx context.Context, contents []model.Content) (SaveResult, error) {
-	return m.result, m.err
+func (mock *mockSaver) Save(
+	ctx context.Context,
+	contents []model.Content,
+) (SaveResult, error) {
+	return mock.result, mock.err
 }
 
 // Tests
@@ -93,27 +105,45 @@ func TestNHKFetcher_Fetch(t *testing.T) {
 		},
 	}
 
-	fetcher := NewNHKFetcher(client, WithMaxArticles(10))
+	fetcher := NewNHKFetcher(
+		client,
+		WithMaxArticles(10),
+	)
 	contents, err := fetcher.Fetch(context.Background())
 
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(
+			"unexpected error: %v",
+			err,
+		)
 	}
 
 	if len(contents) != 2 {
-		t.Fatalf("expected 2 contents, got %d", len(contents))
+		t.Fatalf(
+			"expected 2 contents, got %d",
+			len(contents),
+		)
 	}
 
 	if contents[0].Title != "テスト1" {
-		t.Errorf("expected title テスト1, got %s", contents[0].Title)
+		t.Errorf(
+			"expected title テスト1, got %s",
+			contents[0].Title,
+		)
 	}
 
 	if contents[0].Language != "ja" {
-		t.Errorf("expected language ja, got %s", contents[0].Language)
+		t.Errorf(
+			"expected language ja, got %s",
+			contents[0].Language,
+		)
 	}
 
 	if contents[0].Level != "N4" {
-		t.Errorf("expected level N4, got %s", contents[0].Level)
+		t.Errorf(
+			"expected level N4, got %s",
+			contents[0].Level,
+		)
 	}
 }
 
@@ -133,15 +163,24 @@ func TestNHKFetcher_FetchWithLimit(t *testing.T) {
 		},
 	}
 
-	fetcher := NewNHKFetcher(client, WithMaxArticles(2))
+	fetcher := NewNHKFetcher(
+		client,
+		WithMaxArticles(2),
+	)
 	contents, err := fetcher.Fetch(context.Background())
 
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(
+			"unexpected error: %v",
+			err,
+		)
 	}
 
 	if len(contents) != 2 {
-		t.Fatalf("expected 2 contents (limited), got %d", len(contents))
+		t.Fatalf(
+			"expected 2 contents (limited), got %d",
+			len(contents),
+		)
 	}
 }
 
@@ -175,30 +214,54 @@ func TestPassThroughProcessor_Process(t *testing.T) {
 		},
 	}
 
-	contents, err := processor.Process(context.Background(), raw)
+	contents, err := processor.Process(
+		context.Background(),
+		raw,
+	)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf(
+			"unexpected error: %v",
+			err,
+		)
 	}
 
 	if len(contents) != 1 {
-		t.Fatalf("expected 1 content, got %d", len(contents))
+		t.Fatalf(
+			"expected 1 content, got %d",
+			len(contents),
+		)
 	}
 
-	c := contents[0]
-	if c.SourceURL != "https://test.com" {
-		t.Errorf("expected URL https://test.com, got %s", c.SourceURL)
+	content := contents[0]
+	if content.SourceURL != "https://test.com" {
+		t.Errorf(
+			"expected URL https://test.com, got %s",
+			content.SourceURL,
+		)
 	}
-	if c.Title != "Test Title" {
-		t.Errorf("expected title Test Title, got %s", c.Title)
+	if content.Title != "Test Title" {
+		t.Errorf(
+			"expected title Test Title, got %s",
+			content.Title,
+		)
 	}
-	if c.Language != "ja" {
-		t.Errorf("expected language ja, got %s", c.Language)
+	if content.Language != "ja" {
+		t.Errorf(
+			"expected language ja, got %s",
+			content.Language,
+		)
 	}
-	if c.ProficiencyLevel != "N4" {
-		t.Errorf("expected level N4, got %s", c.ProficiencyLevel)
+	if content.ProficiencyLevel != "N4" {
+		t.Errorf(
+			"expected level N4, got %s",
+			content.ProficiencyLevel,
+		)
 	}
-	if c.SourceType != model.ContentSourceNews {
-		t.Errorf("expected source type news, got %s", c.SourceType)
+	if content.SourceType != model.ContentSourceNews {
+		t.Errorf(
+			"expected source type news, got %s",
+			content.SourceType,
+		)
 	}
 }
 
@@ -218,33 +281,55 @@ func TestOrchestrator_RunAll(t *testing.T) {
 		result: SaveResult{Saved: 1, Duplicates: 0},
 	}
 
-	orchestrator.Register(fetcher, processor, saver)
+	orchestrator.Register(
+		fetcher,
+		processor,
+		saver,
+	)
 
 	if orchestrator.PipelineCount() != 1 {
-		t.Errorf("expected 1 pipeline, got %d", orchestrator.PipelineCount())
+		t.Errorf(
+			"expected 1 pipeline, got %d",
+			orchestrator.PipelineCount(),
+		)
 	}
 
 	results := orchestrator.RunAll(context.Background())
 
 	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
+		t.Fatalf(
+			"expected 1 result, got %d",
+			len(results),
+		)
 	}
 
-	r := results[0]
-	if r.FetcherName != "test" {
-		t.Errorf("expected fetcher name test, got %s", r.FetcherName)
+	result := results[0]
+	if result.FetcherName != "test" {
+		t.Errorf(
+			"expected fetcher name test, got %s",
+			result.FetcherName,
+		)
 	}
 
-	if r.FetchedCount != 1 {
-		t.Errorf("expected 1 fetched, got %d", r.FetchedCount)
+	if result.FetchedCount != 1 {
+		t.Errorf(
+			"expected 1 fetched, got %d",
+			result.FetchedCount,
+		)
 	}
 
-	if r.SaveResult.Saved != 1 {
-		t.Errorf("expected 1 saved, got %d", r.SaveResult.Saved)
+	if result.SaveResult.Saved != 1 {
+		t.Errorf(
+			"expected 1 saved, got %d",
+			result.SaveResult.Saved,
+		)
 	}
 
-	if r.Err != nil {
-		t.Errorf("unexpected error: %v", r.Err)
+	if result.Err != nil {
+		t.Errorf(
+			"unexpected error: %v",
+			result.Err,
+		)
 	}
 }
 
@@ -256,12 +341,19 @@ func TestOrchestrator_RunAll_FetcherError(t *testing.T) {
 		err:  errors.New("fetch error"),
 	}
 
-	orchestrator.Register(fetcher, &mockProcessor{}, &mockSaver{})
+	orchestrator.Register(
+		fetcher,
+		&mockProcessor{},
+		&mockSaver{},
+	)
 
 	results := orchestrator.RunAll(context.Background())
 
 	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
+		t.Fatalf(
+			"expected 1 result, got %d",
+			len(results),
+		)
 	}
 
 	if results[0].Err == nil {
@@ -289,12 +381,18 @@ func TestOrchestrator_RunAll_MultiplePipelines(t *testing.T) {
 	results := orchestrator.RunAll(context.Background())
 
 	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
+		t.Fatalf(
+			"expected 2 results, got %d",
+			len(results),
+		)
 	}
 
 	// First should succeed
 	if results[0].Err != nil {
-		t.Errorf("first pipeline should succeed, got error: %v", results[0].Err)
+		t.Errorf(
+			"first pipeline should succeed, got error: %v",
+			results[0].Err,
+		)
 	}
 
 	// Second should fail

@@ -22,11 +22,11 @@ var (
 )
 
 // BuildMorningQuiz creates the morning Quiz session; nil means no questions were available.
-func (s *SessionService) BuildMorningQuiz(
+func (service *SessionService) BuildMorningQuiz(
 	ctx context.Context,
 	user model.User,
 ) (*model.Session, error) {
-	return s.selection.BuildMorningSession(
+	return service.selection.BuildMorningSession(
 		ctx,
 		user.ID,
 		user.Language,
@@ -35,11 +35,11 @@ func (s *SessionService) BuildMorningQuiz(
 }
 
 // BuildEveningQuiz creates the evening Quiz session; nil means no questions were available.
-func (s *SessionService) BuildEveningQuiz(
+func (service *SessionService) BuildEveningQuiz(
 	ctx context.Context,
 	user model.User,
 ) (*model.Session, error) {
-	return s.selection.BuildEveningSession(
+	return service.selection.BuildEveningSession(
 		ctx,
 		user.ID,
 		user.Language,
@@ -50,11 +50,11 @@ func (s *SessionService) BuildEveningQuiz(
 // BuildReviewQuiz creates an on-demand review Quiz of at most
 // maxReviewQuizQuestions due items. A due-count lookup failure is treated as
 // zero due items (existing policy), so it surfaces as ErrNoDueReviews.
-func (s *SessionService) BuildReviewQuiz(
+func (service *SessionService) BuildReviewQuiz(
 	ctx context.Context,
 	user model.User,
 ) (*model.Session, error) {
-	dueCount, err := s.DueReviewCount(
+	dueCount, err := service.DueReviewCount(
 		ctx,
 		user.ID,
 		user.Language,
@@ -78,7 +78,7 @@ func (s *SessionService) BuildReviewQuiz(
 	if dueCount == 0 {
 		return nil, ErrNoDueReviews
 	}
-	return s.selection.BuildReviewSession(
+	return service.selection.BuildReviewSession(
 		ctx,
 		user.ID,
 		user.Language,
@@ -97,12 +97,12 @@ func (s *SessionService) BuildReviewQuiz(
 // overwrite recorded answers. Only a pending session (no progress yet) is
 // reloaded after the DB transition so Redis reflects the new status.
 // A zero session owner skips the owner check (legacy rows).
-func (s *SessionService) StartQuiz(
+func (service *SessionService) StartQuiz(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) (*model.QuizActiveSessionState, error) {
-	state, err := s.quizProgress.Get(
+	state, err := service.quizProgress.Get(
 		ctx,
 		sessionID,
 	)
@@ -123,7 +123,7 @@ func (s *SessionService) StartQuiz(
 	}
 	wasPending := state.Session.Status == model.SessionPending
 
-	if err := s.sessionRepo.Start(
+	if err := service.sessionRepository.Start(
 		ctx,
 		sessionID,
 	); err != nil {
@@ -136,7 +136,7 @@ func (s *SessionService) StartQuiz(
 	if !wasPending {
 		return state, nil
 	}
-	state, err = s.quizProgress.CreateFromDB(
+	state, err = service.quizProgress.CreateFromDB(
 		ctx,
 		sessionID,
 	)
@@ -151,35 +151,35 @@ func (s *SessionService) StartQuiz(
 	return state, nil
 }
 
-// ShowQuizQuestion moves the working-set cursor to questionIdx and returns the
+// ShowQuizQuestion moves the working-set cursor to questionIndex and returns the
 // state to render, with one Redis read. An index at or past the end returns
 // the state unchanged so the caller can render the finish screen.
-func (s *SessionService) ShowQuizQuestion(
+func (service *SessionService) ShowQuizQuestion(
 	ctx context.Context,
 	sessionID,
-	questionIdx int,
+	questionIndex int,
 ) (*model.QuizActiveSessionState, error) {
-	state, err := s.quizProgress.Get(
+	state, err := service.quizProgress.Get(
 		ctx,
 		sessionID,
 	)
 	if err != nil {
 		return nil, err
 	}
-	if questionIdx >= len(state.Items) {
+	if questionIndex >= len(state.Items) {
 		return state, nil
 	}
-	if questionIdx < 0 {
+	if questionIndex < 0 {
 		return nil, fmt.Errorf(
 			"move quiz cursor session_id=%d idx=%d: %w",
 			sessionID,
-			questionIdx,
+			questionIndex,
 			ErrQuizActiveSessionQuestionNotFound,
 		)
 	}
-	state.CurrentIndex = questionIdx
+	state.CurrentIndex = questionIndex
 	state.UpdatedAt = time.Now()
-	if err := s.quizProgress.save(
+	if err := service.quizProgress.save(
 		ctx,
 		state,
 	); err != nil {

@@ -52,7 +52,7 @@ func main() {
 	)
 	flag.Parse()
 
-	cfg, err := config.Load()
+	appConfig, err := config.Load()
 	if err != nil {
 		log.Fatalf(
 			"load config: %v",
@@ -60,7 +60,7 @@ func main() {
 		)
 	}
 
-	db, err := bootstrap.OpenDB(cfg.DB)
+	db, err := bootstrap.OpenDB(appConfig.DB)
 	if err != nil {
 		log.Fatalf(
 			"database connection failed: %v",
@@ -74,8 +74,8 @@ func main() {
 		*timeout,
 	)
 	defer cancel()
-	repos := repository.NewRepositories(db)
-	pending, err := repos.Question.GetListeningNeedingAudio(
+	repositories := repository.NewRepositories(db)
+	pending, err := repositories.Question.GetListeningNeedingAudio(
 		ctx,
 		*language,
 		1000,
@@ -95,17 +95,17 @@ func main() {
 	}
 
 	audio := newAudioGenerator(
-		repos.Question,
+		repositories.Question,
 		external.NewTTSClient(external.TTSOptions{
-			APIKey:  cfg.LLM.APIKey,
-			BaseURL: cfg.LLM.BaseURL,
-			Model:   cfg.LLM.TTSModel,
-			Voice:   cfg.LLM.TTSVoiceName,
-			VoiceB:  cfg.LLM.TTSVoiceNameB,
+			APIKey:  appConfig.LLM.APIKey,
+			BaseURL: appConfig.LLM.BaseURL,
+			Model:   appConfig.LLM.TTSModel,
+			Voice:   appConfig.LLM.TTSVoiceName,
+			VoiceB:  appConfig.LLM.TTSVoiceNameB,
 		}),
-		bootstrap.NewAudioStore(cfg.Storage),
-		cfg.LLM.TTSVoiceName,
-		cfg.LLM.TTSVoiceNameB,
+		bootstrap.NewAudioStore(appConfig.Storage),
+		appConfig.LLM.TTSVoiceName,
+		appConfig.LLM.TTSVoiceNameB,
 	)
 	cycles := (len(pending) + audioGeneratePerCycle - 1) / audioGeneratePerCycle
 	log.Printf(
@@ -141,7 +141,7 @@ func main() {
 		}
 	}
 
-	remaining, err := repos.Question.GetListeningNeedingAudio(
+	remaining, err := repositories.Question.GetListeningNeedingAudio(
 		ctx,
 		*language,
 		1000,

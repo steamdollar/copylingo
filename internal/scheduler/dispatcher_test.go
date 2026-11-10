@@ -26,29 +26,29 @@ type pushClaimCall struct {
 	today  string
 }
 
-func (m *mockPushClaims) TryClaim(
+func (mock *mockPushClaims) TryClaim(
 	_ context.Context,
 	userID int64,
 	slot model.SessionSlot,
 	today string,
 ) (bool, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	mock.mu.Lock()
+	defer mock.mu.Unlock()
 	call := pushClaimCall{userID: userID, slot: slot, today: today}
-	m.calls = append(
-		m.calls,
+	mock.calls = append(
+		mock.calls,
 		call,
 	)
-	if m.err != nil {
-		return false, m.err
+	if mock.err != nil {
+		return false, mock.err
 	}
-	if m.claimed[call] {
+	if mock.claimed[call] {
 		return false, nil
 	}
-	if m.claimed == nil {
-		m.claimed = make(map[pushClaimCall]bool)
+	if mock.claimed == nil {
+		mock.claimed = make(map[pushClaimCall]bool)
 	}
-	m.claimed[call] = true
+	mock.claimed[call] = true
 	return true, nil
 }
 
@@ -58,42 +58,42 @@ type mockDispatcherPusher struct {
 	studyPushes []int64
 }
 
-// schedulerSessionQueryRepoStub serves the unfinished-session queries; the
-// embedded nil SessionRepo makes any other repository call panic.
-type schedulerSessionQueryRepoStub struct {
-	service.SessionRepo
+// schedulerSessionQueryRepositoryStub serves the unfinished-session queries; the
+// embedded nil SessionRepository makes any other repository call panic.
+type schedulerSessionQueryRepositoryStub struct {
+	service.SessionRepository
 	session *model.Session
 	err     error
 }
 
-func (r *schedulerSessionQueryRepoStub) GetOldestUnfinished(
+func (stub *schedulerSessionQueryRepositoryStub) GetOldestUnfinished(
 	context.Context,
 	int64,
 ) (*model.Session, error) {
-	return r.session, r.err
+	return stub.session, stub.err
 }
 
-func (r *schedulerSessionQueryRepoStub) CountUnfinishedBatch(
+func (stub *schedulerSessionQueryRepositoryStub) CountUnfinishedBatch(
 	context.Context,
 	[]int64,
 ) (map[int64]int, error) {
-	return nil, r.err
+	return nil, stub.err
 }
 
-func newSchedulerSessionService(repo *schedulerSessionQueryRepoStub) *service.SessionService {
-	return service.NewSessionService(service.SessionDeps{SessionRepo: repo})
+func newSchedulerSessionService(repository *schedulerSessionQueryRepositoryStub) *service.SessionService {
+	return service.NewSessionService(service.SessionDependencies{SessionRepository: repository})
 }
 
-func (p *mockDispatcherPusher) PushSession(
+func (mock *mockDispatcherPusher) PushSession(
 	ctx context.Context,
 	chatID int64,
 	sessionID int,
 	sessionType string,
 ) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.quizPushes = append(
-		p.quizPushes,
+	mock.mu.Lock()
+	defer mock.mu.Unlock()
+	mock.quizPushes = append(
+		mock.quizPushes,
 		chatID,
 	)
 	return nil
@@ -101,23 +101,23 @@ func (p *mockDispatcherPusher) PushSession(
 
 // study returns the Study push contract over the same recorder, so a test
 // can assert which kind of push each user received.
-func (p *mockDispatcherPusher) study() mockStudyPusher {
-	return mockStudyPusher{recorder: p}
+func (mock *mockDispatcherPusher) study() mockStudyPusher {
+	return mockStudyPusher{recorder: mock}
 }
 
 type mockStudyPusher struct {
 	recorder *mockDispatcherPusher
 }
 
-func (p mockStudyPusher) PushSession(
+func (mock mockStudyPusher) PushSession(
 	ctx context.Context,
 	chatID int64,
 	sessionID int,
 ) error {
-	p.recorder.mu.Lock()
-	defer p.recorder.mu.Unlock()
-	p.recorder.studyPushes = append(
-		p.recorder.studyPushes,
+	mock.recorder.mu.Lock()
+	defer mock.recorder.mu.Unlock()
+	mock.recorder.studyPushes = append(
+		mock.recorder.studyPushes,
 		chatID,
 	)
 	return nil
@@ -130,10 +130,10 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 
 	// Stub session query returning an unfinished session so reminder succeeds
 	unfinishedSession := &model.Session{ID: 10, Mode: model.SessionModeStudy}
-	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
-	sessions := newSchedulerSessionService(sqStub)
+	sessionQueryStub := &schedulerSessionQueryRepositoryStub{session: unfinishedSession}
+	sessions := newSchedulerSessionService(sessionQueryStub)
 
-	d := newSessionDispatcher(
+	dispatcher := newSessionDispatcher(
 		sessions,
 		pusher,
 		pusher.study(),
@@ -142,7 +142,7 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 	user := model.User{ID: 1001, Language: "ja", ProficiencyLevel: "N5"}
 
 	// 1st dispatch: Should acquire lock and push
-	if err := d.dispatchUser(
+	if err := dispatcher.dispatchUser(
 		ctx,
 		user,
 		model.SessionSlotMorningStudy,
@@ -161,7 +161,7 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 	}
 
 	// 2nd dispatch: Redis lock already exists, should skip
-	if err := d.dispatchUser(
+	if err := dispatcher.dispatchUser(
 		ctx,
 		user,
 		model.SessionSlotMorningStudy,
@@ -207,17 +207,17 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 func TestDispatcher_ClaimErrorFailsOpen(t *testing.T) {
 	claims := &mockPushClaims{err: errors.New("redis unavailable")}
 	pusher := &mockDispatcherPusher{}
-	sessions := newSchedulerSessionService(&schedulerSessionQueryRepoStub{
+	sessions := newSchedulerSessionService(&schedulerSessionQueryRepositoryStub{
 		session: &model.Session{ID: 10, Mode: model.SessionModeStudy},
 	})
-	d := newSessionDispatcher(
+	dispatcher := newSessionDispatcher(
 		sessions,
 		pusher,
 		pusher.study(),
 		claims,
 	)
 
-	if err := d.dispatchUser(
+	if err := dispatcher.dispatchUser(
 		context.Background(),
 		model.User{ID: 1001},
 		model.SessionSlotMorningStudy,
@@ -241,10 +241,10 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 	pusher := &mockDispatcherPusher{}
 
 	unfinishedSession := &model.Session{ID: 99, Type: model.SessionMorning, Mode: model.SessionModeQuiz}
-	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
-	sessions := newSchedulerSessionService(sqStub)
+	sessionQueryStub := &schedulerSessionQueryRepositoryStub{session: unfinishedSession}
+	sessions := newSchedulerSessionService(sessionQueryStub)
 
-	d := newSessionDispatcher(
+	dispatcher := newSessionDispatcher(
 		sessions,
 		pusher,
 		pusher.study(),
@@ -253,7 +253,7 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 	user := model.User{ID: 2002, Language: "ja", ProficiencyLevel: "N5"}
 
 	// Unfinished count = 3 >= max (3): Should remind rather than build
-	if err := d.dispatchUser(
+	if err := dispatcher.dispatchUser(
 		ctx,
 		user,
 		model.SessionSlotMorningQuiz,
@@ -274,8 +274,8 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 }
 
 func TestDispatcher_RateLimiter(t *testing.T) {
-	rl := newRateLimiter(100) // 100 msgs/sec
-	defer rl.Stop()
+	limiter := newRateLimiter(100) // 100 msgs/sec
+	defer limiter.Stop()
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
@@ -283,7 +283,7 @@ func TestDispatcher_RateLimiter(t *testing.T) {
 	)
 	defer cancel()
 
-	if err := rl.Wait(ctx); err != nil {
+	if err := limiter.Wait(ctx); err != nil {
 		t.Fatalf(
 			"Wait failed: %v",
 			err,
@@ -296,18 +296,18 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 	pusher := &mockDispatcherPusher{}
 
 	unfinishedSession := &model.Session{ID: 1, Mode: model.SessionModeStudy}
-	sqStub := &schedulerSessionQueryRepoStub{session: unfinishedSession}
-	sessions := newSchedulerSessionService(sqStub)
+	sessionQueryStub := &schedulerSessionQueryRepositoryStub{session: unfinishedSession}
+	sessions := newSchedulerSessionService(sessionQueryStub)
 
-	d := newSessionDispatcher(
+	dispatcher := newSessionDispatcher(
 		sessions,
 		pusher,
 		pusher.study(),
 		&mockPushClaims{},
 	)
 	// Higher limiter rate for fast testing
-	d.limiter = newRateLimiter(500)
-	defer d.limiter.Stop()
+	dispatcher.limiter = newRateLimiter(500)
+	defer dispatcher.limiter.Stop()
 
 	var users []model.User
 	unfinishedCounts := make(map[int64]int)
@@ -319,7 +319,7 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 		unfinishedCounts[i] = 3
 	}
 
-	if err := d.dispatchBatch(
+	if err := dispatcher.dispatchBatch(
 		ctx,
 		model.SessionSlotMorningStudy,
 		users,

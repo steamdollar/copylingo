@@ -8,51 +8,51 @@ import (
 
 func TestScheduleAnswer(t *testing.T) {
 	tests := []struct {
-		name          string
-		initialRep    int
-		initialInt    int
-		initialEase   float64
-		isCorrect     bool
-		expectRep     int
-		expectInt     int
-		expectEaseGte float64
+		name              string
+		initialRepetition int
+		initialInt        int
+		initialEase       float64
+		isCorrect         bool
+		expectRepetition  int
+		expectInt         int
+		expectEaseGte     float64
 	}{
 		{
-			name:          "CorrectFirstRepetition",
-			initialEase:   2.5,
-			isCorrect:     true,
-			expectRep:     1,
-			expectInt:     3,
-			expectEaseGte: 1.3,
+			name:             "CorrectFirstRepetition",
+			initialEase:      2.5,
+			isCorrect:        true,
+			expectRepetition: 1,
+			expectInt:        3,
+			expectEaseGte:    1.3,
 		},
 		{
-			name:          "CorrectSecondRepetition",
-			initialRep:    1,
-			initialInt:    1,
-			initialEase:   2.5,
-			isCorrect:     true,
-			expectRep:     2,
-			expectInt:     6,
-			expectEaseGte: 1.3,
+			name:              "CorrectSecondRepetition",
+			initialRepetition: 1,
+			initialInt:        1,
+			initialEase:       2.5,
+			isCorrect:         true,
+			expectRepetition:  2,
+			expectInt:         6,
+			expectEaseGte:     1.3,
 		},
 		{
-			name:          "CorrectSubsequentUsesFactor",
-			initialRep:    2,
-			initialInt:    6,
-			initialEase:   2.5,
-			isCorrect:     true,
-			expectRep:     3,
-			expectInt:     15,
-			expectEaseGte: 1.3,
+			name:              "CorrectSubsequentUsesFactor",
+			initialRepetition: 2,
+			initialInt:        6,
+			initialEase:       2.5,
+			isCorrect:         true,
+			expectRepetition:  3,
+			expectInt:         15,
+			expectEaseGte:     1.3,
 		},
 		{
-			name:          "WrongResetsRepetitions",
-			initialRep:    3,
-			initialInt:    20,
-			initialEase:   2.5,
-			expectRep:     0,
-			expectInt:     1,
-			expectEaseGte: 1.3,
+			name:              "WrongResetsRepetitions",
+			initialRepetition: 3,
+			initialInt:        20,
+			initialEase:       2.5,
+			expectRepetition:  0,
+			expectInt:         1,
+			expectEaseGte:     1.3,
 		},
 	}
 
@@ -61,7 +61,7 @@ func TestScheduleAnswer(t *testing.T) {
 			tt.name,
 			func(t *testing.T) {
 				progress := &model.UserQuestionProgress{
-					Repetitions:  tt.initialRep,
+					Repetitions:  tt.initialRepetition,
 					IntervalDays: tt.initialInt,
 					EaseFactor:   tt.initialEase,
 				}
@@ -70,11 +70,11 @@ func TestScheduleAnswer(t *testing.T) {
 					tt.isCorrect,
 				)
 
-				if progress.Repetitions != tt.expectRep {
+				if progress.Repetitions != tt.expectRepetition {
 					t.Errorf(
 						"Repetitions = %d, want %d",
 						progress.Repetitions,
-						tt.expectRep,
+						tt.expectRepetition,
 					)
 				}
 				if progress.IntervalDays != tt.expectInt {

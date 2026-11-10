@@ -41,31 +41,31 @@ type studyActiveSessionStarter interface {
 
 // studyActiveSessionService owns the Redis working set for in-progress study sessions.
 type studyActiveSessionService struct {
-	repo        StudyActiveSessionRepo
-	sessionRepo studyActiveSessionStarter
-	store       StudySessionStore
+	repository        StudyActiveSessionRepository
+	sessionRepository studyActiveSessionStarter
+	store             StudySessionStore
 }
 
 func newStudyActiveSessionService(
-	repo StudyActiveSessionRepo,
-	sessionRepo studyActiveSessionStarter,
+	repository StudyActiveSessionRepository,
+	sessionRepository studyActiveSessionStarter,
 	store StudySessionStore,
 ) *studyActiveSessionService {
 	return &studyActiveSessionService{
-		repo:        repo,
-		sessionRepo: sessionRepo,
-		store:       store,
+		repository:        repository,
+		sessionRepository: sessionRepository,
+		store:             store,
 	}
 }
 
-func (s *studyActiveSessionService) Start(
+func (service *studyActiveSessionService) Start(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) (*model.StudyActiveSessionState, error) {
 	// Resume from the Redis working set when present. Loading from DB here
 	// would discard materials marked studied since the session was started.
-	state, err := s.store.Load(
+	state, err := service.store.Load(
 		ctx,
 		sessionID,
 	)
@@ -73,7 +73,7 @@ func (s *studyActiveSessionService) Start(
 		err,
 		model.ErrSessionStoreNotFound,
 	) {
-		state, err = s.loadFromDB(
+		state, err = service.loadFromDB(
 			ctx,
 			sessionID,
 		)
@@ -94,7 +94,7 @@ func (s *studyActiveSessionService) Start(
 	}
 	state.CurrentIndex = state.NextUnstudiedIndex()
 	if state.Session.Status == model.SessionPending {
-		if err := s.sessionRepo.Start(
+		if err := service.sessionRepository.Start(
 			ctx,
 			sessionID,
 		); err != nil {
@@ -107,7 +107,7 @@ func (s *studyActiveSessionService) Start(
 		state.Session.Status = model.SessionInProgress
 		state.UpdatedAt = time.Now()
 	}
-	if err := s.save(
+	if err := service.save(
 		ctx,
 		state,
 	); err != nil {
@@ -116,11 +116,11 @@ func (s *studyActiveSessionService) Start(
 	return state, nil
 }
 
-func (s *studyActiveSessionService) loadFromDB(
+func (service *studyActiveSessionService) loadFromDB(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
-	state, err := s.repo.LoadStudySessionWithStateBySessionID(
+	state, err := service.repository.LoadStudySessionWithStateBySessionID(
 		ctx,
 		sessionID,
 	)
@@ -134,12 +134,12 @@ func (s *studyActiveSessionService) loadFromDB(
 	return state, nil
 }
 
-func (s *studyActiveSessionService) LoadOwnedStudySessionState(
+func (service *studyActiveSessionService) LoadOwnedStudySessionState(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) (*model.StudyActiveSessionState, error) {
-	state, err := s.store.Load(
+	state, err := service.store.Load(
 		ctx,
 		sessionID,
 	)
@@ -151,7 +151,7 @@ func (s *studyActiveSessionService) LoadOwnedStudySessionState(
 			return nil, err
 		}
 		// no cache > db hit
-		state, err = s.loadFromDB(
+		state, err = service.loadFromDB(
 			ctx,
 			sessionID,
 		)
@@ -174,7 +174,7 @@ func (s *studyActiveSessionService) LoadOwnedStudySessionState(
 	}
 
 	// redis에 save
-	if err := s.save(
+	if err := service.save(
 		ctx,
 		state,
 	); err != nil {
@@ -183,14 +183,14 @@ func (s *studyActiveSessionService) LoadOwnedStudySessionState(
 	return state, nil
 }
 
-func (s *studyActiveSessionService) MarkStudied(
+func (service *studyActiveSessionService) MarkStudied(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 	materialOrder int,
 ) (*model.StudyActiveSessionState, error) {
 	// get session state by ID
-	state, err := s.LoadOwnedStudySessionState(
+	state, err := service.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -212,7 +212,7 @@ func (s *studyActiveSessionService) MarkStudied(
 		materialOrder,
 		time.Now(),
 	)
-	if err := s.save(
+	if err := service.save(
 		ctx,
 		state,
 	); err != nil {
@@ -221,12 +221,12 @@ func (s *studyActiveSessionService) MarkStudied(
 	return state, nil
 }
 
-func (s *studyActiveSessionService) Complete(
+func (service *studyActiveSessionService) Complete(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) error {
-	state, err := s.LoadOwnedStudySessionState(
+	state, err := service.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,
@@ -241,7 +241,7 @@ func (s *studyActiveSessionService) Complete(
 			sessionID,
 		)
 	}
-	if err := s.repo.FlushStudyActiveSession(
+	if err := service.repository.FlushStudyActiveSession(
 		ctx,
 		state,
 	); err != nil {
@@ -251,7 +251,7 @@ func (s *studyActiveSessionService) Complete(
 			err,
 		)
 	}
-	if err := s.Delete(
+	if err := service.Delete(
 		ctx,
 		sessionID,
 	); err != nil {
@@ -260,11 +260,11 @@ func (s *studyActiveSessionService) Complete(
 	return nil
 }
 
-func (s *studyActiveSessionService) Delete(
+func (service *studyActiveSessionService) Delete(
 	ctx context.Context,
 	sessionID int,
 ) error {
-	if err := s.store.Delete(
+	if err := service.store.Delete(
 		ctx,
 		sessionID,
 	); err != nil {
@@ -277,12 +277,12 @@ func (s *studyActiveSessionService) Delete(
 	return nil
 }
 
-func (s *studyActiveSessionService) save(
+func (service *studyActiveSessionService) save(
 	ctx context.Context,
 	state *model.StudyActiveSessionState,
 ) error {
 	state.RecountStudied()
-	if err := s.store.Save(
+	if err := service.store.Save(
 		ctx,
 		state.Session.ID,
 		state,

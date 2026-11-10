@@ -18,13 +18,13 @@ func NewUserRepository(db *sqlx.DB) *UserRepository {
 }
 
 // GetOrCreate finds an existing user or creates a new one.
-func (r *UserRepository) GetOrCreate(
+func (repository *UserRepository) GetOrCreate(
 	ctx context.Context,
 	telegramID int64,
 	username string,
 ) (*model.User, error) {
 	user := &model.User{}
-	err := r.db.GetContext(
+	err := repository.db.GetContext(
 		ctx,
 		user,
 		`SELECT * FROM users WHERE id = $1`,
@@ -36,7 +36,7 @@ func (r *UserRepository) GetOrCreate(
 
 	// Create new user with default Japanese/N5
 	// TODO: ja, N5 defaults should be determined by user input or locale
-	if _, err := r.db.ExecContext(
+	if _, err := repository.db.ExecContext(
 		ctx,
 		`
 		INSERT INTO users (id, username, language, proficiency_level, streak_days, timezone)
@@ -53,18 +53,18 @@ func (r *UserRepository) GetOrCreate(
 		)
 	}
 
-	return r.GetByID(
+	return repository.GetByID(
 		ctx,
 		telegramID,
 	)
 }
 
-func (r *UserRepository) GetByID(
+func (repository *UserRepository) GetByID(
 	ctx context.Context,
 	id int64,
 ) (*model.User, error) {
 	user := &model.User{}
-	err := r.db.GetContext(
+	err := repository.db.GetContext(
 		ctx,
 		user,
 		`SELECT * FROM users WHERE id = $1`,
@@ -74,14 +74,14 @@ func (r *UserRepository) GetByID(
 }
 
 // UpdateStreak updates the user's streak count.
-func (r *UserRepository) UpdateStreak(
+func (repository *UserRepository) UpdateStreak(
 	ctx context.Context,
 	userID int64,
 ) error {
 	now := "now()"
 	_ = now
 
-	user, err := r.GetByID(
+	user, err := repository.GetByID(
 		ctx,
 		userID,
 	)
@@ -100,7 +100,7 @@ func (r *UserRepository) UpdateStreak(
 		newStreak = user.StreakDays + 1
 	}
 
-	if _, err := r.db.ExecContext(
+	if _, err := repository.db.ExecContext(
 		ctx,
 		`
 		UPDATE users SET streak_days = $2, streak_last_date = $3 WHERE id = $1
@@ -119,9 +119,9 @@ func (r *UserRepository) UpdateStreak(
 }
 
 // GetAllUsers returns all registered users (for scheduled pushes).
-func (r *UserRepository) GetAllUsers(ctx context.Context) ([]model.User, error) {
+func (repository *UserRepository) GetAllUsers(ctx context.Context) ([]model.User, error) {
 	var users []model.User
-	err := r.db.SelectContext(
+	err := repository.db.SelectContext(
 		ctx,
 		&users,
 		`SELECT * FROM users ORDER BY id`,
@@ -148,10 +148,10 @@ func slotColumn(slot model.SessionSlot) (string, error) {
 }
 
 // GetActiveTimezones returns all distinct, non-empty timezones configured by users.
-func (r *UserRepository) GetActiveTimezones(ctx context.Context) ([]string, error) {
+func (repository *UserRepository) GetActiveTimezones(ctx context.Context) ([]string, error) {
 	var timezones []string
 	query := `SELECT DISTINCT timezone FROM users WHERE timezone IS NOT NULL AND timezone != '' ORDER BY timezone`
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&timezones,
 		query,
@@ -165,13 +165,13 @@ func (r *UserRepository) GetActiveTimezones(ctx context.Context) ([]string, erro
 }
 
 // GetUsersBySlot retrieves users scheduled for a specific slot at localTime in timezone.
-func (r *UserRepository) GetUsersBySlot(
+func (repository *UserRepository) GetUsersBySlot(
 	ctx context.Context,
 	slot model.SessionSlot,
 	localTime string,
 	timezone string,
 ) ([]model.User, error) {
-	col, err := slotColumn(slot)
+	column, err := slotColumn(slot)
 	if err != nil {
 		return nil, err
 	}
@@ -182,11 +182,11 @@ func (r *UserRepository) GetUsersBySlot(
 		WHERE timezone = $1 AND %s = $2
 		ORDER BY id
 	`,
-		col,
+		column,
 	)
 
 	var users []model.User
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&users,
 		query,
@@ -205,26 +205,26 @@ func (r *UserRepository) GetUsersBySlot(
 }
 
 // UpdateSlotTime updates a specific slot time for a user (nil to disable).
-func (r *UserRepository) UpdateSlotTime(
+func (repository *UserRepository) UpdateSlotTime(
 	ctx context.Context,
 	userID int64,
 	slot model.SessionSlot,
-	timeVal *string,
+	timeValue *string,
 ) error {
-	col, err := slotColumn(slot)
+	column, err := slotColumn(slot)
 	if err != nil {
 		return err
 	}
 
 	query := fmt.Sprintf(
 		`UPDATE users SET %s = $2 WHERE id = $1`,
-		col,
+		column,
 	)
-	result, err := r.db.ExecContext(
+	result, err := repository.db.ExecContext(
 		ctx,
 		query,
 		userID,
-		timeVal,
+		timeValue,
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -250,12 +250,12 @@ func (r *UserRepository) UpdateSlotTime(
 }
 
 // UpdateTimezone updates the user's timezone.
-func (r *UserRepository) UpdateTimezone(
+func (repository *UserRepository) UpdateTimezone(
 	ctx context.Context,
 	userID int64,
 	timezone string,
 ) error {
-	result, err := r.db.ExecContext(
+	result, err := repository.db.ExecContext(
 		ctx,
 		`UPDATE users SET timezone = $2 WHERE id = $1`,
 		userID,

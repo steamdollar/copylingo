@@ -19,25 +19,25 @@ func NewSessionQuestionRepository(db *sqlx.DB) *SessionQuestionRepository {
 }
 
 // CreateSessionQuestions inserts multiple session question entries.
-func (r *SessionQuestionRepository) CreateSessionQuestions(
+func (repository *SessionQuestionRepository) CreateSessionQuestions(
 	ctx context.Context,
-	sqs []model.SessionQuestion,
+	sessionQuestions []model.SessionQuestion,
 ) error {
-	if len(sqs) == 0 {
+	if len(sessionQuestions) == 0 {
 		return nil
 	}
 
-	if _, err := r.db.NamedExecContext(
+	if _, err := repository.db.NamedExecContext(
 		ctx,
 		`
 		INSERT INTO session_questions (session_id, question_id, question_order, is_review)
 		VALUES (:session_id, :question_id, :question_order, :is_review)
 	`,
-		sqs,
+		sessionQuestions,
 	); err != nil {
 		return fmt.Errorf(
 			"SessionQuestionRepository.CreateSessionQuestions count=%d: %w",
-			len(sqs),
+			len(sessionQuestions),
 			err,
 		)
 	}
@@ -46,7 +46,7 @@ func (r *SessionQuestionRepository) CreateSessionQuestions(
 }
 
 // GetCategoryAccuracy returns accuracy rate per category for answered questions.
-func (r *SessionQuestionRepository) GetCategoryAccuracy(
+func (repository *SessionQuestionRepository) GetCategoryAccuracy(
 	ctx context.Context,
 	userID int64,
 ) (map[string]float64, error) {
@@ -55,7 +55,7 @@ func (r *SessionQuestionRepository) GetCategoryAccuracy(
 		Accuracy float64 `db:"accuracy"`
 	}
 	var rows []row
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&rows,
 		`
@@ -79,14 +79,14 @@ func (r *SessionQuestionRepository) GetCategoryAccuracy(
 	}
 
 	result := make(map[string]float64)
-	for _, r := range rows {
-		result[r.Category] = r.Accuracy
+	for _, accuracyRow := range rows {
+		result[accuracyRow.Category] = accuracyRow.Accuracy
 	}
 	return result, nil
 }
 
 // GetTodayStats returns today's answer stats.
-func (r *SessionQuestionRepository) GetTodayStats(
+func (repository *SessionQuestionRepository) GetTodayStats(
 	ctx context.Context,
 	userID int64,
 ) (int, int, error) {
@@ -94,10 +94,10 @@ func (r *SessionQuestionRepository) GetTodayStats(
 		Total   int `db:"total"`
 		Correct int `db:"correct"`
 	}
-	var s stats
-	if err := r.db.GetContext(
+	var todayStats stats
+	if err := repository.db.GetContext(
 		ctx,
-		&s,
+		&todayStats,
 		`
 		SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE sq.is_correct) as correct
 		FROM session_questions sq
@@ -114,5 +114,5 @@ func (r *SessionQuestionRepository) GetTodayStats(
 			err,
 		)
 	}
-	return s.Total, s.Correct, nil
+	return todayStats.Total, todayStats.Correct, nil
 }

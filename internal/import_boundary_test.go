@@ -66,7 +66,7 @@ var driverOwners = map[string][]string{
 // TestInternalImportBoundaries checks the non-test imports of every internal
 // package, as reported by go list, against the tables above.
 func TestInternalImportBoundaries(t *testing.T) {
-	cmd := exec.Command(
+	command := exec.Command(
 		"go",
 		"list",
 		"-f",
@@ -74,8 +74,8 @@ func TestInternalImportBoundaries(t *testing.T) {
 		modulePath+"/internal/...",
 	)
 	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	command.Stderr = &stderr
+	out, err := command.Output()
 	if err != nil {
 		t.Fatalf(
 			"go list internal packages: %v\n%s",
@@ -89,25 +89,25 @@ func TestInternalImportBoundaries(t *testing.T) {
 		"\n",
 	) {
 		fields := strings.Fields(line)
-		pkg, ok := strings.CutPrefix(
+		packageName, ok := strings.CutPrefix(
 			fields[0],
 			modulePath+"/internal/",
 		)
 		if !ok {
 			continue // internal/ itself holds only this test
 		}
-		allowed, known := allowedInternalImports[pkg]
+		allowed, known := allowedInternalImports[packageName]
 		if !known {
 			t.Errorf(
 				"internal/%s has no import rule; add it to allowedInternalImports",
-				pkg,
+				packageName,
 			)
 			continue
 		}
 		for _, imported := range fields[1:] {
 			checkImport(
 				t,
-				pkg,
+				packageName,
 				imported,
 				allowed,
 			)
@@ -117,7 +117,7 @@ func TestInternalImportBoundaries(t *testing.T) {
 
 func checkImport(
 	t *testing.T,
-	pkg string,
+	packageName string,
 	imported string,
 	allowedInternal []string,
 ) {
@@ -126,17 +126,17 @@ func checkImport(
 		imported,
 		modulePath+"/",
 	); ok {
-		dep, ok := strings.CutPrefix(
+		dependency, ok := strings.CutPrefix(
 			local,
 			"internal/",
 		)
 		if !ok || !slices.Contains(
 			allowedInternal,
-			dep,
+			dependency,
 		) {
 			t.Errorf(
 				"internal/%s must not import %s",
-				pkg,
+				packageName,
 				local,
 			)
 		}
@@ -148,11 +148,11 @@ func checkImport(
 			prefix,
 		) && !slices.Contains(
 			owners,
-			pkg,
+			packageName,
 		) {
 			t.Errorf(
 				"internal/%s must not import %s; only %v may",
-				pkg,
+				packageName,
 				imported,
 				owners,
 			)

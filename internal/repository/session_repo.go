@@ -32,30 +32,30 @@ func NewSessionRepository(db *sqlx.DB) *SessionRepository {
 	return &SessionRepository{db: db}
 }
 
-func (r *SessionRepository) CreateSession(
+func (repository *SessionRepository) CreateSession(
 	ctx context.Context,
-	s *model.Session,
+	session *model.Session,
 ) error {
 	sessionID, err := insertSession(
 		ctx,
-		r.db,
-		s,
+		repository.db,
+		session,
 	)
 	if err != nil {
 		return fmt.Errorf(
 			"SessionRepository.CreateSession user_id=%d type=%s mode=%s: %w",
-			s.UserID,
-			s.Type,
-			s.Mode,
+			session.UserID,
+			session.Type,
+			session.Mode,
 			err,
 		)
 	}
-	s.ID = sessionID
+	session.ID = sessionID
 	return nil
 }
 
 // CreateSessionInTx returns the generated ID without publishing it on the model before commit.
-func (r *SessionRepository) CreateSessionInTx(
+func (repository *SessionRepository) CreateSessionInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	session *model.Session,
@@ -81,7 +81,7 @@ type sessionRowQueryer interface {
 	QueryRowContext(
 		ctx context.Context,
 		query string,
-		args ...any,
+		arguments ...any,
 	) *sql.Row
 }
 
@@ -112,7 +112,7 @@ func insertSession(
 }
 
 // CreateSessionMaterialsInTx inserts ordered material links on the caller's transaction.
-func (r *SessionRepository) CreateSessionMaterialsInTx(
+func (repository *SessionRepository) CreateSessionMaterialsInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	sessionID int,
@@ -157,14 +157,14 @@ func (r *SessionRepository) CreateSessionMaterialsInTx(
 // GetOldestUnfinished returns the highest-priority unfinished session for a user.
 // In-progress sessions take precedence over pending sessions; within a status,
 // the oldest created session is returned. A missing session is not an error.
-func (r *SessionRepository) GetOldestUnfinished(
+func (repository *SessionRepository) GetOldestUnfinished(
 	ctx context.Context,
 	userID int64,
 ) (*model.Session, error) {
-	s := &model.Session{}
-	if err := r.db.GetContext(
+	session := &model.Session{}
+	if err := repository.db.GetContext(
 		ctx,
-		s,
+		session,
 		getOldestUnfinishedQuery,
 		userID,
 	); err != nil {
@@ -180,11 +180,11 @@ func (r *SessionRepository) GetOldestUnfinished(
 			err,
 		)
 	}
-	return s, nil
+	return session, nil
 }
 
 // CountUnfinishedBatch returns the number of pending/in-progress sessions for multiple users in a single query.
-func (r *SessionRepository) CountUnfinishedBatch(
+func (repository *SessionRepository) CountUnfinishedBatch(
 	ctx context.Context,
 	userIDs []int64,
 ) (map[int64]int, error) {
@@ -196,7 +196,7 @@ func (r *SessionRepository) CountUnfinishedBatch(
 		return counts, nil
 	}
 
-	query, args, err := sqlx.In(
+	query, arguments, err := sqlx.In(
 		`
 		SELECT user_id, COUNT(*) as count
 		FROM sessions
@@ -211,18 +211,18 @@ func (r *SessionRepository) CountUnfinishedBatch(
 			err,
 		)
 	}
-	query = r.db.Rebind(query)
+	query = repository.db.Rebind(query)
 
 	type userCount struct {
 		UserID int64 `db:"user_id"`
 		Count  int   `db:"count"`
 	}
 	var results []userCount
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&results,
 		query,
-		args...,
+		arguments...,
 	); err != nil {
 		return nil, fmt.Errorf(
 			"SessionRepository.CountUnfinishedBatch select: %w",
@@ -230,19 +230,19 @@ func (r *SessionRepository) CountUnfinishedBatch(
 		)
 	}
 
-	for _, rc := range results {
-		counts[rc.UserID] = rc.Count
+	for _, userCount := range results {
+		counts[userCount.UserID] = userCount.Count
 	}
 	return counts, nil
 }
 
-func (r *SessionRepository) GetSessionsByStatus(
+func (repository *SessionRepository) GetSessionsByStatus(
 	ctx context.Context,
 	userID int64,
 	status model.SessionStatus,
 ) ([]model.Session, error) {
 	var sessions []model.Session
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&sessions,
 		`
@@ -264,9 +264,9 @@ func (r *SessionRepository) GetSessionsByStatus(
 }
 
 // ListInProgress returns all in-progress sessions for all users.
-func (r *SessionRepository) ListInProgress(ctx context.Context) ([]model.Session, error) {
+func (repository *SessionRepository) ListInProgress(ctx context.Context) ([]model.Session, error) {
 	var sessions []model.Session
-	if err := r.db.SelectContext(
+	if err := repository.db.SelectContext(
 		ctx,
 		&sessions,
 		`
@@ -284,11 +284,11 @@ func (r *SessionRepository) ListInProgress(ctx context.Context) ([]model.Session
 }
 
 // Start marks a session as in_progress.
-func (r *SessionRepository) Start(
+func (repository *SessionRepository) Start(
 	ctx context.Context,
 	id int,
 ) error {
-	result, err := r.db.ExecContext(
+	result, err := repository.db.ExecContext(
 		ctx,
 		`
 		UPDATE sessions SET status = 'in_progress', started_at = NOW() WHERE id = $1

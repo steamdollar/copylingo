@@ -19,13 +19,13 @@ var (
 
 // BuildStudy creates a Study session from the profile's plan; a positive
 // limit scales the morning plan. nil means no materials were available.
-func (s *SessionService) BuildStudy(
+func (service *SessionService) BuildStudy(
 	ctx context.Context,
 	user model.User,
 	profile StudySessionProfile,
 	limit int,
 ) (*model.Session, error) {
-	return s.studyBuilder.BuildStudySession(
+	return service.studyBuilder.BuildStudySession(
 		ctx,
 		user.ID,
 		user.Language,
@@ -37,12 +37,12 @@ func (s *SessionService) BuildStudy(
 
 // StartStudy marks the Study in_progress (when pending) and returns its
 // working set, resuming Redis progress when present.
-func (s *SessionService) StartStudy(
+func (service *SessionService) StartStudy(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) (*model.StudyActiveSessionState, error) {
-	return s.studyProgress.Start(
+	return service.studyProgress.Start(
 		ctx,
 		sessionID,
 		userID,
@@ -50,13 +50,13 @@ func (s *SessionService) StartStudy(
 }
 
 // MarkStudied records a material as studied in the Redis working set.
-func (s *SessionService) MarkStudied(
+func (service *SessionService) MarkStudied(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 	materialOrder int,
 ) (*model.StudyActiveSessionState, error) {
-	return s.studyProgress.MarkStudied(
+	return service.studyProgress.MarkStudied(
 		ctx,
 		sessionID,
 		userID,
@@ -67,13 +67,13 @@ func (s *SessionService) MarkStudied(
 // FinishStudy marks the last shown material studied and completes the
 // session. The returned error says which step failed so the caller can tell
 // "progress not saved" from "completion not saved".
-func (s *SessionService) FinishStudy(
+func (service *SessionService) FinishStudy(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 	lastMaterialOrder int,
 ) error {
-	if _, err := s.studyProgress.MarkStudied(
+	if _, err := service.studyProgress.MarkStudied(
 		ctx,
 		sessionID,
 		userID,
@@ -87,7 +87,7 @@ func (s *SessionService) FinishStudy(
 			err,
 		)
 	}
-	if err := s.CompleteStudy(
+	if err := service.CompleteStudy(
 		ctx,
 		sessionID,
 		userID,
@@ -103,12 +103,12 @@ func (s *SessionService) FinishStudy(
 
 // CompleteStudy flushes a fully studied working set to DB and deletes it.
 // Study completion does not update the streak (Quiz completion does).
-func (s *SessionService) CompleteStudy(
+func (service *SessionService) CompleteStudy(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) error {
-	return s.studyProgress.Complete(
+	return service.studyProgress.Complete(
 		ctx,
 		sessionID,
 		userID,
@@ -116,12 +116,12 @@ func (s *SessionService) CompleteStudy(
 }
 
 // StudyProgress returns the caller-owned Study working set, recovering it from DB when Redis has none.
-func (s *SessionService) StudyProgress(
+func (service *SessionService) StudyProgress(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) (*model.StudyActiveSessionState, error) {
-	return s.studyProgress.LoadOwnedStudySessionState(
+	return service.studyProgress.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
 		userID,

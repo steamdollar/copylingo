@@ -15,7 +15,7 @@ const warningInterval = time.Minute
 var dailyLogPattern = regexp.MustCompile(`^copylingo-(\d{4}-\d{2}-\d{2})\.jsonl$`)
 
 type DailyWriterOptions struct {
-	Dir           string
+	Directory     string
 	RetentionDays int
 	Location      *time.Location
 	Now           func() time.Time
@@ -25,7 +25,7 @@ type DailyWriterOptions struct {
 // DailyWriter appends logs to a date-scoped JSONL file and rotates at local midnight.
 type DailyWriter struct {
 	mu            sync.Mutex
-	dir           string
+	directory     string
 	retentionDays int
 	location      *time.Location
 	now           func() time.Time
@@ -36,7 +36,7 @@ type DailyWriter struct {
 }
 
 func NewDailyWriter(options DailyWriterOptions) (*DailyWriter, error) {
-	if options.Dir == "" {
+	if options.Directory == "" {
 		return nil, fmt.Errorf("log directory is empty")
 	}
 	if options.RetentionDays < 1 {
@@ -52,12 +52,18 @@ func NewDailyWriter(options DailyWriterOptions) (*DailyWriter, error) {
 		options.Stderr = os.Stderr
 	}
 
-	if err := os.MkdirAll(options.Dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create log directory: %w", err)
+	if err := os.MkdirAll(
+		options.Directory,
+		0o755,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"create log directory: %w",
+			err,
+		)
 	}
 
 	writer := &DailyWriter{
-		dir:           options.Dir,
+		directory:     options.Directory,
 		retentionDays: options.RetentionDays,
 		location:      options.Location,
 		now:           options.Now,
@@ -70,59 +76,89 @@ func NewDailyWriter(options DailyWriterOptions) (*DailyWriter, error) {
 	return writer, nil
 }
 
-func (w *DailyWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
+func (writer *DailyWriter) Write(data []byte) (int, error) {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
 
-	now := w.now().In(w.location)
-	if date := now.Format(time.DateOnly); date != w.currentDate {
-		if err := w.rotateLocked(now); err != nil {
-			w.warnLocked("rotate daily log file: %v", err)
-			return len(p), nil
+	now := writer.now().In(writer.location)
+	if date := now.Format(time.DateOnly); date != writer.currentDate {
+		if err := writer.rotateLocked(now); err != nil {
+			writer.warnLocked(
+				"rotate daily log file: %v",
+				err,
+			)
+			return len(data), nil
 		}
-		w.cleanupLocked(now)
+		writer.cleanupLocked(now)
 	}
-	if _, err := w.file.Write(p); err != nil {
-		w.warnLocked("append daily log file: %v", err)
-		return len(p), nil
+	if _, err := writer.file.Write(data); err != nil {
+		writer.warnLocked(
+			"append daily log file: %v",
+			err,
+		)
+		return len(data), nil
 	}
-	return len(p), nil
+	return len(data), nil
 }
 
-func (w *DailyWriter) Close() error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	if w.file == nil {
+func (writer *DailyWriter) Close() error {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	if writer.file == nil {
 		return nil
 	}
-	return w.file.Close()
+	return writer.file.Close()
 }
 
-func (w *DailyWriter) rotateLocked(now time.Time) error {
+func (writer *DailyWriter) rotateLocked(now time.Time) error {
 	date := now.Format(time.DateOnly)
-	path := filepath.Join(w.dir, "copylingo-"+date+".jsonl")
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	path := filepath.Join(
+		writer.directory,
+		"copylingo-"+date+".jsonl",
+	)
+	file, err := os.OpenFile(
+		path,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0o644,
+	)
 	if err != nil {
-		return fmt.Errorf("open %s: %w", path, err)
+		return fmt.Errorf(
+			"open %s: %w",
+			path,
+			err,
+		)
 	}
-	if w.file != nil {
-		if err := w.file.Close(); err != nil {
-			w.warnLocked("close previous daily log file: %v", err)
+	if writer.file != nil {
+		if err := writer.file.Close(); err != nil {
+			writer.warnLocked(
+				"close previous daily log file: %v",
+				err,
+			)
 		}
 	}
-	w.file = file
-	w.currentDate = date
+	writer.file = file
+	writer.currentDate = date
 	return nil
 }
 
-func (w *DailyWriter) cleanupLocked(now time.Time) {
-	entries, err := os.ReadDir(w.dir)
+func (writer *DailyWriter) cleanupLocked(now time.Time) {
+	entries, err := os.ReadDir(writer.directory)
 	if err != nil {
-		w.warnLocked("list daily log files: %v", err)
+		writer.warnLocked(
+			"list daily log files: %v",
+			err,
+		)
 		return
 	}
 
-	cutoff := startOfDay(now, w.location).AddDate(0, 0, -w.retentionDays)
+	cutoff := startOfDay(
+		now,
+		writer.location,
+	).AddDate(
+		0,
+		0,
+		-writer.retentionDays,
+	)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -131,26 +167,56 @@ func (w *DailyWriter) cleanupLocked(now time.Time) {
 		if len(match) != 2 {
 			continue
 		}
-		fileDate, err := time.ParseInLocation(time.DateOnly, match[1], w.location)
+		fileDate, err := time.ParseInLocation(
+			time.DateOnly,
+			match[1],
+			writer.location,
+		)
 		if err != nil || !fileDate.Before(cutoff) {
 			continue
 		}
-		if err := os.Remove(filepath.Join(w.dir, entry.Name())); err != nil {
-			w.warnLocked("remove expired daily log file %s: %v", entry.Name(), err)
+		if err := os.Remove(filepath.Join(
+			writer.directory,
+			entry.Name(),
+		)); err != nil {
+			writer.warnLocked(
+				"remove expired daily log file %s: %v",
+				entry.Name(),
+				err,
+			)
 		}
 	}
 }
 
-func (w *DailyWriter) warnLocked(format string, args ...any) {
-	now := w.now()
-	if !w.lastWarningAt.IsZero() && now.Sub(w.lastWarningAt) < warningInterval {
+func (writer *DailyWriter) warnLocked(
+	format string,
+	arguments ...any,
+) {
+	now := writer.now()
+	if !writer.lastWarningAt.IsZero() && now.Sub(writer.lastWarningAt) < warningInterval {
 		return
 	}
-	w.lastWarningAt = now
-	fmt.Fprintf(w.stderr, "[copylingo logging] "+format+"\n", args...)
+	writer.lastWarningAt = now
+	fmt.Fprintf(
+		writer.stderr,
+		"[copylingo logging] "+format+"\n",
+		arguments...,
+	)
 }
 
-func startOfDay(now time.Time, location *time.Location) time.Time {
+func startOfDay(
+	now time.Time,
+	location *time.Location,
+) time.Time {
 	local := now.In(location)
-	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
+	return time.Date(
+		local.Year(),
+		local.Month(),
+		local.Day(),
+		0,
+		0,
+		0,
+		0,
+		location,
+	)
 }

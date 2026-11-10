@@ -23,41 +23,41 @@ type mockBotAPI struct {
 	returnVoiceFileID string
 }
 
-func (m *mockBotAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
-	m.sentMessages = append(
-		m.sentMessages,
-		c,
+func (mock *mockBotAPI) Send(chattable tgbotapi.Chattable) (tgbotapi.Message, error) {
+	mock.sentMessages = append(
+		mock.sentMessages,
+		chattable,
 	)
-	if m.sendErr != nil {
-		return tgbotapi.Message{}, m.sendErr
+	if mock.sendErr != nil {
+		return tgbotapi.Message{}, mock.sendErr
 	}
-	if _, ok := c.(tgbotapi.VoiceConfig); ok && m.returnVoiceFileID != "" {
-		return tgbotapi.Message{MessageID: 1001, Voice: &tgbotapi.Voice{FileID: m.returnVoiceFileID}}, nil
+	if _, ok := chattable.(tgbotapi.VoiceConfig); ok && mock.returnVoiceFileID != "" {
+		return tgbotapi.Message{MessageID: 1001, Voice: &tgbotapi.Voice{FileID: mock.returnVoiceFileID}}, nil
 	}
 	return tgbotapi.Message{MessageID: 1001}, nil
 }
 
-func (m *mockBotAPI) Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
-	m.requests = append(
-		m.requests,
-		c,
+func (mock *mockBotAPI) Request(chattable tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
+	mock.requests = append(
+		mock.requests,
+		chattable,
 	)
 	return &tgbotapi.APIResponse{}, nil
 }
 
-func (m *mockBotAPI) GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
+func (mock *mockBotAPI) GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
 	return nil
 }
 
-func (m *mockBotAPI) StopReceivingUpdates() {}
+func (mock *mockBotAPI) StopReceivingUpdates() {}
 
 type testInteractionStores struct {
 	quiz         *testQuizSessionStore
 	study        *testStudySessionStore
 	pending      map[int64]model.PendingLLMInput
-	active       map[int64]model.ActiveQuestionRef
+	active       map[int64]model.ActiveQuestionReference
 	drafts       map[draftKey][]int
-	messages     map[handwritingMessageKey]model.TelegramMessageRef
+	messages     map[handwritingMessageKey]model.TelegramMessageReference
 	fingerprints map[int]string
 }
 
@@ -76,9 +76,9 @@ func newTestInteractionStores() *testInteractionStores {
 		quiz:         &testQuizSessionStore{states: map[int]*model.QuizActiveSessionState{}},
 		study:        &testStudySessionStore{states: map[int]*model.StudyActiveSessionState{}},
 		pending:      map[int64]model.PendingLLMInput{},
-		active:       map[int64]model.ActiveQuestionRef{},
+		active:       map[int64]model.ActiveQuestionReference{},
 		drafts:       map[draftKey][]int{},
-		messages:     map[handwritingMessageKey]model.TelegramMessageRef{},
+		messages:     map[handwritingMessageKey]model.TelegramMessageReference{},
 		fingerprints: map[int]string{},
 	}
 }
@@ -123,14 +123,14 @@ func cloneTestState[T any](state *T) (*T, error) {
 	return &clone, nil
 }
 
-// missingQuizSessionRepo is a DB without sessions: reloading a Quiz working
+// missingQuizSessionRepository is a DB without sessions: reloading a Quiz working
 // set fails like the real repository does for an unknown session. Any other
 // call panics on the nil embedded interface.
-type missingQuizSessionRepo struct {
-	service.QuizActiveSessionRepo
+type missingQuizSessionRepository struct {
+	service.QuizActiveSessionRepository
 }
 
-func (missingQuizSessionRepo) LoadQuestionSessionWithStateBySessionID(
+func (missingQuizSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	context.Context,
 	int,
 ) (*model.QuizActiveSessionState, error) {
@@ -143,22 +143,22 @@ func (missingQuizSessionRepo) LoadQuestionSessionWithStateBySessionID(
 // unexpected call fails loudly.
 func newTestSessionService(
 	stores *testInteractionStores,
-	deps service.SessionDeps,
+	dependencies service.SessionDependencies,
 ) *service.SessionService {
 	if stores != nil {
-		deps.Stores = service.SessionStores{Quiz: stores.quiz, Study: stores.study}
+		dependencies.Stores = service.SessionStores{Quiz: stores.quiz, Study: stores.study}
 	}
-	if deps.QuizActiveSessionRepo == nil {
-		deps.QuizActiveSessionRepo = missingQuizSessionRepo{}
+	if dependencies.QuizActiveSessionRepository == nil {
+		dependencies.QuizActiveSessionRepository = missingQuizSessionRepository{}
 	}
-	return service.NewSessionService(deps)
+	return service.NewSessionService(dependencies)
 }
 
 // answerByText drives the typed-answer path: it arms the active question for
 // chatID and delivers text from the given user through HandleTextInput.
 func answerByText(
 	t *testing.T,
-	sf *SessionFlow,
+	sessionFlow *SessionFlow,
 	stores *testInteractionStores,
 	chatID int64,
 	from *tgbotapi.User,
@@ -167,8 +167,8 @@ func answerByText(
 	text string,
 ) {
 	t.Helper()
-	stores.active[chatID] = model.ActiveQuestionRef{SessionID: sessionID, QuestionIndex: questionIndex}
-	if !sf.HandleTextInput(
+	stores.active[chatID] = model.ActiveQuestionReference{SessionID: sessionID, QuestionIndex: questionIndex}
+	if !sessionFlow.HandleTextInput(
 		context.Background(),
 		&tgbotapi.Message{Chat: &tgbotapi.Chat{ID: chatID}, From: from, Text: text},
 	) {
@@ -182,68 +182,68 @@ func answerByText(
 func newTestSessionFlow(
 	api *mockBotAPI,
 	stores *testInteractionStores,
-	deps SessionFlowDeps,
+	dependencies SessionFlowDependencies,
 ) *SessionFlow {
 	if api != nil {
-		deps.Telegram = newTelegramClient(api)
+		dependencies.Telegram = newTelegramClient(api)
 	}
 	if stores != nil {
-		if deps.Input == nil {
-			deps.Input = stores
+		if dependencies.Input == nil {
+			dependencies.Input = stores
 		}
-		if deps.Drafts == nil {
-			deps.Drafts = stores
+		if dependencies.Drafts == nil {
+			dependencies.Drafts = stores
 		}
-		if deps.Messages == nil {
-			deps.Messages = stores
+		if dependencies.Messages == nil {
+			dependencies.Messages = stores
 		}
-		if deps.Recovery == nil {
-			deps.Recovery = stores
+		if dependencies.Recovery == nil {
+			dependencies.Recovery = stores
 		}
 	}
-	return NewSessionFlow(deps)
+	return NewSessionFlow(dependencies)
 }
 
 // newTestStudyFlow wires StudyFlow the same way as newTestSessionFlow.
 func newTestStudyFlow(
 	api *mockBotAPI,
 	stores *testInteractionStores,
-	deps StudyFlowDeps,
+	dependencies StudyFlowDependencies,
 ) *StudyFlow {
 	if api != nil {
-		deps.Telegram = newTelegramClient(api)
+		dependencies.Telegram = newTelegramClient(api)
 	}
-	if stores != nil && deps.Input == nil {
-		deps.Input = stores
+	if stores != nil && dependencies.Input == nil {
+		dependencies.Input = stores
 	}
-	return NewStudyFlow(deps)
+	return NewStudyFlow(dependencies)
 }
 
 // newTestSettingsFlow wires SettingsFlow with Telegram from api. It has no
 // store dependency, so service deps are the only other fields.
 func newTestSettingsFlow(
 	api *mockBotAPI,
-	deps SettingsFlowDeps,
+	dependencies SettingsFlowDependencies,
 ) *SettingsFlow {
 	if api != nil {
-		deps.Telegram = newTelegramClient(api)
+		dependencies.Telegram = newTelegramClient(api)
 	}
-	return NewSettingsFlow(deps)
+	return NewSettingsFlow(dependencies)
 }
 
 // newTestLLMQuestionFlow wires LLMQuestionFlow the same way as newTestSessionFlow.
 func newTestLLMQuestionFlow(
 	api *mockBotAPI,
 	stores *testInteractionStores,
-	deps LLMQuestionFlowDeps,
+	dependencies LLMQuestionFlowDependencies,
 ) *LLMQuestionFlow {
 	if api != nil {
-		deps.Telegram = newTelegramClient(api)
+		dependencies.Telegram = newTelegramClient(api)
 	}
-	if stores != nil && deps.Input == nil {
-		deps.Input = stores
+	if stores != nil && dependencies.Input == nil {
+		dependencies.Input = stores
 	}
-	return NewLLMQuestionFlow(deps)
+	return NewLLMQuestionFlow(dependencies)
 }
 
 // testServices are the services newTestBot wires into the flows, mirroring
@@ -272,21 +272,21 @@ func newTestBot(
 	studyFlow := newTestStudyFlow(
 		api,
 		stores,
-		StudyFlowDeps{
+		StudyFlowDependencies{
 			Session:            services.Session,
 			MaterialPreference: services.MaterialPreference,
 		},
 	)
-	sessionDeps := SessionFlowDeps{
+	sessionDependencies := SessionFlowDependencies{
 		Session:            services.Session,
 		User:               services.User,
 		MaterialPreference: services.MaterialPreference,
 		Study:              studyFlow,
 	}
 	if services.Audio != nil {
-		sessionDeps.Audio = services.Audio
+		sessionDependencies.Audio = services.Audio
 	}
-	deps := BotDeps{
+	dependencies := BotDependencies{
 		Telegram: newTelegramClient(api),
 		User:     services.User,
 		Session:  services.Session,
@@ -294,12 +294,12 @@ func newTestBot(
 		SessionFlow: newTestSessionFlow(
 			api,
 			stores,
-			sessionDeps,
+			sessionDependencies,
 		),
 		StudyFlow: studyFlow,
 		SettingsFlow: newTestSettingsFlow(
 			api,
-			SettingsFlowDeps{
+			SettingsFlowDependencies{
 				User:               services.User,
 				MaterialPreference: services.MaterialPreference,
 			},
@@ -307,7 +307,7 @@ func newTestBot(
 		LLMQuestionFlow: newTestLLMQuestionFlow(
 			api,
 			stores,
-			LLMQuestionFlowDeps{
+			LLMQuestionFlowDependencies{
 				User:        services.User,
 				LLMQuestion: services.LLMQuestion,
 				Session:     services.Session,
@@ -316,23 +316,23 @@ func newTestBot(
 	}
 	// A nil *testInteractionStores in the interface would be a non-nil Input.
 	if stores != nil {
-		deps.Input = stores
+		dependencies.Input = stores
 	}
-	return NewBot(deps)
+	return NewBot(dependencies)
 }
 
-func (s *testQuizSessionStore) Load(
+func (store *testQuizSessionStore) Load(
 	_ context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	state, ok := s.states[sessionID]
+	state, ok := store.states[sessionID]
 	if !ok {
 		return nil, model.ErrSessionStoreNotFound
 	}
 	return cloneTestState(state)
 }
 
-func (s *testQuizSessionStore) Save(
+func (store *testQuizSessionStore) Save(
 	_ context.Context,
 	sessionID int,
 	state *model.QuizActiveSessionState,
@@ -341,33 +341,33 @@ func (s *testQuizSessionStore) Save(
 	if err != nil {
 		return err
 	}
-	s.states[sessionID] = clone
+	store.states[sessionID] = clone
 	return nil
 }
 
-func (s *testQuizSessionStore) Delete(
+func (store *testQuizSessionStore) Delete(
 	_ context.Context,
 	sessionID int,
 ) error {
 	delete(
-		s.states,
+		store.states,
 		sessionID,
 	)
 	return nil
 }
 
-func (s *testStudySessionStore) Load(
+func (store *testStudySessionStore) Load(
 	_ context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
-	state, ok := s.states[sessionID]
+	state, ok := store.states[sessionID]
 	if !ok {
 		return nil, model.ErrSessionStoreNotFound
 	}
 	return cloneTestState(state)
 }
 
-func (s *testStudySessionStore) Save(
+func (store *testStudySessionStore) Save(
 	_ context.Context,
 	sessionID int,
 	state *model.StudyActiveSessionState,
@@ -376,108 +376,108 @@ func (s *testStudySessionStore) Save(
 	if err != nil {
 		return err
 	}
-	s.states[sessionID] = clone
+	store.states[sessionID] = clone
 	return nil
 }
 
-func (s *testStudySessionStore) Delete(
+func (store *testStudySessionStore) Delete(
 	_ context.Context,
 	sessionID int,
 ) error {
 	delete(
-		s.states,
+		store.states,
 		sessionID,
 	)
 	return nil
 }
 
-func (s *testInteractionStores) SetLLMPending(
+func (stores *testInteractionStores) SetLLMPending(
 	_ context.Context,
 	userID int64,
 	input model.PendingLLMInput,
 ) error {
-	s.pending[userID] = input
+	stores.pending[userID] = input
 	return nil
 }
 
-func (s *testInteractionStores) TakeLLMPending(
+func (stores *testInteractionStores) TakeLLMPending(
 	_ context.Context,
 	userID int64,
 ) (model.PendingLLMInput, bool, error) {
-	input, ok := s.pending[userID]
+	input, ok := stores.pending[userID]
 	delete(
-		s.pending,
+		stores.pending,
 		userID,
 	)
 	return input, ok, nil
 }
 
-func (s *testInteractionStores) DeleteLLMPending(
+func (stores *testInteractionStores) DeleteLLMPending(
 	_ context.Context,
 	userID int64,
 ) error {
 	delete(
-		s.pending,
+		stores.pending,
 		userID,
 	)
 	return nil
 }
 
-func (s *testInteractionStores) GetActiveQuestion(
+func (stores *testInteractionStores) GetActiveQuestion(
 	_ context.Context,
 	chatID int64,
-) (*model.ActiveQuestionRef, error) {
-	question, ok := s.active[chatID]
+) (*model.ActiveQuestionReference, error) {
+	question, ok := stores.active[chatID]
 	if !ok {
 		return nil, nil
 	}
 	return &question, nil
 }
 
-func (s *testInteractionStores) SetActiveQuestion(
+func (stores *testInteractionStores) SetActiveQuestion(
 	_ context.Context,
 	chatID int64,
-	question model.ActiveQuestionRef,
+	question model.ActiveQuestionReference,
 ) error {
-	s.active[chatID] = question
+	stores.active[chatID] = question
 	return nil
 }
 
-func (s *testInteractionStores) DeleteActiveQuestion(
+func (stores *testInteractionStores) DeleteActiveQuestion(
 	_ context.Context,
 	chatID int64,
 ) error {
 	delete(
-		s.active,
+		stores.active,
 		chatID,
 	)
 	return nil
 }
 
-func (s *testInteractionStores) ClearInput(
+func (stores *testInteractionStores) ClearInput(
 	_ context.Context,
 	chatID int64,
 	userID *int64,
 ) error {
 	delete(
-		s.active,
+		stores.active,
 		chatID,
 	)
 	if userID != nil {
 		delete(
-			s.pending,
+			stores.pending,
 			*userID,
 		)
 	}
 	return nil
 }
 
-func (s *testInteractionStores) GetWordOrderDraft(
+func (stores *testInteractionStores) GetWordOrderDraft(
 	_ context.Context,
 	sessionID,
 	questionID int,
 ) ([]int, error) {
-	selection, ok := s.drafts[draftKey{sessionID, questionID}]
+	selection, ok := stores.drafts[draftKey{sessionID, questionID}]
 	if !ok {
 		return nil, nil
 	}
@@ -487,77 +487,77 @@ func (s *testInteractionStores) GetWordOrderDraft(
 	), nil
 }
 
-func (s *testInteractionStores) SetWordOrderDraft(
+func (stores *testInteractionStores) SetWordOrderDraft(
 	_ context.Context,
 	sessionID,
 	questionID int,
 	selection []int,
 ) error {
-	s.drafts[draftKey{sessionID, questionID}] = append(
+	stores.drafts[draftKey{sessionID, questionID}] = append(
 		[]int(nil),
 		selection...,
 	)
 	return nil
 }
 
-func (s *testInteractionStores) DeleteWordOrderDraft(
+func (stores *testInteractionStores) DeleteWordOrderDraft(
 	_ context.Context,
 	sessionID,
 	questionID int,
 ) error {
 	delete(
-		s.drafts,
+		stores.drafts,
 		draftKey{sessionID, questionID},
 	)
 	return nil
 }
 
-func (s *testInteractionStores) SaveHandwritingMessage(
+func (stores *testInteractionStores) SaveHandwritingMessage(
 	_ context.Context,
 	sessionID,
 	questionID int,
-	ref model.TelegramMessageRef,
+	messageReference model.TelegramMessageReference,
 ) error {
-	s.messages[handwritingMessageKey{sessionID, questionID}] = ref
+	stores.messages[handwritingMessageKey{sessionID, questionID}] = messageReference
 	return nil
 }
 
-func (s *testInteractionStores) GetHandwritingMessage(
+func (stores *testInteractionStores) GetHandwritingMessage(
 	_ context.Context,
 	sessionID,
 	questionID int,
-) (*model.TelegramMessageRef, error) {
-	ref, ok := s.messages[handwritingMessageKey{sessionID, questionID}]
+) (*model.TelegramMessageReference, error) {
+	messageReference, ok := stores.messages[handwritingMessageKey{sessionID, questionID}]
 	if !ok {
 		return nil, nil
 	}
-	return &ref, nil
+	return &messageReference, nil
 }
 
-func (s *testInteractionStores) GetMiniAppFingerprint(
+func (stores *testInteractionStores) GetMiniAppFingerprint(
 	_ context.Context,
 	sessionID int,
 ) (string, error) {
-	return s.fingerprints[sessionID], nil
+	return stores.fingerprints[sessionID], nil
 }
 
-func (s *testInteractionStores) SetMiniAppFingerprint(
+func (stores *testInteractionStores) SetMiniAppFingerprint(
 	_ context.Context,
 	sessionID int,
 	fingerprint string,
 ) error {
-	s.fingerprints[sessionID] = fingerprint
+	stores.fingerprints[sessionID] = fingerprint
 	return nil
 }
 
 type mockLLM struct {
-	answerFn func(
+	answerFunc func(
 		ctx context.Context,
 		question string,
 	) (string, error)
 }
 
-func (m *mockLLM) GradeHandwriting(
+func (mock *mockLLM) GradeHandwriting(
 	ctx context.Context,
 	prompt,
 	correctAnswer string,
@@ -565,12 +565,12 @@ func (m *mockLLM) GradeHandwriting(
 ) (external.GradeResult, error) {
 	return external.GradeResult{}, nil
 }
-func (m *mockLLM) AnswerLearningQuestion(
+func (mock *mockLLM) AnswerLearningQuestion(
 	ctx context.Context,
 	question string,
 ) (string, error) {
-	if m.answerFn != nil {
-		return m.answerFn(
+	if mock.answerFunc != nil {
+		return mock.answerFunc(
 			ctx,
 			question,
 		)

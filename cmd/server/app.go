@@ -28,32 +28,32 @@ type app struct {
 	closers   []io.Closer // closed in order by Close
 }
 
-func initApp(cfg *config.Config) (_ *app, err error) {
+func initializeApp(appConfig *config.Config) (_ *app, err error) {
 	// db, redis setup
-	db, rdb, err := initInfra(cfg)
+	db, redisClient, err := initializeInfrastructure(appConfig)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to init infrastructure: %w",
 			err,
 		)
 	}
-	a := &app{closers: []io.Closer{db, rdb}}
+	application := &app{closers: []io.Closer{db, redisClient}}
 	defer func() {
 		if err != nil {
-			a.Close()
+			application.Close()
 		}
 	}()
 
-	svc := newServices(
-		cfg,
+	services := newServices(
+		appConfig,
 		db,
-		rdb,
+		redisClient,
 	)
 
-	components, err := initBot(
-		cfg,
-		svc,
-		redisstore.NewInteractions(rdb),
+	components, err := initializeBot(
+		appConfig,
+		services,
+		redisstore.NewInteractions(redisClient),
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -61,66 +61,66 @@ func initApp(cfg *config.Config) (_ *app, err error) {
 			err,
 		)
 	}
-	a.bot = components.router
-	a.refresher = components.sessionFlow
+	application.bot = components.router
+	application.refresher = components.sessionFlow
 
 	// Content collection has no scheduled job (ADR-057).
-	a.scheduler = scheduler.New(scheduler.Deps{
-		User:        svc.user,
-		Session:     svc.session,
+	application.scheduler = scheduler.New(scheduler.Dependencies{
+		User:        services.user,
+		Session:     services.session,
 		QuizPusher:  components.sessionFlow,
 		StudyPusher: components.studyFlow,
 		Cron:        cron.New(),
-		Claims:      redisstore.NewPushClaims(rdb),
+		Claims:      redisstore.NewPushClaims(redisClient),
 	})
 
 	// The Mini App only reports a graded handwriting answer; SessionFlow
 	// refreshes the Telegram message.
-	miniappHandler := miniapp.NewHandler(miniapp.HandlerDeps{
-		Session: svc.session,
+	miniappHandler := miniapp.NewHandler(miniapp.HandlerDependencies{
+		Session: services.session,
 		Verifier: miniapp.NewInitDataVerifier(
-			cfg.Telegram.Token,
+			appConfig.Telegram.Token,
 			miniapp.InitDataMaxAge,
 		),
 		HandwritingScreen: components.sessionFlow,
 	})
-	a.server = &http.Server{
+	application.server = &http.Server{
 		Addr: fmt.Sprintf(
 			":%d",
-			cfg.Server.Port,
+			appConfig.Server.Port,
 		),
 		Handler: setupRouter(
-			cfg.Server.Mode == "release",
+			appConfig.Server.Mode == "release",
 			healthHandler(
 				db,
-				rdb,
+				redisClient,
 			),
 			miniappHandler,
 		),
 	}
-	return a, nil
+	return application, nil
 }
 
 // Run binds the HTTP port first so a port conflict starts nothing, then
 // starts the scheduler, Telegram polling, the stale Mini App refresh and the
 // HTTP server. It returns after ctx is cancelled or the HTTP server fails,
 // once shutdown has drained in-flight work.
-func (a *app) Run(ctx context.Context) error {
+func (application *app) Run(ctx context.Context) error {
 	listener, err := net.Listen(
 		"tcp",
-		a.server.Addr,
+		application.server.Addr,
 	)
 	if err != nil {
 		return fmt.Errorf(
 			"HTTP server listen %s: %w",
-			a.server.Addr,
+			application.server.Addr,
 			err,
 		)
 	}
 
-	a.scheduler.Start()
-	go a.bot.Start()
-	go a.refresher.RefreshStaleMiniAppMessages(ctx)
+	application.scheduler.Start()
+	go application.bot.Start()
+	go application.refresher.RefreshStaleMiniAppMessages(ctx)
 
 	serveErr := make(
 		chan error,
@@ -131,7 +131,7 @@ func (a *app) Run(ctx context.Context) error {
 			"HTTP server starting on port %d",
 			listener.Addr().(*net.TCPAddr).Port,
 		)
-		serveErr <- a.server.Serve(listener)
+		serveErr <- application.server.Serve(listener)
 	}()
 
 	var runErr error
@@ -144,7 +144,7 @@ func (a *app) Run(ctx context.Context) error {
 			err,
 		)
 	}
-	a.shutdown()
+	application.shutdown()
 	return runErr
 }
 
@@ -152,7 +152,7 @@ func (a *app) Run(ctx context.Context) error {
 // the scheduler. Each step waits for its in-flight work within one shared
 // shutdownTimeout, so Close does not close DB/Redis under a running handler
 // or job unless that timeout runs out. Connections stay open until Close.
-func (a *app) shutdown() {
+func (application *app) shutdown() {
 	log.Println("Shutting down...")
 
 	ctx, cancel := context.WithTimeout(
@@ -161,13 +161,13 @@ func (a *app) shutdown() {
 	)
 	defer cancel()
 
-	if err := a.bot.Stop(ctx); err != nil {
+	if err := application.bot.Stop(ctx); err != nil {
 		log.Printf(
 			"Telegram bot shutdown error: %v",
 			err,
 		)
 	}
-	if err := a.server.Shutdown(ctx); err != nil {
+	if err := application.server.Shutdown(ctx); err != nil {
 		log.Printf(
 			"HTTP server shutdown error: %v",
 			err,
@@ -175,7 +175,7 @@ func (a *app) shutdown() {
 	}
 	log.Println("Server stopped")
 
-	if err := a.scheduler.Stop(ctx); err != nil {
+	if err := application.scheduler.Stop(ctx); err != nil {
 		log.Printf(
 			"Scheduler shutdown error: %v",
 			err,
@@ -184,8 +184,8 @@ func (a *app) shutdown() {
 }
 
 // Close closes the shared connections (DB, then Redis).
-func (a *app) Close() {
-	for _, closer := range a.closers {
+func (application *app) Close() {
+	for _, closer := range application.closers {
 		if err := closer.Close(); err != nil {
 			log.Printf(
 				"Connection close error: %v",

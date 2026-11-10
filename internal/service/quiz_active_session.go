@@ -47,26 +47,26 @@ type QuizSessionResult struct {
 
 // quizActiveSessionService owns the Redis working set for in-progress learning sessions.
 type quizActiveSessionService struct {
-	repo  QuizActiveSessionRepo
-	store QuizSessionStore
+	repository QuizActiveSessionRepository
+	store      QuizSessionStore
 }
 
 func newQuizActiveSessionService(
-	repo QuizActiveSessionRepo,
+	repository QuizActiveSessionRepository,
 	store QuizSessionStore,
 ) *quizActiveSessionService {
 	return &quizActiveSessionService{
-		repo:  repo,
-		store: store,
+		repository: repository,
+		store:      store,
 	}
 }
 
-func (s *quizActiveSessionService) CreateFromDB(
+func (service *quizActiveSessionService) CreateFromDB(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
 	// retrieve target session from db (session - sessionQuestions - questions)
-	state, err := s.repo.LoadQuestionSessionWithStateBySessionID(
+	state, err := service.repository.LoadQuestionSessionWithStateBySessionID(
 		ctx,
 		sessionID,
 	)
@@ -94,7 +94,7 @@ func (s *quizActiveSessionService) CreateFromDB(
 	}
 
 	// set at redis
-	if err := s.save(
+	if err := service.save(
 		ctx,
 		state,
 	); err != nil {
@@ -108,11 +108,11 @@ func (s *quizActiveSessionService) CreateFromDB(
 }
 
 // Get retrieves the active session working set from Redis. If not found, it attempts to recover from DB and store in Redis.
-func (s *quizActiveSessionService) Get(
+func (service *quizActiveSessionService) Get(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	state, err := s.store.Load(
+	state, err := service.store.Load(
 		ctx,
 		sessionID,
 	)
@@ -121,7 +121,7 @@ func (s *quizActiveSessionService) Get(
 			err,
 			model.ErrSessionStoreNotFound,
 		) {
-			state, err := s.CreateFromDB(
+			state, err := service.CreateFromDB(
 				ctx,
 				sessionID,
 			)
@@ -142,14 +142,14 @@ func (s *quizActiveSessionService) Get(
 	return state, nil
 }
 
-func (s *quizActiveSessionService) RecordAnswer(
+func (service *quizActiveSessionService) RecordAnswer(
 	ctx context.Context,
 	sessionID,
 	questionID int,
 	userAnswer string,
 	isCorrect bool,
 ) error {
-	state, err := s.Get(
+	state, err := service.Get(
 		ctx,
 		sessionID,
 	)
@@ -157,7 +157,7 @@ func (s *quizActiveSessionService) RecordAnswer(
 		return err
 	}
 
-	item, idx, ok := state.CurrentItemByQuestionID(questionID)
+	item, index, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		return fmt.Errorf(
 			"%w session_id=%d question_id=%d",
@@ -177,33 +177,33 @@ func (s *quizActiveSessionService) RecordAnswer(
 
 	answer := userAnswer
 	correct := isCorrect
-	state.Items[idx].SessionQuestion.UserAnswer = &answer
-	state.Items[idx].SessionQuestion.IsCorrect = &correct
-	state.Items[idx].Progress.TimesServed++
+	state.Items[index].SessionQuestion.UserAnswer = &answer
+	state.Items[index].SessionQuestion.IsCorrect = &correct
+	state.Items[index].Progress.TimesServed++
 	if isCorrect {
-		state.Items[idx].Progress.TimesCorrect++
+		state.Items[index].Progress.TimesCorrect++
 	}
 	scheduleAnswer(
-		&state.Items[idx].Progress,
+		&state.Items[index].Progress,
 		isCorrect,
 	)
 
-	state.CurrentIndex = idx
+	state.CurrentIndex = index
 	state.UpdatedAt = time.Now()
 	state.RecountAnswered()
 
-	return s.save(
+	return service.save(
 		ctx,
 		state,
 	)
 }
 
-func (s *quizActiveSessionService) Flush(
+func (service *quizActiveSessionService) Flush(
 	ctx context.Context,
 	sessionID int,
 	userID int64,
 ) (*QuizSessionResult, error) {
-	state, err := s.Get(
+	state, err := service.Get(
 		ctx,
 		sessionID,
 	)
@@ -226,7 +226,7 @@ func (s *quizActiveSessionService) Flush(
 		)
 	}
 	state.Session.CorrectCount = state.CorrectCount()
-	if err := s.repo.FlushQuizActiveSession(
+	if err := service.repository.FlushQuizActiveSession(
 		ctx,
 		state,
 	); err != nil {
@@ -240,11 +240,11 @@ func (s *quizActiveSessionService) Flush(
 	return quizSessionResultFromState(state), nil
 }
 
-func (s *quizActiveSessionService) Delete(
+func (service *quizActiveSessionService) Delete(
 	ctx context.Context,
 	sessionID int,
 ) error {
-	if err := s.store.Delete(
+	if err := service.store.Delete(
 		ctx,
 		sessionID,
 	); err != nil {
@@ -257,11 +257,11 @@ func (s *quizActiveSessionService) Delete(
 	return nil
 }
 
-func (s *quizActiveSessionService) save(
+func (service *quizActiveSessionService) save(
 	ctx context.Context,
 	state *model.QuizActiveSessionState,
 ) error {
-	if err := s.store.Save(
+	if err := service.store.Save(
 		ctx,
 		state.Session.ID,
 		state,

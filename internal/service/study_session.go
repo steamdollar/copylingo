@@ -160,26 +160,26 @@ func scaleStudyNewCount(
 
 // studySessionService creates material-based study sessions.
 type studySessionService struct {
-	materialRepo MaterialRepo
-	sessionRepo  SessionRepo
-	db           *sqlx.DB
+	materialRepository MaterialRepository
+	sessionRepository  SessionRepository
+	db                 *sqlx.DB
 }
 
 func newStudySessionService(
-	materialRepo MaterialRepo,
-	sessionRepo SessionRepo,
+	materialRepository MaterialRepository,
+	sessionRepository SessionRepository,
 	db *sqlx.DB,
 ) *studySessionService {
 	return &studySessionService{
-		materialRepo: materialRepo,
-		sessionRepo:  sessionRepo,
-		db:           db,
+		materialRepository: materialRepository,
+		sessionRepository:  sessionRepository,
+		db:                 db,
 	}
 }
 
 // BuildStudySession selects the fixed morning/evening plan, or scales the
 // morning plan when limit is positive, then creates the session in the DB.
-func (s *studySessionService) BuildStudySession(
+func (service *studySessionService) BuildStudySession(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -229,7 +229,7 @@ func (s *studySessionService) BuildStudySession(
 	}
 
 	// get materials
-	materials, err := s.materialRepo.GetMaterialsByPlan(
+	materials, err := service.materialRepository.GetMaterialsByPlan(
 		ctx,
 		userID,
 		language,
@@ -271,10 +271,10 @@ func (s *studySessionService) BuildStudySession(
 	var sessionID int
 	if err := repository.WithinTx(
 		ctx,
-		s.db,
+		service.db,
 		func(tx *sqlx.Tx) error {
 			var err error
-			sessionID, err = s.sessionRepo.CreateSessionInTx(
+			sessionID, err = service.sessionRepository.CreateSessionInTx(
 				ctx,
 				tx,
 				session,
@@ -282,7 +282,7 @@ func (s *studySessionService) BuildStudySession(
 			if err != nil {
 				return err
 			}
-			return s.sessionRepo.CreateSessionMaterialsInTx(
+			return service.sessionRepository.CreateSessionMaterialsInTx(
 				ctx,
 				tx,
 				sessionID,

@@ -43,13 +43,13 @@ func newTelegramClient(api BotAPI) *TelegramClient {
 }
 
 // Updates starts long polling and returns the update channel.
-func (c *TelegramClient) Updates(pollConfig tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
-	return c.api.GetUpdatesChan(pollConfig)
+func (client *TelegramClient) Updates(pollConfig tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
+	return client.api.GetUpdatesChan(pollConfig)
 }
 
 // StopUpdates stops long polling started by Updates.
-func (c *TelegramClient) StopUpdates() {
-	c.api.StopReceivingUpdates()
+func (client *TelegramClient) StopUpdates() {
+	client.api.StopReceivingUpdates()
 }
 
 // send and request are the only paths to the Bot API. A failed call is logged
@@ -57,12 +57,12 @@ func (c *TelegramClient) StopUpdates() {
 // rejected send (e.g. 429 dropping a "next question" keyboard) leaves no trace.
 // The methods take no context, so entries carry the target instead of
 // interaction_id; correlate them with the update log by time and chat_id.
-func (c *TelegramClient) send(
+func (client *TelegramClient) send(
 	method string,
 	target slog.Attr,
 	chattable tgbotapi.Chattable,
 ) (tgbotapi.Message, error) {
-	sent, err := c.api.Send(chattable)
+	sent, err := client.api.Send(chattable)
 	if err != nil {
 		logTelegramAPIFailure(
 			method,
@@ -73,12 +73,12 @@ func (c *TelegramClient) send(
 	return sent, err
 }
 
-func (c *TelegramClient) request(
+func (client *TelegramClient) request(
 	method string,
 	target slog.Attr,
 	chattable tgbotapi.Chattable,
 ) error {
-	_, err := c.api.Request(chattable)
+	_, err := client.api.Request(chattable)
 	if err != nil {
 		logTelegramAPIFailure(
 			method,
@@ -96,7 +96,7 @@ func logTelegramAPIFailure(
 	target slog.Attr,
 	err error,
 ) {
-	attrs := []any{
+	attributes := []any{
 		"event",
 		"telegram.api.failed",
 		"method",
@@ -110,14 +110,14 @@ func logTelegramAPIFailure(
 		err,
 		&apiErr,
 	) {
-		attrs = append(
-			attrs,
+		attributes = append(
+			attributes,
 			"error_code",
 			apiErr.Code,
 		)
 		if apiErr.RetryAfter > 0 {
-			attrs = append(
-				attrs,
+			attributes = append(
+				attributes,
 				"retry_after_sec",
 				apiErr.RetryAfter,
 			)
@@ -125,7 +125,7 @@ func logTelegramAPIFailure(
 	}
 	slog.Warn(
 		"Telegram API call failed",
-		attrs...,
+		attributes...,
 	)
 }
 
@@ -138,61 +138,61 @@ func chatTarget(chatID int64) slog.Attr {
 
 // TODO: sendMessage, SendMessageWithKeyboard 굳이 따로 두는 이유가?
 // SendMessage sends a text message to a chat.
-func (c *TelegramClient) SendMessage(
+func (client *TelegramClient) SendMessage(
 	chatID int64,
 	text string,
 ) error {
-	msg := tgbotapi.NewMessage(
+	message := tgbotapi.NewMessage(
 		chatID,
 		sanitizeTelegramHTML(text),
 	)
-	msg.ParseMode = "HTML"
-	_, err := c.send(
+	message.ParseMode = "HTML"
+	_, err := client.send(
 		"sendMessage",
 		chatTarget(chatID),
-		msg,
+		message,
 	)
 	return err
 }
 
 // SendMessageWithKeyboard sends a message with an inline keyboard.
-func (c *TelegramClient) SendMessageWithKeyboard(
+func (client *TelegramClient) SendMessageWithKeyboard(
 	chatID int64,
 	text string,
 	keyboard tgbotapi.InlineKeyboardMarkup,
 ) error {
-	msg := tgbotapi.NewMessage(
+	message := tgbotapi.NewMessage(
 		chatID,
 		sanitizeTelegramHTML(text),
 	)
-	msg.ParseMode = "HTML"
+	message.ParseMode = "HTML"
 	if len(keyboard.InlineKeyboard) > 0 {
-		msg.ReplyMarkup = keyboard
+		message.ReplyMarkup = keyboard
 	}
-	_, err := c.send(
+	_, err := client.send(
 		"sendMessage",
 		chatTarget(chatID),
-		msg,
+		message,
 	)
 	return err
 }
 
 // SendMessageWithReplyMarkup sends a message with custom Telegram reply markup.
-func (c *TelegramClient) SendMessageWithReplyMarkup(
+func (client *TelegramClient) SendMessageWithReplyMarkup(
 	chatID int64,
 	text string,
 	replyMarkup interface{},
 ) (int, error) {
-	msg := tgbotapi.NewMessage(
+	message := tgbotapi.NewMessage(
 		chatID,
 		sanitizeTelegramHTML(text),
 	)
-	msg.ParseMode = "HTML"
-	msg.ReplyMarkup = replyMarkup
-	sent, err := c.send(
+	message.ParseMode = "HTML"
+	message.ReplyMarkup = replyMarkup
+	sent, err := client.send(
 		"sendMessage",
 		chatTarget(chatID),
-		msg,
+		message,
 	)
 	if err != nil {
 		return 0, err
@@ -201,7 +201,7 @@ func (c *TelegramClient) SendMessageWithReplyMarkup(
 }
 
 // SendVoiceFileID sends a voice message by reusing a cached Telegram file_id.
-func (c *TelegramClient) SendVoiceFileID(
+func (client *TelegramClient) SendVoiceFileID(
 	chatID int64,
 	fileID string,
 ) error {
@@ -209,7 +209,7 @@ func (c *TelegramClient) SendVoiceFileID(
 		chatID,
 		tgbotapi.FileID(fileID),
 	)
-	_, err := c.send(
+	_, err := client.send(
 		"sendVoice",
 		chatTarget(chatID),
 		voice,
@@ -219,7 +219,7 @@ func (c *TelegramClient) SendVoiceFileID(
 
 // SendVoiceBytes uploads raw OGG/Opus bytes as a voice message and returns the
 // Telegram file_id assigned to it, so callers can cache it for later re-sends.
-func (c *TelegramClient) SendVoiceBytes(
+func (client *TelegramClient) SendVoiceBytes(
 	chatID int64,
 	data []byte,
 ) (string, error) {
@@ -227,7 +227,7 @@ func (c *TelegramClient) SendVoiceBytes(
 		chatID,
 		tgbotapi.FileBytes{Name: "listening.ogg", Bytes: data},
 	)
-	sent, err := c.send(
+	sent, err := client.send(
 		"sendVoice",
 		chatTarget(chatID),
 		voice,
@@ -242,7 +242,7 @@ func (c *TelegramClient) SendVoiceBytes(
 }
 
 // EditMessageReplyMarkup updates the inline keyboard of an existing message.
-func (c *TelegramClient) EditMessageReplyMarkup(
+func (client *TelegramClient) EditMessageReplyMarkup(
 	chatID int64,
 	messageID int,
 	markup tgbotapi.InlineKeyboardMarkup,
@@ -252,7 +252,7 @@ func (c *TelegramClient) EditMessageReplyMarkup(
 		messageID,
 		markup,
 	)
-	_, err := c.send(
+	_, err := client.send(
 		"editMessageReplyMarkup",
 		chatTarget(chatID),
 		edit,
@@ -261,11 +261,11 @@ func (c *TelegramClient) EditMessageReplyMarkup(
 }
 
 // DeleteMessage removes a bot message, e.g. a dismissed settings menu.
-func (c *TelegramClient) DeleteMessage(
+func (client *TelegramClient) DeleteMessage(
 	chatID int64,
 	messageID int,
 ) error {
-	return c.request(
+	return client.request(
 		"deleteMessage",
 		chatTarget(chatID),
 		tgbotapi.NewDeleteMessage(
@@ -276,7 +276,7 @@ func (c *TelegramClient) DeleteMessage(
 }
 
 // EditMessage edits an existing message.
-func (c *TelegramClient) EditMessage(
+func (client *TelegramClient) EditMessage(
 	chatID int64,
 	messageID int,
 	text string,
@@ -291,7 +291,7 @@ func (c *TelegramClient) EditMessage(
 	if keyboard != nil && len(keyboard.InlineKeyboard) > 0 {
 		edit.ReplyMarkup = keyboard
 	}
-	_, err := c.send(
+	_, err := client.send(
 		"editMessageText",
 		chatTarget(chatID),
 		edit,
@@ -300,7 +300,7 @@ func (c *TelegramClient) EditMessage(
 }
 
 // ClearInlineKeyboard removes inline buttons from an existing bot message.
-func (c *TelegramClient) ClearInlineKeyboard(
+func (client *TelegramClient) ClearInlineKeyboard(
 	chatID int64,
 	messageID int,
 ) error {
@@ -310,7 +310,7 @@ func (c *TelegramClient) ClearInlineKeyboard(
 			MessageID: messageID,
 		},
 	}
-	_, err := c.send(
+	_, err := client.send(
 		"editMessageReplyMarkup",
 		chatTarget(chatID),
 		edit,
@@ -319,11 +319,11 @@ func (c *TelegramClient) ClearInlineKeyboard(
 }
 
 // AnswerCallback acknowledges a callback query with an optional toast text.
-func (c *TelegramClient) AnswerCallback(
+func (client *TelegramClient) AnswerCallback(
 	callbackID string,
 	text string,
 ) error {
-	return c.request(
+	return client.request(
 		"answerCallbackQuery",
 		slog.String(
 			"callback_query_id",
@@ -337,11 +337,11 @@ func (c *TelegramClient) AnswerCallback(
 }
 
 // AnswerCallbackAlert acknowledges a callback query with a modal alert.
-func (c *TelegramClient) AnswerCallbackAlert(
+func (client *TelegramClient) AnswerCallbackAlert(
 	callbackID string,
 	text string,
 ) error {
-	return c.request(
+	return client.request(
 		"answerCallbackQuery",
 		slog.String(
 			"callback_query_id",
@@ -355,11 +355,11 @@ func (c *TelegramClient) AnswerCallbackAlert(
 }
 
 // SendChatAction shows a transient status such as "typing" in the chat.
-func (c *TelegramClient) SendChatAction(
+func (client *TelegramClient) SendChatAction(
 	chatID int64,
 	action string,
 ) error {
-	return c.request(
+	return client.request(
 		"sendChatAction",
 		chatTarget(chatID),
 		tgbotapi.NewChatAction(

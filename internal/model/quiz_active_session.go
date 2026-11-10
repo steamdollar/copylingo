@@ -24,55 +24,55 @@ type QuizActiveSessionQuestion struct {
 	Progress        UserQuestionProgress `json:"progress"`
 }
 
-func (s *QuizActiveSessionState) RecountAnswered() int {
+func (state *QuizActiveSessionState) RecountAnswered() int {
 	count := 0
-	for _, item := range s.Items {
+	for _, item := range state.Items {
 		if item.SessionQuestion.IsCorrect != nil {
 			count++
 		}
 	}
-	s.AnsweredCount = count
+	state.AnsweredCount = count
 	return count
 }
 
-func (s *QuizActiveSessionState) CurrentItemByQuestionID(questionID int) (*QuizActiveSessionQuestion, int, bool) {
-	item, ok := s.ItemAt(s.CurrentIndex)
+func (state *QuizActiveSessionState) CurrentItemByQuestionID(questionID int) (*QuizActiveSessionQuestion, int, bool) {
+	item, ok := state.ItemAt(state.CurrentIndex)
 	if !ok || item.SessionQuestion.QuestionID != questionID {
 		return nil, -1, false
 	}
-	return item, s.CurrentIndex, true
+	return item, state.CurrentIndex, true
 }
 
 // ItemByQuestionID finds the session item for a question regardless of CurrentIndex.
 // Used after answering when the current index may have advanced (e.g. in-quiz LLM "ask" flow).
-func (s *QuizActiveSessionState) ItemByQuestionID(questionID int) (*QuizActiveSessionQuestion, bool) {
-	for i := range s.Items {
-		if s.Items[i].SessionQuestion.QuestionID == questionID {
-			return &s.Items[i], true
+func (state *QuizActiveSessionState) ItemByQuestionID(questionID int) (*QuizActiveSessionQuestion, bool) {
+	for i := range state.Items {
+		if state.Items[i].SessionQuestion.QuestionID == questionID {
+			return &state.Items[i], true
 		}
 	}
 	return nil, false
 }
 
-func (s *QuizActiveSessionState) ItemAt(idx int) (*QuizActiveSessionQuestion, bool) {
-	if idx < 0 || idx >= len(s.Items) {
+func (state *QuizActiveSessionState) ItemAt(index int) (*QuizActiveSessionQuestion, bool) {
+	if index < 0 || index >= len(state.Items) {
 		return nil, false
 	}
-	return &s.Items[idx], true
+	return &state.Items[index], true
 }
 
-func (s *QuizActiveSessionState) NextUnansweredIndex() int {
-	for idx, item := range s.Items {
+func (state *QuizActiveSessionState) NextUnansweredIndex() int {
+	for index, item := range state.Items {
 		if item.SessionQuestion.IsCorrect == nil {
-			return idx
+			return index
 		}
 	}
-	return len(s.Items)
+	return len(state.Items)
 }
 
-func (s *QuizActiveSessionState) CorrectCount() int {
+func (state *QuizActiveSessionState) CorrectCount() int {
 	count := 0
-	for _, item := range s.Items {
+	for _, item := range state.Items {
 		if item.SessionQuestion.IsCorrect != nil && *item.SessionQuestion.IsCorrect {
 			count++
 		}
@@ -80,11 +80,17 @@ func (s *QuizActiveSessionState) CorrectCount() int {
 	return count
 }
 
-func (s *QuizActiveSessionState) WrongAnswers() []QuizActiveSessionQuestion {
-	wrong := make([]QuizActiveSessionQuestion, 0)
-	for _, item := range s.Items {
+func (state *QuizActiveSessionState) WrongAnswers() []QuizActiveSessionQuestion {
+	wrong := make(
+		[]QuizActiveSessionQuestion,
+		0,
+	)
+	for _, item := range state.Items {
 		if item.SessionQuestion.IsCorrect != nil && !*item.SessionQuestion.IsCorrect {
-			wrong = append(wrong, item)
+			wrong = append(
+				wrong,
+				item,
+			)
 		}
 	}
 	return wrong

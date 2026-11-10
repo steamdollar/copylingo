@@ -11,61 +11,61 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-type settingsMockUserRepo struct {
+type settingsMockUserRepository struct {
 	user         *model.User
 	slotUpdates  map[model.SessionSlot]*string
 	lastTimezone string
 }
 
-func (m *settingsMockUserRepo) GetOrCreate(
+func (mock *settingsMockUserRepository) GetOrCreate(
 	ctx context.Context,
 	telegramID int64,
 	username string,
 ) (*model.User, error) {
-	return m.user, nil
+	return mock.user, nil
 }
-func (m *settingsMockUserRepo) GetByID(
+func (mock *settingsMockUserRepository) GetByID(
 	ctx context.Context,
 	id int64,
 ) (*model.User, error) {
-	return m.user, nil
+	return mock.user, nil
 }
-func (m *settingsMockUserRepo) GetAllUsers(ctx context.Context) ([]model.User, error) {
-	return []model.User{*m.user}, nil
+func (mock *settingsMockUserRepository) GetAllUsers(ctx context.Context) ([]model.User, error) {
+	return []model.User{*mock.user}, nil
 }
-func (m *settingsMockUserRepo) GetActiveTimezones(ctx context.Context) ([]string, error) {
-	return []string{m.user.Timezone}, nil
+func (mock *settingsMockUserRepository) GetActiveTimezones(ctx context.Context) ([]string, error) {
+	return []string{mock.user.Timezone}, nil
 }
 
-func (m *settingsMockUserRepo) GetUsersBySlot(
+func (mock *settingsMockUserRepository) GetUsersBySlot(
 	ctx context.Context,
 	slot model.SessionSlot,
 	localTime string,
 	timezone string,
 ) ([]model.User, error) {
-	return []model.User{*m.user}, nil
+	return []model.User{*mock.user}, nil
 }
 
-func (m *settingsMockUserRepo) UpdateSlotTime(
+func (mock *settingsMockUserRepository) UpdateSlotTime(
 	ctx context.Context,
 	userID int64,
 	slot model.SessionSlot,
-	timeVal *string,
+	timeValue *string,
 ) error {
-	m.slotUpdates[slot] = timeVal
+	mock.slotUpdates[slot] = timeValue
 	return nil
 }
-func (m *settingsMockUserRepo) UpdateTimezone(
+func (mock *settingsMockUserRepository) UpdateTimezone(
 	ctx context.Context,
 	userID int64,
 	timezone string,
 ) error {
-	m.lastTimezone = timezone
-	m.user.Timezone = timezone
+	mock.lastTimezone = timezone
+	mock.user.Timezone = timezone
 	return nil
 }
 
-func newSettingsTestFlow() (*SettingsFlow, *settingsMockUserRepo, *mockBotAPI) {
+func newSettingsTestFlow() (*SettingsFlow, *settingsMockUserRepository, *mockBotAPI) {
 	mStudy := "08:00"
 	mQuiz := "12:00"
 	eStudy := "16:30"
@@ -83,7 +83,7 @@ func newSettingsTestFlow() (*SettingsFlow, *settingsMockUserRepo, *mockBotAPI) {
 		EveningSessionTime: "21:00",
 	}
 
-	repo := &settingsMockUserRepo{
+	repository := &settingsMockUserRepository{
 		user:        user,
 		slotUpdates: make(map[model.SessionSlot]*string),
 	}
@@ -91,15 +91,15 @@ func newSettingsTestFlow() (*SettingsFlow, *settingsMockUserRepo, *mockBotAPI) {
 	mockAPI := &mockBotAPI{}
 	flow := newTestSettingsFlow(
 		mockAPI,
-		SettingsFlowDeps{User: service.NewUserService(repo)},
+		SettingsFlowDependencies{User: service.NewUserService(repository)},
 	)
-	return flow, repo, mockAPI
+	return flow, repository, mockAPI
 }
 
 func TestHandleSettingsCommand(t *testing.T) {
 	flow, _, mockAPI := newSettingsTestFlow()
 
-	msg := &tgbotapi.Message{
+	message := &tgbotapi.Message{
 		MessageID: 100,
 		Chat:      &tgbotapi.Chat{ID: 12345},
 		From:      &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -108,14 +108,14 @@ func TestHandleSettingsCommand(t *testing.T) {
 
 	flow.handleSettingsCommand(
 		context.Background(),
-		msg,
+		message,
 	)
 
 	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected message to be sent")
 	}
 
-	sentMsg, ok := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	sentMessage, ok := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !ok {
 		t.Fatalf(
 			"expected MessageConfig, got %T",
@@ -124,39 +124,39 @@ func TestHandleSettingsCommand(t *testing.T) {
 	}
 
 	if !strings.Contains(
-		sentMsg.Text,
+		sentMessage.Text,
 		"푸시 알림 및 스케줄 설정",
 	) {
 		t.Errorf(
 			"expected title in message, got: %s",
-			sentMsg.Text,
+			sentMessage.Text,
 		)
 	}
 	if !strings.Contains(
-		sentMsg.Text,
+		sentMessage.Text,
 		"Asia/Seoul",
 	) {
 		t.Errorf(
 			"expected timezone in message, got: %s",
-			sentMsg.Text,
+			sentMessage.Text,
 		)
 	}
 	if !strings.Contains(
-		sentMsg.Text,
+		sentMessage.Text,
 		"08:00",
 	) {
 		t.Errorf(
 			"expected morning study time in message, got: %s",
-			sentMsg.Text,
+			sentMessage.Text,
 		)
 	}
 
 	// Verify keyboard buttons
-	markup, ok := sentMsg.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
+	markup, ok := sentMessage.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
 	if !ok {
 		t.Fatalf(
 			"expected InlineKeyboardMarkup, got %T",
-			sentMsg.ReplyMarkup,
+			sentMessage.ReplyMarkup,
 		)
 	}
 	// 4 slots, timezone, linked-material list, main menu.
@@ -189,7 +189,7 @@ func TestFormatSlotTimeNormalizesDatabaseTimestamp(t *testing.T) {
 func TestHandleSettingsCallback_View(t *testing.T) {
 	flow, _, mockAPI := newSettingsTestFlow()
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_1",
 		Data: callbackMenuSettings,
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -201,14 +201,14 @@ func TestHandleSettingsCallback_View(t *testing.T) {
 
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
 	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected message edit to be sent")
 	}
 
-	editMsg, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
@@ -216,12 +216,12 @@ func TestHandleSettingsCallback_View(t *testing.T) {
 		)
 	}
 	if !strings.Contains(
-		editMsg.Text,
+		editMessage.Text,
 		"푸시 알림 및 스케줄 설정",
 	) {
 		t.Errorf(
 			"unexpected edit text: %s",
-			editMsg.Text,
+			editMessage.Text,
 		)
 	}
 }
@@ -229,7 +229,7 @@ func TestHandleSettingsCallback_View(t *testing.T) {
 func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 	flow, _, mockAPI := newSettingsTestFlow()
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_2",
 		Data: "settings:slot:morning_study",
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -241,14 +241,14 @@ func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
 	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected message edit to be sent")
 	}
 
-	editMsg, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
@@ -256,16 +256,16 @@ func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 		)
 	}
 	if !strings.Contains(
-		editMsg.Text,
+		editMessage.Text,
 		"오전 학습 시각 설정",
 	) {
 		t.Errorf(
 			"unexpected slot picker text: %s",
-			editMsg.Text,
+			editMessage.Text,
 		)
 	}
 
-	markup := editMsg.ReplyMarkup
+	markup := editMessage.ReplyMarkup
 	if markup == nil {
 		t.Fatal("expected reply markup")
 	}
@@ -275,14 +275,14 @@ func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 	foundOff := false
 	foundAllToggle := false
 	for _, row := range markup.InlineKeyboard {
-		for _, btn := range row {
-			if *btn.CallbackData == "settings:set:morning_study:08:30" {
+		for _, button := range row {
+			if *button.CallbackData == "settings:set:morning_study:08:30" {
 				foundTime = true
 			}
-			if *btn.CallbackData == "settings:set:morning_study:off" {
+			if *button.CallbackData == "settings:set:morning_study:off" {
 				foundOff = true
 			}
-			if *btn.CallbackData == "settings:slot:morning_study:all" {
+			if *button.CallbackData == "settings:slot:morning_study:all" {
 				foundAllToggle = true
 			}
 		}
@@ -302,7 +302,7 @@ func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 func TestHandleSettingsCallback_SlotPickerAll(t *testing.T) {
 	flow, _, mockAPI := newSettingsTestFlow()
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_3",
 		Data: "settings:slot:evening_quiz:all",
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -314,10 +314,10 @@ func TestHandleSettingsCallback_SlotPickerAll(t *testing.T) {
 
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
-	editMsg, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
@@ -325,15 +325,15 @@ func TestHandleSettingsCallback_SlotPickerAll(t *testing.T) {
 		)
 	}
 
-	markup := editMsg.ReplyMarkup
+	markup := editMessage.ReplyMarkup
 	foundMidnight := false
 	foundLateNight := false
 	for _, row := range markup.InlineKeyboard {
-		for _, btn := range row {
-			if *btn.CallbackData == "settings:set:evening_quiz:00:00" {
+		for _, button := range row {
+			if *button.CallbackData == "settings:set:evening_quiz:00:00" {
 				foundMidnight = true
 			}
-			if *btn.CallbackData == "settings:set:evening_quiz:23:30" {
+			if *button.CallbackData == "settings:set:evening_quiz:23:30" {
 				foundLateNight = true
 			}
 		}
@@ -345,9 +345,9 @@ func TestHandleSettingsCallback_SlotPickerAll(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_SetSlotTime(t *testing.T) {
-	flow, repo, mockAPI := newSettingsTestFlow()
+	flow, repository, mockAPI := newSettingsTestFlow()
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_4",
 		Data: "settings:set:morning_study:07:30",
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -359,19 +359,19 @@ func TestHandleSettingsCallback_SetSlotTime(t *testing.T) {
 
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
-	val, ok := repo.slotUpdates[model.SessionSlotMorningStudy]
-	if !ok || val == nil || *val != "07:30" {
+	value, ok := repository.slotUpdates[model.SessionSlotMorningStudy]
+	if !ok || value == nil || *value != "07:30" {
 		t.Errorf(
 			"expected slot update to 07:30, got %v",
-			val,
+			value,
 		)
 	}
 
 	// Verify message was re-rendered with new time
-	editMsg, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
@@ -379,20 +379,20 @@ func TestHandleSettingsCallback_SetSlotTime(t *testing.T) {
 		)
 	}
 	if !strings.Contains(
-		editMsg.Text,
+		editMessage.Text,
 		"07:30",
 	) {
 		t.Errorf(
 			"expected updated time 07:30 in message, got: %s",
-			editMsg.Text,
+			editMessage.Text,
 		)
 	}
 }
 
 func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
-	flow, repo, mockAPI := newSettingsTestFlow()
+	flow, repository, mockAPI := newSettingsTestFlow()
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_5",
 		Data: "settings:set:evening_quiz:off",
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -404,22 +404,22 @@ func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
 
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
-	val, ok := repo.slotUpdates[model.SessionSlotEveningQuiz]
+	value, ok := repository.slotUpdates[model.SessionSlotEveningQuiz]
 	if !ok {
 		t.Fatal("expected slot update entry")
 	}
-	if val != nil {
+	if value != nil {
 		t.Errorf(
 			"expected nil for disabled slot, got %v",
-			*val,
+			*value,
 		)
 	}
 
 	// Verify message displays 꺼짐
-	editMsg, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
@@ -427,12 +427,12 @@ func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
 		)
 	}
 	if !strings.Contains(
-		editMsg.Text,
+		editMessage.Text,
 		"🔕 꺼짐",
 	) {
 		t.Errorf(
 			"expected 🔕 꺼짐 in message, got: %s",
-			editMsg.Text,
+			editMessage.Text,
 		)
 	}
 }
@@ -440,7 +440,7 @@ func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
 func TestHandleSettingsCallback_Timezone(t *testing.T) {
 	flow, _, mockAPI := newSettingsTestFlow()
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_6",
 		Data: callbackSettingsTimezone,
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -452,10 +452,10 @@ func TestHandleSettingsCallback_Timezone(t *testing.T) {
 
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
-	editMsg, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
@@ -463,25 +463,25 @@ func TestHandleSettingsCallback_Timezone(t *testing.T) {
 		)
 	}
 	if !strings.Contains(
-		editMsg.Text,
+		editMessage.Text,
 		"시간대(Timezone) 설정",
 	) {
 		t.Errorf(
 			"unexpected timezone view text: %s",
-			editMsg.Text,
+			editMessage.Text,
 		)
 	}
 
 	// Verify timezone options
-	markup := editMsg.ReplyMarkup
+	markup := editMessage.ReplyMarkup
 	foundTokyo := false
 	foundNY := false
 	for _, row := range markup.InlineKeyboard {
-		for _, btn := range row {
-			if *btn.CallbackData == "settings:set_tz:Asia/Tokyo" {
+		for _, button := range row {
+			if *button.CallbackData == "settings:set_tz:Asia/Tokyo" {
 				foundTokyo = true
 			}
-			if *btn.CallbackData == "settings:set_tz:America/New_York" {
+			if *button.CallbackData == "settings:set_tz:America/New_York" {
 				foundNY = true
 			}
 		}
@@ -492,9 +492,9 @@ func TestHandleSettingsCallback_Timezone(t *testing.T) {
 }
 
 func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
-	flow, repo, mockAPI := newSettingsTestFlow()
+	flow, repository, mockAPI := newSettingsTestFlow()
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_7",
 		Data: "settings:set_tz:Asia/Tokyo",
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -506,18 +506,18 @@ func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
 
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
-	if repo.lastTimezone != "Asia/Tokyo" {
+	if repository.lastTimezone != "Asia/Tokyo" {
 		t.Errorf(
 			"expected timezone updated to Asia/Tokyo, got %s",
-			repo.lastTimezone,
+			repository.lastTimezone,
 		)
 	}
 
 	// Verify settings overview shows updated timezone
-	editMsg, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"expected EditMessageTextConfig, got %T",
@@ -525,21 +525,21 @@ func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
 		)
 	}
 	if !strings.Contains(
-		editMsg.Text,
+		editMessage.Text,
 		"Asia/Tokyo",
 	) {
 		t.Errorf(
 			"expected Asia/Tokyo in updated overview, got: %s",
-			editMsg.Text,
+			editMessage.Text,
 		)
 	}
 }
 
 func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
-	flow, repo, _ := newSettingsTestFlow()
+	flow, repository, _ := newSettingsTestFlow()
 
 	// Invalid slot
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_inv_slot",
 		Data: "settings:slot:invalid_slot",
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -550,11 +550,11 @@ func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
 	}
 	flow.handleSettingsCallback(
 		context.Background(),
-		cb,
+		callbackQuery,
 	)
 
 	// Invalid timezone
-	cbTz := &tgbotapi.CallbackQuery{
+	timezoneCallback := &tgbotapi.CallbackQuery{
 		ID:   "cb_inv_tz",
 		Data: "settings:set_tz:Invalid/Location_999",
 		From: &tgbotapi.User{ID: 12345, UserName: "tester"},
@@ -565,9 +565,9 @@ func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
 	}
 	flow.handleSettingsCallback(
 		context.Background(),
-		cbTz,
+		timezoneCallback,
 	)
-	if repo.lastTimezone == "Invalid/Location_999" {
+	if repository.lastTimezone == "Invalid/Location_999" {
 		t.Error("expected invalid timezone to not be saved")
 	}
 }

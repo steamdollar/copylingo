@@ -19,15 +19,15 @@ func storeQuizState(
 	ownerUserID int64,
 	sessionID,
 	questionID int,
-	q model.Question,
-	sq model.SessionQuestion,
+	question model.Question,
+	sessionQuestion model.SessionQuestion,
 ) {
 	t.Helper()
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: sessionID, UserID: ownerUserID},
 		Items: []model.QuizActiveSessionQuestion{
-			{SessionQuestion: sq, Question: q},
+			{SessionQuestion: sessionQuestion, Question: question},
 		},
 	}
 	seedQuizState(
@@ -50,20 +50,20 @@ func storeStudyState(
 
 // keyboardHasCallback reports whether any inline button in a sent message carries the callback data.
 func keyboardHasCallback(
-	c tgbotapi.Chattable,
+	chattable tgbotapi.Chattable,
 	data string,
 ) bool {
-	msg, ok := c.(tgbotapi.MessageConfig)
+	message, ok := chattable.(tgbotapi.MessageConfig)
 	if !ok {
 		return false
 	}
-	markup, ok := msg.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
+	markup, ok := message.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
 	if !ok {
 		return false
 	}
 	for _, row := range markup.InlineKeyboard {
-		for _, btn := range row {
-			if btn.CallbackData != nil && *btn.CallbackData == data {
+		for _, button := range row {
+			if button.CallbackData != nil && *button.CallbackData == data {
 				return true
 			}
 		}
@@ -74,13 +74,13 @@ func keyboardHasCallback(
 func TestLoadQuizQuestionContext(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
-	b := newTestLLMQuestionFlow(
+	flow := newTestLLMQuestionFlow(
 		nil,
 		stateStores,
-		LLMQuestionFlowDeps{
+		LLMQuestionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{},
+				service.SessionDependencies{},
 			),
 		},
 	)
@@ -105,7 +105,7 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 	t.Run(
 		"plain /llm token yields no context",
 		func(t *testing.T) {
-			if got := b.loadQuizQuestionContext(
+			if got := flow.loadQuizQuestionContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMPlain},
 			); got != "" {
@@ -120,7 +120,7 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 	t.Run(
 		"other pending kind yields no context",
 		func(t *testing.T) {
-			if got := b.loadQuizQuestionContext(
+			if got := flow.loadQuizQuestionContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMStudyMaterial},
 			); got != "" {
@@ -135,7 +135,7 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 	t.Run(
 		"missing session yields no context",
 		func(t *testing.T) {
-			if got := b.loadQuizQuestionContext(
+			if got := flow.loadQuizQuestionContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion, SessionID: 999, QuestionID: 1},
 			); got != "" {
@@ -150,7 +150,7 @@ func TestLoadQuizQuestionContext(t *testing.T) {
 	t.Run(
 		"valid token includes question fields",
 		func(t *testing.T) {
-			got := b.loadQuizQuestionContext(
+			got := flow.loadQuizQuestionContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion, SessionID: 10, QuestionID: 1},
 			)
@@ -207,10 +207,10 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 		return newTestLLMQuestionFlow(
 			nil,
 			stateStores,
-			LLMQuestionFlowDeps{
+			LLMQuestionFlowDependencies{
 				Session: newTestSessionService(
 					stateStores,
-					service.SessionDeps{},
+					service.SessionDependencies{},
 				),
 			},
 		)
@@ -219,8 +219,8 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 	t.Run(
 		"valid token includes rendered material and requires ownership",
 		func(t *testing.T) {
-			b := newFlow()
-			got := b.loadStudyMaterialContext(
+			flow := newFlow()
+			got := flow.loadStudyMaterialContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMStudyMaterial, SessionID: 20, MaterialOrder: 0},
 				owner,
@@ -237,7 +237,7 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 					)
 				}
 			}
-			if got := b.loadStudyMaterialContext(
+			if got := flow.loadStudyMaterialContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMStudyMaterial, SessionID: 20, MaterialOrder: 0},
 				owner+1,
@@ -253,8 +253,8 @@ func TestLoadStudyMaterialContext(t *testing.T) {
 	t.Run(
 		"malformed or unknown material token yields no context",
 		func(t *testing.T) {
-			b := newFlow()
-			if got := b.loadStudyMaterialContext(
+			flow := newFlow()
+			if got := flow.loadStudyMaterialContext(
 				ctx,
 				model.PendingLLMInput{Kind: model.PendingLLMQuizQuestion},
 				owner,
@@ -274,21 +274,21 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 
 	newFlow := func(
 		stateStores *testInteractionStores,
-		mAPI *mockBotAPI,
+		mockAPI *mockBotAPI,
 	) *SessionFlow {
 		return newTestSessionFlow(
-			mAPI,
+			mockAPI,
 			stateStores,
-			SessionFlowDeps{
+			SessionFlowDependencies{
 				Session: newTestSessionService(
 					stateStores,
-					service.SessionDeps{LLM: &mockLLM{}},
+					service.SessionDependencies{LLM: &mockLLM{}},
 				),
 			},
 		)
 	}
 
-	mcQuestion := model.Question{
+	multipleChoiceQuestion := model.Question{
 		ID:            questionID,
 		Prompt:        "りんごは？",
 		CorrectAnswer: "apple",
@@ -305,10 +305,10 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 		"owner sees ask button and prompt",
 		func(t *testing.T) {
 			stateStores := newTestInteractionStores()
-			mAPI := &mockBotAPI{}
-			sf := newFlow(
+			mockAPI := &mockBotAPI{}
+			sessionFlow := newFlow(
 				stateStores,
-				mAPI,
+				mockAPI,
 			)
 			storeQuizState(
 				t,
@@ -316,13 +316,13 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 				owner.ID,
 				sessionID,
 				questionID,
-				mcQuestion,
+				multipleChoiceQuestion,
 				model.SessionQuestion{QuestionID: questionID},
 			)
 
 			answerByText(
 				t,
-				sf,
+				sessionFlow,
 				stateStores,
 				123,
 				owner,
@@ -331,24 +331,24 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 				"apple",
 			)
 
-			if len(mAPI.sentMessages) != 1 {
+			if len(mockAPI.sentMessages) != 1 {
 				t.Fatalf(
 					"expected 1 message, got %d",
-					len(mAPI.sentMessages),
+					len(mockAPI.sentMessages),
 				)
 			}
-			msg := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+			message := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 			if !strings.Contains(
-				msg.Text,
+				message.Text,
 				"りんごは？",
 			) {
 				t.Errorf(
 					"expected prompt preserved in result, got %q",
-					msg.Text,
+					message.Text,
 				)
 			}
 			if !keyboardHasCallback(
-				mAPI.sentMessages[0],
+				mockAPI.sentMessages[0],
 				askData,
 			) {
 				t.Errorf(
@@ -363,10 +363,10 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 		"non-owner sees no ask button",
 		func(t *testing.T) {
 			stateStores := newTestInteractionStores()
-			mAPI := &mockBotAPI{}
-			sf := newFlow(
+			mockAPI := &mockBotAPI{}
+			sessionFlow := newFlow(
 				stateStores,
-				mAPI,
+				mockAPI,
 			)
 			storeQuizState(
 				t,
@@ -374,13 +374,13 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 				1,
 				sessionID,
 				questionID,
-				mcQuestion,
+				multipleChoiceQuestion,
 				model.SessionQuestion{QuestionID: questionID},
 			)
 
 			answerByText(
 				t,
-				sf,
+				sessionFlow,
 				stateStores,
 				123,
 				&tgbotapi.User{ID: 1},
@@ -390,7 +390,7 @@ func TestProcessAnswerText_AskButtonOwnerGate(t *testing.T) {
 			)
 
 			if keyboardHasCallback(
-				mAPI.sentMessages[0],
+				mockAPI.sentMessages[0],
 				askData,
 			) {
 				t.Error("did not expect ask button for non-owner")
@@ -405,15 +405,15 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 
 	newFlow := func(
 		stateStores *testInteractionStores,
-		mAPI *mockBotAPI,
+		mockAPI *mockBotAPI,
 	) *SessionFlow {
 		return newTestSessionFlow(
-			mAPI,
+			mockAPI,
 			stateStores,
-			SessionFlowDeps{},
+			SessionFlowDependencies{},
 		)
 	}
-	cbFor := func(from *tgbotapi.User) *tgbotapi.CallbackQuery {
+	callbackFor := func(from *tgbotapi.User) *tgbotapi.CallbackQuery {
 		return &tgbotapi.CallbackQuery{From: from, Message: &tgbotapi.Message{Chat: &tgbotapi.Chat{ID: 123}}}
 	}
 
@@ -421,15 +421,15 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 		"owner arms context-scoped pending value",
 		func(t *testing.T) {
 			stateStores := newTestInteractionStores()
-			mAPI := &mockBotAPI{}
-			sf := newFlow(
+			mockAPI := &mockBotAPI{}
+			sessionFlow := newFlow(
 				stateStores,
-				mAPI,
+				mockAPI,
 			)
 
-			sf.handleAskLLMQuestion(
+			sessionFlow.handleAskLLMQuestion(
 				context.Background(),
-				cbFor(owner),
+				callbackFor(owner),
 				sessionID,
 				"1",
 			)
@@ -443,14 +443,14 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 					want,
 				)
 			}
-			if len(mAPI.sentMessages) != 1 {
+			if len(mockAPI.sentMessages) != 1 {
 				t.Fatalf(
 					"expected 1 instruction message, got %d",
-					len(mAPI.sentMessages),
+					len(mockAPI.sentMessages),
 				)
 			}
 			if !keyboardHasCallback(
-				mAPI.sentMessages[0],
+				mockAPI.sentMessages[0],
 				callbackLLMCancel,
 			) {
 				t.Fatalf(
@@ -465,15 +465,15 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 		"non-owner is ignored",
 		func(t *testing.T) {
 			stateStores := newTestInteractionStores()
-			mAPI := &mockBotAPI{}
-			sf := newFlow(
+			mockAPI := &mockBotAPI{}
+			sessionFlow := newFlow(
 				stateStores,
-				mAPI,
+				mockAPI,
 			)
 
-			sf.handleAskLLMQuestion(
+			sessionFlow.handleAskLLMQuestion(
 				context.Background(),
-				cbFor(&tgbotapi.User{ID: 999}),
+				callbackFor(&tgbotapi.User{ID: 999}),
 				sessionID,
 				"1",
 			)
@@ -481,10 +481,10 @@ func TestHandleAskLLMQuestion(t *testing.T) {
 			if _, ok := stateStores.pending[999]; ok {
 				t.Error("expected no pending value for non-owner")
 			}
-			if len(mAPI.sentMessages) != 0 {
+			if len(mockAPI.sentMessages) != 0 {
 				t.Errorf(
 					"expected no message for non-owner, got %d",
-					len(mAPI.sentMessages),
+					len(mockAPI.sentMessages),
 				)
 			}
 		},
@@ -528,10 +528,10 @@ func TestHandleStudyAskLLMQuestion(t *testing.T) {
 		return newTestStudyFlow(
 			api,
 			stateStores,
-			StudyFlowDeps{
+			StudyFlowDependencies{
 				Session: newTestSessionService(
 					stateStores,
-					service.SessionDeps{},
+					service.SessionDependencies{},
 				),
 			},
 		), stateStores, api

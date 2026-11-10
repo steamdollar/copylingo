@@ -18,9 +18,9 @@ type StudySessionPlan struct {
 }
 
 // TotalMaterialCount returns the total number of requested materials.
-func (p StudySessionPlan) TotalMaterialCount() int {
+func (plan StudySessionPlan) TotalMaterialCount() int {
 	total := 0
-	for _, quota := range p.Quotas {
+	for _, quota := range plan.Quotas {
 		total += quota.NewCount + quota.ReviewCount
 	}
 	return total

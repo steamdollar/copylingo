@@ -12,8 +12,8 @@ import (
 // RefreshStaleMiniAppMessages is called once at server startup to check in-progress sessions.
 // If the next unanswered question is a handwriting task and the Mini App URL has changed,
 // it re-sends the question with a fresh URL.
-func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
-	ctx = observability.WithAttrs(
+func (flow *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
+	ctx = observability.WithAttributes(
 		ctx,
 		slog.String(
 			"interaction_id",
@@ -24,7 +24,7 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 			"telegram.restart_recovery",
 		),
 	)
-	baseURL := sf.publicBaseURL
+	baseURL := flow.publicBaseURL
 	if baseURL == "" {
 		slog.InfoContext(
 			ctx,
@@ -34,9 +34,9 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 		)
 		return
 	}
-	currentFp := callback.MiniAppURLFingerprint(baseURL)
+	currentFingerprint := callback.MiniAppURLFingerprint(baseURL)
 
-	sessions, err := sf.session.ListInProgressQuizzes(ctx)
+	sessions, err := flow.session.ListInProgressQuizzes(ctx)
 	if err != nil {
 		slog.ErrorContext(
 			ctx,
@@ -49,22 +49,22 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 		return
 	}
 
-	for _, s := range sessions {
+	for _, session := range sessions {
 		// Shutdown cancels ctx; stop instead of failing every remaining session.
 		if ctx.Err() != nil {
 			return
 		}
 		// Skip if fingerprint unchanged
-		if last, _ := sf.recovery.GetMiniAppFingerprint(
+		if last, _ := flow.recovery.GetMiniAppFingerprint(
 			ctx,
-			s.ID,
-		); last == currentFp {
+			session.ID,
+		); last == currentFingerprint {
 			continue
 		}
 
-		state, err := sf.session.QuizProgress(
+		state, err := flow.session.QuizProgress(
 			ctx,
-			s.ID,
+			session.ID,
 		)
 		if err != nil {
 			slog.ErrorContext(
@@ -73,32 +73,32 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 				"event",
 				"telegram.restart_recovery.active_state_unavailable",
 				"session_id",
-				s.ID,
+				session.ID,
 				"error",
 				err,
 			)
 			continue
 		}
 
-		idx := state.NextUnansweredIndex()
-		if idx >= len(state.Items) {
+		index := state.NextUnansweredIndex()
+		if index >= len(state.Items) {
 			continue
 		}
 
-		q := state.Items[idx].Question
-		if q.Type != model.QuestionKanaHandwriting {
+		question := state.Items[index].Question
+		if question.Type != model.QuestionKanaHandwriting {
 			continue
 		}
 
 		// Best-effort: edit the old message to strip its stale buttons.
-		if ref, err := sf.messages.GetHandwritingMessage(
+		if messageReference, err := flow.messages.GetHandwritingMessage(
 			ctx,
-			s.ID,
-			q.ID,
-		); err == nil && ref != nil {
-			_ = sf.telegram.ClearInlineKeyboard(
-				ref.ChatID,
-				ref.MessageID,
+			session.ID,
+			question.ID,
+		); err == nil && messageReference != nil {
+			_ = flow.telegram.ClearInlineKeyboard(
+				messageReference.ChatID,
+				messageReference.MessageID,
 			)
 		}
 
@@ -109,26 +109,26 @@ func (sf *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 			"event",
 			"telegram.restart_recovery.link_refreshing",
 			"session_id",
-			s.ID,
+			session.ID,
 			"user_id",
-			s.UserID,
+			session.UserID,
 		)
-		sf.telegram.SendMessage(
-			s.UserID,
+		flow.telegram.SendMessage(
+			session.UserID,
 			botMessagesByLocale[botDefaultLocale].handwritingLinkUpdated,
 		)
-		sf.showQuestion(
+		flow.showQuestion(
 			ctx,
-			s.UserID,
+			session.UserID,
 			nil,
-			s.ID,
-			idx,
+			session.ID,
+			index,
 		)
 
-		_ = sf.recovery.SetMiniAppFingerprint(
+		_ = flow.recovery.SetMiniAppFingerprint(
 			ctx,
-			s.ID,
-			currentFp,
+			session.ID,
+			currentFingerprint,
 		)
 	}
 }

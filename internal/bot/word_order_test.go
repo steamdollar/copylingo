@@ -20,13 +20,13 @@ func newWordOrderFixture(
 	t.Helper()
 	stateStores := newTestInteractionStores()
 	api := &mockBotAPI{}
-	sf := newTestSessionFlow(
+	sessionFlow := newTestSessionFlow(
 		api,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{LLM: &mockLLM{}},
+				service.SessionDependencies{LLM: &mockLLM{}},
 			),
 		},
 	)
@@ -56,7 +56,7 @@ func newWordOrderFixture(
 		7,
 		state,
 	)
-	return sf, stateStores, api
+	return sessionFlow, stateStores, api
 }
 
 func mustTestJSON(
@@ -105,7 +105,7 @@ func TestWordOrderShuffleDeterministic(t *testing.T) {
 			7,
 			99,
 			8,
-		); !sameInts(
+		); !sameIntegers(
 			got,
 			first,
 		) {
@@ -116,7 +116,7 @@ func TestWordOrderShuffleDeterministic(t *testing.T) {
 			)
 		}
 	}
-	if sameInts(
+	if sameIntegers(
 		first,
 		wordOrderShuffleOrder(
 			8,
@@ -130,13 +130,13 @@ func TestWordOrderShuffleDeterministic(t *testing.T) {
 		)
 	}
 
-	kb := wordOrderKeyboard(
+	keyboard := wordOrderKeyboard(
 		7,
 		99,
 		[]string{"私", "は", "私", "です。"},
 		nil,
 	)
-	for _, row := range kb.InlineKeyboard {
+	for _, row := range keyboard.InlineKeyboard {
 		for _, button := range row {
 			if button.CallbackData != nil && len(*button.CallbackData) > 64 {
 				t.Fatalf(
@@ -149,12 +149,12 @@ func TestWordOrderShuffleDeterministic(t *testing.T) {
 }
 
 func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
-	sf, stateStores, api := newWordOrderFixture(
+	sessionFlow, stateStores, api := newWordOrderFixture(
 		t,
 		[]string{"私", "は", "私", "です。"},
 	)
 	ctx := context.Background()
-	text, _, done := sf.renderByType(
+	text, _, done := sessionFlow.renderByType(
 		ctx,
 		42,
 		nil,
@@ -183,9 +183,9 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 		)
 	}
 	selectChunk := func(index int) {
-		sf.handleWordOrderCallback(
+		sessionFlow.handleWordOrderCallback(
 			ctx,
-			cbWithMessage(
+			callbackWithMessage(
 				fmtWordOrderSelect(
 					7,
 					99,
@@ -202,7 +202,7 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 	if got := draftSelection(
 		t,
 		stateStores,
-	); !sameInts(
+	); !sameIntegers(
 		got,
 		[]int{0, 2},
 	) {
@@ -215,7 +215,7 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 	if got := draftSelection(
 		t,
 		stateStores,
-	); !sameInts(
+	); !sameIntegers(
 		got,
 		[]int{0, 2},
 	) {
@@ -224,9 +224,9 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 			got,
 		)
 	}
-	sf.handleWordOrderCallback(
+	sessionFlow.handleWordOrderCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			fmt.Sprintf(
 				formatWordOrderUndo,
 				7,
@@ -240,7 +240,7 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 	if got := draftSelection(
 		t,
 		stateStores,
-	); !sameInts(
+	); !sameIntegers(
 		got,
 		[]int{0},
 	) {
@@ -249,9 +249,9 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 			got,
 		)
 	}
-	sf.handleWordOrderCallback(
+	sessionFlow.handleWordOrderCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			fmt.Sprintf(
 				formatWordOrderReset,
 				7,
@@ -271,13 +271,13 @@ func TestWordOrderRepeatedChunksUndoReset(t *testing.T) {
 }
 
 func TestWordOrderRejectsStaleOwnerAndIndex(t *testing.T) {
-	sf, stateStores, _ := newWordOrderFixture(
+	sessionFlow, stateStores, _ := newWordOrderFixture(
 		t,
 		[]string{"私", "は", "です。"},
 	)
 	ctx := context.Background()
-	for _, cb := range []*tgbotapi.CallbackQuery{
-		cbWithMessage(
+	for _, callbackQuery := range []*tgbotapi.CallbackQuery{
+		callbackWithMessage(
 			fmtWordOrderSelect(
 				7,
 				99,
@@ -287,7 +287,7 @@ func TestWordOrderRejectsStaleOwnerAndIndex(t *testing.T) {
 			1,
 			42,
 		), // invalid index
-		cbWithMessage(
+		callbackWithMessage(
 			fmtWordOrderSelect(
 				7,
 				99,
@@ -297,7 +297,7 @@ func TestWordOrderRejectsStaleOwnerAndIndex(t *testing.T) {
 			1,
 			999,
 		), // wrong owner
-		cbWithMessage(
+		callbackWithMessage(
 			fmtWordOrderSelect(
 				7,
 				98,
@@ -308,9 +308,9 @@ func TestWordOrderRejectsStaleOwnerAndIndex(t *testing.T) {
 			42,
 		), // stale question
 	} {
-		sf.handleWordOrderCallback(
+		sessionFlow.handleWordOrderCallback(
 			ctx,
-			cb,
+			callbackQuery,
 		)
 	}
 	if len(stateStores.drafts) != 0 {
@@ -322,15 +322,15 @@ func TestWordOrderRejectsStaleOwnerAndIndex(t *testing.T) {
 }
 
 func TestWordOrderSubmitExactAndIdempotent(t *testing.T) {
-	sf, stateStores, api := newWordOrderFixture(
+	sessionFlow, stateStores, api := newWordOrderFixture(
 		t,
 		[]string{"私", "は", "学生", "です。"},
 	)
 	ctx := context.Background()
 	for i := 0; i < 4; i++ {
-		sf.handleWordOrderCallback(
+		sessionFlow.handleWordOrderCallback(
 			ctx,
-			cbWithMessage(
+			callbackWithMessage(
 				fmtWordOrderSelect(
 					7,
 					99,
@@ -345,7 +345,7 @@ func TestWordOrderSubmitExactAndIdempotent(t *testing.T) {
 	if got := draftSelection(
 		t,
 		stateStores,
-	); !sameInts(
+	); !sameIntegers(
 		got,
 		[]int{0, 1, 2, 3},
 	) {
@@ -354,9 +354,9 @@ func TestWordOrderSubmitExactAndIdempotent(t *testing.T) {
 			got,
 		)
 	}
-	sf.handleWordOrderCallback(
+	sessionFlow.handleWordOrderCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			fmt.Sprintf(
 				formatWordOrderSubmit,
 				7,
@@ -367,7 +367,7 @@ func TestWordOrderSubmitExactAndIdempotent(t *testing.T) {
 			42,
 		),
 	)
-	state, err := sf.session.QuizProgress(
+	state, err := sessionFlow.session.QuizProgress(
 		ctx,
 		7,
 	)
@@ -387,9 +387,9 @@ func TestWordOrderSubmitExactAndIdempotent(t *testing.T) {
 		t.Fatal("submit must delete the draft")
 	}
 	messageCount := len(api.sentMessages)
-	sf.handleWordOrderCallback(
+	sessionFlow.handleWordOrderCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			fmt.Sprintf(
 				formatWordOrderSubmit,
 				7,
@@ -418,15 +418,15 @@ func fmtWordOrderSelect(
 	)
 }
 
-func sameInts(
-	a,
-	b []int,
+func sameIntegers(
+	left,
+	right []int,
 ) bool {
-	if len(a) != len(b) {
+	if len(left) != len(right) {
 		return false
 	}
-	for i := range a {
-		if a[i] != b[i] {
+	for i := range left {
+		if left[i] != right[i] {
 			return false
 		}
 	}

@@ -21,33 +21,33 @@ func setupRouter(
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.New()
-	r.Use(
+	router := gin.New()
+	router.Use(
 		requestLoggingMiddleware(),
 		structuredRecoveryMiddleware(),
 	)
 
-	r.GET(
+	router.GET(
 		"/health",
 		health,
 	)
 	miniapp.RegisterRoutes(
-		r,
+		router,
 		miniappHandler,
 	)
 
-	return r
+	return router
 }
 
 // healthHandler reports unhealthy when the DB or Redis connection fails a ping.
 func healthHandler(
 	db *sqlx.DB,
-	rdb *redis.Client,
+	redisClient *redis.Client,
 ) gin.HandlerFunc {
-	return func(c *gin.Context) {
+	return func(ginContext *gin.Context) {
 		// Check DB
 		if err := db.Ping(); err != nil {
-			c.JSON(
+			ginContext.JSON(
 				http.StatusServiceUnavailable,
 				gin.H{
 					"status": "unhealthy",
@@ -58,8 +58,8 @@ func healthHandler(
 		}
 
 		// Check Redis
-		if err := rdb.Ping(c.Request.Context()).Err(); err != nil {
-			c.JSON(
+		if err := redisClient.Ping(ginContext.Request.Context()).Err(); err != nil {
+			ginContext.JSON(
 				http.StatusServiceUnavailable,
 				gin.H{
 					"status": "unhealthy",
@@ -69,7 +69,7 @@ func healthHandler(
 			return
 		}
 
-		c.JSON(
+		ginContext.JSON(
 			http.StatusOK,
 			gin.H{
 				"status": "healthy",

@@ -302,51 +302,52 @@ func TestBuildHandwritingResponseFormatUsesStrictJSONSchema(t *testing.T) {
 func TestBuildHandwritingChatCompletionRequestConstrainsGeneration(t *testing.T) {
 	t.Parallel()
 
-	req := buildHandwritingChatCompletionRequest(
+	request := buildHandwritingChatCompletionRequest(
 		"gemini-3.5-flash-lite",
 		"system prompt",
 		"user prompt",
 		"data:image/png;base64,abc",
 	)
 
-	if req.MaxCompletionTokens != handwritingMaxCompletionTokens {
+	if request.MaxCompletionTokens != handwritingMaxCompletionTokens {
 		t.Fatalf(
 			"MaxCompletionTokens = %d, want %d",
-			req.MaxCompletionTokens,
+			request.MaxCompletionTokens,
 			handwritingMaxCompletionTokens,
 		)
 	}
-	if req.ReasoningEffort != "" {
+	if request.ReasoningEffort != "" {
 		t.Fatalf(
 			"ReasoningEffort = %q, want empty",
-			req.ReasoningEffort,
+			request.ReasoningEffort,
 		)
 	}
-	if req.Temperature != 0 {
+	if request.Temperature != 0 {
 		t.Fatalf(
 			"Temperature = %v, want omitted zero value",
-			req.Temperature,
+			request.Temperature,
 		)
 	}
-	if req.ResponseFormat == nil || req.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONSchema {
+	if request.ResponseFormat == nil ||
+		request.ResponseFormat.Type != openai.ChatCompletionResponseFormatTypeJSONSchema {
 		t.Fatalf(
 			"ResponseFormat = %#v, want JSON schema",
-			req.ResponseFormat,
+			request.ResponseFormat,
 		)
 	}
-	if len(req.Messages) != 2 {
+	if len(request.Messages) != 2 {
 		t.Fatalf(
 			"messages length = %d, want 2",
-			len(req.Messages),
+			len(request.Messages),
 		)
 	}
-	if len(req.Messages[1].MultiContent) != 2 {
+	if len(request.Messages[1].MultiContent) != 2 {
 		t.Fatalf(
 			"user multi content length = %d, want 2",
-			len(req.Messages[1].MultiContent),
+			len(request.Messages[1].MultiContent),
 		)
 	}
-	imagePart := req.Messages[1].MultiContent[1]
+	imagePart := request.Messages[1].MultiContent[1]
 	if imagePart.ImageURL == nil {
 		t.Fatal("image part ImageURL is nil")
 	}
@@ -363,20 +364,20 @@ func TestGradeHandwritingReturnsProviderFeedback(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(
-		w http.ResponseWriter,
-		r *http.Request,
+		responseWriter http.ResponseWriter,
+		request *http.Request,
 	) {
-		if r.URL.Path != "/v1/chat/completions" {
+		if request.URL.Path != "/v1/chat/completions" {
 			t.Fatalf(
 				"request path = %q, want /v1/chat/completions",
-				r.URL.Path,
+				request.URL.Path,
 			)
 		}
-		w.Header().Set(
+		responseWriter.Header().Set(
 			"Content-Type",
 			"application/json",
 		)
-		_, _ = w.Write([]byte(`{
+		_, _ = responseWriter.Write([]byte(`{
 			"choices": [{
 				"message": {
 					"content": "{\"is_correct\":false,\"feedback\":\"탁점이 빠졌습니다.\"}"
@@ -386,10 +387,10 @@ func TestGradeHandwritingReturnsProviderFeedback(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := openai.DefaultConfig("test-api-key")
-	cfg.BaseURL = server.URL + "/v1"
+	clientConfig := openai.DefaultConfig("test-api-key")
+	clientConfig.BaseURL = server.URL + "/v1"
 	client := &DefaultLLMClient{
-		client: openai.NewClientWithConfig(cfg),
+		client: openai.NewClientWithConfig(clientConfig),
 		model:  "test-model",
 	}
 
@@ -419,22 +420,22 @@ func TestGradeHandwritingReturnsProviderFeedback(t *testing.T) {
 func TestAnswerLearningQuestionSuccess(t *testing.T) {
 	t.Parallel()
 
-	var req openai.ChatCompletionRequest
+	var chatRequest openai.ChatCompletionRequest
 	server := httptest.NewServer(http.HandlerFunc(func(
-		w http.ResponseWriter,
-		r *http.Request,
+		responseWriter http.ResponseWriter,
+		request *http.Request,
 	) {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := json.NewDecoder(request.Body).Decode(&chatRequest); err != nil {
 			t.Fatalf(
 				"decode request: %v",
 				err,
 			)
 		}
-		w.Header().Set(
+		responseWriter.Header().Set(
 			"Content-Type",
 			"application/json",
 		)
-		_, _ = w.Write([]byte(`{
+		_, _ = responseWriter.Write([]byte(`{
 			"choices": [{
 				"message": {
 					"content": "honoo는 일본어로 불꽃이라는 뜻입니다."
@@ -444,10 +445,10 @@ func TestAnswerLearningQuestionSuccess(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := openai.DefaultConfig("test-api-key")
-	cfg.BaseURL = server.URL + "/v1"
+	clientConfig := openai.DefaultConfig("test-api-key")
+	clientConfig.BaseURL = server.URL + "/v1"
 	client := &DefaultLLMClient{
-		client: openai.NewClientWithConfig(cfg),
+		client: openai.NewClientWithConfig(clientConfig),
 		model:  "test-model",
 	}
 
@@ -470,23 +471,23 @@ func TestAnswerLearningQuestionSuccess(t *testing.T) {
 			answer,
 		)
 	}
-	if req.Model != "test-model" {
+	if chatRequest.Model != "test-model" {
 		t.Fatalf(
 			"request model = %q, want test-model",
-			req.Model,
+			chatRequest.Model,
 		)
 	}
-	if req.MaxCompletionTokens != learningQuestionMaxTokens {
+	if chatRequest.MaxCompletionTokens != learningQuestionMaxTokens {
 		t.Fatalf(
 			"MaxCompletionTokens = %d, want %d",
-			req.MaxCompletionTokens,
+			chatRequest.MaxCompletionTokens,
 			learningQuestionMaxTokens,
 		)
 	}
-	if len(req.Messages) != 2 || req.Messages[1].Content != "honoo가 뭐야?" {
+	if len(chatRequest.Messages) != 2 || chatRequest.Messages[1].Content != "honoo가 뭐야?" {
 		t.Fatalf(
 			"request messages = %+v",
-			req.Messages,
+			chatRequest.Messages,
 		)
 	}
 }

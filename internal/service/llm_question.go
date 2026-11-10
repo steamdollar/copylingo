@@ -47,14 +47,14 @@ func NewLLMQuestionService(
 // Answer asks the LLM with prompt and stores question/answer as a tip
 // candidate. Candidate storage is best-effort: a failure is logged and the
 // answer is still returned.
-func (s *LLMQuestionService) Answer(
+func (service *LLMQuestionService) Answer(
 	ctx context.Context,
 	user model.User,
 	username,
 	prompt,
 	question string,
 ) (string, error) {
-	answer, err := s.llm.AnswerLearningQuestion(
+	answer, err := service.llm.AnswerLearningQuestion(
 		ctx,
 		prompt,
 	)
@@ -66,11 +66,11 @@ func (s *LLMQuestionService) Answer(
 	}
 
 	var sourceModel *string
-	if strings.TrimSpace(s.sourceModel) != "" {
-		modelName := s.sourceModel
+	if strings.TrimSpace(service.sourceModel) != "" {
+		modelName := service.sourceModel
 		sourceModel = &modelName
 	}
-	if err := s.tips.CreateCandidate(
+	if err := service.tips.CreateCandidate(
 		ctx,
 		&model.TipCandidate{
 			UserID:           user.ID,

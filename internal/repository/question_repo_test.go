@@ -15,7 +15,7 @@ func TestBuildQuestionBatchBaseQuery(t *testing.T) {
 			QuestionKey:      &questionKey,
 			MaterialID:       &materialID,
 			Type:             model.QuestionFillBlank,
-			Skill:            model.SkillPtr(model.SkillKanaRecall),
+			Skill:            model.SkillPointer(model.SkillKanaRecall),
 			Language:         "ja",
 			ProficiencyLevel: "N5",
 			Category:         "kana",
@@ -38,7 +38,7 @@ func TestBuildQuestionBatchBaseQuery(t *testing.T) {
 		},
 	}
 
-	query, args := buildQuestionBatchBaseQuery(questions)
+	query, arguments := buildQuestionBatchBaseQuery(questions)
 
 	if !strings.Contains(
 		query,
@@ -112,33 +112,33 @@ func TestBuildQuestionBatchBaseQuery(t *testing.T) {
 			query,
 		)
 	}
-	if len(args) != 30 {
+	if len(arguments) != 30 {
 		t.Fatalf(
-			"len(args) = %d, want 30",
-			len(args),
+			"len(arguments) = %d, want 30",
+			len(arguments),
 		)
 	}
-	gotQuestionKey, ok := args[0].(*string)
+	gotQuestionKey, ok := arguments[0].(*string)
 	if !ok || gotQuestionKey == nil || *gotQuestionKey != questionKey {
 		t.Fatalf(
-			"args[0] = %#v, want question_key %q",
-			args[0],
+			"arguments[0] = %#v, want question_key %q",
+			arguments[0],
 			questionKey,
 		)
 	}
-	gotMaterialID, ok := args[2].(*int)
+	gotMaterialID, ok := arguments[2].(*int)
 	if !ok || gotMaterialID == nil || *gotMaterialID != materialID {
 		t.Fatalf(
-			"args[2] = %#v, want material_id %d",
-			args[2],
+			"arguments[2] = %#v, want material_id %d",
+			arguments[2],
 			materialID,
 		)
 	}
-	gotSkill, ok := args[4].(*model.Skill)
+	gotSkill, ok := arguments[4].(*model.Skill)
 	if !ok || gotSkill == nil || *gotSkill != model.SkillKanaRecall {
 		t.Fatalf(
-			"args[4] = %#v, want %q",
-			args[4],
+			"arguments[4] = %#v, want %q",
+			arguments[4],
 			model.SkillKanaRecall,
 		)
 	}
@@ -150,7 +150,7 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 		{
 			QuestionKey:      &questionKey,
 			Type:             model.QuestionFillBlank,
-			Skill:            model.SkillPtr(model.SkillKanaReading),
+			Skill:            model.SkillPointer(model.SkillKanaReading),
 			Language:         "ja",
 			ProficiencyLevel: "N5",
 			Category:         "kana",
@@ -162,7 +162,7 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 		},
 	}
 
-	query, args := buildQuestionBatchUpsertQuery(questions)
+	query, arguments := buildQuestionBatchUpsertQuery(questions)
 
 	if !strings.Contains(
 		query,
@@ -248,10 +248,10 @@ func TestBuildQuestionBatchUpsertQuery(t *testing.T) {
 			)
 		}
 	}
-	if len(args) != 15 {
+	if len(arguments) != 15 {
 		t.Fatalf(
-			"len(args) = %d, want 15",
-			len(args),
+			"len(arguments) = %d, want 15",
+			len(arguments),
 		)
 	}
 }
@@ -329,8 +329,8 @@ func TestDueReviewsQueryPrioritizesStudiedMaterialsWithFallback(t *testing.T) {
 	}
 }
 
-func TestQuestionUpsertBatchesStayUnderBindParamLimit(t *testing.T) {
-	rowsPerStatement := postgresMaxBindParams / questionBatchColumnCount
+func TestQuestionUpsertBatchesStayUnderBindParameterLimit(t *testing.T) {
+	rowsPerStatement := postgresMaxBindParameters / questionBatchColumnCount
 	questions := make(
 		[]*model.Question,
 		2*rowsPerStatement+1,
@@ -349,12 +349,12 @@ func TestQuestionUpsertBatchesStayUnderBindParamLimit(t *testing.T) {
 	// Batches must cover every question once, in order, with each statement under the limit.
 	next := 0
 	for i, batch := range batches {
-		if _, args := buildQuestionBatchUpsertQuery(batch); len(args) > postgresMaxBindParams {
+		if _, arguments := buildQuestionBatchUpsertQuery(batch); len(arguments) > postgresMaxBindParameters {
 			t.Fatalf(
 				"batch %d binds %d params, limit %d",
 				i,
-				len(args),
-				postgresMaxBindParams,
+				len(arguments),
+				postgresMaxBindParameters,
 			)
 		}
 		for _, question := range batch {

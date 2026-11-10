@@ -2,10 +2,10 @@ package model
 
 import "errors"
 
-var ErrInvalidTelegramMessageRef = errors.New("invalid Telegram message reference")
+var ErrInvalidTelegramMessageReference = errors.New("invalid Telegram message reference")
 
-// ActiveQuestionRef identifies the text-answer question waiting for a chat reply.
-type ActiveQuestionRef struct {
+// ActiveQuestionReference identifies the text-answer question waiting for a chat reply.
+type ActiveQuestionReference struct {
 	SessionID     int
 	QuestionIndex int
 }
@@ -26,8 +26,8 @@ const (
 	PendingLLMStudyMaterial
 )
 
-// TelegramMessageRef identifies the Telegram message containing a Mini App link.
-type TelegramMessageRef struct {
+// TelegramMessageReference identifies the Telegram message containing a Mini App link.
+type TelegramMessageReference struct {
 	ChatID    int64
 	MessageID int
 }

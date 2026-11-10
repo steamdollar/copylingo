@@ -41,27 +41,27 @@ type DefaultLLMClient struct {
 }
 
 // NewLLMClient initializes the client using the OpenAI compatible API.
-func NewLLMClient(opts LLMOptions) *DefaultLLMClient {
-	clientConfig := openai.DefaultConfig(opts.APIKey)
-	if opts.BaseURL != "" {
-		clientConfig.BaseURL = opts.BaseURL
+func NewLLMClient(options LLMOptions) *DefaultLLMClient {
+	clientConfig := openai.DefaultConfig(options.APIKey)
+	if options.BaseURL != "" {
+		clientConfig.BaseURL = options.BaseURL
 	}
 
 	return &DefaultLLMClient{
 		client: openai.NewClientWithConfig(clientConfig),
-		model:  opts.Model,
+		model:  options.Model,
 	}
 }
 
 // AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
-func (c *DefaultLLMClient) AnswerLearningQuestion(
+func (client *DefaultLLMClient) AnswerLearningQuestion(
 	ctx context.Context,
 	question string,
 ) (string, error) {
-	resp, err := c.client.CreateChatCompletion(
+	response, err := client.client.CreateChatCompletion(
 		ctx,
 		openai.ChatCompletionRequest{
-			Model:               c.model,
+			Model:               client.model,
 			MaxCompletionTokens: learningQuestionMaxTokens,
 			Messages: []openai.ChatCompletionMessage{
 				{
@@ -85,21 +85,21 @@ Do not use HTML tags or markdown code fences.`,
 			err,
 		)
 	}
-	if len(resp.Choices) == 0 {
+	if len(response.Choices) == 0 {
 		return "", fmt.Errorf("empty llm learning question response")
 	}
-	return resp.Choices[0].Message.Content, nil
+	return response.Choices[0].Message.Content, nil
 }
 
 // GradeHandwriting verifies whether a rendered handwriting image matches the expected Japanese text.
-func (c *DefaultLLMClient) GradeHandwriting(
+func (client *DefaultLLMClient) GradeHandwriting(
 	ctx context.Context,
 	questionPrompt,
 	correctAnswer string,
 	pngImage []byte,
 ) (GradeResult, error) {
 	startedAt := time.Now()
-	ctx = observability.WithAttrs(
+	ctx = observability.WithAttributes(
 		ctx,
 		slog.String(
 			"source",
@@ -114,15 +114,15 @@ func (c *DefaultLLMClient) GradeHandwriting(
 	)
 
 	imageURL := "data:image/png;base64," + base64.StdEncoding.EncodeToString(pngImage)
-	req := buildHandwritingChatCompletionRequest(
-		c.model,
+	request := buildHandwritingChatCompletionRequest(
+		client.model,
 		systemPrompt,
 		userPrompt,
 		imageURL,
 	)
-	resp, err := c.client.CreateChatCompletion(
+	response, err := client.client.CreateChatCompletion(
 		ctx,
-		req,
+		request,
 	)
 	if err != nil {
 		return GradeResult{}, fmt.Errorf(
@@ -130,11 +130,11 @@ func (c *DefaultLLMClient) GradeHandwriting(
 			err,
 		)
 	}
-	if len(resp.Choices) == 0 {
+	if len(response.Choices) == 0 {
 		return GradeResult{}, fmt.Errorf("empty llm handwriting response")
 	}
 
-	rawContent := resp.Choices[0].Message.Content
+	rawContent := response.Choices[0].Message.Content
 	var result GradeResult
 	if err := json.Unmarshal(
 		[]byte(rawContent),
@@ -152,7 +152,7 @@ func (c *DefaultLLMClient) GradeHandwriting(
 		"event",
 		"handwriting.llm.completed",
 		"model",
-		c.model,
+		client.model,
 		"duration_ms",
 		time.Since(startedAt).Milliseconds(),
 		"image_bytes",

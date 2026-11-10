@@ -50,12 +50,13 @@ type materialPreferenceList interface {
 // from the owner's session before showing or changing the linked preference.
 // The menu is a separate message so the question keeps its answer buttons;
 // its close button deletes only that menu message.
-func (sf *SessionFlow) handleQuizMaterialPreference(
+func (flow *SessionFlow) handleQuizMaterialPreference(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	parts []string,
 ) {
-	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil || len(cb.Data) > 64 ||
+	if callbackQuery == nil || callbackQuery.From == nil ||
+		callbackQuery.Message == nil || callbackQuery.Message.Chat == nil || len(callbackQuery.Data) > 64 ||
 		len(parts) < 4 || len(parts) > 5 || parts[0] != callback.QuestionRoot ||
 		(parts[2] != callback.QuestionActionPolicy &&
 			(parts[2] != callbackActionExclude || len(parts) != 4)) {
@@ -75,9 +76,9 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	if len(parts) == 5 && parts[4] == callbackActionClose {
 		// Closing reads no session: it removes only the menu message the
 		// button sits on, so it still works after the Quiz has finished.
-		sf.telegram.DeleteMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+		flow.telegram.DeleteMessage(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 		)
 		return
 	}
@@ -85,11 +86,11 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	if !modeOK {
 		return
 	}
-	state, err := sf.session.QuizProgress(
+	state, err := flow.session.QuizProgress(
 		ctx,
 		sessionID,
 	)
-	if err != nil || state == nil || state.Session.ID != sessionID || state.Session.UserID != cb.From.ID ||
+	if err != nil || state == nil || state.Session.ID != sessionID || state.Session.UserID != callbackQuery.From.ID ||
 		state.Session.Mode != model.SessionModeQuiz {
 		slog.WarnContext(
 			ctx,
@@ -99,7 +100,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 			"question_id",
 			questionID,
 			"user_id",
-			cb.From.ID,
+			callbackQuery.From.ID,
 			"error",
 			err,
 		)
@@ -111,9 +112,9 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	}
 	mode, ok := applyMaterialPreference(
 		ctx,
-		sf.telegram,
-		sf.materialPreference,
-		cb,
+		flow.telegram,
+		flow.materialPreference,
+		callbackQuery,
 		*item.Question.MaterialID,
 		mode,
 	)
@@ -127,16 +128,16 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 	)
 	if len(parts) == 5 {
 		// A choice re-renders the menu message in place, as on the Study card.
-		sf.telegram.EditMessage(
-			cb.Message.Chat.ID,
-			cb.Message.MessageID,
+		flow.telegram.EditMessage(
+			callbackQuery.Message.Chat.ID,
+			callbackQuery.Message.MessageID,
 			text,
 			&keyboard,
 		)
 		return
 	}
-	if err := sf.telegram.SendMessageWithKeyboard(
-		cb.Message.Chat.ID,
+	if err := flow.telegram.SendMessageWithKeyboard(
+		callbackQuery.Message.Chat.ID,
 		text,
 		keyboard,
 	); err != nil {
@@ -148,7 +149,7 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 			"question_id",
 			questionID,
 			"user_id",
-			cb.From.ID,
+			callbackQuery.From.ID,
 			"error",
 			err,
 		)
@@ -157,12 +158,12 @@ func (sf *SessionFlow) handleQuizMaterialPreference(
 
 // handleMaterialPreference only changes selection policy. Opening the menu,
 // changing a policy, and returning to the card never mark material studied.
-func (sf *StudyFlow) handleMaterialPreference(
+func (flow *StudyFlow) handleMaterialPreference(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	parts []string,
 ) {
-	if len(cb.Data) > 64 || len(parts) < 4 || len(parts) > 5 || parts[0] != callbackRootStudy {
+	if len(callbackQuery.Data) > 64 || len(parts) < 4 || len(parts) > 5 || parts[0] != callbackRootStudy {
 		return
 	}
 	if parts[2] == callbackActionCard && len(parts) != 4 {
@@ -183,10 +184,10 @@ func (sf *StudyFlow) handleMaterialPreference(
 	if !modeOK {
 		return
 	}
-	state, err := sf.session.StudyProgress(
+	state, err := flow.session.StudyProgress(
 		ctx,
 		sessionID,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	)
 	if err != nil || state == nil || state.Session.ID != sessionID {
 		slog.WarnContext(
@@ -195,29 +196,29 @@ func (sf *StudyFlow) handleMaterialPreference(
 			"session_id",
 			sessionID,
 			"user_id",
-			cb.From.ID,
+			callbackQuery.From.ID,
 			"error",
 			err,
 		)
-		sf.telegram.AnswerCallbackAlert(
-			cb.ID,
+		flow.telegram.AnswerCallbackAlert(
+			callbackQuery.ID,
 			botMessagesByLocale[botDefaultLocale].materialQuizSessionRejected,
 		)
 		return
 	}
 	item, ok := state.ItemByMaterialID(materialID)
 	if !ok {
-		sf.telegram.AnswerCallbackAlert(
-			cb.ID,
+		flow.telegram.AnswerCallbackAlert(
+			callbackQuery.ID,
 			botMessagesByLocale[botDefaultLocale].materialNotInSession,
 		)
 		return
 	}
 	if parts[2] == callbackActionCard {
-		sf.showMaterial(
+		flow.showMaterial(
 			ctx,
-			cb.Message.Chat.ID,
-			&cb.Message.MessageID,
+			callbackQuery.Message.Chat.ID,
+			&callbackQuery.Message.MessageID,
 			state,
 			item.SessionMaterial.MaterialOrder,
 		)
@@ -225,9 +226,9 @@ func (sf *StudyFlow) handleMaterialPreference(
 	}
 	mode, ok = applyMaterialPreference(
 		ctx,
-		sf.telegram,
-		sf.materialPreference,
-		cb,
+		flow.telegram,
+		flow.materialPreference,
+		callbackQuery,
 		materialID,
 		mode,
 	)
@@ -240,9 +241,9 @@ func (sf *StudyFlow) handleMaterialPreference(
 		materialID,
 		mode,
 	)
-	sf.telegram.EditMessage(
-		cb.Message.Chat.ID,
-		cb.Message.MessageID,
+	flow.telegram.EditMessage(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.Message.MessageID,
 		text,
 		&keyboard,
 	)
@@ -264,42 +265,42 @@ func applyMaterialPreference(
 	ctx context.Context,
 	telegram *TelegramClient,
 	preferences materialPreferences,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	materialID int,
 	chosen model.MaterialReviewMode,
 ) (model.MaterialReviewMode, bool) {
 	if chosen != "" {
 		if err := preferences.Set(
 			ctx,
-			cb.From.ID,
+			callbackQuery.From.ID,
 			materialID,
 			chosen,
 		); err != nil {
 			materialPreferenceError(
 				ctx,
 				telegram,
-				cb,
+				callbackQuery,
 				"set",
 				err,
 			)
 			return "", false
 		}
 		telegram.AnswerCallback(
-			cb.ID,
+			callbackQuery.ID,
 			botMessagesByLocale[botDefaultLocale].materialPreferenceAppliedNotice,
 		)
 		return chosen, true
 	}
 	preference, err := preferences.Get(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		materialID,
 	)
 	if err != nil {
 		materialPreferenceError(
 			ctx,
 			telegram,
-			cb,
+			callbackQuery,
 			"get",
 			err,
 		)
@@ -418,15 +419,15 @@ func materialReviewModeLabel(mode model.MaterialReviewMode) string {
 	}
 }
 
-func (sf *SettingsFlow) handleMaterialPreferencesCallback(
+func (flow *SettingsFlow) handleMaterialPreferencesCallback(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
-	if len(cb.Data) > 64 {
+	if len(callbackQuery.Data) > 64 {
 		return
 	}
 	parts := strings.Split(
-		cb.Data,
+		callbackQuery.Data,
 		":",
 	)
 	if len(parts) < 3 || parts[0] != callbackRootSettings {
@@ -467,36 +468,36 @@ func (sf *SettingsFlow) handleMaterialPreferencesCallback(
 	if parts[1] == callbackActionRestore {
 		// The service restores only this user's preference and treats an already
 		// restored or absent preference as normal, so repeated callbacks are safe.
-		if err := sf.materialPreference.Set(
+		if err := flow.materialPreference.Set(
 			ctx,
-			cb.From.ID,
+			callbackQuery.From.ID,
 			materialID,
 			model.MaterialReviewNormal,
 		); err != nil {
 			materialPreferenceError(
 				ctx,
-				sf.telegram,
-				cb,
+				flow.telegram,
+				callbackQuery,
 				"restore",
 				err,
 			)
 			return
 		}
-		sf.telegram.AnswerCallback(
-			cb.ID,
+		flow.telegram.AnswerCallback(
+			callbackQuery.ID,
 			botMessagesByLocale[botDefaultLocale].materialPreferenceRestoredNotice,
 		)
 	}
-	items, hasNext, err := sf.materialPreference.List(
+	items, hasNext, err := flow.materialPreference.List(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 		page,
 	)
 	if err != nil {
 		materialPreferenceError(
 			ctx,
-			sf.telegram,
-			cb,
+			flow.telegram,
+			callbackQuery,
 			"list",
 			err,
 		)
@@ -507,9 +508,9 @@ func (sf *SettingsFlow) handleMaterialPreferencesCallback(
 		page,
 		hasNext,
 	)
-	sf.telegram.EditMessage(
-		cb.Message.Chat.ID,
-		cb.Message.MessageID,
+	flow.telegram.EditMessage(
+		callbackQuery.Message.Chat.ID,
+		callbackQuery.Message.MessageID,
 		text,
 		&keyboard,
 	)
@@ -621,7 +622,7 @@ func materialPreferenceInt(
 func materialPreferenceError(
 	ctx context.Context,
 	telegram *TelegramClient,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 	action string,
 	err error,
 ) {
@@ -629,14 +630,14 @@ func materialPreferenceError(
 		ctx,
 		"Material preference request failed",
 		"user_id",
-		cb.From.ID,
+		callbackQuery.From.ID,
 		"action",
 		action,
 		"error",
 		err,
 	)
 	telegram.AnswerCallbackAlert(
-		cb.ID,
+		callbackQuery.ID,
 		botMessagesByLocale[botDefaultLocale].materialPreferenceFailed,
 	)
 }

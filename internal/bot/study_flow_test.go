@@ -19,7 +19,7 @@ import (
 
 type botStudyMaterialStore struct{}
 
-func (s *botStudyMaterialStore) GetMaterialsByPlan(
+func (store *botStudyMaterialStore) GetMaterialsByPlan(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -31,16 +31,16 @@ func (s *botStudyMaterialStore) GetMaterialsByPlan(
 }
 
 // botStudySessionStore drives Study creation, start and completion; the
-// embedded nil SessionRepo makes any other sessions-table call panic.
+// embedded nil SessionRepository makes any other sessions-table call panic.
 type botStudySessionStore struct {
-	service.SessionRepo
-	session    *model.Session
-	started    []int
-	completed  []int
-	correctCnt []int
+	service.SessionRepository
+	session      *model.Session
+	started      []int
+	completed    []int
+	correctCount []int
 }
 
-func (s *botStudySessionStore) CreateSessionInTx(
+func (store *botStudySessionStore) CreateSessionInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	session *model.Session,
@@ -48,7 +48,7 @@ func (s *botStudySessionStore) CreateSessionInTx(
 	return 0, nil
 }
 
-func (s *botStudySessionStore) CreateSessionMaterialsInTx(
+func (store *botStudySessionStore) CreateSessionMaterialsInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	sessionID int,
@@ -57,70 +57,70 @@ func (s *botStudySessionStore) CreateSessionMaterialsInTx(
 	return nil
 }
 
-func (s *botStudySessionStore) GetByID(
+func (store *botStudySessionStore) GetByID(
 	ctx context.Context,
 	id int,
 ) (*model.Session, error) {
-	return s.session, nil
+	return store.session, nil
 }
 
-func (s *botStudySessionStore) Start(
+func (store *botStudySessionStore) Start(
 	ctx context.Context,
 	id int,
 ) error {
-	s.started = append(
-		s.started,
+	store.started = append(
+		store.started,
 		id,
 	)
-	if s.session != nil {
-		s.session.Status = model.SessionInProgress
+	if store.session != nil {
+		store.session.Status = model.SessionInProgress
 	}
 	return nil
 }
 
-func (s *botStudySessionStore) Complete(
+func (store *botStudySessionStore) Complete(
 	ctx context.Context,
 	id int,
 	correctCount int,
 ) error {
-	s.completed = append(
-		s.completed,
+	store.completed = append(
+		store.completed,
 		id,
 	)
-	s.correctCnt = append(
-		s.correctCnt,
+	store.correctCount = append(
+		store.correctCount,
 		correctCount,
 	)
-	if s.session != nil {
-		s.session.Status = model.SessionCompleted
+	if store.session != nil {
+		store.session.Status = model.SessionCompleted
 	}
 	return nil
 }
 
-type botStudyActiveRepo struct {
+type botStudyActiveRepository struct {
 	session      *model.Session
 	items        []model.StudySessionMaterial
 	flushedState *model.StudyActiveSessionState
 }
 
-func (r *botStudyActiveRepo) LoadStudySessionWithStateBySessionID(
+func (repository *botStudyActiveRepository) LoadStudySessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.StudyActiveSessionState, error) {
 	return &model.StudyActiveSessionState{
-		Session:   *r.session,
-		Items:     r.items,
+		Session:   *repository.session,
+		Items:     repository.items,
 		UpdatedAt: timeNowForTest(),
 	}, nil
 }
 
-func (r *botStudyActiveRepo) FlushStudyActiveSession(
+func (repository *botStudyActiveRepository) FlushStudyActiveSession(
 	ctx context.Context,
 	state *model.StudyActiveSessionState,
 ) error {
-	r.flushedState = state
-	if r.session != nil {
-		r.session.Status = model.SessionCompleted
+	repository.flushedState = state
+	if repository.session != nil {
+		repository.session.Status = model.SessionCompleted
 	}
 	return nil
 }
@@ -165,24 +165,24 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 			),
 		),
 	}
-	activeRepo := &botStudyActiveRepo{
+	activeRepository := &botStudyActiveRepository{
 		session: sessionStore.session,
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
 	session := newTestSessionService(
 		stateStores,
-		service.SessionDeps{
-			MaterialRepo:           &botStudyMaterialStore{},
-			SessionRepo:            sessionStore,
-			StudyActiveSessionRepo: activeRepo,
-			DB:                     botTestDB,
+		service.SessionDependencies{
+			MaterialRepository:           &botStudyMaterialStore{},
+			SessionRepository:            sessionStore,
+			StudyActiveSessionRepository: activeRepository,
+			DB:                           botTestDB,
 		},
 	)
 	flow := newTestStudyFlow(
 		api,
 		nil,
-		StudyFlowDeps{
+		StudyFlowDependencies{
 			Session: session,
 		},
 	)
@@ -294,14 +294,14 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 			userID,
 		),
 	)
-	if activeRepo.flushedState == nil {
+	if activeRepository.flushedState == nil {
 		t.Fatal("expected study active session to flush on finish")
 	}
-	if activeRepo.flushedState.Items[0].SessionMaterial.StudiedAt == nil ||
-		activeRepo.flushedState.Items[1].SessionMaterial.StudiedAt == nil {
+	if activeRepository.flushedState.Items[0].SessionMaterial.StudiedAt == nil ||
+		activeRepository.flushedState.Items[1].SessionMaterial.StudiedAt == nil {
 		t.Fatalf(
 			"expected all materials studied before flush: %+v",
-			activeRepo.flushedState.Items,
+			activeRepository.flushedState.Items,
 		)
 	}
 	edit = lastEditMessage(
@@ -319,7 +319,7 @@ func TestStudyFlowStartNextFinish(t *testing.T) {
 	}
 }
 
-func TestStudyFlowPrevNavigation(t *testing.T) {
+func TestStudyFlowPreviousNavigation(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 79
 	userID := int64(123)
@@ -359,22 +359,22 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 			),
 		),
 	}
-	activeRepo := &botStudyActiveRepo{
+	activeRepository := &botStudyActiveRepository{
 		session: sessionStore.session,
 		items:   items,
 	}
 	stateStores := newTestInteractionStores()
 	session := newTestSessionService(
 		stateStores,
-		service.SessionDeps{
-			SessionRepo:            sessionStore,
-			StudyActiveSessionRepo: activeRepo,
+		service.SessionDependencies{
+			SessionRepository:            sessionStore,
+			StudyActiveSessionRepository: activeRepository,
 		},
 	)
 	flow := newTestStudyFlow(
 		api,
 		nil,
-		StudyFlowDeps{
+		StudyFlowDependencies{
 			Session: session,
 		},
 	)
@@ -402,7 +402,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
-			formatStudyPrev,
+			formatStudyPrevious,
 			sessionID,
 			1,
 			userID,
@@ -486,7 +486,7 @@ func TestStudyFlowPrevNavigation(t *testing.T) {
 			userID,
 		),
 	)
-	if activeRepo.flushedState == nil {
+	if activeRepository.flushedState == nil {
 		t.Fatal("expected study active session to flush on finish after prev round-trip")
 	}
 }
@@ -550,7 +550,7 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 			},
 		},
 	}
-	activeRepo := &botStudyActiveRepo{
+	activeRepository := &botStudyActiveRepository{
 		session: sessionStore.session,
 		items:   items,
 	}
@@ -558,14 +558,14 @@ func TestStudyFlowGrammarRendering(t *testing.T) {
 	flow := newTestStudyFlow(
 		api,
 		nil,
-		StudyFlowDeps{
+		StudyFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{
-					MaterialRepo:           &botStudyMaterialStore{},
-					SessionRepo:            sessionStore,
-					StudyActiveSessionRepo: activeRepo,
-					DB:                     botTestDB,
+				service.SessionDependencies{
+					MaterialRepository:           &botStudyMaterialStore{},
+					SessionRepository:            sessionStore,
+					StudyActiveSessionRepository: activeRepository,
+					DB:                           botTestDB,
 				},
 			),
 		},
@@ -648,7 +648,7 @@ func TestStudyFlowReadingRendering(t *testing.T) {
 			},
 		},
 	}
-	activeRepo := &botStudyActiveRepo{
+	activeRepository := &botStudyActiveRepository{
 		session: sessionStore.session,
 		items:   items,
 	}
@@ -656,14 +656,14 @@ func TestStudyFlowReadingRendering(t *testing.T) {
 	flow := newTestStudyFlow(
 		api,
 		nil,
-		StudyFlowDeps{
+		StudyFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{
-					MaterialRepo:           &botStudyMaterialStore{},
-					SessionRepo:            sessionStore,
-					StudyActiveSessionRepo: activeRepo,
-					DB:                     botTestDB,
+				service.SessionDependencies{
+					MaterialRepository:           &botStudyMaterialStore{},
+					SessionRepository:            sessionStore,
+					StudyActiveSessionRepository: activeRepository,
+					DB:                           botTestDB,
 				},
 			),
 		},
@@ -751,7 +751,7 @@ func TestStudyMaterialKeyboardAskLLMGate(t *testing.T) {
 		99,
 		3,
 	)
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name    string
 		showAsk bool
 		wantAsk bool
@@ -760,14 +760,14 @@ func TestStudyMaterialKeyboardAskLLMGate(t *testing.T) {
 		{name: "non-owner has no ask button", showAsk: false, wantAsk: false},
 	} {
 		t.Run(
-			tc.name,
+			testCase.name,
 			func(t *testing.T) {
 				keyboard := studyMaterialKeyboard(
 					99,
 					3,
 					false,
 					false,
-					tc.showAsk,
+					testCase.showAsk,
 				)
 				found := false
 				for _, row := range keyboard.InlineKeyboard {
@@ -777,11 +777,11 @@ func TestStudyMaterialKeyboardAskLLMGate(t *testing.T) {
 						}
 					}
 				}
-				if found != tc.wantAsk {
+				if found != testCase.wantAsk {
 					t.Errorf(
 						"ask button present = %t, want %t",
 						found,
-						tc.wantAsk,
+						testCase.wantAsk,
 					)
 				}
 			},
@@ -847,7 +847,7 @@ func studyCallback(
 		data = "study:" + intString(sessionID) + ":start"
 	case formatStudyNext:
 		data = "study:" + intString(sessionID) + ":next:" + intString(order)
-	case formatStudyPrev:
+	case formatStudyPrevious:
 		data = "study:" + intString(sessionID) + ":prev:" + intString(order)
 	case formatStudyFinish:
 		data = "study:" + intString(sessionID) + ":finish:" + intString(order)
@@ -862,8 +862,8 @@ func studyCallback(
 	}
 }
 
-func intString(v int) string {
-	return strconv.Itoa(v)
+func intString(value int) string {
+	return strconv.Itoa(value)
 }
 
 func lastEditMessage(
@@ -948,7 +948,7 @@ func TestHasKanjiDetailDecidesButton(t *testing.T) {
 	t.Parallel()
 
 	base := `"kana":"せいけつ","kanji":"清潔","meaning_ko":"청결함","part_of_speech":"noun"`
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name     string
 		category model.MaterialCategory
 		payload  string
@@ -977,17 +977,17 @@ func TestHasKanjiDetailDecidesButton(t *testing.T) {
 		{name: "not vocabulary", category: model.MaterialCategoryGrammar, payload: seiketsuPayload, want: false},
 	} {
 		t.Run(
-			tc.name,
+			testCase.name,
 			func(t *testing.T) {
 				got := hasKanjiDetail(model.Material{
-					Category: tc.category,
-					Payload:  json.RawMessage(tc.payload),
+					Category: testCase.category,
+					Payload:  json.RawMessage(testCase.payload),
 				})
-				if got != tc.want {
+				if got != testCase.want {
 					t.Errorf(
 						"hasKanjiDetail = %v, want %v",
 						got,
-						tc.want,
+						testCase.want,
 					)
 				}
 			},
@@ -1031,7 +1031,7 @@ func TestRenderStudyMaterialIgnoresKanjiNotes(t *testing.T) {
 func TestRenderStudyMaterialLevelMarker(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name  string
 		level string
 		want  string
@@ -1048,14 +1048,14 @@ func TestRenderStudyMaterialLevelMarker(t *testing.T) {
 		},
 	} {
 		t.Run(
-			tc.name,
+			testCase.name,
 			func(t *testing.T) {
 				t.Parallel()
 
 				got := renderStudyMaterial(
 					model.Material{
 						Category:         model.MaterialCategoryVocabulary,
-						ProficiencyLevel: tc.level,
+						ProficiencyLevel: testCase.level,
 						Title:            "みず",
 						Payload: vocabularyPayload(
 							"みず",
@@ -1069,12 +1069,12 @@ func TestRenderStudyMaterialLevelMarker(t *testing.T) {
 				)
 				if !strings.Contains(
 					got,
-					tc.want,
+					testCase.want,
 				) {
 					t.Errorf(
 						"card = %q, want header %q",
 						got,
-						tc.want,
+						testCase.want,
 					)
 				}
 			},
@@ -1089,15 +1089,15 @@ func TestRenderStudyMaterialLevelMarker(t *testing.T) {
 func TestRenderKanjiNotes(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range []struct {
-		name    string
-		vocab   vocabularyStudyPayload
-		want    []string
-		notWant []string
+	for _, testCase := range []struct {
+		name       string
+		vocabulary vocabularyStudyPayload
+		want       []string
+		notWant    []string
 	}{
 		{
 			name: "kun reading below the note",
-			vocab: vocabularyStudyPayload{
+			vocabulary: vocabularyStudyPayload{
 				Kana:  "まつ",
 				Kanji: "待つ",
 				KanjiReadings: []model.KanjiReading{
@@ -1105,8 +1105,8 @@ func TestRenderKanjiNotes(t *testing.T) {
 				},
 				KanjiNotes: []model.KanjiNote{
 					{
-						Char: "待",
-						Type: model.KanjiNotePhonoSemantic,
+						Character: "待",
+						Type:      model.KanjiNotePhonoSemantic,
 						Parts: []model.KanjiPart{
 							{Part: "彳", Role: model.KanjiPartMeaning, GlossKo: "길을 감"},
 							{Part: "寺", Role: model.KanjiPartSound, HunEum: "절 사"},
@@ -1114,8 +1114,8 @@ func TestRenderKanjiNotes(t *testing.T) {
 						ExplanationKo: "寺(ジ)는 원래 발음 요소지만 일본어 음은 タイ다.",
 					},
 					{
-						Char: "読",
-						Type: model.KanjiNotePhonoSemantic,
+						Character: "読",
+						Type:      model.KanjiNotePhonoSemantic,
 						Parts: []model.KanjiPart{
 							{Part: "言", Role: model.KanjiPartMeaning, GlossKo: "말"},
 							{Part: "売", Role: model.KanjiPartForm, GlossKo: "간략화된 <모양>"},
@@ -1133,7 +1133,7 @@ func TestRenderKanjiNotes(t *testing.T) {
 		},
 		{
 			name: "radical base and sound part with on'yomi",
-			vocab: vocabularyStudyPayload{
+			vocabulary: vocabularyStudyPayload{
 				Kana:  "ゆび",
 				Kanji: "指",
 				KanjiReadings: []model.KanjiReading{
@@ -1141,8 +1141,8 @@ func TestRenderKanjiNotes(t *testing.T) {
 				},
 				KanjiNotes: []model.KanjiNote{
 					{
-						Char: "指",
-						Type: model.KanjiNotePhonoSemantic,
+						Character: "指",
+						Type:      model.KanjiNotePhonoSemantic,
 						Parts: []model.KanjiPart{
 							{Part: "扌", Role: model.KanjiPartMeaning, GlossKo: "손", Base: "手"},
 							{Part: "旨", Role: model.KanjiPartSound, HunEum: "뜻 지", On: "シ"},
@@ -1155,7 +1155,7 @@ func TestRenderKanjiNotes(t *testing.T) {
 		},
 		{
 			name: "kanji without a note",
-			vocab: vocabularyStudyPayload{
+			vocabulary: vocabularyStudyPayload{
 				Kana:  "じこ",
 				Kanji: "事故",
 				KanjiReadings: []model.KanjiReading{
@@ -1170,7 +1170,7 @@ func TestRenderKanjiNotes(t *testing.T) {
 		},
 		{
 			name: "jukuji group",
-			vocab: vocabularyStudyPayload{
+			vocabulary: vocabularyStudyPayload{
 				Kana:  "きょう",
 				Kanji: "今日",
 				KanjiReadings: []model.KanjiReading{
@@ -1182,10 +1182,10 @@ func TestRenderKanjiNotes(t *testing.T) {
 		},
 	} {
 		t.Run(
-			tc.name,
+			testCase.name,
 			func(t *testing.T) {
-				got := renderKanjiNotes(tc.vocab)
-				for _, want := range tc.want {
+				got := renderKanjiNotes(testCase.vocabulary)
+				for _, want := range testCase.want {
 					if !strings.Contains(
 						got,
 						want,
@@ -1197,7 +1197,7 @@ func TestRenderKanjiNotes(t *testing.T) {
 						)
 					}
 				}
-				for _, notWant := range tc.notWant {
+				for _, notWant := range testCase.notWant {
 					if strings.Contains(
 						got,
 						notWant,
@@ -1254,10 +1254,10 @@ func TestStudyFlowKanjiNotes(t *testing.T) {
 	}
 	session := newTestSessionService(
 		newTestInteractionStores(),
-		service.SessionDeps{
-			MaterialRepo: &botStudyMaterialStore{},
-			SessionRepo:  sessionStore,
-			StudyActiveSessionRepo: &botStudyActiveRepo{
+		service.SessionDependencies{
+			MaterialRepository: &botStudyMaterialStore{},
+			SessionRepository:  sessionStore,
+			StudyActiveSessionRepository: &botStudyActiveRepository{
 				session: sessionStore.session,
 				items:   items,
 			},
@@ -1267,7 +1267,7 @@ func TestStudyFlowKanjiNotes(t *testing.T) {
 	flow := newTestStudyFlow(
 		api,
 		nil,
-		StudyFlowDeps{Session: session},
+		StudyFlowDependencies{Session: session},
 	)
 	kanjiCallback := func(materialID int) *tgbotapi.CallbackQuery {
 		return &tgbotapi.CallbackQuery{

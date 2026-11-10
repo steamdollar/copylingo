@@ -8,58 +8,58 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// fakeSessionRepo implements SessionRepo for SessionService tests. The
+// fakeSessionRepository implements SessionRepository for SessionService tests. The
 // embedded nil interface makes an unexpected repository call panic.
-type fakeSessionRepo struct {
-	SessionRepo
+type fakeSessionRepository struct {
+	SessionRepository
 	oldest       *model.Session
 	oldestUserID int64
 	batchCounts  map[int64]int
 	err          error
-	startFn      func(id int) error
+	startFunc    func(id int) error
 	created      []*model.Session
 }
 
-func (r *fakeSessionRepo) GetOldestUnfinished(
+func (fake *fakeSessionRepository) GetOldestUnfinished(
 	_ context.Context,
 	userID int64,
 ) (*model.Session, error) {
-	r.oldestUserID = userID
-	return r.oldest, r.err
+	fake.oldestUserID = userID
+	return fake.oldest, fake.err
 }
 
-func (r *fakeSessionRepo) CountUnfinishedBatch(
+func (fake *fakeSessionRepository) CountUnfinishedBatch(
 	context.Context,
 	[]int64,
 ) (map[int64]int, error) {
-	return r.batchCounts, r.err
+	return fake.batchCounts, fake.err
 }
 
-func (r *fakeSessionRepo) Start(
+func (fake *fakeSessionRepository) Start(
 	_ context.Context,
 	id int,
 ) error {
-	return r.startFn(id)
+	return fake.startFunc(id)
 }
 
-func (r *fakeSessionRepo) CreateSession(
+func (fake *fakeSessionRepository) CreateSession(
 	_ context.Context,
-	s *model.Session,
+	session *model.Session,
 ) error {
-	s.ID = 500 + len(r.created)
-	r.created = append(
-		r.created,
-		s,
+	session.ID = 500 + len(fake.created)
+	fake.created = append(
+		fake.created,
+		session,
 	)
 	return nil
 }
 
 func TestSessionServiceOldestUnfinishedPassesThrough(t *testing.T) {
 	want := &model.Session{ID: 42, UserID: 123, Status: model.SessionInProgress}
-	repo := &fakeSessionRepo{oldest: want}
-	svc := NewSessionService(SessionDeps{SessionRepo: repo})
+	repository := &fakeSessionRepository{oldest: want}
+	sessionService := NewSessionService(SessionDependencies{SessionRepository: repository})
 
-	got, err := svc.OldestUnfinished(
+	got, err := sessionService.OldestUnfinished(
 		context.Background(),
 		want.UserID,
 	)
@@ -76,10 +76,10 @@ func TestSessionServiceOldestUnfinishedPassesThrough(t *testing.T) {
 			want,
 		)
 	}
-	if repo.oldestUserID != want.UserID {
+	if repository.oldestUserID != want.UserID {
 		t.Fatalf(
 			"userID = %d, want %d",
-			repo.oldestUserID,
+			repository.oldestUserID,
 			want.UserID,
 		)
 	}
@@ -87,9 +87,9 @@ func TestSessionServiceOldestUnfinishedPassesThrough(t *testing.T) {
 
 func TestSessionServiceOldestUnfinishedReturnsRepositoryError(t *testing.T) {
 	wantErr := errors.New("query failed")
-	svc := NewSessionService(SessionDeps{SessionRepo: &fakeSessionRepo{err: wantErr}})
+	sessionService := NewSessionService(SessionDependencies{SessionRepository: &fakeSessionRepository{err: wantErr}})
 
-	_, err := svc.OldestUnfinished(
+	_, err := sessionService.OldestUnfinished(
 		context.Background(),
 		123,
 	)
@@ -107,9 +107,11 @@ func TestSessionServiceOldestUnfinishedReturnsRepositoryError(t *testing.T) {
 
 func TestSessionServiceCountUnfinishedBatchPassesThrough(t *testing.T) {
 	expected := map[int64]int{1: 2, 2: 0}
-	svc := NewSessionService(SessionDeps{SessionRepo: &fakeSessionRepo{batchCounts: expected}})
+	sessionService := NewSessionService(
+		SessionDependencies{SessionRepository: &fakeSessionRepository{batchCounts: expected}},
+	)
 
-	got, err := svc.CountUnfinishedBatch(
+	got, err := sessionService.CountUnfinishedBatch(
 		context.Background(),
 		[]int64{1, 2},
 	)

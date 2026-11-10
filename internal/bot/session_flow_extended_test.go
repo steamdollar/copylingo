@@ -13,53 +13,53 @@ import (
 )
 
 // mockSessionStore implements the sessions-table calls these tests drive; the
-// embedded nil SessionRepo makes any other call panic.
+// embedded nil SessionRepository makes any other call panic.
 type mockSessionStore struct {
-	service.SessionRepo
-	getSessionsByStatusFn func(
+	service.SessionRepository
+	getSessionsByStatusFunc func(
 		ctx context.Context,
 		userID int64,
 		status model.SessionStatus,
 	) ([]model.Session, error)
-	startFn func(
+	startFunc func(
 		ctx context.Context,
 		id int,
 	) error
-	createSessionFn func(
+	createSessionFunc func(
 		ctx context.Context,
-		s *model.Session,
+		session *model.Session,
 	) error
 }
 
-func (m *mockSessionStore) CreateSession(
+func (mock *mockSessionStore) CreateSession(
 	ctx context.Context,
-	s *model.Session,
+	session *model.Session,
 ) error {
-	return m.createSessionFn(
+	return mock.createSessionFunc(
 		ctx,
-		s,
+		session,
 	)
 }
 
-func (m *mockSessionStore) GetSessionsByStatus(
+func (mock *mockSessionStore) GetSessionsByStatus(
 	ctx context.Context,
 	userID int64,
 	status model.SessionStatus,
 ) ([]model.Session, error) {
-	return m.getSessionsByStatusFn(
+	return mock.getSessionsByStatusFunc(
 		ctx,
 		userID,
 		status,
 	)
 }
-func (m *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
+func (mock *mockSessionStore) ListInProgress(ctx context.Context) ([]model.Session, error) {
 	return nil, nil
 }
-func (m *mockSessionStore) Start(
+func (mock *mockSessionStore) Start(
 	ctx context.Context,
 	id int,
 ) error {
-	return m.startFn(
+	return mock.startFunc(
 		ctx,
 		id,
 	)
@@ -67,9 +67,9 @@ func (m *mockSessionStore) Start(
 
 func TestStartStudy_NoSessions(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
-	mSessionStore := &mockSessionStore{
-		getSessionsByStatusFn: func(
+	mockAPI := &mockBotAPI{}
+	sessionStoreMock := &mockSessionStore{
+		getSessionsByStatusFunc: func(
 			ctx context.Context,
 			userID int64,
 			status model.SessionStatus,
@@ -77,18 +77,18 @@ func TestStartStudy_NoSessions(t *testing.T) {
 			return nil, nil
 		},
 	}
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{SessionRepo: mSessionStore},
+				service.SessionDependencies{SessionRepository: sessionStoreMock},
 			),
 		},
 	)
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: 456},
@@ -96,15 +96,15 @@ func TestStartStudy_NoSessions(t *testing.T) {
 		},
 	}
 
-	sf.StartStudy(
+	sessionFlow.StartStudy(
 		ctx,
-		cb,
+		callbackQuery,
 	)
 
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
 	}
-	sent := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	sent := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !strings.Contains(
 		sent.Text,
 		"대기 중인 학습 세션이 없습니다",
@@ -118,9 +118,9 @@ func TestStartStudy_NoSessions(t *testing.T) {
 
 func TestStartStudy_PendingStudySession(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
-	mSessionStore := &mockSessionStore{
-		getSessionsByStatusFn: func(
+	mockAPI := &mockBotAPI{}
+	sessionStoreMock := &mockSessionStore{
+		getSessionsByStatusFunc: func(
 			ctx context.Context,
 			userID int64,
 			status model.SessionStatus,
@@ -137,18 +137,18 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 			return nil, nil
 		},
 	}
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{SessionRepo: mSessionStore},
+				service.SessionDependencies{SessionRepository: sessionStoreMock},
 			),
 		},
 	)
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: 456},
@@ -156,15 +156,15 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 		},
 	}
 
-	sf.StartStudy(
+	sessionFlow.StartStudy(
 		ctx,
-		cb,
+		callbackQuery,
 	)
 
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
 	}
-	sent := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	sent := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !strings.Contains(
 		sent.Text,
 		"Study Session 준비됨",
@@ -193,10 +193,10 @@ func TestStartStudy_PendingStudySession(t *testing.T) {
 
 func TestStartStudy_ResumeInProgress(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	mSessionStore := &mockSessionStore{
-		getSessionsByStatusFn: func(
+	sessionStoreMock := &mockSessionStore{
+		getSessionsByStatusFunc: func(
 			ctx context.Context,
 			userID int64,
 			status model.SessionStatus,
@@ -207,18 +207,18 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 			return nil, nil
 		},
 	}
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: newTestSessionService(
 				stateStores,
-				service.SessionDeps{SessionRepo: mSessionStore},
+				service.SessionDependencies{SessionRepository: sessionStoreMock},
 			),
 		},
 	)
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: 456},
@@ -246,15 +246,15 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 		state,
 	)
 
-	sf.StartStudy(
+	sessionFlow.StartStudy(
 		ctx,
-		cb,
+		callbackQuery,
 	)
 
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
 	}
-	sent := mAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
+	sent := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !strings.Contains(
 		sent.Text,
 		"Q1",
@@ -268,35 +268,35 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 
 type mockSessionQuestionStore struct{}
 
-func (m *mockSessionQuestionStore) CreateSessionQuestions(
+func (mock *mockSessionQuestionStore) CreateSessionQuestions(
 	ctx context.Context,
-	sqs []model.SessionQuestion,
+	sessionQuestions []model.SessionQuestion,
 ) error {
 	return nil
 }
 
 func TestStartReview_NoneDue(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
-	mSRSRepo := &mockSRSRepoWithCount{count: 5} // Has due questions
+	mockAPI := &mockBotAPI{}
+	srsRepositoryMock := &mockSRSRepositoryWithCount{count: 5} // Has due questions
 
-	mSessionStore := &mockSessionStore{
-		createSessionFn: func(
+	sessionStoreMock := &mockSessionStore{
+		createSessionFunc: func(
 			ctx context.Context,
-			s *model.Session,
+			session *model.Session,
 		) error {
-			s.ID = 100
-			s.TotalQuestions = 5
+			session.ID = 100
+			session.TotalQuestions = 5
 			return nil
 		},
 	}
-	mSQStore := &mockSessionQuestionStore{}
+	sessionQuestionStoreMock := &mockSessionQuestionStore{}
 
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{
-			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
+		SessionFlowDependencies{
+			User: service.NewUserService(&mockUserRepository{getOrCreateFunc: func(
 				context.Context,
 				int64,
 				string,
@@ -305,16 +305,16 @@ func TestStartReview_NoneDue(t *testing.T) {
 			}}),
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{
-					QuestionRepo:        mSRSRepo,
-					SessionRepo:         mSessionStore,
-					SessionQuestionRepo: mSQStore,
+				service.SessionDependencies{
+					QuestionRepository:        srsRepositoryMock,
+					SessionRepository:         sessionStoreMock,
+					SessionQuestionRepository: sessionQuestionStoreMock,
 				},
 			),
 		},
 	)
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: 456},
@@ -322,20 +322,20 @@ func TestStartReview_NoneDue(t *testing.T) {
 		},
 	}
 
-	sf.StartReview(
+	sessionFlow.StartReview(
 		ctx,
-		cb,
+		callbackQuery,
 	)
 
-	if len(mAPI.sentMessages) == 0 {
+	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected message sent")
 	}
 	var sentText string
-	switch m := mAPI.sentMessages[0].(type) {
+	switch sent := mockAPI.sentMessages[0].(type) {
 	case tgbotapi.MessageConfig:
-		sentText = m.Text
+		sentText = sent.Text
 	case tgbotapi.EditMessageTextConfig:
-		sentText = m.Text
+		sentText = sent.Text
 	}
 	if !strings.Contains(
 		sentText,
@@ -348,12 +348,12 @@ func TestStartReview_NoneDue(t *testing.T) {
 	}
 }
 
-type mockSRSRepoWithCount struct {
-	mockSRSRepo
+type mockSRSRepositoryWithCount struct {
+	mockSRSRepository
 	count int
 }
 
-func (m *mockSRSRepoWithCount) GetDueReviews(
+func (mock *mockSRSRepositoryWithCount) GetDueReviews(
 	ctx context.Context,
 	userID int64,
 	language,
@@ -363,33 +363,33 @@ func (m *mockSRSRepoWithCount) GetDueReviews(
 	kanjiRecallLimit int,
 	categories ...model.QuestionCategory,
 ) ([]model.Question, error) {
-	if m.count > 0 {
+	if mock.count > 0 {
 		return make(
 			[]model.Question,
-			m.count,
+			mock.count,
 		), nil
 	}
 	return nil, nil
 }
 
-func (m *mockSRSRepoWithCount) GetDueReviewCount(
+func (mock *mockSRSRepositoryWithCount) GetDueReviewCount(
 	ctx context.Context,
 	userID int64,
 	language string,
 	levels []string,
 ) (int, error) {
-	return m.count, nil
+	return mock.count, nil
 }
 
 func TestStartReview_NoneDue_Actual(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
-	mSRSRepo := &mockSRSRepoWithCount{count: 0}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	srsRepositoryMock := &mockSRSRepositoryWithCount{count: 0}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{
-			User: service.NewUserService(&mockUserRepo{getOrCreateFn: func(
+		SessionFlowDependencies{
+			User: service.NewUserService(&mockUserRepository{getOrCreateFunc: func(
 				context.Context,
 				int64,
 				string,
@@ -398,12 +398,12 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 			}}),
 			Session: newTestSessionService(
 				nil,
-				service.SessionDeps{QuestionRepo: mSRSRepo},
+				service.SessionDependencies{QuestionRepository: srsRepositoryMock},
 			),
 		},
 	)
 
-	cb := &tgbotapi.CallbackQuery{
+	callbackQuery := &tgbotapi.CallbackQuery{
 		From: &tgbotapi.User{ID: 123},
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: 456},
@@ -411,18 +411,18 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 		},
 	}
 
-	sf.StartReview(
+	sessionFlow.StartReview(
 		ctx,
-		cb,
+		callbackQuery,
 	)
 
 	// In the fail/NoneDue path it might be MessageConfig or EditMessageTextConfig
 	var sentText string
-	switch m := mAPI.sentMessages[0].(type) {
+	switch sent := mockAPI.sentMessages[0].(type) {
 	case tgbotapi.MessageConfig:
-		sentText = m.Text
+		sentText = sent.Text
 	case tgbotapi.EditMessageTextConfig:
-		sentText = m.Text
+		sentText = sent.Text
 	}
 
 	if !strings.Contains(
@@ -438,10 +438,10 @@ func TestStartReview_NoneDue_Actual(t *testing.T) {
 
 func TestHandleSessionCallback(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
-	mSessionStore := &mockSessionStore{
-		startFn: func(
+	sessionStoreMock := &mockSessionStore{
+		startFunc: func(
 			ctx context.Context,
 			id int,
 		) error {
@@ -450,12 +450,12 @@ func TestHandleSessionCallback(t *testing.T) {
 	}
 	session := newTestSessionService(
 		stateStores,
-		service.SessionDeps{SessionRepo: mSessionStore},
+		service.SessionDependencies{SessionRepository: sessionStoreMock},
 	)
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: session,
 		},
 	)
@@ -463,7 +463,7 @@ func TestHandleSessionCallback(t *testing.T) {
 	t.Run(
 		"start action",
 		func(t *testing.T) {
-			cb := &tgbotapi.CallbackQuery{
+			callbackQuery := &tgbotapi.CallbackQuery{
 				Data: "session:10:start",
 				From: &tgbotapi.User{ID: 123},
 				Message: &tgbotapi.Message{
@@ -476,9 +476,9 @@ func TestHandleSessionCallback(t *testing.T) {
 			// Wait, startSession calls showQuestion which needs active session.
 			// I'll skip deep testing here as it requires complex mocks,
 			// but I can at least check it doesn't crash.
-			sf.HandleSessionCallback(
+			sessionFlow.HandleSessionCallback(
 				ctx,
-				cb,
+				callbackQuery,
 			)
 		},
 	)
@@ -486,11 +486,11 @@ func TestHandleSessionCallback(t *testing.T) {
 
 func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	startCalls := 0
-	mSessionStore := &mockSessionStore{
-		startFn: func(
+	sessionStoreMock := &mockSessionStore{
+		startFunc: func(
 			ctx context.Context,
 			id int,
 		) error {
@@ -500,12 +500,12 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 	}
 	session := newTestSessionService(
 		stateStores,
-		service.SessionDeps{SessionRepo: mSessionStore},
+		service.SessionDependencies{SessionRepository: sessionStoreMock},
 	)
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{
+		SessionFlowDependencies{
 			Session: session,
 		},
 	)
@@ -537,20 +537,20 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 		sessionID,
 		state,
 	)
-	cb := cbWithMessage(
+	callbackQuery := callbackWithMessage(
 		"session:31:start",
 		123,
 		456,
 		123,
 	)
 
-	sf.HandleSessionCallback(
+	sessionFlow.HandleSessionCallback(
 		ctx,
-		cb,
+		callbackQuery,
 	)
-	sf.HandleSessionCallback(
+	sessionFlow.HandleSessionCallback(
 		ctx,
-		cb,
+		callbackQuery,
 	)
 
 	if startCalls != 2 {
@@ -559,17 +559,17 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 			startCalls,
 		)
 	}
-	if len(mAPI.sentMessages) != 2 {
+	if len(mockAPI.sentMessages) != 2 {
 		t.Fatalf(
 			"rendered messages = %d, want 2",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	last, ok := mAPI.sentMessages[1].(tgbotapi.EditMessageTextConfig)
+	last, ok := mockAPI.sentMessages[1].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
 			"last message type = %T, want edit",
-			mAPI.sentMessages[1],
+			mockAPI.sentMessages[1],
 		)
 	}
 	if !strings.Contains(
@@ -596,18 +596,18 @@ func TestStartSessionRepeatedStartResumesNextUnanswered(t *testing.T) {
 	}
 }
 
-type quizStartActiveRepo struct {
+type quizStartActiveRepository struct {
 	state *model.QuizActiveSessionState
 }
 
-func (r *quizStartActiveRepo) LoadQuestionSessionWithStateBySessionID(
+func (repository *quizStartActiveRepository) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	return r.state, nil
+	return repository.state, nil
 }
 
-func (r *quizStartActiveRepo) FlushQuizActiveSession(
+func (repository *quizStartActiveRepository) FlushQuizActiveSession(
 	ctx context.Context,
 	state *model.QuizActiveSessionState,
 ) error {
@@ -616,7 +616,7 @@ func (r *quizStartActiveRepo) FlushQuizActiveSession(
 
 func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 	ctx := context.Background()
-	mAPI := &mockBotAPI{}
+	mockAPI := &mockBotAPI{}
 	stateStores := newTestInteractionStores()
 	dbState := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
@@ -638,27 +638,27 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 			},
 		},
 	}
-	repo := &quizStartActiveRepo{state: dbState}
+	repository := &quizStartActiveRepository{state: dbState}
 	store := &mockSessionStore{
-		startFn: func(
+		startFunc: func(
 			ctx context.Context,
 			sessionID int,
 		) error {
-			repo.state.Session.Status = model.SessionInProgress
+			repository.state.Session.Status = model.SessionInProgress
 			return nil
 		},
 	}
 	session := newTestSessionService(
 		stateStores,
-		service.SessionDeps{
-			SessionRepo:           store,
-			QuizActiveSessionRepo: repo,
+		service.SessionDependencies{
+			SessionRepository:           store,
+			QuizActiveSessionRepository: repository,
 		},
 	)
-	sf := newTestSessionFlow(
-		mAPI,
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		stateStores,
-		SessionFlowDeps{Session: session},
+		SessionFlowDependencies{Session: session},
 	)
 	storeActiveState(
 		t,
@@ -667,9 +667,9 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 		dbState,
 	)
 
-	sf.HandleSessionCallback(
+	sessionFlow.HandleSessionCallback(
 		ctx,
-		cbWithMessage(
+		callbackWithMessage(
 			"session:32:start",
 			123,
 			456,
@@ -697,14 +697,14 @@ func TestStartSessionRefreshesPendingStatusAfterDBStart(t *testing.T) {
 }
 
 func TestPushSession(t *testing.T) {
-	mAPI := &mockBotAPI{}
-	sf := newTestSessionFlow(
-		mAPI,
+	mockAPI := &mockBotAPI{}
+	sessionFlow := newTestSessionFlow(
+		mockAPI,
 		nil,
-		SessionFlowDeps{},
+		SessionFlowDependencies{},
 	)
 
-	err := sf.PushSession(
+	err := sessionFlow.PushSession(
 		context.Background(),
 		123,
 		10,
@@ -717,13 +717,13 @@ func TestPushSession(t *testing.T) {
 		)
 	}
 
-	if len(mAPI.sentMessages) != 1 {
+	if len(mockAPI.sentMessages) != 1 {
 		t.Fatalf(
 			"expected 1 message, got %d",
-			len(mAPI.sentMessages),
+			len(mockAPI.sentMessages),
 		)
 	}
-	sent := mAPI.sentMessages[0].(tgbotapi.MessageConfig)
+	sent := mockAPI.sentMessages[0].(tgbotapi.MessageConfig)
 	if !strings.Contains(
 		sent.Text,
 		"세션이 도착했습니다",

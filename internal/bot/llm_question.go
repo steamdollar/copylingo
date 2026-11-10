@@ -55,8 +55,8 @@ type llmInputStore interface {
 	) error
 }
 
-// LLMQuestionFlowDeps wires LLMQuestionFlow; every dependency is required.
-type LLMQuestionFlowDeps struct {
+// LLMQuestionFlowDependencies wires LLMQuestionFlow; every dependency is required.
+type LLMQuestionFlowDependencies struct {
 	Telegram    *TelegramClient
 	User        userReader
 	LLMQuestion llmQuestionAnswerer
@@ -74,38 +74,38 @@ type LLMQuestionFlow struct {
 	input       llmInputStore
 }
 
-func NewLLMQuestionFlow(deps LLMQuestionFlowDeps) *LLMQuestionFlow {
+func NewLLMQuestionFlow(dependencies LLMQuestionFlowDependencies) *LLMQuestionFlow {
 	return &LLMQuestionFlow{
-		telegram:    deps.Telegram,
-		user:        deps.User,
-		llmQuestion: deps.LLMQuestion,
-		session:     deps.Session,
-		input:       deps.Input,
+		telegram:    dependencies.Telegram,
+		user:        dependencies.User,
+		llmQuestion: dependencies.LLMQuestion,
+		session:     dependencies.Session,
+		input:       dependencies.Input,
 	}
 }
 
-func (lf *LLMQuestionFlow) handleLLM(
+func (flow *LLMQuestionFlow) handleLLM(
 	ctx context.Context,
-	msg *tgbotapi.Message,
+	message *tgbotapi.Message,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if !isLLMAllowed(msg.From) {
+	if !isLLMAllowed(message.From) {
 		slog.WarnContext(
 			ctx,
 			"Unauthorized LLM command ignored",
 			"event",
 			"telegram.llm.unauthorized",
 			"user_id",
-			telegramUserID(msg.From),
+			telegramUserID(message.From),
 			"username",
-			telegramUsername(msg.From),
+			telegramUsername(message.From),
 		)
 		return
 	}
 
-	if err := lf.input.SetLLMPending(
+	if err := flow.input.SetLLMPending(
 		ctx,
-		msg.From.ID,
+		message.From.ID,
 		model.PendingLLMInput{Kind: model.PendingLLMPlain},
 	); err != nil {
 		slog.ErrorContext(
@@ -114,18 +114,18 @@ func (lf *LLMQuestionFlow) handleLLM(
 			"event",
 			"telegram.llm.activate_failed",
 			"user_id",
-			msg.From.ID,
+			message.From.ID,
 			"error",
 			err,
 		)
-		lf.telegram.SendMessage(
-			msg.Chat.ID,
+		flow.telegram.SendMessage(
+			message.Chat.ID,
 			messages.activationUnavailable,
 		)
 		return
 	}
-	lf.telegram.SendMessageWithKeyboard(
-		msg.Chat.ID,
+	flow.telegram.SendMessageWithKeyboard(
+		message.Chat.ID,
 		messages.modeActivated,
 		llmCancelKeyboard(),
 	)
@@ -143,17 +143,18 @@ func llmCancelKeyboard() tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
-func (lf *LLMQuestionFlow) handleLLMCancel(
+func (flow *LLMQuestionFlow) handleLLMCancel(
 	ctx context.Context,
-	cb *tgbotapi.CallbackQuery,
+	callbackQuery *tgbotapi.CallbackQuery,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if cb == nil || cb.From == nil || cb.Message == nil || cb.Message.Chat == nil {
+	if callbackQuery == nil || callbackQuery.From == nil || callbackQuery.Message == nil ||
+		callbackQuery.Message.Chat == nil {
 		return
 	}
-	if err := lf.input.DeleteLLMPending(
+	if err := flow.input.DeleteLLMPending(
 		ctx,
-		cb.From.ID,
+		callbackQuery.From.ID,
 	); err != nil {
 		slog.ErrorContext(
 			ctx,
@@ -161,63 +162,63 @@ func (lf *LLMQuestionFlow) handleLLMCancel(
 			"event",
 			"telegram.llm.cancel_failed",
 			"user_id",
-			cb.From.ID,
+			callbackQuery.From.ID,
 			"error",
 			err,
 		)
-		lf.telegram.SendMessage(
-			cb.Message.Chat.ID,
+		flow.telegram.SendMessage(
+			callbackQuery.Message.Chat.ID,
 			messages.cancelUnavailable,
 		)
 		return
 	}
-	lf.telegram.SendMessage(
-		cb.Message.Chat.ID,
+	flow.telegram.SendMessage(
+		callbackQuery.Message.Chat.ID,
 		messages.modeCancelled,
 	)
 }
 
-func (lf *LLMQuestionFlow) handleLLMQuestion(
+func (flow *LLMQuestionFlow) handleLLMQuestion(
 	ctx context.Context,
-	msg *tgbotapi.Message,
+	message *tgbotapi.Message,
 ) bool {
 	messages := botMessagesByLocale[botDefaultLocale]
-	if msg.From == nil {
+	if message.From == nil {
 		return false
 	}
-	pendingInput, found, err := lf.input.TakeLLMPending(
+	pendingInput, found, err := flow.input.TakeLLMPending(
 		ctx,
-		msg.From.ID,
+		message.From.ID,
 	)
 	if err != nil || !found {
 		return false
 	}
 
-	if !isLLMAllowed(msg.From) {
+	if !isLLMAllowed(message.From) {
 		slog.WarnContext(
 			ctx,
 			"Unauthorized LLM question ignored",
 			"event",
 			"telegram.llm.question_unauthorized",
 			"user_id",
-			telegramUserID(msg.From),
+			telegramUserID(message.From),
 			"username",
-			telegramUsername(msg.From),
+			telegramUsername(message.From),
 		)
 		return true
 	}
-	question := strings.TrimSpace(msg.Text)
+	question := strings.TrimSpace(message.Text)
 	if question == "" {
-		lf.telegram.SendMessage(
-			msg.Chat.ID,
+		flow.telegram.SendMessage(
+			message.Chat.ID,
 			messages.emptyQuestion,
 		)
 		return true
 	}
-	user, err := lf.user.GetUser(
+	user, err := flow.user.GetUser(
 		ctx,
-		msg.From.ID,
-		msg.From.UserName,
+		message.From.ID,
+		message.From.UserName,
 	)
 	if err != nil {
 		slog.ErrorContext(
@@ -226,24 +227,24 @@ func (lf *LLMQuestionFlow) handleLLMQuestion(
 			"event",
 			"telegram.llm.user_lookup_failed",
 			"user_id",
-			msg.From.ID,
+			message.From.ID,
 			"error",
 			err,
 		)
-		lf.telegram.SendMessage(
-			msg.Chat.ID,
+		flow.telegram.SendMessage(
+			message.Chat.ID,
 			messages.userUnavailable,
 		)
 		return true
 	}
 
-	lf.telegram.SendMessage(
-		msg.Chat.ID,
+	flow.telegram.SendMessage(
+		message.Chat.ID,
 		messages.answerGenerating,
 	)
 	// in-quiz "ask" 버튼 경로면 그 문제의 원문/정답/해설/사용자 답을 프롬프트에 실어준다.
 	llmPrompt := question
-	if quizContext := lf.loadQuizQuestionContext(
+	if quizContext := flow.loadQuizQuestionContext(
 		ctx,
 		pendingInput,
 	); quizContext != "" {
@@ -251,10 +252,10 @@ func (lf *LLMQuestionFlow) handleLLMQuestion(
 			messages.quizQuestionPromptFormat,
 			question,
 		)
-	} else if studyContext := lf.loadStudyMaterialContext(
+	} else if studyContext := flow.loadStudyMaterialContext(
 		ctx,
 		pendingInput,
-		msg.From.ID,
+		message.From.ID,
 	); studyContext != "" {
 		llmPrompt = studyContext + fmt.Sprintf(
 			messages.studyQuestionPromptFormat,
@@ -262,10 +263,10 @@ func (lf *LLMQuestionFlow) handleLLMQuestion(
 		)
 	}
 	// The service also keeps the Q&A as a tip candidate for curation.
-	answer, err := lf.llmQuestion.Answer(
+	answer, err := flow.llmQuestion.Answer(
 		ctx,
 		*user,
-		msg.From.UserName,
+		message.From.UserName,
 		llmPrompt,
 		question,
 	)
@@ -280,14 +281,14 @@ func (lf *LLMQuestionFlow) handleLLMQuestion(
 			"error",
 			err,
 		)
-		lf.telegram.SendMessage(
-			msg.Chat.ID,
+		flow.telegram.SendMessage(
+			message.Chat.ID,
 			messages.answerFailed,
 		)
 		return true
 	}
-	lf.telegram.SendMessage(
-		msg.Chat.ID,
+	flow.telegram.SendMessage(
+		message.Chat.ID,
 		fmt.Sprintf(
 			messages.answerFormat,
 			html.EscapeString(answer),
@@ -297,14 +298,14 @@ func (lf *LLMQuestionFlow) handleLLMQuestion(
 }
 
 // The Redis adapter turns stored tokens into typed input; invalid tokens remain plain questions.
-func (lf *LLMQuestionFlow) loadQuizQuestionContext(
+func (flow *LLMQuestionFlow) loadQuizQuestionContext(
 	ctx context.Context,
 	input model.PendingLLMInput,
 ) string {
 	if input.Kind != model.PendingLLMQuizQuestion {
 		return ""
 	}
-	state, err := lf.session.QuizProgress(
+	state, err := flow.session.QuizProgress(
 		ctx,
 		input.SessionID,
 	)
@@ -315,13 +316,13 @@ func (lf *LLMQuestionFlow) loadQuizQuestionContext(
 	if !ok {
 		return ""
 	}
-	q := item.Question
+	question := item.Question
 	messages := botMessagesByLocale[botDefaultLocale]
 	return fmt.Sprintf(
 		messages.quizContextFormat,
-		stripHTML(q.Prompt),
-		q.CorrectAnswer,
-		q.Explanation,
+		stripHTML(question.Prompt),
+		question.CorrectAnswer,
+		question.Explanation,
 		formatSessionAnswer(item.SessionQuestion.UserAnswer),
 	)
 }
@@ -329,7 +330,7 @@ func (lf *LLMQuestionFlow) loadQuizQuestionContext(
 // loadStudyMaterialContext resolves a pending Study Material token into a
 // user-owned active-session card. Invalid, stale, or completed session tokens
 // intentionally fall back to a plain LLM question.
-func (lf *LLMQuestionFlow) loadStudyMaterialContext(
+func (flow *LLMQuestionFlow) loadStudyMaterialContext(
 	ctx context.Context,
 	input model.PendingLLMInput,
 	userID int64,
@@ -338,7 +339,7 @@ func (lf *LLMQuestionFlow) loadStudyMaterialContext(
 		return ""
 	}
 
-	state, err := lf.session.StudyProgress(
+	state, err := flow.session.StudyProgress(
 		ctx,
 		input.SessionID,
 		userID,
@@ -346,13 +347,13 @@ func (lf *LLMQuestionFlow) loadStudyMaterialContext(
 	if err != nil || state.Session.Status == model.SessionCompleted {
 		return ""
 	}
-	item, idx, ok := state.ItemByOrder(input.MaterialOrder)
+	item, index, ok := state.ItemByOrder(input.MaterialOrder)
 	if !ok {
 		return ""
 	}
 	materialText := stripHTML(renderStudyMaterial(
 		item.Material,
-		idx,
+		index,
 		len(state.Items),
 	))
 	messages := botMessagesByLocale[botDefaultLocale]

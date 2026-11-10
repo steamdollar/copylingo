@@ -16,10 +16,10 @@ import (
 
 // OpenDB connects to PostgreSQL. Pool tuning stays with the caller because
 // only the long-running server needs it.
-func OpenDB(cfg config.DBConfig) (*sqlx.DB, error) {
+func OpenDB(dbConfig config.DBConfig) (*sqlx.DB, error) {
 	db, err := sqlx.Connect(
 		"postgres",
-		cfg.DSN(),
+		dbConfig.DSN(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -32,13 +32,13 @@ func OpenDB(cfg config.DBConfig) (*sqlx.DB, error) {
 
 // NewAudioStore builds the S3-compatible object store that holds listening
 // audio. The server reads clips from it; the admin tool writes them (ADR-082).
-func NewAudioStore(cfg config.StorageConfig) *external.S3AudioStore {
+func NewAudioStore(storageConfig config.StorageConfig) *external.S3AudioStore {
 	return external.NewS3AudioStore(external.S3Options{
-		Endpoint:     cfg.Endpoint,
-		Region:       cfg.Region,
-		Bucket:       cfg.Bucket,
-		AccessKey:    cfg.AccessKey,
-		SecretKey:    cfg.SecretKey,
-		UsePathStyle: cfg.UsePathStyle,
+		Endpoint:     storageConfig.Endpoint,
+		Region:       storageConfig.Region,
+		Bucket:       storageConfig.Bucket,
+		AccessKey:    storageConfig.AccessKey,
+		SecretKey:    storageConfig.SecretKey,
+		UsePathStyle: storageConfig.UsePathStyle,
 	})
 }

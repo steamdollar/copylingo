@@ -72,8 +72,8 @@ type pushClaims interface {
 	) (bool, error)
 }
 
-// Deps wires Scheduler with the service calls it makes.
-type Deps struct {
+// Dependencies wires Scheduler with the service calls it makes.
+type Dependencies struct {
 	User        slotUsers
 	Session     slotSessions
 	QuizPusher  quizPusher
@@ -82,30 +82,30 @@ type Deps struct {
 	Claims      pushClaims
 }
 
-func New(deps Deps) *Scheduler {
-	s := &Scheduler{
-		user:    deps.User,
-		session: deps.Session,
-		cron:    deps.Cron,
+func New(dependencies Dependencies) *Scheduler {
+	scheduler := &Scheduler{
+		user:    dependencies.User,
+		session: dependencies.Session,
+		cron:    dependencies.Cron,
 	}
-	s.dispatcher = newSessionDispatcher(
-		deps.Session,
-		deps.QuizPusher,
-		deps.StudyPusher,
-		deps.Claims,
+	scheduler.dispatcher = newSessionDispatcher(
+		dependencies.Session,
+		dependencies.QuizPusher,
+		dependencies.StudyPusher,
+		dependencies.Claims,
 	)
-	return s
+	return scheduler
 }
 
 // Start registers the 30-minute user dispatch and starts the scheduler.
-func (s *Scheduler) Start() {
-	if _, err := s.cron.AddFunc(
+func (scheduler *Scheduler) Start() {
+	if _, err := scheduler.cron.AddFunc(
 		userPushCron,
 		func() {
-			s.runJob(
+			scheduler.runJob(
 				"dynamic_user_push",
 				10*time.Minute,
-				s.tick,
+				scheduler.tick,
 			)
 		},
 	); err != nil {
@@ -134,7 +134,7 @@ func (s *Scheduler) Start() {
 		)
 	}
 
-	s.cron.Start()
+	scheduler.cron.Start()
 	slog.Info(
 		"Scheduler started",
 		"event",
@@ -148,8 +148,8 @@ func (s *Scheduler) Start() {
 // when ctx ends. Only then does it stop the rate limiter: the dispatch waits
 // on its ticker, so stopping it first would stall the dispatch mid-way after
 // the daily push claim was already taken.
-func (s *Scheduler) Stop(ctx context.Context) error {
-	jobsDone := s.cron.Stop()
+func (scheduler *Scheduler) Stop(ctx context.Context) error {
+	jobsDone := scheduler.cron.Stop()
 	var waitErr error
 	select {
 	case <-jobsDone.Done():
@@ -159,7 +159,7 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 			ctx.Err(),
 		)
 	}
-	s.dispatcher.limiter.Stop()
+	scheduler.dispatcher.limiter.Stop()
 	slog.Info(
 		"Scheduler stopped",
 		"event",
@@ -170,12 +170,12 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	return waitErr
 }
 
-func (s *Scheduler) runJob(
+func (scheduler *Scheduler) runJob(
 	name string,
 	timeout time.Duration,
 	run func(context.Context) error,
 ) {
-	ctx := observability.WithAttrs(
+	ctx := observability.WithAttributes(
 		context.Background(),
 		slog.String(
 			"interaction_id",
@@ -229,8 +229,8 @@ func (s *Scheduler) runJob(
 }
 
 // tick executes 30-minute interval dynamic dispatch across distinct timezones and slots.
-func (s *Scheduler) tick(ctx context.Context) error {
-	timezones, err := s.user.GetActiveTimezones(ctx)
+func (scheduler *Scheduler) tick(ctx context.Context) error {
+	timezones, err := scheduler.user.GetActiveTimezones(ctx)
 	if err != nil {
 		slog.WarnContext(
 			ctx,
@@ -253,21 +253,21 @@ func (s *Scheduler) tick(ctx context.Context) error {
 
 	var failures int
 
-	for _, tz := range timezones {
-		loc, err := time.LoadLocation(tz)
+	for _, timezone := range timezones {
+		location, err := time.LoadLocation(timezone)
 		if err != nil {
 			slog.WarnContext(
 				ctx,
 				"Failed to load timezone",
 				"timezone",
-				tz,
+				timezone,
 				"error",
 				err,
 			)
 			continue
 		}
 
-		nowLocal := time.Now().In(loc)
+		nowLocal := time.Now().In(location)
 		minuteSlot := (nowLocal.Minute() / 30) * 30
 		localTime := fmt.Sprintf(
 			"%02d:%02d",
@@ -276,11 +276,11 @@ func (s *Scheduler) tick(ctx context.Context) error {
 		)
 
 		for _, slot := range slots {
-			users, err := s.user.GetUsersBySlot(
+			users, err := scheduler.user.GetUsersBySlot(
 				ctx,
 				slot,
 				localTime,
-				tz,
+				timezone,
 			)
 			if err != nil {
 				failures++
@@ -292,7 +292,7 @@ func (s *Scheduler) tick(ctx context.Context) error {
 					"slot",
 					slot,
 					"timezone",
-					tz,
+					timezone,
 					"time",
 					localTime,
 					"error",
@@ -308,12 +308,12 @@ func (s *Scheduler) tick(ctx context.Context) error {
 				[]int64,
 				len(users),
 			)
-			for i, u := range users {
-				userIDs[i] = u.ID
+			for i, user := range users {
+				userIDs[i] = user.ID
 			}
 
 			var unfinishedCounts map[int64]int
-			counts, err := s.session.CountUnfinishedBatch(
+			counts, err := scheduler.session.CountUnfinishedBatch(
 				ctx,
 				userIDs,
 			)
@@ -328,7 +328,7 @@ func (s *Scheduler) tick(ctx context.Context) error {
 				unfinishedCounts = counts
 			}
 
-			if err := s.dispatcher.dispatchBatch(
+			if err := scheduler.dispatcher.dispatchBatch(
 				ctx,
 				slot,
 				users,

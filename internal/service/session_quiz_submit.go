@@ -40,14 +40,14 @@ type QuizTextAnswer struct {
 
 // SubmitQuizOption grades the chosen option of the current question.
 // userID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
-func (s *SessionService) SubmitQuizOption(
+func (service *SessionService) SubmitQuizOption(
 	ctx context.Context,
 	userID int64,
 	sessionID,
 	questionID,
-	optionIdx int,
+	optionIndex int,
 ) (*QuizAnswerResult, error) {
-	state, err := s.loadQuizForAnswer(
+	state, err := service.loadQuizForAnswer(
 		ctx,
 		userID,
 		sessionID,
@@ -55,7 +55,7 @@ func (s *SessionService) SubmitQuizOption(
 	if err != nil {
 		return nil, err
 	}
-	item, idx, err := currentUnansweredQuizItem(
+	item, index, err := currentUnansweredQuizItem(
 		state,
 		questionID,
 	)
@@ -63,36 +63,36 @@ func (s *SessionService) SubmitQuizOption(
 		return nil, err
 	}
 	options, err := item.Question.GetOptions()
-	if err != nil || optionIdx < 0 || optionIdx >= len(options) {
+	if err != nil || optionIndex < 0 || optionIndex >= len(options) {
 		return nil, fmt.Errorf(
 			"%w session_id=%d question_id=%d option=%d",
 			ErrQuizInvalidOption,
 			sessionID,
 			questionID,
-			optionIdx,
+			optionIndex,
 		)
 	}
-	return s.gradeQuizAnswer(
+	return service.gradeQuizAnswer(
 		ctx,
 		sessionID,
 		state,
 		item,
-		idx,
-		options[optionIdx],
+		index,
+		options[optionIndex],
 	)
 }
 
 // SubmitQuizWordOrder grades a word-order answer given as option indices in
 // the chosen order. The selection must use every option exactly once.
 // userID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
-func (s *SessionService) SubmitQuizWordOrder(
+func (service *SessionService) SubmitQuizWordOrder(
 	ctx context.Context,
 	userID int64,
 	sessionID,
 	questionID int,
 	selection []int,
 ) (*QuizAnswerResult, error) {
-	state, err := s.loadQuizForAnswer(
+	state, err := service.loadQuizForAnswer(
 		ctx,
 		userID,
 		sessionID,
@@ -100,7 +100,7 @@ func (s *SessionService) SubmitQuizWordOrder(
 	if err != nil {
 		return nil, err
 	}
-	item, idx, err := currentUnansweredQuizItem(
+	item, index, err := currentUnansweredQuizItem(
 		state,
 		questionID,
 	)
@@ -121,15 +121,15 @@ func (s *SessionService) SubmitQuizWordOrder(
 		)
 	}
 	var answer strings.Builder
-	for _, optionIdx := range selection {
-		answer.WriteString(options[optionIdx])
+	for _, optionIndex := range selection {
+		answer.WriteString(options[optionIndex])
 	}
-	return s.gradeQuizAnswer(
+	return service.gradeQuizAnswer(
 		ctx,
 		sessionID,
 		state,
 		item,
-		idx,
+		index,
 		answer.String(),
 	)
 }
@@ -137,11 +137,11 @@ func (s *SessionService) SubmitQuizWordOrder(
 // SubmitQuizText grades a typed answer to the question at answer.QuestionIndex.
 // An out-of-range index reports ErrQuizActiveSessionQuestionNotFound.
 // answer.UserID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
-func (s *SessionService) SubmitQuizText(
+func (service *SessionService) SubmitQuizText(
 	ctx context.Context,
 	answer QuizTextAnswer,
 ) (*QuizAnswerResult, error) {
-	state, err := s.loadQuizForAnswer(
+	state, err := service.loadQuizForAnswer(
 		ctx,
 		answer.UserID,
 		answer.SessionID,
@@ -157,29 +157,29 @@ func (s *SessionService) SubmitQuizText(
 			answer.QuestionIndex,
 		)
 	}
-	item, idx, err := currentUnansweredQuizItem(
+	item, index, err := currentUnansweredQuizItem(
 		state,
 		state.Items[answer.QuestionIndex].SessionQuestion.QuestionID,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return s.gradeQuizAnswer(
+	return service.gradeQuizAnswer(
 		ctx,
 		answer.SessionID,
 		state,
 		item,
-		idx,
+		index,
 		strings.TrimSpace(answer.Text),
 	)
 }
 
-func (s *SessionService) loadQuizForAnswer(
+func (service *SessionService) loadQuizForAnswer(
 	ctx context.Context,
 	userID int64,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	state, err := s.quizProgress.Get(
+	state, err := service.quizProgress.Get(
 		ctx,
 		sessionID,
 	)
@@ -209,7 +209,7 @@ func currentUnansweredQuizItem(
 	state *model.QuizActiveSessionState,
 	questionID int,
 ) (*model.QuizActiveSessionQuestion, int, error) {
-	item, idx, ok := state.CurrentItemByQuestionID(questionID)
+	item, index, ok := state.CurrentItemByQuestionID(questionID)
 	if !ok {
 		if _, exists := state.ItemByQuestionID(questionID); exists {
 			return nil, 0, fmt.Errorf(
@@ -234,7 +234,7 @@ func currentUnansweredQuizItem(
 			questionID,
 		)
 	}
-	return item, idx, nil
+	return item, index, nil
 }
 
 // isOptionPermutation reports whether selection orders all optionCount options exactly once.
@@ -249,22 +249,22 @@ func isOptionPermutation(
 		[]bool,
 		optionCount,
 	)
-	for _, optionIdx := range selection {
-		if optionIdx < 0 || optionIdx >= optionCount || seen[optionIdx] {
+	for _, optionIndex := range selection {
+		if optionIndex < 0 || optionIndex >= optionCount || seen[optionIndex] {
 			return false
 		}
-		seen[optionIdx] = true
+		seen[optionIndex] = true
 	}
 	return true
 }
 
 // gradeQuizAnswer grades and records one answer.
-func (s *SessionService) gradeQuizAnswer(
+func (service *SessionService) gradeQuizAnswer(
 	ctx context.Context,
 	sessionID int,
 	state *model.QuizActiveSessionState,
 	item *model.QuizActiveSessionQuestion,
-	idx int,
+	index int,
 	answer string,
 ) (*QuizAnswerResult, error) {
 	question := item.Question
@@ -274,7 +274,7 @@ func (s *SessionService) gradeQuizAnswer(
 
 	// Text and option answers are exact-match; only handwriting uses the LLM.
 	isCorrect := answer == question.CorrectAnswer
-	err := s.quizProgress.RecordAnswer(
+	err := service.quizProgress.RecordAnswer(
 		ctx,
 		sessionID,
 		question.ID,
@@ -303,7 +303,7 @@ func (s *SessionService) gradeQuizAnswer(
 		Question:       question,
 		Answer:         answer,
 		IsCorrect:      isCorrect,
-		QuestionIndex:  idx,
+		QuestionIndex:  index,
 		TotalQuestions: len(state.Items),
 	}, nil
 }

@@ -1,13 +1,13 @@
-const tg = window.Telegram?.WebApp;
+const telegramWebApp = window.Telegram?.WebApp;
 const canvas = document.getElementById("pad");
-const ctx = canvas.getContext("2d");
+const padContext = canvas.getContext("2d");
 const clearButton = document.getElementById("clear");
 const undoButton = document.getElementById("undo");
 const eraserButton = document.getElementById("eraser");
 const submitButton = document.getElementById("submit");
 const overview = document.getElementById("overview");
-const overviewCtx = overview.getContext("2d");
-const statusEl = document.getElementById("status");
+const overviewContext = overview.getContext("2d");
+const statusElement = document.getElementById("status");
 const gradeResult = document.getElementById("gradeResult");
 const questionPanel = document.getElementById("questionPanel");
 const questionPrompt = document.getElementById("questionPrompt");
@@ -16,7 +16,7 @@ const padScrollControl = document.getElementById("padScrollControl");
 const overviewPanel = document.getElementById("overviewPanel");
 const padScroll = document.getElementById("padScroll");
 const loadingPanel = document.getElementById("loadingPanel");
-const params = new URLSearchParams(window.location.search);
+const queryParameters = new URLSearchParams(window.location.search);
 
 // 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
 // 기존 패드 크기(224x280) 대비 세로는 약 80%, 가로는 기존 비율보다 약 5% 좁게 줄인다.
@@ -37,10 +37,10 @@ const state = {
 	erasingActive: false,
 };
 
-tg?.ready();
-tg?.expand();
-if (tg?.isVersionAtLeast?.("7.7")) {
-	tg.disableVerticalSwipes?.();
+telegramWebApp?.ready();
+telegramWebApp?.expand();
+if (telegramWebApp?.isVersionAtLeast?.("7.7")) {
+	telegramWebApp.disableVerticalSwipes?.();
 }
 configurePad();
 renderQuestionPrompt();
@@ -50,7 +50,7 @@ setupDebugExport();
 // 답안 글자 수만큼 캔버스 폭(=셀 개수, 셀당 4:5 비율)을 잡고 격자를 글자 단위로 맞춘다.
 // canvas.width/height 재설정은 2D context 상태를 초기화하므로 stroke 속성은 그 뒤에 다시 적용한다.
 function configurePad() {
-	const parsed = Number.parseInt(params.get("cells") || "1", 10);
+	const parsed = Number.parseInt(queryParameters.get("cells") || "1", 10);
 	const cells = Math.min(Math.max(Number.isFinite(parsed) ? parsed : 1, 1), PAD_MAX_CELLS);
 	const width = PAD_CELL_PX * cells;
 
@@ -60,10 +60,10 @@ function configurePad() {
 	canvas.style.height = `${PAD_HEIGHT_CSS_PX}px`;
 	canvas.style.backgroundSize = `${PAD_CELL_CSS_PX}px ${PAD_HEIGHT_CSS_PX}px`;
 
-	ctx.lineWidth = 10 * PAD_SCALE;
-	ctx.lineCap = "round";
-	ctx.lineJoin = "round";
-	ctx.strokeStyle = "#111811";
+	padContext.lineWidth = 10 * PAD_SCALE;
+	padContext.lineCap = "round";
+	padContext.lineJoin = "round";
+	padContext.strokeStyle = "#111811";
 
 	// 미니맵은 메인 캔버스와 동일 해상도로 두고, CSS(width:100%)가 컨테이너 폭에 맞춰 축소한다.
 	// background-size 를 셀 폭(%)으로 잡아 글자 단위 분할선을 표시한다.
@@ -74,7 +74,7 @@ function configurePad() {
 }
 
 function renderQuestionPrompt() {
-	const prompt = stripPromptHTML(params.get("prompt") || "").trim();
+	const prompt = stripPromptHTML(queryParameters.get("prompt") || "").trim();
 	if (!prompt) return;
 
 	questionPrompt.textContent = prompt;
@@ -84,7 +84,7 @@ function renderQuestionPrompt() {
 function stripPromptHTML(raw) {
 	const template = document.createElement("template");
 	template.innerHTML = raw;
-	template.content.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
+	template.content.querySelectorAll("br").forEach((lineBreak) => lineBreak.replaceWith("\n"));
 	return template.content.textContent || "";
 }
 
@@ -107,7 +107,7 @@ function stopLoading() {
 }
 
 function setStatus(message) {
-  statusEl.textContent = message;
+  statusElement.textContent = message;
 }
 
 function setGradeResult(message) {
@@ -131,8 +131,8 @@ function beginStroke(event) {
   state.currentStroke = { points: [] };
   const point = pointFromEvent(event);
   state.currentStroke.points.push(point);
-  ctx.beginPath();
-  ctx.moveTo(point.x, point.y);
+  padContext.beginPath();
+  padContext.moveTo(point.x, point.y);
 }
 
 function moveStroke(event) {
@@ -140,8 +140,8 @@ function moveStroke(event) {
   event.preventDefault();
   const point = pointFromEvent(event);
   state.currentStroke.points.push(point);
-  ctx.lineTo(point.x, point.y);
-  ctx.stroke();
+  padContext.lineTo(point.x, point.y);
+  padContext.stroke();
 }
 
 function endStroke(event) {
@@ -157,7 +157,7 @@ function endStroke(event) {
 
 // state.strokes 를 단일 진실 소스로 캔버스 전체를 다시 그린다. undo/지우개/clear 후 호출.
 function redrawAll() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  padContext.clearRect(0, 0, canvas.width, canvas.height);
   for (const stroke of state.strokes) {
     drawStroke(stroke);
   }
@@ -165,44 +165,44 @@ function redrawAll() {
 }
 
 function drawStroke(stroke) {
-  const pts = stroke.points;
-  if (pts.length === 0) return;
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  if (pts.length === 1) {
+  const points = stroke.points;
+  if (points.length === 0) return;
+  padContext.beginPath();
+  padContext.moveTo(points[0].x, points[0].y);
+  if (points.length === 1) {
     // 점 하나짜리 획도 둥근 점으로 보이게 0 길이 선을 긋는다(lineCap: round).
-    ctx.lineTo(pts[0].x, pts[0].y);
+    padContext.lineTo(points[0].x, points[0].y);
   } else {
-    for (let i = 1; i < pts.length; i++) {
-      ctx.lineTo(pts[i].x, pts[i].y);
+    for (let i = 1; i < points.length; i++) {
+      padContext.lineTo(points[i].x, points[i].y);
     }
   }
-  ctx.stroke();
+  padContext.stroke();
 }
 
 // 메인 캔버스(획만, 배경 투명)를 미니맵에 1:1 복사한다. 격자/배경은 미니맵 CSS가 담당.
 function renderOverview() {
-  overviewCtx.clearRect(0, 0, overview.width, overview.height);
-  overviewCtx.drawImage(canvas, 0, 0);
+  overviewContext.clearRect(0, 0, overview.width, overview.height);
+  overviewContext.drawImage(canvas, 0, 0);
 }
 
-function distToSegment(px, py, a, b) {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const len2 = dx * dx + dy * dy;
-  if (len2 === 0) return Math.hypot(px - a.x, py - a.y);
-  let t = ((px - a.x) * dx + (py - a.y) * dy) / len2;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(px - (a.x + t * dx), py - (a.y + t * dy));
+function distanceToSegment(pointX, pointY, segmentStart, segmentEnd) {
+  const deltaX = segmentEnd.x - segmentStart.x;
+  const deltaY = segmentEnd.y - segmentStart.y;
+  const squaredLength = deltaX * deltaX + deltaY * deltaY;
+  if (squaredLength === 0) return Math.hypot(pointX - segmentStart.x, pointY - segmentStart.y);
+  let projection = ((pointX - segmentStart.x) * deltaX + (pointY - segmentStart.y) * deltaY) / squaredLength;
+  projection = Math.max(0, Math.min(1, projection));
+  return Math.hypot(pointX - (segmentStart.x + projection * deltaX), pointY - (segmentStart.y + projection * deltaY));
 }
 
 function strokeHit(stroke, x, y, radius) {
-  const pts = stroke.points;
-  if (pts.length === 1) {
-    return Math.hypot(pts[0].x - x, pts[0].y - y) <= radius;
+  const points = stroke.points;
+  if (points.length === 1) {
+    return Math.hypot(points[0].x - x, points[0].y - y) <= radius;
   }
-  for (let i = 1; i < pts.length; i++) {
-    if (distToSegment(x, y, pts[i - 1], pts[i]) <= radius) return true;
+  for (let i = 1; i < points.length; i++) {
+    if (distanceToSegment(x, y, points[i - 1], points[i]) <= radius) return true;
   }
   return false;
 }
@@ -215,7 +215,7 @@ function eraseAt(event) {
     if (strokeHit(state.strokes[i], point.x, point.y, ERASER_HIT_PX)) {
       state.strokes.splice(i, 1);
       redrawAll();
-      tg?.HapticFeedback?.impactOccurred?.("light");
+      telegramWebApp?.HapticFeedback?.impactOccurred?.("light");
       return;
     }
   }
@@ -250,9 +250,9 @@ function clearPad() {
 }
 
 async function submitAnswer() {
-  const sessionID = Number(params.get("session_id"));
-  const questionID = Number(params.get("question_id"));
-  const initData = tg?.initData || "";
+  const sessionID = Number(queryParameters.get("session_id"));
+  const questionID = Number(queryParameters.get("question_id"));
+  const initData = telegramWebApp?.initData || "";
 
   if (!sessionID || !questionID) {
     setStatus("문항 정보가 없습니다. 텔레그램에서 다시 열어 주세요.");
@@ -298,7 +298,7 @@ async function submitAnswer() {
       setGradeResult(`❌ ${answerText}`);
       setStatus(payload.feedback || "");
     }
-    tg?.HapticFeedback?.notificationOccurred(payload.is_correct ? "success" : "error");
+    telegramWebApp?.HapticFeedback?.notificationOccurred(payload.is_correct ? "success" : "error");
   } catch (error) {
     setStatus(error.message);
     setToolsDisabled(false);
@@ -318,10 +318,10 @@ function setToolsDisabled(disabled) {
 // client.png(현재 canvas) + strokes.json(서버 입력과 동일한 stroke 배열)을 내보낸다.
 // 운영 UI에는 노출하지 않는다. 비교 절차는 cmd/dev/handwriting_renderer 주석 참고.
 function setupDebugExport() {
-  if (params.get("debug") !== "1") return;
+  if (queryParameters.get("debug") !== "1") return;
 
-  const bar = document.createElement("div");
-  bar.style.cssText = "display:flex;gap:8px;margin-top:8px";
+  const debugBar = document.createElement("div");
+  debugBar.style.cssText = "display:flex;gap:8px;margin-top:8px";
 
   const pngButton = document.createElement("button");
   pngButton.type = "button";
@@ -333,8 +333,8 @@ function setupDebugExport() {
   jsonButton.textContent = "debug: strokes.json";
   jsonButton.addEventListener("click", exportStrokesJSON);
 
-  bar.append(pngButton, jsonButton);
-  document.body.append(bar);
+  debugBar.append(pngButton, jsonButton);
+  document.body.append(debugBar);
 }
 
 function exportClientPNG() {
@@ -358,12 +358,12 @@ function exportStrokesJSON() {
 }
 
 function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
+  const objectURL = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = url;
+  link.href = objectURL;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  URL.revokeObjectURL(objectURL);
 }
 
 canvas.addEventListener("pointerdown", (event) => {
