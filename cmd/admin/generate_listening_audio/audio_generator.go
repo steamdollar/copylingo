@@ -12,7 +12,6 @@ import (
 // requests against provider rate limits.
 const audioGeneratePerCycle = 5
 
-// audioGeneratorRepository is the narrow question-repository contract audioGenerator needs.
 type audioGeneratorRepository interface {
 	GetListeningNeedingAudio(
 		ctx context.Context,
@@ -34,7 +33,6 @@ type audioSynthesizer interface {
 	) ([]byte, error)
 }
 
-// audioObjectStore is the object-store contract audioGenerator writes through.
 type audioObjectStore interface {
 	Exists(
 		ctx context.Context,
@@ -48,9 +46,7 @@ type audioObjectStore interface {
 	) error
 }
 
-// audioGenerator pre-generates listening audio into the object store (ADR-031).
-// It lives in this admin tool because nothing else runs it: the server never
-// calls TTS and only serves stored clips through service.AudioService (ADR-082).
+// audioGenerator lives in this admin tool because the server never calls TTS (ADR-082).
 type audioGenerator struct {
 	questions audioGeneratorRepository
 	tts       audioSynthesizer
@@ -58,8 +54,7 @@ type audioGenerator struct {
 	voiceKey  string // both configured voices identify newly generated audio
 }
 
-// newAudioGenerator wires the generator with its repo, TTS client, object store,
-// and configured voices. The second voice changes the key for future clips only.
+// newAudioGenerator: the second voice changes the key for future clips only.
 func newAudioGenerator(
 	questions audioGeneratorRepository,
 	tts audioSynthesizer,
@@ -70,10 +65,8 @@ func newAudioGenerator(
 	return &audioGenerator{questions: questions, tts: tts, store: store, voiceKey: voiceA + "-" + voiceB}
 }
 
-// TopUpAudio synthesizes audio for up to audioGeneratePerCycle listening questions
-// of the language that still lack it, across every level. Content-addressing
-// dedups identical scripts to one object; a per-question failure is logged and
-// skipped.
+// TopUpAudio fills up to audioGeneratePerCycle questions; identical scripts dedup to one object, and a
+// per-question failure is logged and skipped.
 func (generator *audioGenerator) TopUpAudio(
 	ctx context.Context,
 	language string,

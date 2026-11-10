@@ -5,7 +5,6 @@ import (
 	"log/slog"
 )
 
-// ContextHandler injects boundary attributes carried through context.Context.
 type ContextHandler struct {
 	next slog.Handler
 }

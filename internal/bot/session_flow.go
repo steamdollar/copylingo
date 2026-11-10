@@ -15,9 +15,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// quizSession is the Quiz part of service.SessionService that SessionFlow
-// drives: start/resume, per-type answer submission, completion, and the
-// working-set reads used to render and recover questions.
 type quizSession interface {
 	StartQuiz(
 		ctx context.Context,
@@ -68,7 +65,6 @@ type quizSession interface {
 	ListInProgressQuizzes(ctx context.Context) ([]model.Session, error)
 }
 
-// userReader loads (or lazily registers) the Telegram user behind an update.
 type userReader interface {
 	GetUser(
 		ctx context.Context,
@@ -77,8 +73,7 @@ type userReader interface {
 	) (*model.User, error)
 }
 
-// listeningAudio serves pre-generated listening clips (ADR-082). When it is
-// nil, listening questions go out as text only.
+// listeningAudio may be nil, then listening questions go out as text only (ADR-082).
 type listeningAudio interface {
 	GetClip(
 		ctx context.Context,
@@ -91,8 +86,6 @@ type listeningAudio interface {
 	) error
 }
 
-// quizInputStore is the transient input state SessionFlow owns: the active
-// typed-answer question and the in-quiz "ask the LLM" pending token.
 type quizInputStore interface {
 	GetActiveQuestion(
 		ctx context.Context,
@@ -114,8 +107,7 @@ type quizInputStore interface {
 	) error
 }
 
-// SessionFlowDependencies wires SessionFlow. Audio may be left nil (see listeningAudio);
-// every other dependency is required.
+// Audio may be nil (see listeningAudio), every other dependency is required.
 type SessionFlowDependencies struct {
 	Telegram           *TelegramClient
 	Session            quizSession
@@ -126,12 +118,10 @@ type SessionFlowDependencies struct {
 	Drafts             WordOrderDraftStore
 	Messages           HandwritingMessageStore
 	Recovery           MiniAppRecoveryStore
-	// Study resumes an in-progress Study session from the main menu.
-	Study         *StudyFlow
-	PublicBaseURL string
+	Study              *StudyFlow
+	PublicBaseURL      string
 }
 
-// SessionFlow handles the question-answering interaction flow.
 type SessionFlow struct {
 	telegram           *TelegramClient
 	session            quizSession
@@ -162,12 +152,10 @@ func NewSessionFlow(dependencies SessionFlowDependencies) *SessionFlow {
 	}
 }
 
-// StartStudy begins a new study session or resumes a pending one.
 func (flow *SessionFlow) StartStudy(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
 ) {
-	// get in-progess session for user, if exists, and resume
 	resumed, err := flow.getInProgressSessions(
 		ctx,
 		callbackQuery,
@@ -190,7 +178,6 @@ func (flow *SessionFlow) StartStudy(
 		return
 	}
 
-	// get pending session for user, if exists, and show start button
 	if err := flow.getPendingSessions(
 		ctx,
 		callbackQuery,
@@ -362,7 +349,6 @@ func (flow *SessionFlow) getInProgressSessions(
 	return true, nil
 }
 
-// StartReview starts an on-demand review session.
 func (flow *SessionFlow) StartReview(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -432,12 +418,10 @@ func (flow *SessionFlow) StartReview(
 	)
 }
 
-// HandleSessionCallback handles session-level callbacks (start, finish).
 func (flow *SessionFlow) HandleSessionCallback(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
 ) {
-	// e.g. session:50:start
 	parts := strings.Split(
 		callbackQuery.Data,
 		":",
@@ -474,7 +458,6 @@ func (flow *SessionFlow) HandleSessionCallback(
 	}
 }
 
-// HandleAnswerCallback handles question answer callbacks.
 func (flow *SessionFlow) HandleAnswerCallback(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -541,13 +524,12 @@ func (flow *SessionFlow) HandleAnswerCallback(
 			)
 			return
 		}
-		// 같은 손글씨 제출 결과로 다음 문제를 중복 진행하지 못하게 먼저 버튼을 제거한다.
+		// 같은 손글씨 제출 결과로 다음 문제가 중복 진행되지 않도록 먼저 버튼을 제거한다.
 		flow.telegram.ClearInlineKeyboard(
 			callbackQuery.Message.Chat.ID,
 			callbackQuery.Message.MessageID,
 		)
-		// 손글씨 문항은 Mini App HTTP로 제출되므로 원래 메시지 맥락을 남기고,
-		// 다음 문제는 새 Telegram 메시지로 렌더링한다.
+		// 손글씨는 Mini App HTTP로 제출되므로 원래 메시지를 남기고, 다음 문제는 새 메시지로 렌더링한다.
 		flow.showQuestion(
 			ctx,
 			callbackQuery.Message.Chat.ID,
@@ -594,8 +576,7 @@ func (flow *SessionFlow) HandleAnswerCallback(
 	)
 }
 
-// handleAskLLMQuestion arms one-shot LLM mode scoped to a just-answered question.
-// The next plain-text message is answered with that question's context (see handleLLMQuestion).
+// One-shot LLM mode scoped to a just-answered question. The next plain-text message is answered with its context.
 func (flow *SessionFlow) handleAskLLMQuestion(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -750,7 +731,6 @@ func (flow *SessionFlow) finishSession(
 		accuracy = float64(result.CorrectCount) / float64(result.TotalQuestions) * 100
 	}
 
-	// Build wrong answers summary
 	wrongSummary := ""
 	if len(result.WrongAnswers) > 0 {
 		wrongSummary = botMessagesByLocale[botDefaultLocale].sessionCompletionWrongAnswerHeading
@@ -818,11 +798,8 @@ func (flow *SessionFlow) PushSession(
 		label,
 	)
 
-	// 여러 row를 합쳐 줌
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		// 버튼을 가로로 배치할 row 생성
 		tgbotapi.NewInlineKeyboardRow(
-			// 버튼 1개 만들기
 			tgbotapi.NewInlineKeyboardButtonData(
 				botMessagesByLocale[botDefaultLocale].startButton,
 				fmt.Sprintf(
@@ -833,7 +810,6 @@ func (flow *SessionFlow) PushSession(
 		),
 	)
 
-	// 위해서 만든 keyboard를 send
 	return flow.telegram.SendMessageWithKeyboard(
 		chatID,
 		text,

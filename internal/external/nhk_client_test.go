@@ -10,7 +10,6 @@ import (
 )
 
 func TestNHKClient_FetchArticleList(t *testing.T) {
-	// Mock server that handles the NHK list endpoint
 	server := httptest.NewServer(http.HandlerFunc(func(
 		responseWriter http.ResponseWriter,
 		request *http.Request,
@@ -39,7 +38,6 @@ func TestNHKClient_FetchArticleList(t *testing.T) {
 		baseURL:    server.URL,
 	}
 
-	// Test JSON parsing
 	jsonData := `[{
 		"2024-03-22": [
 			{

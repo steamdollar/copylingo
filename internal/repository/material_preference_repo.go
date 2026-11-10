@@ -76,8 +76,7 @@ func (repository *MaterialPreferenceRepository) Get(
 	return &preference, nil
 }
 
-// Set changes only the user's preference; catalog and learning history stay intact.
-// Repeating the current mode must not postpone a maintenance check.
+// Set changes only the preference; repeating the current mode must not postpone a maintenance check.
 func (repository *MaterialPreferenceRepository) Set(
 	ctx context.Context,
 	userID int64,
@@ -164,11 +163,9 @@ func (repository *MaterialPreferenceRepository) List(
 	return preferences, nil
 }
 
-// A stable representative prevents multiple variants of one maintenance material
-// from entering a session through separate category, new, and due queries. Due
-// questions take precedence; ordinary questions precede optional kanji recall.
-// Admission is shared with Study so unread passages and missing audio can fall
-// back to a Study card instead of permanently blocking a maintenance check.
+// A stable representative keeps variants of one maintenance material out of a session via separate queries. Due
+// questions take precedence; ordinary questions precede optional kanji recall. Admission is shared with Study so
+// unread passages and missing audio fall back to a Study card instead of blocking a maintenance check.
 func maintenanceQuizCandidatesCTE(levelsPlaceholder string) string {
 	return fmt.Sprintf(
 		`maintenance_quiz_candidates AS (

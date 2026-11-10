@@ -9,9 +9,7 @@ import (
 	"github.com/lsj/copylingo/internal/observability"
 )
 
-// RefreshStaleMiniAppMessages is called once at server startup to check in-progress sessions.
-// If the next unanswered question is a handwriting task and the Mini App URL has changed,
-// it re-sends the question with a fresh URL.
+// Runs once at startup: re-sends a pending handwriting question when the Mini App URL changed.
 func (flow *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 	ctx = observability.WithAttributes(
 		ctx,
@@ -54,7 +52,6 @@ func (flow *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		// Skip if fingerprint unchanged
 		if last, _ := flow.recovery.GetMiniAppFingerprint(
 			ctx,
 			session.ID,
@@ -102,7 +99,6 @@ func (flow *SessionFlow) RefreshStaleMiniAppMessages(ctx context.Context) {
 			)
 		}
 
-		// (b) re-send the question with fresh URL
 		slog.InfoContext(
 			ctx,
 			"Refreshing stale handwriting link",

@@ -9,12 +9,9 @@ import (
 
 const modulePath = "github.com/lsj/copylingo"
 
-// allowedInternalImports lists, for each package under internal/, the other
-// internal packages its non-test code may import. A package missing from this
-// map, or an import missing from its list, fails the test: changing a package
-// boundary means editing this table in the same diff (ADR-059 §5, §8.4).
+// allowedInternalImports lists the internal packages each package's non-test code may import; changing a boundary
+// means editing this table in the same diff (ADR-059 §5, §8.4).
 var allowedInternalImports = map[string][]string{
-	// Leaf packages: shared types, settings and logging.
 	"model":         nil,
 	"config":        nil,
 	"callback":      nil,
@@ -63,8 +60,6 @@ var driverOwners = map[string][]string{
 	"github.com/aws/":                   {"external"},
 }
 
-// TestInternalImportBoundaries checks the non-test imports of every internal
-// package, as reported by go list, against the tables above.
 func TestInternalImportBoundaries(t *testing.T) {
 	command := exec.Command(
 		"go",

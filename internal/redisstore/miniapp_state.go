@@ -20,7 +20,6 @@ const (
 	miniAppFingerprintTTL = 24 * time.Hour
 )
 
-// SaveHandwritingMessage records which Telegram message to update after submission.
 func (interactions *Interactions) SaveHandwritingMessage(
 	ctx context.Context,
 	sessionID,

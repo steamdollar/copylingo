@@ -6,11 +6,9 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// srs: Spaced Repetition System. Only the SM-2 scheduling lives here; due
-// reviews are read straight from QuestionRepository with the session level scope.
+// Only SM-2 scheduling lives here; due reviews are read straight from QuestionRepository.
 
-// scheduleAnswer applies one answer to progress in memory. The Quiz flush
-// writes it to the DB when the session completes.
+// scheduleAnswer applies one answer in memory; the Quiz flush writes it to the DB on completion.
 func scheduleAnswer(
 	progress *model.UserQuestionProgress,
 	isCorrect bool,
@@ -25,7 +23,6 @@ func scheduleAnswer(
 	)
 }
 
-// updateSchedule applies the SM-2 algorithm to update the user's Question progress.
 func updateSchedule(
 	progress *model.UserQuestionProgress,
 	quality int,
@@ -50,7 +47,6 @@ func updateSchedule(
 		progress.IntervalDays = 1
 	}
 
-	// Update ease factor
 	easeFactor := progress.EaseFactor + (0.1 - float64(5-quality)*(0.08+float64(5-quality)*0.02))
 	if easeFactor < 1.3 {
 		easeFactor = 1.3

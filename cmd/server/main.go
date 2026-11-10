@@ -22,7 +22,6 @@ func main() {
 }
 
 func run() error {
-	// load config
 	appConfig, err := config.Load()
 	if err != nil {
 		return fmt.Errorf(
@@ -31,7 +30,6 @@ func run() error {
 		)
 	}
 
-	// set logger
 	logger, closeLogger, err := observability.NewLogger(observability.LoggerOptions{
 		Directory:     appConfig.Logging.Directory,
 		Level:         appConfig.Logging.Level,
@@ -47,7 +45,6 @@ func run() error {
 	defer closeLogger()
 	slog.SetDefault(logger)
 
-	// init app
 	app, err := initializeApp(appConfig)
 	if err != nil {
 		return fmt.Errorf(
@@ -57,7 +54,6 @@ func run() error {
 	}
 	defer app.Close()
 
-	// stop
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGINT,

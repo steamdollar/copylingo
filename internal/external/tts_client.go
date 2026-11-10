@@ -14,24 +14,20 @@ import (
 	"time"
 )
 
-// Gemini native TTS returns raw PCM (ADR-031): signed 16-bit little-endian,
-// 24kHz, mono. These parameters drive the ffmpeg transcode below.
+// Gemini native TTS returns raw PCM (ADR-031): signed 16-bit little-endian, 24kHz, mono; these drive the transcode.
 const (
 	ttsPCMSampleRate = 24000
 	ttsPCMChannels   = 1
 	ttsHTTPTimeout   = 60 * time.Second
 )
 
-// transcoder converts raw PCM into OGG/Opus. It is a field on the client so tests
-// can substitute a fake and avoid the external ffmpeg dependency.
+// transcoder is a field so tests can fake it and skip the ffmpeg dependency.
 type transcoder func(
 	ctx context.Context,
 	pcmAudio []byte,
 ) ([]byte, error)
 
-// GeminiTTSClient calls the Gemini native generateContent AUDIO modality. The
-// OpenAI-compatible layer used by the chat LLM does not expose TTS (ADR-031), so
-// this is a separate hand-rolled call — the API key is reused, the client is not.
+// GeminiTTSClient calls Gemini's native generateContent AUDIO modality; the OpenAI-compat layer has no TTS (ADR-031).
 type GeminiTTSClient struct {
 	httpClient *http.Client
 	apiKey     string
@@ -42,9 +38,8 @@ type GeminiTTSClient struct {
 	transcode  transcoder
 }
 
-// TTSOptions are the settings NewTTSClient needs. APIKey and BaseURL are the
-// LLM's (OpenAI-compat) values; Voice is used for single-speaker audio and
-// speaker A of dialogues, VoiceB for speaker B.
+// APIKey and BaseURL are the LLM's (OpenAI-compat) values; Voice is single-speaker and speaker A of conversations,
+// VoiceB is speaker B.
 type TTSOptions struct {
 	APIKey  string
 	BaseURL string
@@ -53,9 +48,7 @@ type TTSOptions struct {
 	VoiceB  string
 }
 
-// NewTTSClient builds a Gemini native TTS client. It reuses the LLM API key and
-// derives the native base URL from the LLM (OpenAI-compat) base URL so a single
-// endpoint swap moves both.
+// NewTTSClient reuses the LLM API key and derives the native base URL from the LLM one, so one swap moves both.
 func NewTTSClient(options TTSOptions) *GeminiTTSClient {
 	return &GeminiTTSClient{
 		httpClient: &http.Client{Timeout: ttsHTTPTimeout},
@@ -68,8 +61,7 @@ func NewTTSClient(options TTSOptions) *GeminiTTSClient {
 	}
 }
 
-// geminiNativeBaseURL turns the OpenAI-compat base URL
-// (…/v1beta/openai/) into the native base (…/v1beta) that generateContent needs.
+// geminiNativeBaseURL turns the OpenAI-compat base (…/v1beta/openai/) into the native one (…/v1beta).
 func geminiNativeBaseURL(compatibleBaseURL string) string {
 	baseURL := strings.TrimRight(
 		strings.TrimSpace(compatibleBaseURL),
@@ -85,7 +77,6 @@ func geminiNativeBaseURL(compatibleBaseURL string) string {
 	return baseURL
 }
 
-// Synthesize generates audio for text: native TTS -> raw PCM -> OGG/Opus.
 func (client *GeminiTTSClient) Synthesize(
 	ctx context.Context,
 	text string,
@@ -117,8 +108,6 @@ func (client *GeminiTTSClient) Synthesize(
 	}
 	return ogg, nil
 }
-
-// --- Gemini native generateContent (AUDIO modality) ---
 
 type ttsRequest struct {
 	Contents         []ttsContent        `json:"contents"`
@@ -174,7 +163,6 @@ type ttsResponse struct {
 	} `json:"candidates"`
 }
 
-// generatePCM performs the native generateContent call and returns decoded raw PCM.
 func (client *GeminiTTSClient) generatePCM(
 	ctx context.Context,
 	text string,
@@ -343,7 +331,6 @@ func dialogueTurns(script string) []string {
 	return turns
 }
 
-// extractTTSAudioData pulls the first inline audio payload out of the response.
 func extractTTSAudioData(response ttsResponse) string {
 	for _, candidate := range response.Candidates {
 		for _, part := range candidate.Content.Parts {
@@ -355,9 +342,7 @@ func extractTTSAudioData(response ttsResponse) string {
 	return ""
 }
 
-// ffmpegPCMToOGG converts raw signed-16-bit/24kHz/mono PCM into OGG/Opus, the
-// container/codec Telegram sendVoice accepts. ffmpeg is an external binary
-// dependency (ADR-031: no mature pure-Go Opus encoder).
+// ffmpegPCMToOGG transcodes PCM to OGG/Opus, which sendVoice accepts; no mature pure-Go Opus encoder (ADR-031).
 func ffmpegPCMToOGG(
 	ctx context.Context,
 	pcmAudio []byte,

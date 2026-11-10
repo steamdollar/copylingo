@@ -9,15 +9,10 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-// TelegramClient owns every call to the Telegram Bot API: update polling,
-// outbound messages/edits/voice, callback answers, and chat actions. Flows
-// depend on it directly instead of reaching the API through *Bot.
 type TelegramClient struct {
 	api BotAPI
 }
 
-// NewTelegramClient authorizes the bot token against the Telegram Bot API.
-// cmd/server creates one client and shares it with every flow and the router.
 func NewTelegramClient(
 	token string,
 	debug bool,
@@ -42,21 +37,17 @@ func newTelegramClient(api BotAPI) *TelegramClient {
 	return &TelegramClient{api: api}
 }
 
-// Updates starts long polling and returns the update channel.
 func (client *TelegramClient) Updates(pollConfig tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {
 	return client.api.GetUpdatesChan(pollConfig)
 }
 
-// StopUpdates stops long polling started by Updates.
 func (client *TelegramClient) StopUpdates() {
 	client.api.StopReceivingUpdates()
 }
 
-// send and request are the only paths to the Bot API. A failed call is logged
-// here because most flows fire and forget outbound messages; without this a
-// rejected send (e.g. 429 dropping a "next question" keyboard) leaves no trace.
-// The methods take no context, so entries carry the target instead of
-// interaction_id; correlate them with the update log by time and chat_id.
+// send and request are the only Bot API paths. Failures are logged here because flows fire and forget
+// (e.g. a 429 drops a keyboard).
+// Methods take no context, so entries carry chat_id instead of interaction_id.
 func (client *TelegramClient) send(
 	method string,
 	target slog.Attr,
@@ -89,8 +80,7 @@ func (client *TelegramClient) request(
 	return err
 }
 
-// logTelegramAPIFailure adds Telegram's error_code and retry_after when the
-// API rejected the call, so rate limits are distinguishable from network errors.
+// Adds error_code and retry_after so rate limits are distinguishable from network errors.
 func logTelegramAPIFailure(
 	method string,
 	target slog.Attr,
@@ -137,7 +127,6 @@ func chatTarget(chatID int64) slog.Attr {
 }
 
 // TODO: sendMessage, SendMessageWithKeyboard 굳이 따로 두는 이유가?
-// SendMessage sends a text message to a chat.
 func (client *TelegramClient) SendMessage(
 	chatID int64,
 	text string,
@@ -155,7 +144,6 @@ func (client *TelegramClient) SendMessage(
 	return err
 }
 
-// SendMessageWithKeyboard sends a message with an inline keyboard.
 func (client *TelegramClient) SendMessageWithKeyboard(
 	chatID int64,
 	text string,
@@ -177,7 +165,6 @@ func (client *TelegramClient) SendMessageWithKeyboard(
 	return err
 }
 
-// SendMessageWithReplyMarkup sends a message with custom Telegram reply markup.
 func (client *TelegramClient) SendMessageWithReplyMarkup(
 	chatID int64,
 	text string,
@@ -200,7 +187,6 @@ func (client *TelegramClient) SendMessageWithReplyMarkup(
 	return sent.MessageID, nil
 }
 
-// SendVoiceFileID sends a voice message by reusing a cached Telegram file_id.
 func (client *TelegramClient) SendVoiceFileID(
 	chatID int64,
 	fileID string,
@@ -217,8 +203,7 @@ func (client *TelegramClient) SendVoiceFileID(
 	return err
 }
 
-// SendVoiceBytes uploads raw OGG/Opus bytes as a voice message and returns the
-// Telegram file_id assigned to it, so callers can cache it for later re-sends.
+// Returns the Telegram file_id so callers can cache it for re-sends.
 func (client *TelegramClient) SendVoiceBytes(
 	chatID int64,
 	data []byte,
@@ -241,7 +226,6 @@ func (client *TelegramClient) SendVoiceBytes(
 	return "", nil
 }
 
-// EditMessageReplyMarkup updates the inline keyboard of an existing message.
 func (client *TelegramClient) EditMessageReplyMarkup(
 	chatID int64,
 	messageID int,
@@ -260,7 +244,6 @@ func (client *TelegramClient) EditMessageReplyMarkup(
 	return err
 }
 
-// DeleteMessage removes a bot message, e.g. a dismissed settings menu.
 func (client *TelegramClient) DeleteMessage(
 	chatID int64,
 	messageID int,
@@ -275,7 +258,6 @@ func (client *TelegramClient) DeleteMessage(
 	)
 }
 
-// EditMessage edits an existing message.
 func (client *TelegramClient) EditMessage(
 	chatID int64,
 	messageID int,
@@ -299,7 +281,6 @@ func (client *TelegramClient) EditMessage(
 	return err
 }
 
-// ClearInlineKeyboard removes inline buttons from an existing bot message.
 func (client *TelegramClient) ClearInlineKeyboard(
 	chatID int64,
 	messageID int,
@@ -318,7 +299,6 @@ func (client *TelegramClient) ClearInlineKeyboard(
 	return err
 }
 
-// AnswerCallback acknowledges a callback query with an optional toast text.
 func (client *TelegramClient) AnswerCallback(
 	callbackID string,
 	text string,
@@ -336,7 +316,6 @@ func (client *TelegramClient) AnswerCallback(
 	)
 }
 
-// AnswerCallbackAlert acknowledges a callback query with a modal alert.
 func (client *TelegramClient) AnswerCallbackAlert(
 	callbackID string,
 	text string,
@@ -354,7 +333,6 @@ func (client *TelegramClient) AnswerCallbackAlert(
 	)
 }
 
-// SendChatAction shows a transient status such as "typing" in the chat.
 func (client *TelegramClient) SendChatAction(
 	chatID int64,
 	action string,

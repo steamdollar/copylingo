@@ -12,7 +12,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// storeQuizState seeds a single-item active session in the typed test store.
 func storeQuizState(
 	t *testing.T,
 	stateStores *testInteractionStores,
@@ -48,7 +47,6 @@ func storeStudyState(
 	)
 }
 
-// keyboardHasCallback reports whether any inline button in a sent message carries the callback data.
 func keyboardHasCallback(
 	chattable tgbotapi.Chattable,
 	data string,

@@ -111,7 +111,6 @@ func insertSession(
 	return sessionID, nil
 }
 
-// CreateSessionMaterialsInTx inserts ordered material links on the caller's transaction.
 func (repository *SessionRepository) CreateSessionMaterialsInTx(
 	ctx context.Context,
 	tx *sqlx.Tx,
@@ -154,9 +153,7 @@ func (repository *SessionRepository) CreateSessionMaterialsInTx(
 	return nil
 }
 
-// GetOldestUnfinished returns the highest-priority unfinished session for a user.
-// In-progress sessions take precedence over pending sessions; within a status,
-// the oldest created session is returned. A missing session is not an error.
+// GetOldestUnfinished prefers in-progress over pending, then the oldest; a missing session is not an error.
 func (repository *SessionRepository) GetOldestUnfinished(
 	ctx context.Context,
 	userID int64,
@@ -183,7 +180,6 @@ func (repository *SessionRepository) GetOldestUnfinished(
 	return session, nil
 }
 
-// CountUnfinishedBatch returns the number of pending/in-progress sessions for multiple users in a single query.
 func (repository *SessionRepository) CountUnfinishedBatch(
 	ctx context.Context,
 	userIDs []int64,
@@ -263,7 +259,6 @@ func (repository *SessionRepository) GetSessionsByStatus(
 	return sessions, nil
 }
 
-// ListInProgress returns all in-progress sessions for all users.
 func (repository *SessionRepository) ListInProgress(ctx context.Context) ([]model.Session, error) {
 	var sessions []model.Session
 	if err := repository.db.SelectContext(
@@ -283,7 +278,6 @@ func (repository *SessionRepository) ListInProgress(ctx context.Context) ([]mode
 	return sessions, nil
 }
 
-// Start marks a session as in_progress.
 func (repository *SessionRepository) Start(
 	ctx context.Context,
 	id int,

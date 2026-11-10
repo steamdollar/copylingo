@@ -19,7 +19,6 @@ type Config struct {
 
 type ServerConfig struct {
 	Port          int    `mapstructure:"port"`
-	Mode          string `mapstructure:"mode"`            // debug, release
 	PublicBaseURL string `mapstructure:"public_base_url"` // HTTPS URL used by Telegram Mini Apps
 }
 
@@ -58,24 +57,21 @@ type TelegramConfig struct {
 // Chat uses the OpenAI-compatible endpoint; TTS uses Gemini's native endpoint.
 type LLMConfig struct {
 	APIKey        string `mapstructure:"api_key"`
-	Model         string `mapstructure:"model"`            // Chat model.
-	BaseURL       string `mapstructure:"base_url"`         // OpenAI-compatible endpoint.
-	TTSModel      string `mapstructure:"tts_model"`        // Gemini native TTS model (ADR-031).
+	Model         string `mapstructure:"model"`
+	BaseURL       string `mapstructure:"base_url"`
+	TTSModel      string `mapstructure:"tts_model"`
 	TTSVoiceName  string `mapstructure:"tts_voice_name"`   // Voice A; also used for single-speaker audio.
 	TTSVoiceNameB string `mapstructure:"tts_voice_name_b"` // Voice B for dialogue audio.
 }
 
-// StorageConfig configures the S3-compatible object store that holds TTS audio
-// (ADR-032). "S3" here is the API standard, not the AWS vendor: only Endpoint
-// changes between local MinIO and prod AWS S3. Endpoint empty => default AWS
-// endpoint for Region.
+// StorageConfig is the S3-compatible store for TTS audio; only Endpoint differs between MinIO and AWS.
 type StorageConfig struct {
-	Endpoint     string `mapstructure:"endpoint"`       // e.g. http://localhost:9000 (MinIO); empty for AWS S3.
-	Region       string `mapstructure:"region"`         // e.g. ap-northeast-2 (Seoul).
-	Bucket       string `mapstructure:"bucket"`         // e.g. copylingo-audio.
-	AccessKey    string `mapstructure:"access_key"`     // static credentials; env-injected in prod.
-	SecretKey    string `mapstructure:"secret_key"`     // static credentials; env-injected in prod.
-	UsePathStyle bool   `mapstructure:"use_path_style"` // true for MinIO (path-style addressing); false for AWS S3 virtual-hosted style.
+	Endpoint     string `mapstructure:"endpoint"` // e.g. http://localhost:9000 (MinIO); empty for AWS S3.
+	Region       string `mapstructure:"region"`
+	Bucket       string `mapstructure:"bucket"`
+	AccessKey    string `mapstructure:"access_key"`
+	SecretKey    string `mapstructure:"secret_key"`
+	UsePathStyle bool   `mapstructure:"use_path_style"` // true for MinIO; false for AWS virtual-hosted style.
 }
 
 type LoggingConfig struct {
@@ -85,13 +81,8 @@ type LoggingConfig struct {
 	Timezone      string `mapstructure:"timezone"`
 }
 
+// validate checks value formats only; checkRequired already rejected empty required keys.
 func (config *Config) validate() error {
-	if config.Telegram.Token == "" {
-		return fmt.Errorf("telegram.token is required")
-	}
-	if config.LLM.APIKey == "" {
-		return fmt.Errorf("llm.api_key is required")
-	}
 	if strings.TrimSpace(config.Logging.Directory) == "" {
 		return fmt.Errorf("logging.dir is required")
 	}

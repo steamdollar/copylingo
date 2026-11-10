@@ -9,16 +9,11 @@ import (
 )
 
 var (
-	// ErrStudyFinalMarkFailed means the last material could not be marked
-	// studied, so the Study session was not completed.
 	ErrStudyFinalMarkFailed = errors.New("study final material mark failed")
-	// ErrStudyCompleteFailed means every material was marked studied but the
-	// session could not be completed.
-	ErrStudyCompleteFailed = errors.New("study session complete failed")
+	ErrStudyCompleteFailed  = errors.New("study session complete failed")
 )
 
-// BuildStudy creates a Study session from the profile's plan; a positive
-// limit scales the morning plan. nil means no materials were available.
+// A positive limit scales the morning plan; nil means no materials were available.
 func (service *SessionService) BuildStudy(
 	ctx context.Context,
 	user model.User,
@@ -35,8 +30,7 @@ func (service *SessionService) BuildStudy(
 	)
 }
 
-// StartStudy marks the Study in_progress (when pending) and returns its
-// working set, resuming Redis progress when present.
+// StartStudy resumes Redis progress when present.
 func (service *SessionService) StartStudy(
 	ctx context.Context,
 	sessionID int,
@@ -49,7 +43,6 @@ func (service *SessionService) StartStudy(
 	)
 }
 
-// MarkStudied records a material as studied in the Redis working set.
 func (service *SessionService) MarkStudied(
 	ctx context.Context,
 	sessionID int,
@@ -64,9 +57,7 @@ func (service *SessionService) MarkStudied(
 	)
 }
 
-// FinishStudy marks the last shown material studied and completes the
-// session. The returned error says which step failed so the caller can tell
-// "progress not saved" from "completion not saved".
+// FinishStudy's error says which step failed: "progress not saved" vs "completion not saved".
 func (service *SessionService) FinishStudy(
 	ctx context.Context,
 	sessionID int,
@@ -101,7 +92,6 @@ func (service *SessionService) FinishStudy(
 	return nil
 }
 
-// CompleteStudy flushes a fully studied working set to DB and deletes it.
 // Study completion does not update the streak (Quiz completion does).
 func (service *SessionService) CompleteStudy(
 	ctx context.Context,
@@ -115,7 +105,7 @@ func (service *SessionService) CompleteStudy(
 	)
 }
 
-// StudyProgress returns the caller-owned Study working set, recovering it from DB when Redis has none.
+// StudyProgress recovers the working set from DB when Redis has none.
 func (service *SessionService) StudyProgress(
 	ctx context.Context,
 	sessionID int,

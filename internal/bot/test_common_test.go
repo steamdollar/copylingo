@@ -15,11 +15,9 @@ import (
 
 type mockBotAPI struct {
 	sentMessages []tgbotapi.Chattable
-	// requests records Request calls (callback answers, deletes, edits that return bool).
-	requests []tgbotapi.Chattable
-	sendErr  error
-	// returnVoiceFileID, when set, is echoed back as the file_id of a sent voice
-	// message so file_id-caching paths can be exercised.
+	requests     []tgbotapi.Chattable
+	sendErr      error
+	// returnVoiceFileID is echoed back as a sent voice message's file_id to exercise file_id caching.
 	returnVoiceFileID string
 }
 
@@ -123,9 +121,7 @@ func cloneTestState[T any](state *T) (*T, error) {
 	return &clone, nil
 }
 
-// missingQuizSessionRepository is a DB without sessions: reloading a Quiz working
-// set fails like the real repository does for an unknown session. Any other
-// call panics on the nil embedded interface.
+// A DB without sessions: reloading a Quiz working set fails like the real repository. Any other call panics.
 type missingQuizSessionRepository struct {
 	service.QuizActiveSessionRepository
 }
@@ -137,10 +133,7 @@ func (missingQuizSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	return nil, sql.ErrNoRows
 }
 
-// newTestSessionService wires SessionService over test fakes. When stores is
-// non-nil, its Quiz/Study working-set stores back the service. An unset Quiz
-// repo is a DB without sessions; other deps left unset stay nil so an
-// unexpected call fails loudly.
+// Unset deps stay nil so an unexpected call fails loudly.
 func newTestSessionService(
 	stores *testInteractionStores,
 	dependencies service.SessionDependencies,
@@ -154,8 +147,6 @@ func newTestSessionService(
 	return service.NewSessionService(dependencies)
 }
 
-// answerByText drives the typed-answer path: it arms the active question for
-// chatID and delivers text from the given user through HandleTextInput.
 func answerByText(
 	t *testing.T,
 	sessionFlow *SessionFlow,
@@ -176,9 +167,7 @@ func answerByText(
 	}
 }
 
-// newTestSessionFlow wires SessionFlow over the shared test fakes: Telegram
-// from api, and each store field deps leaves nil from stores. Service deps
-// left unset stay nil so an unexpected call fails loudly.
+// Unset service deps stay nil so an unexpected call fails loudly.
 func newTestSessionFlow(
 	api *mockBotAPI,
 	stores *testInteractionStores,
@@ -204,7 +193,6 @@ func newTestSessionFlow(
 	return NewSessionFlow(dependencies)
 }
 
-// newTestStudyFlow wires StudyFlow the same way as newTestSessionFlow.
 func newTestStudyFlow(
 	api *mockBotAPI,
 	stores *testInteractionStores,
@@ -219,8 +207,6 @@ func newTestStudyFlow(
 	return NewStudyFlow(dependencies)
 }
 
-// newTestSettingsFlow wires SettingsFlow with Telegram from api. It has no
-// store dependency, so service deps are the only other fields.
 func newTestSettingsFlow(
 	api *mockBotAPI,
 	dependencies SettingsFlowDependencies,
@@ -231,7 +217,6 @@ func newTestSettingsFlow(
 	return NewSettingsFlow(dependencies)
 }
 
-// newTestLLMQuestionFlow wires LLMQuestionFlow the same way as newTestSessionFlow.
 func newTestLLMQuestionFlow(
 	api *mockBotAPI,
 	stores *testInteractionStores,
@@ -246,8 +231,6 @@ func newTestLLMQuestionFlow(
 	return NewLLMQuestionFlow(dependencies)
 }
 
-// testServices are the services newTestBot wires into the flows, mirroring
-// cmd/server's services struct. Unset fields stay nil.
 type testServices struct {
 	Session            *service.SessionService
 	User               *service.UserService
@@ -257,10 +240,7 @@ type testServices struct {
 	Audio              *service.AudioService
 }
 
-// newTestBot assembles the router with every flow wired the way cmd/server
-// does, for tests that dispatch updates through handleMessage/handleCallback.
-// A nil services means no service dependency is wired; a nil stores leaves
-// every store unset.
+// A nil services wires no service dependency, a nil stores leaves every store unset.
 func newTestBot(
 	api *mockBotAPI,
 	stores *testInteractionStores,

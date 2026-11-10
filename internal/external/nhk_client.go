@@ -17,7 +17,6 @@ const (
 	defaultTimeout = 30 * time.Second
 )
 
-// NHKArticleMeta represents metadata for a single article from news-list.json.
 type NHKArticleMeta struct {
 	NewsID          string `json:"news_id"`
 	Title           string `json:"title"`
@@ -28,23 +27,19 @@ type NHKArticleMeta struct {
 	NewsWebImageURI string `json:"news_web_image_uri"`
 }
 
-// NHKClient handles HTTP communication with NHK News Easy API.
 type NHKClient struct {
 	httpClient *http.Client
 	baseURL    string
 }
 
-// NHKClientOption configures NHKClient.
 type NHKClientOption func(*NHKClient)
 
-// WithHTTPClient sets a custom HTTP client.
 func WithHTTPClient(client *http.Client) NHKClientOption {
 	return func(nhkClient *NHKClient) {
 		nhkClient.httpClient = client
 	}
 }
 
-// NewNHKClient creates a new NHK News Easy API client.
 func NewNHKClient(options ...NHKClientOption) *NHKClient {
 	client := &NHKClient{
 		httpClient: &http.Client{Timeout: defaultTimeout},
@@ -56,8 +51,7 @@ func NewNHKClient(options ...NHKClientOption) *NHKClient {
 	return client
 }
 
-// FetchArticleList fetches the news list JSON.
-// Returns a map where keys are dates (YYYY-MM-DD) and values are article lists.
+// FetchArticleList returns article lists keyed by date (YYYY-MM-DD).
 func (client *NHKClient) FetchArticleList(ctx context.Context) (map[string][]NHKArticleMeta, error) {
 	request, err := http.NewRequestWithContext(
 		ctx,
@@ -115,7 +109,6 @@ func (client *NHKClient) FetchArticleList(ctx context.Context) (map[string][]NHK
 	return wrapper[0], nil
 }
 
-// FetchArticleBody fetches and extracts the article body from HTML.
 func (client *NHKClient) FetchArticleBody(
 	ctx context.Context,
 	newsID string,
@@ -167,10 +160,8 @@ func (client *NHKClient) FetchArticleBody(
 	return extractArticleBody(string(body)), nil
 }
 
-// extractArticleBody extracts the main article text from NHK Easy HTML.
-// Uses regex to find content within <div id="js-article-body"> tags.
+// extractArticleBody pulls the text from <div id="js-article-body">.
 func extractArticleBody(html string) string {
-	// Pattern to match article body div
 	pattern := regexp.MustCompile(`(?s)<div[^>]*id="js-article-body"[^>]*>(.*?)</div>`)
 	matches := pattern.FindStringSubmatch(html)
 	if len(matches) < 2 {
@@ -179,22 +170,19 @@ func extractArticleBody(html string) string {
 
 	content := matches[1]
 
-	// Remove ruby annotations but keep the base text
-	// <ruby>漢字<rt>かんじ</rt></ruby> -> 漢字
+	// Strip ruby annotations, keeping the base text: <ruby>漢字<rt>かんじ</rt></ruby> -> 漢字
 	rubyPattern := regexp.MustCompile(`<ruby>([^<]*)<rt>[^<]*</rt></ruby>`)
 	content = rubyPattern.ReplaceAllString(
 		content,
 		"$1",
 	)
 
-	// Remove remaining HTML tags
 	tagPattern := regexp.MustCompile(`<[^>]+>`)
 	content = tagPattern.ReplaceAllString(
 		content,
 		"",
 	)
 
-	// Clean up whitespace
 	content = strings.TrimSpace(content)
 	content = regexp.MustCompile(`\s+`).ReplaceAllString(
 		content,

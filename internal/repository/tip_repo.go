@@ -17,8 +17,7 @@ func NewTipRepository(db *sqlx.DB) *TipRepository {
 	return &TipRepository{db: db}
 }
 
-// CreateCandidate stores a raw LLM question/answer pair. The tips feature was
-// retired (ADR-075); the table keeps the learner Q&A history.
+// CreateCandidate stores a raw LLM Q&A pair; the table keeps learner history though tips were retired (ADR-075).
 func (repository *TipRepository) CreateCandidate(
 	ctx context.Context,
 	candidate *model.TipCandidate,

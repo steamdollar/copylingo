@@ -54,7 +54,6 @@ func (repository *ContentRepository) GetByID(
 	return content, err
 }
 
-// ExistsByURL checks if content with the given URL already exists.
 func (repository *ContentRepository) ExistsByURL(
 	ctx context.Context,
 	url string,

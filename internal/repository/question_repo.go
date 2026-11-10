@@ -25,7 +25,6 @@ func NewQuestionRepository(db *sqlx.DB) *QuestionRepository {
 	return &QuestionRepository{db: db}
 }
 
-// UpsertSeedBatch inserts or refreshes seed-owned questions identified by stable question_key.
 func (repository *QuestionRepository) UpsertSeedBatch(
 	ctx context.Context,
 	questions []*model.Question,
@@ -71,11 +70,8 @@ func (repository *QuestionRepository) UpsertSeedBatch(
 // postgresMaxBindParameters is PostgreSQL's per-statement bind parameter limit.
 const postgresMaxBindParameters = 65535
 
-// questionBatchColumnCount is the number of bind parameters per question row.
 const questionBatchColumnCount = 15
 
-// questionUpsertBatches splits questions so each multi-row upsert binds at
-// most postgresMaxBindParameters parameters.
 func questionUpsertBatches(questions []*model.Question) [][]*model.Question {
 	const rowsPerStatement = postgresMaxBindParameters / questionBatchColumnCount
 	batches := make(
@@ -95,7 +91,6 @@ func questionUpsertBatches(questions []*model.Question) [][]*model.Question {
 	return batches
 }
 
-// GetNewQuestions returns catalog questions without progress for the user.
 func (repository *QuestionRepository) GetNewQuestions(
 	ctx context.Context,
 	userID int64,
@@ -203,11 +198,8 @@ var newQuestionsForStudiedMaterialsQuery = fmt.Sprintf(
 	questionCatalogColumns,
 )
 
-// GetListeningNeedingAudio returns a language's listening questions, at every
-// level, that have a script but no generated audio yet, oldest first, so the
-// pre-generation tool can fill them in bounded batches (ADR-031, ADR-082).
-// audio_file_id is ignored here — the gate is audio_path (the object-store SSOT
-// pointer).
+// GetListeningNeedingAudio returns a language's listening questions that have a script but no audio_path, oldest
+// first, in bounded batches. audio_file_id is ignored: audio_path is the object-store SSOT pointer (ADR-031, ADR-082).
 func (repository *QuestionRepository) GetListeningNeedingAudio(
 	ctx context.Context,
 	language string,
@@ -235,9 +227,7 @@ func (repository *QuestionRepository) GetListeningNeedingAudio(
 	return questions, err
 }
 
-// SetAudioPath stores the object-store key produced for a question's audio. A
-// new key means a new clip, so it also clears the Telegram file_id cached for
-// the previous clip; otherwise the bot would keep re-sending the old voice.
+// SetAudioPath stores the new object key and clears the cached Telegram file_id, else the bot re-sends the old voice.
 func (repository *QuestionRepository) SetAudioPath(
 	ctx context.Context,
 	id int,
@@ -252,8 +242,7 @@ func (repository *QuestionRepository) SetAudioPath(
 	return err
 }
 
-// SetAudioFileID caches the Telegram file_id returned after the first upload so
-// later sends can reuse it (ADR-032). The object store remains the SSOT.
+// SetAudioFileID caches the Telegram file_id from the first upload for reuse (ADR-032).
 func (repository *QuestionRepository) SetAudioFileID(
 	ctx context.Context,
 	id int,
@@ -268,7 +257,6 @@ func (repository *QuestionRepository) SetAudioFileID(
 	return err
 }
 
-// GetDueReviews returns questions due for SRS review.
 func (repository *QuestionRepository) GetDueReviews(
 	ctx context.Context,
 	userID int64,
@@ -354,7 +342,6 @@ var dueReviewsForStudiedMaterialsQuery = fmt.Sprintf(
 	questionCatalogColumns,
 )
 
-// GetDueReviewCount returns the number of questions due for review.
 func (repository *QuestionRepository) GetDueReviewCount(
 	ctx context.Context,
 	userID int64,

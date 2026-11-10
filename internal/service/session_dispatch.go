@@ -7,9 +7,7 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// BuildForSlot creates the session a scheduled push slot calls for: Study
-// slots use the fixed morning/evening study plan and Quiz slots the
-// morning/evening question mix. nil means no content was available.
+// BuildForSlot: Study slots use the fixed morning/evening plan, Quiz slots the question mix; nil means no content.
 func (service *SessionService) BuildForSlot(
 	ctx context.Context,
 	user model.User,

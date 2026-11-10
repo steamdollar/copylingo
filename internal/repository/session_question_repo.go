@@ -9,7 +9,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// SessionQuestionRepository manages the session_questions join table.
 type SessionQuestionRepository struct {
 	db *sqlx.DB
 }
@@ -18,7 +17,6 @@ func NewSessionQuestionRepository(db *sqlx.DB) *SessionQuestionRepository {
 	return &SessionQuestionRepository{db: db}
 }
 
-// CreateSessionQuestions inserts multiple session question entries.
 func (repository *SessionQuestionRepository) CreateSessionQuestions(
 	ctx context.Context,
 	sessionQuestions []model.SessionQuestion,
@@ -45,7 +43,6 @@ func (repository *SessionQuestionRepository) CreateSessionQuestions(
 	return nil
 }
 
-// GetCategoryAccuracy returns accuracy rate per category for answered questions.
 func (repository *SessionQuestionRepository) GetCategoryAccuracy(
 	ctx context.Context,
 	userID int64,
@@ -85,7 +82,6 @@ func (repository *SessionQuestionRepository) GetCategoryAccuracy(
 	return result, nil
 }
 
-// GetTodayStats returns today's answer stats.
 func (repository *SessionQuestionRepository) GetTodayStats(
 	ctx context.Context,
 	userID int64,

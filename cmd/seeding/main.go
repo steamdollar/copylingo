@@ -1,7 +1,4 @@
-// Command seeding upserts a language's seed records into the database
-// (ADR-065, ADR-066, ADR-067). Every level is authored as records in
-// cmd/seeding/data/<language>/<level>.json, so seeding is one copy path
-// regardless of question type.
+// Command seeding upserts a language's seed records from cmd/seeding/data/<language>/<level>.json.
 //
 // Usage: go run ./cmd/seeding <language>
 package main
@@ -27,14 +24,11 @@ import (
 	"github.com/lsj/copylingo/internal/repository"
 )
 
-// The build fails unless data/<language>/<level>.json files exist, so data/
-// holds only language directories and every embedded path below is readable.
+// The build fails unless data/<language>/<level>.json exist; data/ holds only language directories.
 //
 //go:embed data/*/*.json
 var seedDataFS embed.FS
 
-// levelData is one decoded level file (data/<language>/<level>.json): the
-// level's materials with their nested questions, plus material-less questions.
 type levelData struct {
 	Materials []materialRecord `json:"materials"`
 	Questions []model.Question `json:"questions"`
@@ -72,9 +66,7 @@ func main() {
 	}
 }
 
-// setup turns the command line and environment into a validated language and
-// an open database. A bad argument prints usage and exits 2 before any config
-// or database work; config and connection failures are fatal.
+// setup exits 2 on a bad argument before any config or database work.
 func setup() (string, *sqlx.DB) {
 	entries, _ := fs.ReadDir(
 		seedDataFS,
@@ -125,8 +117,7 @@ func setup() (string, *sqlx.DB) {
 	return language, db
 }
 
-// parseLanguageArgument takes the one positional argument, which must name an
-// embedded data directory exactly, without case or space normalization.
+// parseLanguageArgument requires an exact embedded directory name (no case or space normalization).
 func parseLanguageArgument(
 	arguments []string,
 	languages []string,
@@ -150,10 +141,7 @@ func parseLanguageArgument(
 	return language, nil
 }
 
-// loadRecords decodes every level file of a validated language, failing on
-// unknown fields so a misspelled key is not silently dropped. Each row gets
-// the language and the file's level (data/ja/n5.json -> N5), so adding a
-// level is a data change.
+// loadRecords fails on unknown fields so a misspelled key is not silently dropped.
 func loadRecords(language string) ([]*materialRecord, []*model.Question, error) {
 	// The pattern is fixed and the language names an embedded directory.
 	levelFilePaths, _ := fs.Glob(
@@ -180,8 +168,7 @@ func loadRecords(language string) ([]*materialRecord, []*model.Question, error) 
 			)
 		}
 
-		// The pointers reach into data's slices, so the material IDs set by
-		// the upsert are visible to collectQuestions.
+		// Pointers alias data's slices, so material IDs set by the upsert reach collectQuestions.
 		level := strings.ToUpper(strings.TrimSuffix(
 			path.Base(filePath),
 			".json",
@@ -212,8 +199,7 @@ func loadRecords(language string) ([]*materialRecord, []*model.Question, error) 
 	return materials, looseQuestions, nil
 }
 
-// seedRecords upserts every material first, because UpsertBatch sets the
-// material IDs that nested questions link to, then every question.
+// seedRecords upserts materials first: UpsertBatch sets the IDs that nested questions link to.
 func seedRecords(
 	ctx context.Context,
 	repositories *repository.Repositories,
@@ -261,8 +247,6 @@ func seedRecords(
 	return nil
 }
 
-// collectQuestions links each nested question to its material's upserted row
-// and appends the material-less questions.
 func collectQuestions(
 	materials []*materialRecord,
 	looseQuestions []*model.Question,

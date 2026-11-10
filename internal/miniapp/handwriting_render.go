@@ -11,9 +11,8 @@ import (
 
 var ErrEmptyStrokes = errors.New("empty handwriting strokes")
 
-// The PNG sent to Gemini is always renderHeight tall; its width follows the ink
-// aspect ratio within [renderHeight, renderMaxWidth]. Sized so dakuten and small
-// kana survive the model's downscaling (ADR_from_01_to_20.md, 2026-06).
+// The PNG sent to Gemini is renderHeight tall; width follows the ink aspect within [renderHeight, renderMaxWidth].
+// Sized so dakuten and small kana survive the model's downscaling.
 const (
 	renderHeight   = 768
 	renderMaxWidth = 2304
@@ -22,7 +21,6 @@ const (
 	renderBrush = renderHeight / 51
 )
 
-// StrokePoint represents one sampled drawing point from the Mini App canvas.
 type StrokePoint struct {
 	X       float64 `json:"x"`
 	Y       float64 `json:"y"`
@@ -30,14 +28,11 @@ type StrokePoint struct {
 	Drawing bool    `json:"drawing"`
 }
 
-// Stroke represents one continuous pen-down path.
 type Stroke struct {
 	Points []StrokePoint `json:"points"`
 }
 
-// RenderStrokesPNG converts the Mini App's vector strokes into the compact image
-// sent to Gemini. The ink bounding box is cropped and scaled to renderHeight, so
-// the client canvas size does not affect the result.
+// RenderStrokesPNG crops the ink bounding box and scales it to renderHeight, so canvas size does not matter.
 func RenderStrokesPNG(strokes []Stroke) ([]byte, error) {
 	if len(strokes) == 0 {
 		return nil, ErrEmptyStrokes

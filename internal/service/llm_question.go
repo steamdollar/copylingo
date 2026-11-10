@@ -9,7 +9,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// LearningQuestionLLM answers a free-form learning question.
 type LearningQuestionLLM interface {
 	AnswerLearningQuestion(
 		ctx context.Context,
@@ -24,8 +23,7 @@ type tipCandidateCreator interface {
 	) error
 }
 
-// LLMQuestionService answers learner questions and keeps each Q&A as a tip
-// candidate for curation. Prompt context (quiz/study card) is built by the caller.
+// LLMQuestionService keeps each Q&A as a tip candidate; the caller builds the prompt context.
 type LLMQuestionService struct {
 	llm         LearningQuestionLLM
 	tips        tipCandidateCreator
@@ -44,9 +42,7 @@ func NewLLMQuestionService(
 	}
 }
 
-// Answer asks the LLM with prompt and stores question/answer as a tip
-// candidate. Candidate storage is best-effort: a failure is logged and the
-// answer is still returned.
+// Candidate storage is best-effort: a failure is logged and the answer is still returned.
 func (service *LLMQuestionService) Answer(
 	ctx context.Context,
 	user model.User,

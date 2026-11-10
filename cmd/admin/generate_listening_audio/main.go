@@ -1,7 +1,5 @@
-// Command generate_listening_audio fills every missing listening-audio object
-// for one language, at every level. It is the only place that calls TTS: the
-// server only serves stored clips (ADR-082). Run it after seeding new
-// listening questions; until then they are never selected for a session.
+// Command generate_listening_audio fills missing listening-audio objects for one language.
+// It is the only place that calls TTS (ADR-082); until it runs, new listening questions are never selected.
 package main
 
 import (

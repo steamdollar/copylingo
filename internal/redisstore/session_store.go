@@ -31,9 +31,7 @@ type sessionRedis interface {
 	) *redis.IntCmd
 }
 
-// SessionStore directly implements typed session persistence for Quiz and Study.
-// Use NewQuizSessions or NewStudySessions to configure its state type and key.
-// The zero value is not ready for use.
+// SessionStore persists typed Quiz and Study session state; use NewQuizSessions or NewStudySessions.
 type SessionStore[T any] struct {
 	redisClient sessionRedis
 	key         func(sessionID int) string
@@ -56,7 +54,6 @@ func newSessionStore[T any](
 	return &SessionStore[T]{redisClient: redisClient, key: key, name: name, validate: validate}
 }
 
-// Load rejects malformed JSON and state that fails the configured validator.
 func (store *SessionStore[T]) Load(
 	ctx context.Context,
 	sessionID int,
@@ -168,7 +165,6 @@ func (store *SessionStore[T]) Save(
 	return nil
 }
 
-// Delete removes working state after completion or corruption handling.
 func (store *SessionStore[T]) Delete(
 	ctx context.Context,
 	sessionID int,

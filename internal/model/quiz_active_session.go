@@ -4,20 +4,17 @@ import "time"
 
 const QuizActiveSessionStateVersion = 2
 
-// QuizActiveSessionState is the Redis working state for an in-progress quiz session.
 type QuizActiveSessionState struct {
 	Version int `json:"version"`
 	// Session is copied from the sessions table and flushed back on complete.
 	Session Session `json:"session"`
-	// Items are copied from session_questions + questions and mutated in Redis
-	// while the user answers.
+	// Items are copied from session_questions + questions and mutated in Redis while the user answers.
 	Items         []QuizActiveSessionQuestion `json:"items"`
 	CurrentIndex  int                         `json:"current_index"`
 	AnsweredCount int                         `json:"answered_count"`
 	UpdatedAt     time.Time                   `json:"updated_at"`
 }
 
-// QuizActiveSessionQuestion keeps the ordered session question and its question copy together.
 type QuizActiveSessionQuestion struct {
 	SessionQuestion SessionQuestion      `json:"session_question"`
 	Question        Question             `json:"question"`
@@ -43,8 +40,7 @@ func (state *QuizActiveSessionState) CurrentItemByQuestionID(questionID int) (*Q
 	return item, state.CurrentIndex, true
 }
 
-// ItemByQuestionID finds the session item for a question regardless of CurrentIndex.
-// Used after answering when the current index may have advanced (e.g. in-quiz LLM "ask" flow).
+// ItemByQuestionID finds an item regardless of CurrentIndex, which may have advanced (e.g. in-quiz LLM "ask" flow).
 func (state *QuizActiveSessionState) ItemByQuestionID(questionID int) (*QuizActiveSessionQuestion, bool) {
 	for i := range state.Items {
 		if state.Items[i].SessionQuestion.QuestionID == questionID {

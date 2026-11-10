@@ -10,16 +10,13 @@ import (
 )
 
 var (
-	// ErrQuizStateUnavailable means the Quiz working set could not be loaded.
 	ErrQuizStateUnavailable = errors.New("quiz working set unavailable")
 	// ErrQuizAnswerStale means the answer targets a question that is already
 	// answered or no longer current; the caller should show the next unanswered one.
-	ErrQuizAnswerStale = errors.New("quiz answer targets a stale question")
-	// ErrQuizInvalidOption means the chosen option index does not exist.
+	ErrQuizAnswerStale   = errors.New("quiz answer targets a stale question")
 	ErrQuizInvalidOption = errors.New("quiz option out of range")
 )
 
-// QuizAnswerResult is a recorded Quiz answer with what the caller needs to render it.
 type QuizAnswerResult struct {
 	Question model.Question
 	// Answer is the answer as graded (text answers trimmed, fill-blank lowercased).
@@ -29,7 +26,6 @@ type QuizAnswerResult struct {
 	TotalQuestions int
 }
 
-// QuizTextAnswer is a typed answer to the question at QuestionIndex.
 type QuizTextAnswer struct {
 	// UserID is the owner of the session; mismatches are rejected.
 	UserID        int64
@@ -38,7 +34,6 @@ type QuizTextAnswer struct {
 	Text          string
 }
 
-// SubmitQuizOption grades the chosen option of the current question.
 // userID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
 func (service *SessionService) SubmitQuizOption(
 	ctx context.Context,
@@ -82,7 +77,6 @@ func (service *SessionService) SubmitQuizOption(
 	)
 }
 
-// SubmitQuizWordOrder grades a word-order answer given as option indices in
 // the chosen order. The selection must use every option exactly once.
 // userID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
 func (service *SessionService) SubmitQuizWordOrder(
@@ -134,7 +128,6 @@ func (service *SessionService) SubmitQuizWordOrder(
 	)
 }
 
-// SubmitQuizText grades a typed answer to the question at answer.QuestionIndex.
 // An out-of-range index reports ErrQuizActiveSessionQuestionNotFound.
 // answer.UserID must be the session owner, otherwise ErrQuizActiveSessionUserMismatch.
 func (service *SessionService) SubmitQuizText(
@@ -237,7 +230,6 @@ func currentUnansweredQuizItem(
 	return item, index, nil
 }
 
-// isOptionPermutation reports whether selection orders all optionCount options exactly once.
 func isOptionPermutation(
 	selection []int,
 	optionCount int,
@@ -258,7 +250,6 @@ func isOptionPermutation(
 	return true
 }
 
-// gradeQuizAnswer grades and records one answer.
 func (service *SessionService) gradeQuizAnswer(
 	ctx context.Context,
 	sessionID int,

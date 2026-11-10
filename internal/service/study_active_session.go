@@ -39,7 +39,6 @@ type studyActiveSessionStarter interface {
 	) error
 }
 
-// studyActiveSessionService owns the Redis working set for in-progress study sessions.
 type studyActiveSessionService struct {
 	repository        StudyActiveSessionRepository
 	sessionRepository studyActiveSessionStarter
@@ -150,7 +149,6 @@ func (service *studyActiveSessionService) LoadOwnedStudySessionState(
 		) {
 			return nil, err
 		}
-		// no cache > db hit
 		state, err = service.loadFromDB(
 			ctx,
 			sessionID,
@@ -164,7 +162,6 @@ func (service *studyActiveSessionService) LoadOwnedStudySessionState(
 			)
 		}
 	}
-	// validate
 	if err := validateStudyOwnerAndMode(
 		state,
 		sessionID,
@@ -173,7 +170,6 @@ func (service *studyActiveSessionService) LoadOwnedStudySessionState(
 		return nil, err
 	}
 
-	// redis에 save
 	if err := service.save(
 		ctx,
 		state,
@@ -189,7 +185,6 @@ func (service *studyActiveSessionService) MarkStudied(
 	userID int64,
 	materialOrder int,
 ) (*model.StudyActiveSessionState, error) {
-	// get session state by ID
 	state, err := service.LoadOwnedStudySessionState(
 		ctx,
 		sessionID,
@@ -199,7 +194,6 @@ func (service *studyActiveSessionService) MarkStudied(
 		return nil, err
 	}
 
-	//
 	if _, _, ok := state.ItemByOrder(materialOrder); !ok {
 		return nil, fmt.Errorf(
 			"%w session_id=%d material_order=%d",

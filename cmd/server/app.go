@@ -29,7 +29,6 @@ type app struct {
 }
 
 func initializeApp(appConfig *config.Config) (_ *app, err error) {
-	// db, redis setup
 	db, redisClient, err := initializeInfrastructure(appConfig)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -37,10 +36,12 @@ func initializeApp(appConfig *config.Config) (_ *app, err error) {
 			err,
 		)
 	}
-	application := &app{closers: []io.Closer{db, redisClient}}
+
+	// Closed on shutdown, or before returning if a later step fails, so a failed start leaks no connection.
+	closers := []io.Closer{db, redisClient}
 	defer func() {
 		if err != nil {
-			application.Close()
+			closeAll(closers)
 		}
 	}()
 
@@ -61,50 +62,46 @@ func initializeApp(appConfig *config.Config) (_ *app, err error) {
 			err,
 		)
 	}
-	application.bot = components.router
-	application.refresher = components.sessionFlow
 
-	// Content collection has no scheduled job (ADR-057).
-	application.scheduler = scheduler.New(scheduler.Dependencies{
-		User:        services.user,
-		Session:     services.session,
-		QuizPusher:  components.sessionFlow,
-		StudyPusher: components.studyFlow,
-		Cron:        cron.New(),
-		Claims:      redisstore.NewPushClaims(redisClient),
-	})
-
-	// The Mini App only reports a graded handwriting answer; SessionFlow
-	// refreshes the Telegram message.
-	miniappHandler := miniapp.NewHandler(miniapp.HandlerDependencies{
-		Session: services.session,
-		Verifier: miniapp.NewInitDataVerifier(
-			appConfig.Telegram.Token,
-			miniapp.InitDataMaxAge,
-		),
-		HandwritingScreen: components.sessionFlow,
-	})
-	application.server = &http.Server{
-		Addr: fmt.Sprintf(
-			":%d",
-			appConfig.Server.Port,
-		),
-		Handler: setupRouter(
-			appConfig.Server.Mode == "release",
-			healthHandler(
-				db,
-				redisClient,
+	return &app{
+		bot:       components.router,
+		refresher: components.sessionFlow,
+		scheduler: scheduler.New(scheduler.Dependencies{
+			User:        services.user,
+			Session:     services.session,
+			QuizPusher:  components.sessionFlow,
+			StudyPusher: components.studyFlow,
+			Cron:        cron.New(),
+			Claims:      redisstore.NewPushClaims(redisClient),
+		}),
+		server: &http.Server{
+			Addr: fmt.Sprintf(
+				":%d",
+				appConfig.Server.Port,
 			),
-			miniappHandler,
-		),
-	}
-	return application, nil
+			Handler: setupRouter(
+				healthHandler(
+					db,
+					redisClient,
+				),
+				// The Mini App only reports a graded handwriting answer; SessionFlow
+				// refreshes the Telegram message.
+				miniapp.NewHandler(miniapp.HandlerDependencies{
+					Session: services.session,
+					Verifier: miniapp.NewInitDataVerifier(
+						appConfig.Telegram.Token,
+						miniapp.InitDataMaxAge,
+					),
+					HandwritingScreen: components.sessionFlow,
+				}),
+			),
+		},
+		closers: closers,
+	}, nil
 }
 
-// Run binds the HTTP port first so a port conflict starts nothing, then
-// starts the scheduler, Telegram polling, the stale Mini App refresh and the
-// HTTP server. It returns after ctx is cancelled or the HTTP server fails,
-// once shutdown has drained in-flight work.
+// Run binds the HTTP port first so a port conflict starts nothing. It returns after ctx is canceled or
+// the HTTP server fails, once shutdown has drained in-flight work.
 func (application *app) Run(ctx context.Context) error {
 	listener, err := net.Listen(
 		"tcp",
@@ -148,10 +145,8 @@ func (application *app) Run(ctx context.Context) error {
 	return runErr
 }
 
-// shutdown stops taking Telegram updates, drains HTTP requests, then stops
-// the scheduler. Each step waits for its in-flight work within one shared
-// shutdownTimeout, so Close does not close DB/Redis under a running handler
-// or job unless that timeout runs out. Connections stay open until Close.
+// shutdown stops Telegram updates, drains HTTP, then stops the scheduler, each within one shared
+// shutdownTimeout, so Close does not close DB/Redis under running work unless the timeout runs out.
 func (application *app) shutdown() {
 	log.Println("Shutting down...")
 
@@ -183,9 +178,13 @@ func (application *app) shutdown() {
 	}
 }
 
-// Close closes the shared connections (DB, then Redis).
 func (application *app) Close() {
-	for _, closer := range application.closers {
+	closeAll(application.closers)
+}
+
+// closeAll logs close failures so one failure does not keep the rest open.
+func closeAll(closers []io.Closer) {
+	for _, closer := range closers {
 		if err := closer.Close(); err != nil {
 			log.Printf(
 				"Connection close error: %v",

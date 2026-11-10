@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// Question callbacks are also created by the Mini App and handwriting flow.
 const (
 	QuestionRoot         = "q"
 	QuestionPrefix       = QuestionRoot + ":"
@@ -17,7 +16,6 @@ const (
 	FormatQuestionPolicy = QuestionPrefix + "%d:" + QuestionActionPolicy + ":%d"
 )
 
-// FormatHandwritingNext generates callback data for the "Next Question" button in handwriting tasks.
 func FormatHandwritingNext(
 	sessionID,
 	questionIndex int,
@@ -42,8 +40,7 @@ func FormatHandwritingNext(
 	)
 }
 
-// MiniAppURLFingerprint generates a 8-char hex fingerprint of the host part of a URL.
-// This is used to detect if a callback was generated for a different server instance (e.g. tunnel restart).
+// MiniAppURLFingerprint is 8 hex chars of the URL host, to detect callbacks from another server instance.
 func MiniAppURLFingerprint(rawURL string) string {
 	parsedURL, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || parsedURL.Host == "" {
@@ -57,7 +54,6 @@ func MiniAppURLFingerprint(rawURL string) string {
 	)
 }
 
-// IsStaleMiniAppCallback checks if the callback data was generated for the current server instance.
 func IsStaleMiniAppCallback(
 	parts []string,
 	currentPublicBaseURL string,
@@ -71,7 +67,6 @@ func IsStaleMiniAppCallback(
 	return currentToken == "" || messageToken != currentToken
 }
 
-// MiniAppFingerprintFromCallbackParts extracts the URL fingerprint from parsed callback data.
 func MiniAppFingerprintFromCallbackParts(parts []string) (string, bool) {
 	for i := 0; i+1 < len(parts); i++ {
 		if parts[i] == "u" && parts[i+1] != "" {

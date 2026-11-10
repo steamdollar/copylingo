@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// MaterialCategory defines the kind of concept shown in a study session.
 type MaterialCategory string
 
 const (
@@ -16,7 +15,6 @@ const (
 	MaterialCategorySentence   MaterialCategory = "sentence"
 )
 
-// Material represents a single concept that a user can study.
 type Material struct {
 	ID               int              `db:"id"                json:"id"`
 	MaterialKey      string           `db:"material_key"      json:"material_key"`

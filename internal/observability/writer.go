@@ -22,7 +22,6 @@ type DailyWriterOptions struct {
 	Stderr        io.Writer
 }
 
-// DailyWriter appends logs to a date-scoped JSONL file and rotates at local midnight.
 type DailyWriter struct {
 	mu            sync.Mutex
 	directory     string

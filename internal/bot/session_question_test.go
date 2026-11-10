@@ -16,7 +16,6 @@ import (
 
 func TestIsStaleMiniAppCallbackWrapper(t *testing.T) {
 	t.Parallel()
-	// This is a simple wrapper, we just check it doesn't crash and delegates correctly
 	if !isStaleMiniAppCallback(
 		[]string{"q", "1"},
 		"http://new.com",
@@ -220,9 +219,6 @@ func TestQuestionNavigation(t *testing.T) {
 	)
 }
 
-// TestBuildMCQLayout pins the picker layout: short options stay on two-column
-// buttons; any too-wide option moves every option into the message text and
-// leaves one row of number buttons, since Telegram truncates button labels.
 func TestBuildMCQLayout(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -371,8 +367,6 @@ func TestRenderByType(t *testing.T) {
 		},
 	)
 
-	// The header shows the question's own level before the review marker and
-	// drops the marker when the question has no level.
 	t.Run(
 		"HeaderLevel",
 		func(t *testing.T) {
@@ -488,8 +482,6 @@ func TestRenderByType(t *testing.T) {
 		},
 	)
 }
-
-// --- listening render fakes (structurally satisfy service.NewAudioService deps) ---
 
 type fakeAudioRepository struct {
 	setFileID    int
@@ -719,7 +711,6 @@ func TestShowQuestion_Finish(t *testing.T) {
 		state,
 	)
 
-	// Index 1 on 1 item session -> should show finish
 	sessionFlow.showQuestion(
 		ctx,
 		123,

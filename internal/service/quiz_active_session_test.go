@@ -133,7 +133,6 @@ func TestQuizActiveSessionCreateFromDBAndGet(t *testing.T) {
 					requestedSessionID,
 				)
 			}
-			// One answered, one unanswered
 			state := quizActiveSessionTestState(
 				sessionID,
 				123,
@@ -238,7 +237,6 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 		)
 	}
 
-	// Verify deterministic: same sessionID + questionID yields identical order
 	store2 := newFakeQuizSessionStore()
 	service2 := newQuizActiveSessionService(
 		repository,
@@ -266,7 +264,6 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 		}
 	}
 
-	// Verify different sessionID yields different permutation across sessions
 	differentPermutationFound := false
 	for nextSessionID := sessionID + 1; nextSessionID <= sessionID+20; nextSessionID++ {
 		nextStore := newFakeQuizSessionStore()
@@ -297,7 +294,7 @@ func TestQuizActiveSessionCreateFromDB_ShufflesQuestionOptions(t *testing.T) {
 func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 10
-	store := newFakeQuizSessionStore() // Empty Redis
+	store := newFakeQuizSessionStore()
 	repository := &fakeQuizActiveSessionRepository{
 		loadFunc: func(
 			ctx context.Context,
@@ -315,7 +312,6 @@ func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 		store,
 	)
 
-	// Get should trigger auto-recovery because it's missing in Redis
 	got, err := service.Get(
 		ctx,
 		sessionID,
@@ -334,7 +330,6 @@ func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 		)
 	}
 
-	// Verify it's now in Redis
 	stored, err := store.Load(
 		ctx,
 		sessionID,
@@ -352,7 +347,6 @@ func TestQuizActiveSessionGetAutoRecover(t *testing.T) {
 
 func TestQuizActiveSessionGetMissing(t *testing.T) {
 	ctx := context.Background()
-	// Neither Redis nor the DB has the session.
 	service := newQuizActiveSessionService(
 		&fakeQuizActiveSessionRepository{loadFunc: func(
 			context.Context,
@@ -1006,8 +1000,6 @@ func quizActiveSessionTestState(
 	return state
 }
 
-// activeStateForQuestion builds a one-item quiz state for sessionID, optionally
-// already answered.
 func activeStateForQuestion(
 	sessionID int,
 	question model.Question,

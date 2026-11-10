@@ -7,7 +7,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// WithinTx runs service work in one transaction on the supplied DB pool.
 func WithinTx(
 	ctx context.Context,
 	db *sqlx.DB,

@@ -2,16 +2,12 @@ package service
 
 import "slices"
 
-// proficiencyLevels lists each language's levels in difficulty order, easiest
-// first. Every level relation (rank, neighbors, session scope) is read from
-// this map; a language or level missing here keeps an exact scope. Japanese NZ
-// holds the kana (hiragana/katakana) foundation below N5.
+// proficiencyLevels lists levels easiest first; a language or level missing here keeps an exact scope.
 var proficiencyLevels = map[string][]string{
 	"ja": {"NZ", "N5", "N4", "N3", "N2", "N1"},
 }
 
-// levelRank returns level's position in its language's order and puts
-// unknown levels last.
+// levelRank puts unknown levels last.
 func levelRank(
 	language,
 	level string,
@@ -26,9 +22,7 @@ func levelRank(
 	return len(levels)
 }
 
-// neighborLevels returns the levels one step easier and one step harder than
-// level. Either is "" at the ends of the order, and both are "" when the
-// language or level has no known order.
+// Either is "" at the ends of the order or when the level has no known order.
 func neighborLevels(
 	language,
 	level string,
@@ -50,9 +44,6 @@ func neighborLevels(
 	return lower, upper
 }
 
-// sessionLevelsFor returns the Study and Quiz scope for a user's current
-// level: the level and its neighbors, easiest first. Levels without a known
-// order keep an exact scope.
 func sessionLevelsFor(
 	language,
 	currentLevel string,

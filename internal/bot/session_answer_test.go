@@ -93,7 +93,6 @@ func TestHandleTextInput(t *testing.T) {
 				t.Error("expected active question key to be deleted")
 			}
 
-			// Verify message sent
 			if len(mockAPI.sentMessages) == 0 {
 				t.Fatal("expected message sent")
 			}
@@ -312,8 +311,6 @@ func TestProcessAnswer_AlreadyAnsweredRedirectsToNextQuestion(t *testing.T) {
 	}
 }
 
-// ShowHandwritingGraded edits the stored handwriting message only while the
-// graded question is still current, taking its position from progress.
 func TestShowHandwritingGraded(t *testing.T) {
 	const (
 		sessionID     = 7
@@ -512,8 +509,7 @@ func TestHandleAnswerCallback_NonNumericOptionIndexIsIgnored(t *testing.T) {
 	}
 }
 
-// newResumeTestSessionFlow wires a SessionFlow whose user has the given
-// in-progress sessions and whose Quiz working set is state (nil = expired).
+// state nil = expired Quiz working set.
 func newResumeTestSessionFlow(
 	api *mockBotAPI,
 	inProgress []model.Session,

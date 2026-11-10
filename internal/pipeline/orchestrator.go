@@ -6,19 +6,16 @@ import (
 	"log"
 )
 
-// Pipeline represents a complete fetch-process-save workflow.
 type Pipeline struct {
 	Fetcher   Fetcher
 	Processor Processor
 	Saver     Saver
 }
 
-// Orchestrator manages multiple pipelines and coordinates their execution.
 type Orchestrator struct {
 	pipelines []Pipeline
 }
 
-// NewOrchestrator creates a new pipeline orchestrator.
 func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{
 		pipelines: make(
@@ -28,7 +25,6 @@ func NewOrchestrator() *Orchestrator {
 	}
 }
 
-// Register adds a pipeline to the orchestrator.
 func (orchestrator *Orchestrator) Register(
 	fetcher Fetcher,
 	processor Processor,
@@ -48,8 +44,7 @@ func (orchestrator *Orchestrator) Register(
 	)
 }
 
-// RunAll executes all registered pipelines sequentially.
-// Individual pipeline failures don't stop other pipelines.
+// RunAll runs pipelines sequentially; one failing pipeline does not stop the others.
 func (orchestrator *Orchestrator) RunAll(ctx context.Context) []PipelineResult {
 	results := make(
 		[]PipelineResult,
@@ -95,7 +90,6 @@ func (orchestrator *Orchestrator) runPipeline(
 		FetcherName: pipeline.Fetcher.Name(),
 	}
 
-	// Fetch
 	rawContents, err := pipeline.Fetcher.Fetch(ctx)
 	if err != nil {
 		result.Err = fmt.Errorf(
@@ -114,7 +108,6 @@ func (orchestrator *Orchestrator) runPipeline(
 		return result
 	}
 
-	// Process
 	contents, err := pipeline.Processor.Process(
 		ctx,
 		rawContents,
@@ -127,7 +120,6 @@ func (orchestrator *Orchestrator) runPipeline(
 		return result
 	}
 
-	// Save
 	saveResult, err := pipeline.Saver.Save(
 		ctx,
 		contents,
@@ -144,7 +136,6 @@ func (orchestrator *Orchestrator) runPipeline(
 	return result
 }
 
-// PipelineCount returns the number of registered pipelines.
 func (orchestrator *Orchestrator) PipelineCount() int {
 	return len(orchestrator.pipelines)
 }

@@ -32,20 +32,17 @@ type QuizSessionStore interface {
 	) error
 }
 
-// QuizSessionWrongAnswer contains enough data to render a completed wrong-answer summary without DB reads.
 type QuizSessionWrongAnswer struct {
 	SessionQuestion model.SessionQuestion
 	Question        model.Question
 }
 
-// QuizSessionResult contains the summary of a completed session.
 type QuizSessionResult struct {
 	TotalQuestions int
 	CorrectCount   int
 	WrongAnswers   []QuizSessionWrongAnswer
 }
 
-// quizActiveSessionService owns the Redis working set for in-progress learning sessions.
 type quizActiveSessionService struct {
 	repository QuizActiveSessionRepository
 	store      QuizSessionStore
@@ -65,7 +62,6 @@ func (service *quizActiveSessionService) CreateFromDB(
 	ctx context.Context,
 	sessionID int,
 ) (*model.QuizActiveSessionState, error) {
-	// retrieve target session from db (session - sessionQuestions - questions)
 	state, err := service.repository.LoadQuestionSessionWithStateBySessionID(
 		ctx,
 		sessionID,
@@ -93,7 +89,6 @@ func (service *quizActiveSessionService) CreateFromDB(
 		}
 	}
 
-	// set at redis
 	if err := service.save(
 		ctx,
 		state,
@@ -107,7 +102,7 @@ func (service *quizActiveSessionService) CreateFromDB(
 	return state, nil
 }
 
-// Get retrieves the active session working set from Redis. If not found, it attempts to recover from DB and store in Redis.
+// Get recovers the working set from DB and stores it in Redis when Redis has none.
 func (service *quizActiveSessionService) Get(
 	ctx context.Context,
 	sessionID int,

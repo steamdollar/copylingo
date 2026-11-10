@@ -12,7 +12,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// StudyActiveSessionRepository loads and flushes Redis-backed study session state.
 type StudyActiveSessionRepository struct {
 	db *sqlx.DB
 }

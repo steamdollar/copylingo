@@ -17,8 +17,6 @@ const (
 	nhkDifficulty        = 3
 )
 
-// NHKAPIClient defines the interface for NHK HTTP operations.
-// This allows for mocking in tests.
 type NHKAPIClient interface {
 	FetchArticleList(ctx context.Context) (map[string][]external.NHKArticleMeta, error)
 	FetchArticleBody(
@@ -27,23 +25,19 @@ type NHKAPIClient interface {
 	) (string, error)
 }
 
-// NHKFetcher fetches articles from NHK News Easy.
 type NHKFetcher struct {
 	client      NHKAPIClient
 	maxArticles int
 }
 
-// NHKFetcherOption configures NHKFetcher.
 type NHKFetcherOption func(*NHKFetcher)
 
-// WithMaxArticles sets the maximum number of articles to fetch.
 func WithMaxArticles(max int) NHKFetcherOption {
 	return func(fetcher *NHKFetcher) {
 		fetcher.maxArticles = max
 	}
 }
 
-// NewNHKFetcher creates a new NHK News Easy fetcher.
 func NewNHKFetcher(
 	client NHKAPIClient,
 	options ...NHKFetcherOption,
@@ -58,12 +52,10 @@ func NewNHKFetcher(
 	return fetcher
 }
 
-// Name returns the fetcher identifier.
 func (fetcher *NHKFetcher) Name() string {
 	return nhkFetcherName
 }
 
-// Fetch retrieves articles from NHK News Easy.
 func (fetcher *NHKFetcher) Fetch(ctx context.Context) ([]RawContent, error) {
 	articleMap, err := fetcher.client.FetchArticleList(ctx)
 	if err != nil {
@@ -73,7 +65,6 @@ func (fetcher *NHKFetcher) Fetch(ctx context.Context) ([]RawContent, error) {
 		)
 	}
 
-	// Sort dates descending to get newest articles first
 	dates := make(
 		[]string,
 		0,

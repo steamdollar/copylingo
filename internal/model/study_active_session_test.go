@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// studyMaterial builds one StudySessionMaterial. order is MaterialOrder,
-// materialID is the underlying material id, studied marks StudiedAt.
 func studyMaterial(
 	order,
 	materialID int,

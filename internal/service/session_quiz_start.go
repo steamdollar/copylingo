@@ -10,18 +10,14 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// maxReviewQuizQuestions caps an on-demand review Quiz regardless of the due backlog.
 const maxReviewQuizQuestions = 10
 
 var (
-	// ErrNoDueReviews means an on-demand review Quiz has nothing to review.
 	ErrNoDueReviews = errors.New("no due review questions")
-	// ErrQuizStatePrepareFailed means the Quiz was marked started in DB but
-	// its Redis working set could not be reloaded to reflect that.
+	// ErrQuizStatePrepareFailed: Quiz was marked started in DB but its Redis working set could not be reloaded.
 	ErrQuizStatePrepareFailed = errors.New("quiz working set prepare failed")
 )
 
-// BuildMorningQuiz creates the morning Quiz session; nil means no questions were available.
 func (service *SessionService) BuildMorningQuiz(
 	ctx context.Context,
 	user model.User,
@@ -34,7 +30,6 @@ func (service *SessionService) BuildMorningQuiz(
 	)
 }
 
-// BuildEveningQuiz creates the evening Quiz session; nil means no questions were available.
 func (service *SessionService) BuildEveningQuiz(
 	ctx context.Context,
 	user model.User,
@@ -47,9 +42,7 @@ func (service *SessionService) BuildEveningQuiz(
 	)
 }
 
-// BuildReviewQuiz creates an on-demand review Quiz of at most
-// maxReviewQuizQuestions due items. A due-count lookup failure is treated as
-// zero due items (existing policy), so it surfaces as ErrNoDueReviews.
+// A due-count lookup failure is treated as zero due items (existing policy), so it surfaces as ErrNoDueReviews.
 func (service *SessionService) BuildReviewQuiz(
 	ctx context.Context,
 	user model.User,
@@ -90,8 +83,6 @@ func (service *SessionService) BuildReviewQuiz(
 	)
 }
 
-// StartQuiz marks the Quiz in_progress and returns its working set.
-//
 // Redis is the source of truth while a Quiz is in progress: an in-progress
 // working set is never replaced from DB, so a repeated start button cannot
 // overwrite recorded answers. Only a pending session (no progress yet) is
@@ -151,9 +142,7 @@ func (service *SessionService) StartQuiz(
 	return state, nil
 }
 
-// ShowQuizQuestion moves the working-set cursor to questionIndex and returns the
-// state to render, with one Redis read. An index at or past the end returns
-// the state unchanged so the caller can render the finish screen.
+// An index at or past the end returns the state unchanged so the caller can render the finish screen.
 func (service *SessionService) ShowQuizQuestion(
 	ctx context.Context,
 	sessionID,

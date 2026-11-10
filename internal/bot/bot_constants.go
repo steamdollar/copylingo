@@ -4,7 +4,6 @@ import "github.com/lsj/copylingo/internal/callback"
 
 const botDefaultLocale = "ko"
 
-// Telegram commands and the LLM access list belong to the bot entry point.
 type botCommand string
 
 const (
@@ -22,7 +21,6 @@ const (
 
 var llmAllowedTelegramUserIDs = [...]int64{2006481393}
 
-// Callback identifiers stay separate from localized button text.
 const (
 	callbackRootMenu     = "menu"
 	callbackRootSession  = "session"
@@ -74,7 +72,6 @@ const (
 	callbackSettingsTimezone = callbackPrefixSettings + "tz"
 )
 
-// These formats are consumed only by bot handlers and keyboards.
 const (
 	formatSessionStart      = callbackPrefixSession + "%d:" + callbackActionStart
 	formatSessionFinish     = callbackPrefixSession + "%d:" + callbackActionFinish

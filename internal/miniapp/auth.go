@@ -24,7 +24,6 @@ type TelegramUser struct {
 	ID int64 `json:"id"`
 }
 
-// InitDataMaxAge is how long a Telegram Mini App launch (init data) stays valid.
 const InitDataMaxAge = 24 * time.Hour
 
 type InitDataVerifier struct {

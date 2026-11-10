@@ -13,7 +13,6 @@ import (
 	"github.com/lsj/copylingo/internal/observability"
 )
 
-// GradeResult represents the structured JSON output from the LLM.
 type GradeResult struct {
 	IsCorrect bool   `json:"is_correct"`
 	Feedback  string `json:"feedback"`
@@ -24,23 +23,19 @@ const (
 	learningQuestionMaxTokens      = 700
 )
 
-// LLMOptions are the settings NewLLMClient needs. An empty BaseURL keeps the
-// OpenAI default endpoint.
+// LLMOptions: an empty BaseURL keeps the OpenAI default endpoint.
 type LLMOptions struct {
 	APIKey  string
 	BaseURL string
 	Model   string
 }
 
-// DefaultLLMClient serves every LLM call (handwriting grading and learner questions)
-// over one OpenAI-compatible client. Services depend on their
-// own narrow interfaces, so the client is returned as a concrete type.
+// DefaultLLMClient serves all LLM calls over one OpenAI-compatible client; services use their own narrow interfaces.
 type DefaultLLMClient struct {
 	client *openai.Client
 	model  string
 }
 
-// NewLLMClient initializes the client using the OpenAI compatible API.
 func NewLLMClient(options LLMOptions) *DefaultLLMClient {
 	clientConfig := openai.DefaultConfig(options.APIKey)
 	if options.BaseURL != "" {
@@ -53,7 +48,6 @@ func NewLLMClient(options LLMOptions) *DefaultLLMClient {
 	}
 }
 
-// AnswerLearningQuestion answers an ad-hoc language-learning question from Telegram.
 func (client *DefaultLLMClient) AnswerLearningQuestion(
 	ctx context.Context,
 	question string,
@@ -91,7 +85,6 @@ Do not use HTML tags or markdown code fences.`,
 	return response.Choices[0].Message.Content, nil
 }
 
-// GradeHandwriting verifies whether a rendered handwriting image matches the expected Japanese text.
 func (client *DefaultLLMClient) GradeHandwriting(
 	ctx context.Context,
 	questionPrompt,

@@ -11,8 +11,7 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// mockPushClaims grants each user/slot/date claim once. Workers call it
-// concurrently.
+// mockPushClaims grants each user/slot/date claim once; workers call it concurrently.
 type mockPushClaims struct {
 	mu      sync.Mutex
 	claimed map[pushClaimCall]bool
@@ -58,8 +57,7 @@ type mockDispatcherPusher struct {
 	studyPushes []int64
 }
 
-// schedulerSessionQueryRepositoryStub serves the unfinished-session queries; the
-// embedded nil SessionRepository makes any other repository call panic.
+// schedulerSessionQueryRepositoryStub embeds a nil SessionRepository so any other call panics.
 type schedulerSessionQueryRepositoryStub struct {
 	service.SessionRepository
 	session *model.Session
@@ -99,8 +97,6 @@ func (mock *mockDispatcherPusher) PushSession(
 	return nil
 }
 
-// study returns the Study push contract over the same recorder, so a test
-// can assert which kind of push each user received.
 func (mock *mockDispatcherPusher) study() mockStudyPusher {
 	return mockStudyPusher{recorder: mock}
 }
@@ -128,7 +124,6 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 	claims := &mockPushClaims{}
 	pusher := &mockDispatcherPusher{}
 
-	// Stub session query returning an unfinished session so reminder succeeds
 	unfinishedSession := &model.Session{ID: 10, Mode: model.SessionModeStudy}
 	sessionQueryStub := &schedulerSessionQueryRepositoryStub{session: unfinishedSession}
 	sessions := newSchedulerSessionService(sessionQueryStub)
@@ -141,7 +136,6 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 	)
 	user := model.User{ID: 1001, Language: "ja", ProficiencyLevel: "N5"}
 
-	// 1st dispatch: Should acquire lock and push
 	if err := dispatcher.dispatchUser(
 		ctx,
 		user,
@@ -160,7 +154,6 @@ func TestDispatcher_RedisIdempotency(t *testing.T) {
 		)
 	}
 
-	// 2nd dispatch: Redis lock already exists, should skip
 	if err := dispatcher.dispatchUser(
 		ctx,
 		user,
@@ -274,7 +267,7 @@ func TestDispatcher_BacklogRemind(t *testing.T) {
 }
 
 func TestDispatcher_RateLimiter(t *testing.T) {
-	limiter := newRateLimiter(100) // 100 msgs/sec
+	limiter := newRateLimiter(100)
 	defer limiter.Stop()
 
 	ctx, cancel := context.WithTimeout(
@@ -305,7 +298,6 @@ func TestDispatcher_BatchConcurrent(t *testing.T) {
 		pusher.study(),
 		&mockPushClaims{},
 	)
-	// Higher limiter rate for fast testing
 	dispatcher.limiter = newRateLimiter(500)
 	defer dispatcher.limiter.Stop()
 

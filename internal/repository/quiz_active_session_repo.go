@@ -13,7 +13,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// QuizActiveSessionRepository loads and flushes Redis-backed question session state.
 type QuizActiveSessionRepository struct {
 	db *sqlx.DB
 }
@@ -61,7 +60,6 @@ type questionSessionWithStateRow struct {
 	QuestionCreatedAt      time.Time              `db:"question_created_at"`
 }
 
-// LoadQuestionSessionWithStateBySessionID loads the full ordered question session state in one DB round-trip.
 func (repository *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySessionID(
 	ctx context.Context,
 	sessionID int,
@@ -204,7 +202,6 @@ func (repository *QuizActiveSessionRepository) LoadQuestionSessionWithStateBySes
 	return state, nil
 }
 
-// FlushQuizActiveSession persists the question session state in a single DB transaction.
 func (repository *QuizActiveSessionRepository) FlushQuizActiveSession(
 	ctx context.Context,
 	state *model.QuizActiveSessionState,

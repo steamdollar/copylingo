@@ -18,8 +18,7 @@ var (
 	ErrHandwritingInvalidQuestion  = errors.New("question is not a handwriting question")
 )
 
-// HandwritingSubmitRequest is the service-level request after HTTP auth is
-// verified. Image is the PNG the Mini App rendered from the learner's strokes.
+// HandwritingSubmitRequest.Image is the PNG the Mini App rendered from the learner's strokes.
 type HandwritingSubmitRequest struct {
 	UserID     int64
 	SessionID  int
@@ -27,7 +26,6 @@ type HandwritingSubmitRequest struct {
 	Image      []byte
 }
 
-// HandwritingSubmitResult is returned to the Mini App after grading.
 type HandwritingSubmitResult struct {
 	IsCorrect     bool   `json:"is_correct"`
 	Feedback      string `json:"feedback"`
@@ -35,9 +33,7 @@ type HandwritingSubmitResult struct {
 	Explanation   string `json:"explanation"`
 }
 
-// SubmitHandwriting grades a Mini App handwriting submission for the current
-// question. An AI grading failure is returned as an error and nothing is
-// recorded, so the user can resubmit.
+// An AI grading failure is returned as an error and nothing is recorded, so the user can resubmit.
 func (service *SessionService) SubmitHandwriting(
 	ctx context.Context,
 	request HandwritingSubmitRequest,
@@ -90,7 +86,6 @@ func (service *SessionService) SubmitHandwriting(
 	}
 
 	llmStartedAt := time.Now()
-	// An LLM failure returns before recording, so the learner can resubmit.
 	result, err := service.llm.GradeHandwriting(
 		ctx,
 		question.Prompt,

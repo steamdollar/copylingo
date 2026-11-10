@@ -7,54 +7,45 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// RawContent represents raw data fetched from external sources.
-// This intermediate structure allows Fetchers to remain decoupled from model.Content.
 type RawContent struct {
 	SourceURL  string
 	Title      string
 	Body       string
-	Language   string   // ISO 639-1: 'ja', 'el', 'en'
-	Level      string   // JLPT: N5-N1, CEFR: A1-C2
-	SourceType string   // 'news' or 'exam_prep'
-	Difficulty int      // 1-10
-	Tags       []string // e.g., ["news", "nhk"]
-	IsArticle  bool     // true for reading practice content
+	Language   string // ISO 639-1: 'ja', 'el', 'en'
+	Level      string // JLPT: N5-N1, CEFR: A1-C2
+	SourceType string // 'news' or 'exam_prep'
+	Difficulty int    // 1-10
+	Tags       []string
+	IsArticle  bool
 }
 
-// Fetcher collects raw content from external sources.
 type Fetcher interface {
-	// Name returns a unique identifier for this fetcher.
 	Name() string
 
-	// Fetch retrieves content from the external source.
-	// Individual item failures should be logged but not stop the entire fetch.
+	// Individual item failures should be logged but not stop the whole fetch.
 	Fetch(ctx context.Context) ([]RawContent, error)
 }
 
-// Processor transforms raw content into model.Content.
-// This allows for AI processing, enrichment, or pass-through.
 type Processor interface {
-	// Process transforms raw content into model.Content.
-	// For Phase 2.1, this is a simple pass-through.
-	// For Phase 2.3, this will involve AI processing to generate questions.
-	Process(ctx context.Context, raw []RawContent) ([]model.Content, error)
+	Process(
+		ctx context.Context,
+		raw []RawContent,
+	) ([]model.Content, error)
 }
 
-// SaveResult preserves the pipeline API while the content service owns persistence.
 type SaveResult = service.ContentSaveResult
 
-// Saver persists processed content to the database.
 type Saver interface {
-	// Save persists content to the database.
-	// Duplicate URLs are skipped (not treated as errors).
-	// Individual save failures are collected but don't stop the batch.
-	Save(ctx context.Context, contents []model.Content) (SaveResult, error)
+	// Duplicate URLs are skipped without error; per-item save failures don't stop the batch.
+	Save(
+		ctx context.Context,
+		contents []model.Content,
+	) (SaveResult, error)
 }
 
-// PipelineResult contains the outcome of a single pipeline run.
 type PipelineResult struct {
 	FetcherName  string
 	FetchedCount int
 	SaveResult   SaveResult
-	Err          error // Fatal error that stopped the pipeline
+	Err          error
 }

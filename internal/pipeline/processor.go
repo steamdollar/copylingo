@@ -7,16 +7,12 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// PassThroughProcessor converts RawContent to model.Content without modification.
-// In Phase 2.3, AIProcessor will be added for question generation.
 type PassThroughProcessor struct{}
 
-// NewPassThroughProcessor creates a new pass-through processor.
 func NewPassThroughProcessor() *PassThroughProcessor {
 	return &PassThroughProcessor{}
 }
 
-// Process converts raw content to model.Content.
 func (processor *PassThroughProcessor) Process(
 	ctx context.Context,
 	raw []RawContent,

@@ -378,9 +378,6 @@ func TestQuizMaterialPreferenceCloseDeletesOnlyMenuMessage(t *testing.T) {
 	}
 }
 
-// assertMaterialPreferenceMenu checks the shared menu layout: normal,
-// maintenance and excluded rows with only the selected one checked, then one
-// navigation row.
 func assertMaterialPreferenceMenu(
 	t *testing.T,
 	keyboard tgbotapi.InlineKeyboardMarkup,
@@ -634,7 +631,6 @@ func TestStudyMaterialPreferenceEscapesHTMLAndExplainsMaintenance(t *testing.T) 
 	if edit.ReplyMarkup == nil {
 		t.Fatal("Study preference menu lost its keyboard")
 	}
-	// Same shared menu as Quiz; the navigation row returns to the card.
 	assertMaterialPreferenceMenu(
 		t,
 		*edit.ReplyMarkup,

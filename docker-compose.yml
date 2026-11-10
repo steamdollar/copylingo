@@ -79,7 +79,6 @@ services:
         condition: service_healthy
     environment:
       COPYLINGO_DB_HOST: postgres
-      COPYLINGO_DB_PORT: 5432
       COPYLINGO_DB_USER: copylingo
       COPYLINGO_DB_PASSWORD: copylingo
       COPYLINGO_DB_DBNAME: copylingo
@@ -99,7 +98,6 @@ services:
       - "8080:8080"
     volumes:
       - ./data/audio:/app/data/audio
-      - ./config.yaml:/app/config.yaml
       - ./logs:/app/logs
 
 volumes:

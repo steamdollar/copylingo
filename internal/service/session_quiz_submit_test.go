@@ -193,7 +193,6 @@ func TestSessionServiceSubmitQuizOption(t *testing.T) {
 	t.Run(
 		"missing working set is unavailable",
 		func(t *testing.T) {
-			// Neither Redis nor the DB has the session.
 			sessionService := NewSessionService(SessionDependencies{
 				Stores: SessionStores{Quiz: newFakeQuizSessionStore()},
 				QuizActiveSessionRepository: &fakeQuizActiveSessionRepository{loadFunc: func(

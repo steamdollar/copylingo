@@ -19,7 +19,6 @@ const loadingPanel = document.getElementById("loadingPanel");
 const queryParameters = new URLSearchParams(window.location.search);
 
 // 캔버스 폭을 답안 글자 수(cells)에 비례시킨다. 화면 크기는 유지하고 내부 좌표 해상도만 2배로 올린다.
-// 기존 패드 크기(224x280) 대비 세로는 약 80%, 가로는 기존 비율보다 약 5% 좁게 줄인다.
 const PAD_CELL_CSS_PX = 170;
 const PAD_HEIGHT_CSS_PX = 224;
 const PAD_SCALE = 2;
@@ -97,7 +96,6 @@ function updatePadScrollRange() {
 	overviewPanel.hidden = maxScroll === 0;
 }
 
-// 채점 대기 동안 spinner 를 보여 준다.
 function startLoading() {
 	loadingPanel.hidden = false;
 }
@@ -180,7 +178,6 @@ function drawStroke(stroke) {
   padContext.stroke();
 }
 
-// 메인 캔버스(획만, 배경 투명)를 미니맵에 1:1 복사한다. 격자/배경은 미니맵 CSS가 담당.
 function renderOverview() {
   overviewContext.clearRect(0, 0, overview.width, overview.height);
   overviewContext.drawImage(canvas, 0, 0);
@@ -314,9 +311,8 @@ function setToolsDisabled(disabled) {
   eraserButton.disabled = disabled;
 }
 
-// ?debug=1 일 때만: 서버 RenderStrokesPNG()와 정합성을 비교하기 위한 개발용 export 버튼을 단다.
-// client.png(현재 canvas) + strokes.json(서버 입력과 동일한 stroke 배열)을 내보낸다.
-// 운영 UI에는 노출하지 않는다. 비교 절차는 cmd/dev/handwriting_renderer 주석 참고.
+// ?debug=1 일 때만 서버 RenderStrokesPNG() 정합성 비교용 export 버튼(client.png + strokes.json)을 단다.
+// 비교 절차는 cmd/dev/handwriting_renderer 주석 참고.
 function setupDebugExport() {
   if (queryParameters.get("debug") !== "1") return;
 
@@ -345,7 +341,6 @@ function exportClientPNG() {
 }
 
 function exportStrokesJSON() {
-  // 서버 RenderStrokesPNG()에 들어가는 stroke 배열을 그대로 직렬화한다.
   // canvas_width/height/line_width 는 사람이 정합성 맥락을 읽기 위한 메타데이터.
   const payload = {
     canvas_width: canvas.width,

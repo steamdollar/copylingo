@@ -12,8 +12,7 @@ import (
 	"github.com/lsj/copylingo/internal/config"
 )
 
-// initializeInfrastructure opens the shared DB and Redis connections. If Redis fails, the
-// DB connection is closed before returning.
+// initializeInfrastructure closes the DB connection if Redis fails to open.
 func initializeInfrastructure(appConfig *config.Config) (*sqlx.DB, *redis.Client, error) {
 	db, err := initializeDB(appConfig)
 	if err != nil {

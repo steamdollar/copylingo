@@ -23,9 +23,7 @@ import (
 	"github.com/lsj/copylingo/internal/miniapp"
 )
 
-// parityInput mirrors the JSON exported by the Mini App debug block. Only
-// strokes is consumed by the renderer; canvas dimensions and line width are
-// carried for human-readable parity context.
+// parityInput mirrors the Mini App debug export; only strokes is consumed, the rest is human context.
 type parityInput struct {
 	CanvasWidth  int              `json:"canvas_width,omitempty"`
 	CanvasHeight int              `json:"canvas_height,omitempty"`

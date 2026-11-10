@@ -12,8 +12,7 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// mockSessionStore implements the sessions-table calls these tests drive; the
-// embedded nil SessionRepository makes any other call panic.
+// The embedded nil SessionRepository makes any other call panic.
 type mockSessionStore struct {
 	service.SessionRepository
 	getSessionsByStatusFunc func(
@@ -226,7 +225,6 @@ func TestStartStudy_ResumeInProgress(t *testing.T) {
 		},
 	}
 
-	// Setup active session state
 	state := &model.QuizActiveSessionState{
 		Version: model.QuizActiveSessionStateVersion,
 		Session: model.Session{ID: 10},
@@ -471,11 +469,7 @@ func TestHandleSessionCallback(t *testing.T) {
 					MessageID: 456,
 				},
 			}
-			// QuizActiveSession.CreateFromDB will fail because sessionStore.GetByID is nil.
-			// Let's just mock StartSession and see it logs and returns.
-			// Wait, startSession calls showQuestion which needs active session.
-			// I'll skip deep testing here as it requires complex mocks,
-			// but I can at least check it doesn't crash.
+			// Deep testing is skipped (needs complex mocks): only checks that it logs and does not crash.
 			sessionFlow.HandleSessionCallback(
 				ctx,
 				callbackQuery,

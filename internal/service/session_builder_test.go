@@ -121,7 +121,6 @@ func (pool *builderPool) GetNewQuestions(
 	return rows, nil
 }
 
-// generalDueQuery returns the uncategorized due query every build issues once.
 func (pool *builderPool) generalDueQuery(t *testing.T) dueQuery {
 	t.Helper()
 	for _, query := range pool.dueQueries {
@@ -172,7 +171,6 @@ func newTestBuilder(pool *builderPool) (*sessionBuilderService, *builderStores) 
 	), stores
 }
 
-// makeQuestions returns count questions with consecutive IDs from start.
 func makeQuestions(
 	start,
 	count int,
@@ -189,7 +187,6 @@ func makeQuestions(
 	return questions
 }
 
-// rowIDs returns the selected question IDs in session order.
 func rowIDs(rows []model.SessionQuestion) []int {
 	ids := make(
 		[]int,

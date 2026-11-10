@@ -246,7 +246,6 @@ func TestUpdateSlotTime_ValidatesFormat(t *testing.T) {
 	}
 	userService := NewUserService(userRepositoryMock)
 
-	// Invalid time should return error
 	badTime := "08:15"
 	if err := userService.UpdateSlotTime(
 		ctx,
@@ -257,7 +256,6 @@ func TestUpdateSlotTime_ValidatesFormat(t *testing.T) {
 		t.Error("expected error for 08:15, got nil")
 	}
 
-	// Valid time should succeed
 	validTime := "08:30"
 	if err := userService.UpdateSlotTime(
 		ctx,
@@ -277,7 +275,6 @@ func TestUpdateSlotTime_ValidatesFormat(t *testing.T) {
 		)
 	}
 
-	// Nil time (disable slot) should succeed
 	if err := userService.UpdateSlotTime(
 		ctx,
 		1,
@@ -312,7 +309,6 @@ func TestUpdateTimezone_ValidatesIANA(t *testing.T) {
 	}
 	userService := NewUserService(userRepositoryMock)
 
-	// Invalid timezone should fail
 	if err := userService.UpdateTimezone(
 		ctx,
 		1,
@@ -321,7 +317,6 @@ func TestUpdateTimezone_ValidatesIANA(t *testing.T) {
 		t.Error("expected error for invalid timezone, got nil")
 	}
 
-	// Valid timezones should succeed
 	for _, timezone := range []string{"Asia/Seoul", "America/New_York", "UTC"} {
 		if err := userService.UpdateTimezone(
 			ctx,

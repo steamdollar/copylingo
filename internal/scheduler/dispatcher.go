@@ -18,8 +18,6 @@ type pushJob struct {
 	unfinishedCount int
 }
 
-// dispatchSessions builds a slot's session or finds the oldest unfinished one
-// to remind about.
 type dispatchSessions interface {
 	BuildForSlot(
 		ctx context.Context,
@@ -52,7 +50,7 @@ func newSessionDispatcher(
 		quiz:    quiz,
 		study:   study,
 		claims:  claims,
-		limiter: newRateLimiter(25), // 25 msg/sec rate limit (Telegram safety margin)
+		limiter: newRateLimiter(25), // msg/sec; Telegram safety margin
 		workers: 4,
 	}
 }
@@ -183,7 +181,6 @@ func (dispatcher *sessionDispatcher) dispatchUser(
 		}
 	}
 
-	// 3. Build & push session
 	session, err := dispatcher.session.BuildForSlot(
 		ctx,
 		user,
@@ -217,7 +214,6 @@ func (dispatcher *sessionDispatcher) dispatchUser(
 	)
 }
 
-// pushBuiltSession sends a freshly built session with the push matching its mode.
 func (dispatcher *sessionDispatcher) pushBuiltSession(
 	ctx context.Context,
 	userID int64,

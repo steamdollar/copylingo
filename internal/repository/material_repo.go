@@ -35,10 +35,8 @@ func NewMaterialRepository(db *sqlx.DB) *MaterialRepository {
 	return &MaterialRepository{db: db}
 }
 
-// GetMaterialsByPlan returns materials according to the per-category new and
-// review quotas in plan. New materials prefer the current level, while due
-// reviews remain ordered by oldest due time. Remaining slots are filled with
-// additional new vocabulary after eligible due reviews are exhausted.
+// GetMaterialsByPlan fills per-category new/review quotas: new prefers the current level, due reviews go oldest
+// first, and leftover slots take extra new vocabulary once eligible due reviews run out.
 func (repository *MaterialRepository) GetMaterialsByPlan(
 	ctx context.Context,
 	userID int64,
@@ -297,9 +295,8 @@ var studySessionMaterialsQuery = `
 	LIMIT $6
 `
 
-// GetLevelProgress counts, per level of language, all materials and the ones
-// the user has studied at least once. Levels come back in lexical order; the
-// caller applies the language's proficiency order.
+// GetLevelProgress counts, per level, all materials and those studied at least once; levels come back in lexical
+// order and the caller applies the language's proficiency order.
 func (repository *MaterialRepository) GetLevelProgress(
 	ctx context.Context,
 	userID int64,
@@ -336,8 +333,7 @@ func (repository *MaterialRepository) GetLevelProgress(
 	return progress, nil
 }
 
-// UpsertBatch inserts or refreshes materials identified by their stable
-// material key and sets each material's ID to its row ID, so callers can link
+// UpsertBatch upserts by stable material key and sets each material's ID to its row ID, so callers can link
 // questions without a second lookup.
 func (repository *MaterialRepository) UpsertBatch(
 	ctx context.Context,

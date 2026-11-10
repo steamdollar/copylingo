@@ -85,4 +85,5 @@ Go 파일을 변경하지 않은 문서 전용 작업은 이 단계를 생략한
 
 ## Config
 
-- **Inject secrets via environment variables** (`COPYLINGO_TELEGRAM_TOKEN`, `COPYLINGO_LLM_API_KEY`, etc.). Never hardcode API keys/tokens in `config.yaml`.
+- **Inject secrets via environment variables** (`COPYLINGO_TELEGRAM_TOKEN`, `COPYLINGO_LLM_API_KEY`, etc.). Never hardcode API keys/tokens in code or committed files.
+- **Config source**: environment variables only (`internal/config/load.go`). Give a default only to values that are the same in every environment; secrets and environment-specific values (hosts, credentials) go in `requiredKeys` so a missing one fails startup.

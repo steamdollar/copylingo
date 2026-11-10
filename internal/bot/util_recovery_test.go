@@ -11,7 +11,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// sessionListStore drives ListInProgressQuizzes for refresh tests.
 type sessionListStore struct {
 	mockSessionStore
 	inProgress []model.Session
@@ -67,8 +66,7 @@ func TestRefreshStaleMiniAppMessages_NoSessions(t *testing.T) {
 	}
 }
 
-// fingerprintSpy counts fingerprint lookups, the first per-session step of
-// restart recovery.
+// fingerprintSpy counts fingerprint lookups, the first per-session step of restart recovery.
 type fingerprintSpy struct {
 	MiniAppRecoveryStore
 	lookups int
@@ -114,7 +112,6 @@ func TestRefreshStaleMiniAppMessages_StopsWhenContextCancelled(t *testing.T) {
 	}
 }
 
-// emptyQuestionFetcher has no new questions; due-review calls come from mockSRSRepository.
 type emptyQuestionFetcher struct {
 	mockSRSRepository
 }

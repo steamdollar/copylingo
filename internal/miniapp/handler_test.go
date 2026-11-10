@@ -15,7 +15,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// fakeHandwritingScreen records the graded question the Mini App reports.
 type fakeHandwritingScreen struct {
 	sessionID   int
 	questionID  int
@@ -50,11 +49,9 @@ func TestRefreshHandwritingMessageReportsGradedQuestionWithTimeout(t *testing.T)
 	}
 }
 
-// oneStrokeSubmitBody is a submit request whose strokes render to a PNG.
 const oneStrokeSubmitBody = `{"init_data":"dummy","session_id":1,"question_id":1,` +
 	`"strokes":[{"points":[{"x":0,"y":0,"drawing":true},{"x":10,"y":10,"drawing":true}]}]}`
 
-// mockQuizSession fakes service.SessionService's Mini App surface.
 type mockQuizSession struct {
 	submitHandwritingFunc func(
 		ctx context.Context,

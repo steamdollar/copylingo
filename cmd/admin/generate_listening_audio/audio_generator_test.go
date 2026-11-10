@@ -68,7 +68,7 @@ func (mock *mockSynthesizer) Synthesize(
 }
 
 type mockStore struct {
-	existing map[string]bool // keys that already exist
+	existing map[string]bool
 	putKeys  []string
 	existErr error
 	putErr   error
@@ -102,7 +102,6 @@ func (mock *mockStore) Put(
 
 func scriptPointer(value string) *string { return &value }
 
-// New object → Synthesize + Put + SetAudioPath with the content-addressed key.
 func TestTopUpAudio_GeneratesMissing(t *testing.T) {
 	script := "すみません、駅はどこですか。"
 	repository := &mockAudioRepository{pending: []model.Question{
@@ -278,7 +277,6 @@ func TestTopUpAudio_SkipsEmptyScript(t *testing.T) {
 	}
 }
 
-// Empty backlog → no-op, no error.
 func TestTopUpAudio_EmptyPending(t *testing.T) {
 	repository := &mockAudioRepository{pending: nil}
 	synthesizer := &mockSynthesizer{}

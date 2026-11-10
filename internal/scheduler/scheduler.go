@@ -15,7 +15,6 @@ import (
 // userPushCron matches the 30-minute choices in each user's schedule settings.
 const userPushCron = "*/30 * * * *"
 
-// Scheduler runs the periodic user-session dispatch.
 type Scheduler struct {
 	user       slotUsers
 	session    slotSessions
@@ -23,7 +22,6 @@ type Scheduler struct {
 	dispatcher *sessionDispatcher
 }
 
-// slotUsers finds the timezones in use and the users due at a slot time.
 type slotUsers interface {
 	GetActiveTimezones(ctx context.Context) ([]string, error)
 	GetUsersBySlot(
@@ -34,8 +32,6 @@ type slotUsers interface {
 	) ([]model.User, error)
 }
 
-// slotSessions counts unfinished sessions for the backlog limit and serves the
-// dispatcher's build/remind calls.
 type slotSessions interface {
 	CountUnfinishedBatch(
 		ctx context.Context,
@@ -44,7 +40,6 @@ type slotSessions interface {
 	dispatchSessions
 }
 
-// quizPusher sends the "Quiz session arrived" message (bot SessionFlow).
 type quizPusher interface {
 	PushSession(
 		ctx context.Context,
@@ -54,7 +49,6 @@ type quizPusher interface {
 	) error
 }
 
-// studyPusher sends the "Study session arrived" message (bot StudyFlow).
 type studyPusher interface {
 	PushSession(
 		ctx context.Context,
@@ -72,7 +66,6 @@ type pushClaims interface {
 	) (bool, error)
 }
 
-// Dependencies wires Scheduler with the service calls it makes.
 type Dependencies struct {
 	User        slotUsers
 	Session     slotSessions
@@ -97,7 +90,6 @@ func New(dependencies Dependencies) *Scheduler {
 	return scheduler
 }
 
-// Start registers the 30-minute user dispatch and starts the scheduler.
 func (scheduler *Scheduler) Start() {
 	if _, err := scheduler.cron.AddFunc(
 		userPushCron,
@@ -144,10 +136,8 @@ func (scheduler *Scheduler) Start() {
 	)
 }
 
-// Stop stops new ticks and waits for a running dispatch to finish, giving up
-// when ctx ends. Only then does it stop the rate limiter: the dispatch waits
-// on its ticker, so stopping it first would stall the dispatch mid-way after
-// the daily push claim was already taken.
+// Stop stops new ticks and waits for a running dispatch (until ctx ends) before stopping the rate limiter:
+// stopping it first would stall the dispatch after the daily push claim was taken.
 func (scheduler *Scheduler) Stop(ctx context.Context) error {
 	jobsDone := scheduler.cron.Stop()
 	var waitErr error
@@ -228,7 +218,6 @@ func (scheduler *Scheduler) runJob(
 	)
 }
 
-// tick executes 30-minute interval dynamic dispatch across distinct timezones and slots.
 func (scheduler *Scheduler) tick(ctx context.Context) error {
 	timezones, err := scheduler.user.GetActiveTimezones(ctx)
 	if err != nil {

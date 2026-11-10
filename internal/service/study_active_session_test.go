@@ -644,7 +644,7 @@ func TestStudyActiveSessionLoadOwnedStudySessionStateRejectsModeMismatch(t *test
 		userID,
 		model.SessionInProgress,
 	)
-	state.Session.Mode = model.SessionModeQuiz // wrong mode for a study session
+	state.Session.Mode = model.SessionModeQuiz
 	if err := service.save(
 		ctx,
 		state,

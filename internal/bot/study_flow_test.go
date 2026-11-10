@@ -30,8 +30,7 @@ func (store *botStudyMaterialStore) GetMaterialsByPlan(
 	return nil, nil
 }
 
-// botStudySessionStore drives Study creation, start and completion; the
-// embedded nil SessionRepository makes any other sessions-table call panic.
+// The embedded nil SessionRepository makes any other sessions-table call panic.
 type botStudySessionStore struct {
 	service.SessionRepository
 	session      *model.Session
@@ -398,7 +397,6 @@ func TestStudyFlowPreviousNavigation(t *testing.T) {
 		),
 	)
 
-	// 마지막 카드(2/2)에서 이전으로 돌아가면 첫 카드가 다시 보인다.
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
@@ -424,7 +422,6 @@ func TestStudyFlowPreviousNavigation(t *testing.T) {
 			edit.Text,
 		)
 	}
-	// 첫 카드에는 이전 버튼이 없다.
 	if got := onlyCallbackData(
 		t,
 		edit,
@@ -451,7 +448,6 @@ func TestStudyFlowPreviousNavigation(t *testing.T) {
 		t.Fatal("first material should stay studied after prev")
 	}
 
-	// 이미 studied인 카드에서 다시 앞으로 이동한 뒤 완료까지 정상 진행된다.
 	flow.HandleCallback(
 		ctx,
 		studyCallback(
@@ -907,8 +903,7 @@ func rowCallbackData(
 	edit tgbotapi.EditMessageTextConfig,
 ) []string {
 	t.Helper()
-	// Every Study card carries the navigation row plus the study settings row;
-	// only the navigation row (first) is inspected.
+	// Only the first (navigation) row is inspected.
 	if edit.ReplyMarkup == nil || len(edit.ReplyMarkup.InlineKeyboard) != 2 {
 		t.Fatalf(
 			"unexpected reply markup: %+v",
@@ -933,8 +928,7 @@ func rowCallbackData(
 	return datas
 }
 
-// seiketsuPayload is a vocabulary payload whose 清 carries a kanji note and
-// whose both kanji carry readings; 潔 has no note.
+// 清 has a kanji note and readings, 潔 has readings but no note.
 const seiketsuPayload = `{"kana":"せいけつ","kanji":"清潔","meaning_ko":"청결함","part_of_speech":"noun",` +
 	`"kanji_readings":[{"text":"清","reading":"せい","type":"on","on":["セイ","ショウ"]},` +
 	`{"text":"潔","reading":"けつ","type":"on","on":["ケツ"]}],` +
@@ -942,8 +936,6 @@ const seiketsuPayload = `{"kana":"せいけつ","kanji":"清潔","meaning_ko":"�
 	`"parts":[{"part":"氵","role":"meaning","gloss_ko":"물"},{"part":"青","role":"sound","on":"セイ"}],` +
 	`"explanation_ko":"물(氵)처럼 맑다는 뜻에 青이 음 セイ를 더한다."}]}`
 
-// TestHasKanjiDetailDecidesButton pins the button rule: only a vocabulary
-// payload with at least one note or reading gets the button.
 func TestHasKanjiDetailDecidesButton(t *testing.T) {
 	t.Parallel()
 
@@ -995,8 +987,6 @@ func TestHasKanjiDetailDecidesButton(t *testing.T) {
 	}
 }
 
-// TestRenderStudyMaterialIgnoresKanjiNotes keeps the card text identical with
-// or without notes; the notes only appear behind the button.
 func TestRenderStudyMaterialIgnoresKanjiNotes(t *testing.T) {
 	t.Parallel()
 
@@ -1026,8 +1016,6 @@ func TestRenderStudyMaterialIgnoresKanjiNotes(t *testing.T) {
 	}
 }
 
-// TestRenderStudyMaterialLevelMarker shows the material's level in the header
-// like quiz questions, and omits the marker when the level is empty.
 func TestRenderStudyMaterialLevelMarker(t *testing.T) {
 	t.Parallel()
 
@@ -1082,10 +1070,6 @@ func TestRenderStudyMaterialLevelMarker(t *testing.T) {
 	}
 }
 
-// TestRenderKanjiNotes pins each block: the title carries the 훈음 when the
-// reading has one, a noted kanji gets its note then the reading lines, a kanji
-// without a note gets a title alone, a jukuji group has no on'yomi line, and a
-// note without a reading entry still shows without a 훈음.
 func TestRenderKanjiNotes(t *testing.T) {
 	t.Parallel()
 
@@ -1214,8 +1198,6 @@ func TestRenderKanjiNotes(t *testing.T) {
 	}
 }
 
-// TestStudyFlowKanjiNotes walks card → notes → card for a word with notes and
-// checks that a word without notes gets neither the button nor a notes view.
 func TestStudyFlowKanjiNotes(t *testing.T) {
 	ctx := context.Background()
 	sessionID := 77

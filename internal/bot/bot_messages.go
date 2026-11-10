@@ -1,7 +1,6 @@
 package bot
 
 type botMessages struct {
-	// Study cards and one-shot LLM questions.
 	sessionPush                        string
 	startButton                        string
 	startFailed                        string
@@ -65,7 +64,6 @@ type botMessages struct {
 	studyContextFormat                 string
 	studyQuestionPromptFormat          string
 
-	// Commands, menu, and statistics.
 	unknownCommand          string
 	welcomeMessage          string
 	mainMenuFormat          string
@@ -99,7 +97,6 @@ type botMessages struct {
 	languageEnglish         string
 	languageKorean          string
 
-	// Push schedule and timezone settings.
 	settingsLoadFailed                 string
 	settingsUserLoadFailed             string
 	settingsTimezoneInvalid            string
@@ -128,7 +125,6 @@ type botMessages struct {
 	settingsDisabledSlotLabel          string
 	settingsBackButton                 string
 
-	// Linked material preferences.
 	materialPreferenceNotice         string
 	linkedQuizMaterialTitle          string
 	materialExcludedLabel            string
@@ -148,7 +144,6 @@ type botMessages struct {
 	materialPageFormat               string
 	materialPreferenceFailed         string
 
-	// Quiz sessions and question rendering.
 	sessionFetchFailed                  string
 	activeSessionUnavailable            string
 	quizResumeNotice                    string
@@ -192,7 +187,6 @@ type botMessages struct {
 	sessionPushStudyLabel               string
 	sessionPushReviewLabel              string
 
-	// Labels reused across session views.
 	unansweredLabel           string
 	morningStudySessionLabel  string
 	eveningReviewSessionLabel string
@@ -200,7 +194,6 @@ type botMessages struct {
 	articleSessionLabel       string
 	middayStudySessionLabel   string
 
-	// Word order controls and the marker used to update its message.
 	wordOrderEmptySelection  string
 	wordOrderAssembledPrefix string
 	wordOrderUndoButton      string
@@ -209,7 +202,6 @@ type botMessages struct {
 	alreadyAnswered          string
 }
 
-// User-facing copy and locale-specific LLM context instructions share one map.
 var botMessagesByLocale = map[string]botMessages{
 	botDefaultLocale: {
 		sessionPush: "📚 <b>Study Session이 도착했습니다!</b>\n\n" +

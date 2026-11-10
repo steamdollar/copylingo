@@ -106,7 +106,7 @@ Or use:
 make run
 ```
 
-`config.yaml` provides local defaults for the infrastructure started by `make infra`:
+`.env.example` holds the local values for the infrastructure started by `make infra`:
 
 ```text
 PostgreSQL  localhost:5432
@@ -117,16 +117,18 @@ Bucket      copylingo-audio
 
 ## Runtime configuration
 
+Config comes only from environment variables; a local `.env` overrides the shell. Values that are the same in every environment have defaults in [`internal/config/load.go`](internal/config/load.go). Secrets and environment-specific values (DB, Redis, object storage) have none: startup fails and names every missing variable. See `.env.example` for the full list.
+
 Core variables:
 
 | Variable | Purpose |
 |---|---|
-| `COPYLINGO_TELEGRAM_TOKEN` | Telegram bot token |
-| `COPYLINGO_LLM_API_KEY` | **Required** (startup fails without it). Gemini API key used for handwriting grading, learning Q&A, and native TTS |
+| `COPYLINGO_TELEGRAM_TOKEN` | **Required**. Telegram bot token |
+| `COPYLINGO_LLM_API_KEY` | **Required**. Gemini API key used for handwriting grading, learning Q&A, and native TTS |
 | `COPYLINGO_LLM_MODEL` | Chat model override (grading, Q&A) |
 | `COPYLINGO_SERVER_PUBLIC_BASE_URL` | Public HTTPS base URL required for Telegram Mini App flows |
 
-Object storage can use the local MinIO defaults from `config.yaml` or be overridden for another S3-compatible service:
+Object storage (region, bucket, and keys are required; `.env.example` has the local MinIO values):
 
 | Variable | Purpose |
 |---|---|
@@ -152,11 +154,9 @@ Endpoints, security notes, and operations: [`docs/HANDWRITING_MINIAPP_INGRESS.md
 Example deployment setup:
 
 ```bash
-cat > .env <<'EOF'
-COPYLINGO_TELEGRAM_TOKEN=<telegram-bot-token>
-COPYLINGO_LLM_API_KEY=<gemini-api-key>
-COPYLINGO_SERVER_PUBLIC_BASE_URL=https://copylingo.example.com
-EOF
+# Fill the token, API key, and COPYLINGO_SERVER_PUBLIC_BASE_URL=https://copylingo.example.com.
+# Compose reads the secrets from it; the host-side seeding below uses the rest.
+cp .env.example .env
 
 docker compose up -d
 

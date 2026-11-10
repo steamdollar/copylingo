@@ -15,8 +15,6 @@ const (
 	MaxStudySessionMaterialCount     = 50
 )
 
-// StudySessionProfile selects the fixed quota policy used by an automated
-// study push.
 type StudySessionProfile string
 
 const (
@@ -38,11 +36,8 @@ var eveningStudySessionPlan = model.StudySessionPlan{Quotas: []model.StudyMateri
 	{Category: model.MaterialCategoryReading, NewCount: 0, ReviewCount: 0},
 }}
 
-// scaleMorningStudySessionPlan scales the morning plan's category totals
-// (vocabulary:grammar:reading) and per-category new ratios to a requested
-// limit, so tuning morningStudySessionPlan also tunes /study n. Reading is
-// capped at two slots; any excess is redistributed between vocabulary and
-// grammar using their plan weights.
+// scaleMorningStudySessionPlan scales to a requested limit so tuning morningStudySessionPlan also tunes /study n.
+// Reading is capped at two slots; any excess is split between vocabulary and grammar by plan weight.
 func scaleMorningStudySessionPlan(limit int) model.StudySessionPlan {
 	base := morningStudySessionPlan.Quotas
 	weights := make(
@@ -158,7 +153,6 @@ func scaleStudyNewCount(
 	return newCount
 }
 
-// studySessionService creates material-based study sessions.
 type studySessionService struct {
 	materialRepository MaterialRepository
 	sessionRepository  SessionRepository
@@ -177,8 +171,6 @@ func newStudySessionService(
 	}
 }
 
-// BuildStudySession selects the fixed morning/evening plan, or scales the
-// morning plan when limit is positive, then creates the session in the DB.
 func (service *studySessionService) BuildStudySession(
 	ctx context.Context,
 	userID int64,
@@ -197,12 +189,10 @@ func (service *studySessionService) BuildStudySession(
 		)
 	}
 
-	// retrieve profile > check the type of profile > fix plan
 	var plan model.StudySessionPlan
 	switch profile {
 	case StudyProfileMorning:
 		if limit == 0 {
-			// default
 			plan = morningStudySessionPlan
 		} else {
 			// TODO: 이 부분 정책, 코드 관련 정리 필요
@@ -218,7 +208,6 @@ func (service *studySessionService) BuildStudySession(
 		)
 	}
 
-	// validate plan
 	if plan.TotalMaterialCount() <= 0 ||
 		plan.TotalMaterialCount() > MaxStudySessionMaterialCount {
 		return nil, fmt.Errorf(
@@ -228,7 +217,6 @@ func (service *studySessionService) BuildStudySession(
 		)
 	}
 
-	// get materials
 	materials, err := service.materialRepository.GetMaterialsByPlan(
 		ctx,
 		userID,

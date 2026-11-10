@@ -2,7 +2,6 @@ package model
 
 import "time"
 
-// ContentSourceType defines the origin of learning content.
 type ContentSourceType string
 
 const (
@@ -10,7 +9,6 @@ const (
 	ContentSourceExamPreparation ContentSourceType = "exam_prep"
 )
 
-// Content represents collected learning material from external sources.
 type Content struct {
 	ID               int               `db:"id"                json:"id"`
 	SourceType       ContentSourceType `db:"source_type"       json:"source_type"`

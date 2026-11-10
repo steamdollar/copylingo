@@ -12,8 +12,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// llmQuestionAnswerer answers a learning question; the service also keeps the
-// Q&A as a tip candidate.
 type llmQuestionAnswerer interface {
 	Answer(
 		ctx context.Context,
@@ -24,8 +22,6 @@ type llmQuestionAnswerer interface {
 	) (string, error)
 }
 
-// llmContextSession reads the Quiz question or Study card that an in-session
-// "ask the LLM" token points at, to prepend it to the prompt.
 type llmContextSession interface {
 	QuizProgress(
 		ctx context.Context,
@@ -38,7 +34,6 @@ type llmContextSession interface {
 	) (*model.StudyActiveSessionState, error)
 }
 
-// llmInputStore holds the one-shot "next message is an LLM question" token.
 type llmInputStore interface {
 	SetLLMPending(
 		ctx context.Context,
@@ -55,7 +50,6 @@ type llmInputStore interface {
 	) error
 }
 
-// LLMQuestionFlowDependencies wires LLMQuestionFlow; every dependency is required.
 type LLMQuestionFlowDependencies struct {
 	Telegram    *TelegramClient
 	User        userReader
@@ -64,8 +58,6 @@ type LLMQuestionFlowDependencies struct {
 	Input       llmInputStore
 }
 
-// LLMQuestionFlow handles the owner-only /llm mode: arming it, cancelling it,
-// and answering the next message with optional Quiz/Study context.
 type LLMQuestionFlow struct {
 	telegram    *TelegramClient
 	user        userReader
@@ -262,7 +254,6 @@ func (flow *LLMQuestionFlow) handleLLMQuestion(
 			question,
 		)
 	}
-	// The service also keeps the Q&A as a tip candidate for curation.
 	answer, err := flow.llmQuestion.Answer(
 		ctx,
 		*user,
@@ -327,9 +318,7 @@ func (flow *LLMQuestionFlow) loadQuizQuestionContext(
 	)
 }
 
-// loadStudyMaterialContext resolves a pending Study Material token into a
-// user-owned active-session card. Invalid, stale, or completed session tokens
-// intentionally fall back to a plain LLM question.
+// Invalid, stale, or completed tokens fall back to a plain LLM question.
 func (flow *LLMQuestionFlow) loadStudyMaterialContext(
 	ctx context.Context,
 	input model.PendingLLMInput,
@@ -365,7 +354,6 @@ func (flow *LLMQuestionFlow) loadStudyMaterialContext(
 	)
 }
 
-// isLLMAllowed gates the owner-only LLM features to the allowlisted Telegram users.
 func isLLMAllowed(from *tgbotapi.User) bool {
 	if from == nil {
 		return false

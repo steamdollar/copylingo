@@ -9,14 +9,11 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// SessionStores groups the typed Redis working-set stores for Quiz and Study.
-// They stay separate instances (ADR-059 §8.6) and travel as one SessionDependencies field.
 type SessionStores struct {
 	Quiz  QuizSessionStore
 	Study StudySessionStore
 }
 
-// QuestionRepository is the question-bank boundary used for Quiz selection and SRS counts.
 type QuestionRepository interface {
 	GetNewQuestions(
 		ctx context.Context,
@@ -46,7 +43,6 @@ type QuestionRepository interface {
 	) (int, error)
 }
 
-// SessionRepository is the sessions-table boundary shared by both session modes.
 type SessionRepository interface {
 	CreateSession(
 		ctx context.Context,
@@ -83,7 +79,6 @@ type SessionRepository interface {
 	) error
 }
 
-// SessionQuestionRepository stores the ordered question list of a new Quiz session.
 type SessionQuestionRepository interface {
 	CreateSessionQuestions(
 		ctx context.Context,
@@ -91,7 +86,6 @@ type SessionQuestionRepository interface {
 	) error
 }
 
-// QuizActiveSessionRepository loads a Quiz working set from DB and flushes it back on completion.
 type QuizActiveSessionRepository interface {
 	LoadQuestionSessionWithStateBySessionID(
 		ctx context.Context,
@@ -103,7 +97,6 @@ type QuizActiveSessionRepository interface {
 	) error
 }
 
-// StudyActiveSessionRepository loads a Study working set from DB and flushes it back on completion.
 type StudyActiveSessionRepository interface {
 	LoadStudySessionWithStateBySessionID(
 		ctx context.Context,
@@ -115,7 +108,6 @@ type StudyActiveSessionRepository interface {
 	) error
 }
 
-// MaterialRepository selects Study materials for a session plan.
 type MaterialRepository interface {
 	GetMaterialsByPlan(
 		ctx context.Context,
@@ -127,7 +119,6 @@ type MaterialRepository interface {
 	) ([]model.Material, error)
 }
 
-// QuizGradingLLM grades handwriting answers, which need AI judgment.
 type QuizGradingLLM interface {
 	GradeHandwriting(
 		ctx context.Context,
@@ -137,7 +128,6 @@ type QuizGradingLLM interface {
 	) (external.GradeResult, error)
 }
 
-// SessionUserRepository updates user-level learning records on Quiz completion.
 type SessionUserRepository interface {
 	UpdateStreak(
 		ctx context.Context,
@@ -145,7 +135,6 @@ type SessionUserRepository interface {
 	) error
 }
 
-// SessionDependencies lists every external boundary SessionService touches (ADR-059 §8.3).
 type SessionDependencies struct {
 	QuestionRepository           QuestionRepository
 	SessionRepository            SessionRepository
@@ -156,14 +145,10 @@ type SessionDependencies struct {
 	UserRepository               SessionUserRepository
 	Stores                       SessionStores
 	LLM                          QuizGradingLLM
-	// DB lets Study creation own its transaction boundary (ADR-061).
-	DB *sqlx.DB
+	DB                           *sqlx.DB
 }
 
-// SessionService is the Tier1 entry point for Quiz and Study sessions
-// (ADR-059 §8.6). Callers see only this type; selection and progress are
-// internal collaborators built here. Grading happens inline in the submit
-// methods: exact match for text/option answers, the LLM for handwriting.
+// SessionService grades inline: exact match for text/option answers, the LLM for handwriting.
 type SessionService struct {
 	sessionRepository  SessionRepository
 	userRepository     SessionUserRepository

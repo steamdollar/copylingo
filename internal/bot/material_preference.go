@@ -14,8 +14,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// materialPreferences reads and changes one user's review mode for a linked
-// material from the Quiz and Study screens.
 type materialPreferences interface {
 	Get(
 		ctx context.Context,
@@ -30,8 +28,6 @@ type materialPreferences interface {
 	) error
 }
 
-// materialPreferenceList pages one user's changed material preferences and
-// restores one to normal from the Settings screen.
 type materialPreferenceList interface {
 	List(
 		ctx context.Context,
@@ -46,10 +42,8 @@ type materialPreferenceList interface {
 	) error
 }
 
-// Quiz callbacks carry a question ID, never a trusted material ID. Resolve it
-// from the owner's session before showing or changing the linked preference.
-// The menu is a separate message so the question keeps its answer buttons;
-// its close button deletes only that menu message.
+// Quiz callbacks carry a question ID, never a trusted material ID: resolve it from the owner's session.
+// The menu is a separate message so the question keeps its answer buttons.
 func (flow *SessionFlow) handleQuizMaterialPreference(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -74,8 +68,7 @@ func (flow *SessionFlow) handleQuizMaterialPreference(
 		return
 	}
 	if len(parts) == 5 && parts[4] == callbackActionClose {
-		// Closing reads no session: it removes only the menu message the
-		// button sits on, so it still works after the Quiz has finished.
+		// Closing reads no session, so it still works after the Quiz has finished.
 		flow.telegram.DeleteMessage(
 			callbackQuery.Message.Chat.ID,
 			callbackQuery.Message.MessageID,
@@ -127,7 +120,6 @@ func (flow *SessionFlow) handleQuizMaterialPreference(
 		mode,
 	)
 	if len(parts) == 5 {
-		// A choice re-renders the menu message in place, as on the Study card.
 		flow.telegram.EditMessage(
 			callbackQuery.Message.Chat.ID,
 			callbackQuery.Message.MessageID,
@@ -156,8 +148,7 @@ func (flow *SessionFlow) handleQuizMaterialPreference(
 	}
 }
 
-// handleMaterialPreference only changes selection policy. Opening the menu,
-// changing a policy, and returning to the card never mark material studied.
+// Never marks the material studied.
 func (flow *StudyFlow) handleMaterialPreference(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -249,8 +240,7 @@ func (flow *StudyFlow) handleMaterialPreference(
 	)
 }
 
-// materialPreferenceMode returns the review mode a menu callback chose, or ""
-// when the callback only opens the menu. It reports false for unknown modes.
+// Returns "" when the callback only opens the menu, false for unknown modes.
 func materialPreferenceMode(parts []string) (model.MaterialReviewMode, bool) {
 	if len(parts) != 5 {
 		return "", true
@@ -259,8 +249,7 @@ func materialPreferenceMode(parts []string) (model.MaterialReviewMode, bool) {
 	return mode, mode.Valid()
 }
 
-// applyMaterialPreference stores the chosen mode, or reads the current one when
-// chosen is "" (menu just opened). On failure it alerts the user and reports false.
+// chosen "" (menu just opened) reads the current mode instead of storing one.
 func applyMaterialPreference(
 	ctx context.Context,
 	telegram *TelegramClient,
@@ -312,8 +301,6 @@ func applyMaterialPreference(
 	return preference.ReviewMode, true
 }
 
-// quizMaterialPreferenceMenu is the shared menu for a Quiz question's linked
-// material. Its close button deletes the separate menu message.
 func quizMaterialPreferenceMenu(
 	sessionID,
 	questionID int,
@@ -338,8 +325,6 @@ func quizMaterialPreferenceMenu(
 	)
 }
 
-// studyMaterialPreferenceMenu is the shared menu for a Study card. Its back
-// button re-renders the same card in place.
 func studyMaterialPreferenceMenu(
 	title string,
 	sessionID,
@@ -368,9 +353,6 @@ func studyMaterialPreferenceMenu(
 	)
 }
 
-// materialPreferenceMenu renders the menu shared by the Quiz and Study screens:
-// the subject and current mode, one button per review mode with the current
-// one checked, and a final navigation button chosen by the caller.
 func materialPreferenceMenu(
 	subject string,
 	selected model.MaterialReviewMode,
@@ -466,8 +448,7 @@ func (flow *SettingsFlow) handleMaterialPreferencesCallback(
 		return
 	}
 	if parts[1] == callbackActionRestore {
-		// The service restores only this user's preference and treats an already
-		// restored or absent preference as normal, so repeated callbacks are safe.
+		// The service treats an already restored or absent preference as normal, so repeated callbacks are safe.
 		if err := flow.materialPreference.Set(
 			ctx,
 			callbackQuery.From.ID,
@@ -617,8 +598,6 @@ func materialPreferenceInt(
 	return value, err == nil && value >= 0 && (allowZero || value > 0) && strconv.Itoa(value) == raw
 }
 
-// materialPreferenceError logs a failed preference read/write and tells the
-// user through a callback alert, shared by the Quiz, Study and Settings screens.
 func materialPreferenceError(
 	ctx context.Context,
 	telegram *TelegramClient,

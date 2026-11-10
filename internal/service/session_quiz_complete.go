@@ -7,19 +7,14 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// QuizCompletion is the completed-Quiz summary plus the word-order question IDs
-// whose ephemeral drafts the caller should now discard.
+// QuizCompletion carries the word-order question IDs whose ephemeral drafts the caller should discard.
 type QuizCompletion struct {
 	QuizSessionResult
 	WordOrderQuestionIDs []int
 }
 
-// CompleteQuiz flushes the Quiz working set to DB, updates the user's streak
-// (Quiz completion only; Study does not count) and deletes the working set.
-//
-// Word-order IDs are captured first because Delete removes the working set;
-// they are collected only when the caller owns the session, and a failed
-// capture lookup is left for Flush to report.
+// CompleteQuiz updates the streak (Quiz completion only; Study does not count).
+// Word-order IDs are captured before Delete removes the working set, only when the caller owns the session.
 func (service *SessionService) CompleteQuiz(
 	ctx context.Context,
 	sessionID int,

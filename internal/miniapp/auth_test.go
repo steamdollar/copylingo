@@ -19,7 +19,6 @@ func TestInitDataVerifier_Verify(t *testing.T) {
 	)
 	verifier.now = func() time.Time { return now }
 
-	// Valid data generation
 	userData := `{"id":12345678,"first_name":"Test","username":"testuser"}`
 	authDate := fmt.Sprintf(
 		"%d",
@@ -40,7 +39,6 @@ func TestInitDataVerifier_Verify(t *testing.T) {
 		userData,
 	)
 
-	// Create data_check_string
 	// Pairs sorted by key: auth_date=..., query_id=..., user=...
 	dataCheckString := fmt.Sprintf(
 		"auth_date=%s\nquery_id=AAHd_E0_AAAAAN38TT-S-F4G\nuser=%s",

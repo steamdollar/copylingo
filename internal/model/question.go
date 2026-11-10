@@ -8,28 +8,20 @@ import (
 	"time"
 )
 
-// QuestionType defines the type of question.
 type QuestionType string
 
 const (
-	// QuestionMultipleChoice - 객관식 (4지선다 등)
 	QuestionMultipleChoice QuestionType = "multiple_choice"
-	// QuestionFillBlank - 빈칸 채우기
-	QuestionFillBlank QuestionType = "fill_blank"
-	// QuestionKanaHandwriting - 가나 손글씨 입력 (Mini App + AI binary grading)
-	QuestionKanaHandwriting QuestionType = "kana_handwriting"
-	// QuestionTranslation - 번역 문제
-	QuestionTranslation QuestionType = "translation"
-	// QuestionListening - 청해 문제
-	QuestionListening QuestionType = "listening"
-	// QuestionReadingComprehension - 독해 문제
+	QuestionFillBlank      QuestionType = "fill_blank"
+	// QuestionKanaHandwriting is entered in the Mini App and graded pass/fail by the LLM.
+	QuestionKanaHandwriting      QuestionType = "kana_handwriting"
+	QuestionTranslation          QuestionType = "translation"
+	QuestionListening            QuestionType = "listening"
 	QuestionReadingComprehension QuestionType = "reading_comp"
-	// QuestionWordOrder - 단어 배열 (어순 교정)
-	QuestionWordOrder QuestionType = "word_order"
+	QuestionWordOrder            QuestionType = "word_order"
 )
 
-// Skill defines the skill measured by a question.
-// Question.Type remains the answer/rendering mode for backward compatibility.
+// Skill is the skill a question measures; Question.Type stays the answer/rendering mode.
 type Skill string
 
 const (
@@ -44,8 +36,7 @@ const (
 
 	// JLPT official-style taxonomy.
 	SkillKanjiReading Skill = "kanji_reading"
-	// SkillVocabularyKanjiReading is the N4/JLPT vocabulary kanji-reading item type.
-	// It is intentionally distinct from the legacy app-owned vocab_kanji_recall.
+	// SkillVocabularyKanjiReading is the N4/JLPT kanji-reading item, distinct from legacy vocab_kanji_recall.
 	SkillVocabularyKanjiReading Skill = "vocab_kanji_reading"
 	SkillVocabularyOrthography  Skill = "vocab_orthography"
 	SkillVocabularyContext      Skill = "vocab_context"
@@ -75,7 +66,6 @@ func SkillPointer(skill Skill) *Skill {
 	return &skill
 }
 
-// QuestionCategory defines the learning category.
 type QuestionCategory string
 
 const (
@@ -88,7 +78,6 @@ const (
 	CategoryListening   QuestionCategory = "listening"
 )
 
-// Question represents a reusable learning-question catalog entry.
 type Question struct {
 	ID               int              `db:"id"                json:"id"`
 	QuestionKey      *string          `db:"question_key"      json:"question_key,omitempty"`
@@ -113,7 +102,6 @@ type Question struct {
 	IsMaintenanceCheck bool `db:"is_maintenance_check" json:"-"`
 }
 
-// GetOptions parses the JSONB options field into a string slice.
 func (question *Question) GetOptions() ([]string, error) {
 	var options []string
 	if err := json.Unmarshal(
@@ -125,8 +113,7 @@ func (question *Question) GetOptions() ([]string, error) {
 	return options, nil
 }
 
-// ShuffleOptions deterministically shuffles the question options using a seed derived from sessionID and Question.ID.
-// If options contains 1 or fewer elements, or is empty/nil, it does nothing and returns nil.
+// ShuffleOptions shuffles deterministically, seeded from sessionID and Question.ID; no-op for 1 or fewer options.
 func (question *Question) ShuffleOptions(sessionID int) error {
 	if len(question.Options) == 0 {
 		return nil

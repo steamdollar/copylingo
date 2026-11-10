@@ -73,8 +73,7 @@ func (mock *mockUserRepository) UpdateTimezone(
 	return nil
 }
 
-// mockSRSRepository serves due-review queries; the embedded nil QuestionRepository makes
-// any other question-bank call panic.
+// The embedded nil QuestionRepository makes any other question-bank call panic.
 type mockSRSRepository struct {
 	service.QuestionRepository
 }
@@ -132,8 +131,7 @@ func (store *commandStudyMaterialStore) GetMaterialsByPlan(
 	return store.materials, nil
 }
 
-// commandStudySessionStore records Study creation; the embedded nil
-// SessionRepository makes any other sessions-table call panic.
+// The embedded nil SessionRepository makes any other sessions-table call panic.
 type commandStudySessionStore struct {
 	service.SessionRepository
 	nextID             int
@@ -172,7 +170,6 @@ func (store *commandStudySessionStore) CreateSessionMaterialsInTx(
 
 var botTestDB = testutil.TransactionDB()
 
-// llmTipCandidateStore records the learner Q&A pairs saved as tip candidates.
 type llmTipCandidateStore struct {
 	created []*model.TipCandidate
 	err     error
@@ -258,7 +255,6 @@ func TestHandleUpdate_Dispatch(t *testing.T) {
 				},
 			}
 
-			// Setup dependencies for showMainMenu
 			userRepositoryMock := &mockUserRepository{
 				getOrCreateFunc: func(
 					ctx context.Context,

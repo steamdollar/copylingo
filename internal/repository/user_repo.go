@@ -17,7 +17,6 @@ func NewUserRepository(db *sqlx.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// GetOrCreate finds an existing user or creates a new one.
 func (repository *UserRepository) GetOrCreate(
 	ctx context.Context,
 	telegramID int64,
@@ -34,7 +33,6 @@ func (repository *UserRepository) GetOrCreate(
 		return user, nil
 	}
 
-	// Create new user with default Japanese/N5
 	// TODO: ja, N5 defaults should be determined by user input or locale
 	if _, err := repository.db.ExecContext(
 		ctx,
@@ -73,7 +71,6 @@ func (repository *UserRepository) GetByID(
 	return user, err
 }
 
-// UpdateStreak updates the user's streak count.
 func (repository *UserRepository) UpdateStreak(
 	ctx context.Context,
 	userID int64,
@@ -118,7 +115,6 @@ func (repository *UserRepository) UpdateStreak(
 	return nil
 }
 
-// GetAllUsers returns all registered users (for scheduled pushes).
 func (repository *UserRepository) GetAllUsers(ctx context.Context) ([]model.User, error) {
 	var users []model.User
 	err := repository.db.SelectContext(
@@ -147,7 +143,6 @@ func slotColumn(slot model.SessionSlot) (string, error) {
 	}
 }
 
-// GetActiveTimezones returns all distinct, non-empty timezones configured by users.
 func (repository *UserRepository) GetActiveTimezones(ctx context.Context) ([]string, error) {
 	var timezones []string
 	query := `SELECT DISTINCT timezone FROM users WHERE timezone IS NOT NULL AND timezone != '' ORDER BY timezone`
@@ -164,7 +159,6 @@ func (repository *UserRepository) GetActiveTimezones(ctx context.Context) ([]str
 	return timezones, nil
 }
 
-// GetUsersBySlot retrieves users scheduled for a specific slot at localTime in timezone.
 func (repository *UserRepository) GetUsersBySlot(
 	ctx context.Context,
 	slot model.SessionSlot,
@@ -204,7 +198,7 @@ func (repository *UserRepository) GetUsersBySlot(
 	return users, nil
 }
 
-// UpdateSlotTime updates a specific slot time for a user (nil to disable).
+// UpdateSlotTime sets a slot time for a user; nil disables the slot.
 func (repository *UserRepository) UpdateSlotTime(
 	ctx context.Context,
 	userID int64,
@@ -249,7 +243,6 @@ func (repository *UserRepository) UpdateSlotTime(
 	return nil
 }
 
-// UpdateTimezone updates the user's timezone.
 func (repository *UserRepository) UpdateTimezone(
 	ctx context.Context,
 	userID int64,

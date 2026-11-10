@@ -12,9 +12,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// --- helpers ---------------------------------------------------------------
-
-// storeActiveState seeds the typed active-session test store.
 func storeActiveState(
 	t *testing.T,
 	stateStores *testInteractionStores,
@@ -29,7 +26,6 @@ func storeActiveState(
 	)
 }
 
-// streakRepositoryStub satisfies SessionService's user repo (UpdateStreak).
 type streakRepositoryStub struct {
 	updated bool
 }
@@ -42,7 +38,6 @@ func (stub *streakRepositoryStub) UpdateStreak(
 	return nil
 }
 
-// activeRepositoryStub satisfies the active session repository for Flush.
 type activeRepositoryStub struct {
 	flushed bool
 }
@@ -61,7 +56,6 @@ func (stub *activeRepositoryStub) FlushQuizActiveSession(
 	return nil
 }
 
-// botWithActive wires a SessionFlow whose QuizActiveSession + Grader use the given repo/redis.
 func botWithActive(
 	stateStores *testInteractionStores,
 	repository *activeRepositoryStub,
@@ -115,8 +109,6 @@ func collectText(messages []tgbotapi.Chattable) string {
 	}
 	return builder.String()
 }
-
-// --- finishSession ---------------------------------------------------------
 
 func TestFinishSession_Summary(t *testing.T) {
 	ctx := context.Background()
@@ -211,8 +203,6 @@ func TestFinishSession_Summary(t *testing.T) {
 	}
 }
 
-// --- HandleSessionCallback dispatch to finish ------------------------------
-
 func TestHandleSessionCallback_Finish(t *testing.T) {
 	ctx := context.Background()
 	stateStores := newTestInteractionStores()
@@ -280,7 +270,6 @@ func TestHandleSessionCallback_BadData(t *testing.T) {
 			3,
 		),
 	)
-	// non-numeric session id -> early return
 	sessionFlow.HandleSessionCallback(
 		ctx,
 		callbackWithMessage(
@@ -291,8 +280,6 @@ func TestHandleSessionCallback_BadData(t *testing.T) {
 		),
 	)
 }
-
-// --- HandleAnswerCallback --------------------------------------------------
 
 func TestHandleAnswerCallback_OptionSelected(t *testing.T) {
 	ctx := context.Background()
@@ -419,7 +406,6 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 			3,
 		),
 	)
-	// non-numeric session id
 	sessionFlow.HandleAnswerCallback(
 		ctx,
 		callbackWithMessage(
@@ -430,8 +416,6 @@ func TestHandleAnswerCallback_BadData(t *testing.T) {
 		),
 	)
 }
-
-// --- showQuestion / renderByType -------------------------------------------
 
 func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 	ctx := context.Background()
@@ -500,7 +484,6 @@ func TestShowQuestion_MultipleChoiceKeyboard(t *testing.T) {
 			message.ReplyMarkup,
 		)
 	}
-	// 4 options -> 2 rows of 2
 	if len(keyboard.InlineKeyboard) != 2 {
 		t.Errorf(
 			"expected 2 option rows, got %d",
@@ -553,8 +536,6 @@ func TestShowQuestion_AllAnsweredShowsFinish(t *testing.T) {
 		)
 	}
 }
-
-// --- processAnswerText: wrong answer & AI unavailable ----------------------
 
 func TestProcessAnswerText_Wrong(t *testing.T) {
 	stateStores := newTestInteractionStores()
@@ -618,8 +599,6 @@ func TestProcessAnswerText_Wrong(t *testing.T) {
 		)
 	}
 }
-
-// --- handler.go stats/streak/menu paths ------------------------------------
 
 type analyzerUserRepositoryStub struct{ streak int }
 
@@ -811,7 +790,6 @@ func TestHandleStatsProgressCallback(t *testing.T) {
 	)
 }
 
-// assertStatsTabs checks the 정답률 | 진도 tab row marks only activeCallback.
 func assertStatsTabs(
 	t *testing.T,
 	edit tgbotapi.EditMessageTextConfig,

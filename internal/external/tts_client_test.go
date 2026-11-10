@@ -121,7 +121,6 @@ func TestSynthesize_Success(t *testing.T) {
 		)
 	}
 
-	// Request body reflects the native TTS contract (ADR-031).
 	if len(gotBody.Contents) != 1 || len(gotBody.Contents[0].Parts) != 1 ||
 		gotBody.Contents[0].Parts[0].Text != "こんにちは" {
 		t.Errorf(

@@ -19,8 +19,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// studySession is the Study part of service.SessionService that StudyFlow
-// drives: start, per-card progress, finish/complete, and owner-checked reads.
 type studySession interface {
 	StartStudy(
 		ctx context.Context,
@@ -51,7 +49,6 @@ type studySession interface {
 	) (*model.StudyActiveSessionState, error)
 }
 
-// studyInputStore arms the per-card "ask the LLM" pending token.
 type studyInputStore interface {
 	SetLLMPending(
 		ctx context.Context,
@@ -60,7 +57,6 @@ type studyInputStore interface {
 	) error
 }
 
-// StudyFlowDependencies wires StudyFlow; every dependency is required.
 type StudyFlowDependencies struct {
 	Telegram           *TelegramClient
 	Session            studySession
@@ -68,7 +64,6 @@ type StudyFlowDependencies struct {
 	Input              studyInputStore
 }
 
-// StudyFlow handles material-based study sessions.
 type StudyFlow struct {
 	telegram           *TelegramClient
 	session            studySession
@@ -275,7 +270,6 @@ func (flow *StudyFlow) nextMaterial(
 	currentOrder int,
 ) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	// update study proceeding state
 	state, err := flow.session.MarkStudied(
 		ctx,
 		sessionID,
@@ -311,7 +305,7 @@ func (flow *StudyFlow) nextMaterial(
 	)
 }
 
-// previousMaterial re-shows an already-seen card; it never mutates studied state.
+// previousMaterial never mutates studied state.
 func (flow *StudyFlow) previousMaterial(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -490,10 +484,7 @@ func (flow *StudyFlow) showMaterial(
 		index == len(items)-1,
 		isLLMAllowed(&tgbotapi.User{ID: state.Session.UserID}),
 	)
-	// The kanji button exists only when the payload carries notes or
-	// readings, so other cards keep their previous keyboard (ADR-073,
-	// ADR-074). It goes right below the navigation row (index 0), above the
-	// ask-LLM row.
+	// Kanji button only when the card has notes or readings, right below the navigation row (ADR-074).
 	if hasKanjiDetail(item.Material) {
 		keyboard.InlineKeyboard = slices.Insert(
 			keyboard.InlineKeyboard,
@@ -612,9 +603,7 @@ func studyMaterialKeyboard(
 	return tgbotapi.NewInlineKeyboardMarkup(rows...)
 }
 
-// handleAskLLMQuestion arms one contextual LLM question for a Study material.
-// Ownership and material membership are checked before accepting the callback;
-// they are checked again when resolving the context after the text reply.
+// Ownership and material membership are checked here and again when resolving context after the text reply.
 func (flow *StudyFlow) handleAskLLMQuestion(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -696,8 +685,7 @@ func (flow *StudyFlow) handleAskLLMQuestion(
 	)
 }
 
-// showKanjiNotes replaces the card with its kanji notes and a button back to
-// the card. Like the settings menu, it never marks the material studied.
+// Never marks the material studied.
 func (flow *StudyFlow) showKanjiNotes(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -806,8 +794,7 @@ func renderStudyMaterial(
 	index,
 	total int,
 ) string {
-	// Study sessions mix adjacent levels like quiz sessions (ADR-046), so the
-	// header names each material's level; materials without one omit the marker.
+	// Study sessions mix adjacent levels (ADR-046), so the header names each material's level when it has one.
 	levelTag := ""
 	if material.ProficiencyLevel != "" {
 		levelTag = fmt.Sprintf(
@@ -899,8 +886,6 @@ func renderVocabularyPayload(payload json.RawMessage) string {
 	)
 }
 
-// hasKanjiDetail reports whether a vocabulary card has kanji notes or
-// readings to show behind the kanji button; other categories have none.
 func hasKanjiDetail(material model.Material) bool {
 	if material.Category != model.MaterialCategoryVocabulary {
 		return false
@@ -915,12 +900,7 @@ func hasKanjiDetail(material model.Material) bool {
 	return len(vocabulary.KanjiNotes)+len(vocabulary.KanjiReadings) > 0
 }
 
-// renderKanjiNotes shows one block per kanji in word order: its title with
-// its 훈음, its structure note when it has one, then how this word reads it
-// and the kanji's common on'yomi, so an on'yomi seen here carries over to
-// other words (ADR-074, ADR-076). A note whose kanji has no reading entry,
-// such as one inside a jukuji group, follows the others without 훈음 or
-// reading lines.
+// A note whose kanji has no reading entry (e.g. inside a jukuji group) comes last, without 훈음 or reading lines.
 func renderKanjiNotes(vocabulary vocabularyStudyPayload) string {
 	messages := botMessagesByLocale[botDefaultLocale]
 	unrenderedNotes := make(
@@ -993,9 +973,7 @@ func renderKanjiNotes(vocabulary vocabularyStudyPayload) string {
 	)
 }
 
-// kanjiTitle names a block's kanji, then its 훈음 so the reader knows what
-// the kanji is before its parts (ADR-076), then the note's type when it has
-// one: <b>伸</b> 펼 신 · 형성문자. Empty hunEum or noteType is left out.
+// Format: <b>伸</b> 펼 신 · 형성문자. Empty hunEum or noteType is left out.
 func kanjiTitle(
 	text,
 	hunEum string,
@@ -1023,9 +1001,7 @@ func kanjiTitle(
 	return title
 }
 
-// kanjiNoteLines writes a note's title with its 훈음 and type, its parts and
-// its one-line explanation. hunEum comes from the kanji's reading entry and
-// is empty for a note that has none.
+// hunEum is empty for a note whose kanji has no reading entry.
 func kanjiNoteLines(
 	note model.KanjiNote,
 	hunEum string,
@@ -1066,8 +1042,7 @@ func kanjiNoteLines(
 	return lines
 }
 
-// kanjiReadingLines writes how this word reads the kanji, as 이 단어에선: の
-// (훈독), and the kanji's common on'yomi, which a jukuji group has none of.
+// A jukuji group has no common on'yomi.
 func kanjiReadingLines(reading model.KanjiReading) []string {
 	messages := botMessagesByLocale[botDefaultLocale]
 	lines := []string{
@@ -1104,12 +1079,7 @@ func kanjiReadingTypeLabel(readingType model.KanjiReadingType) string {
 	}
 }
 
-// renderKanjiPart writes a part with what it gives its kanji in brackets
-// (ADR-080): a meaning or form part its gloss, after the kanji a radical
-// variant stands for, as 扌(手 · 손) or 木(나무); a sound part its own 훈음
-// and the on'yomi it shares with the kanji, then 발음, as
-// 交(사귈 교 · コウ · 발음) or 寺(절 사 · 발음) when the readings diverged.
-// Empty values are left out.
+// Brackets (ADR-080): 扌(手 · 손), 木(나무), sound part 交(사귈 교 · コウ · 발음), 발음 only if readings diverged.
 func renderKanjiPart(part model.KanjiPart) string {
 	messages := botMessagesByLocale[botDefaultLocale]
 	values := []string{
@@ -1250,9 +1220,7 @@ type readingStudyPayload struct {
 	KeyVocabulary []readingStudyVocabulary `json:"key_vocabulary"`
 }
 
-// renderReadingPayload shows the passage, its full-hiragana reading aid, and
-// key vocabulary. The Korean translation and answer rationale intentionally
-// stay out — they surface only in the quiz explanation (ADR-036).
+// Korean translation and answer rationale stay out, they surface only in the quiz explanation (ADR-036).
 func renderReadingPayload(payload json.RawMessage) string {
 	messages := botMessagesByLocale[botDefaultLocale]
 	var reading readingStudyPayload

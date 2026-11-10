@@ -9,7 +9,6 @@ import (
 // Read-only lookups for rendering and scheduling. They never change DB or
 // Redis state beyond the Quiz working-set recovery done by QuizProgress.
 
-// CountUnfinishedBatch returns the number of pending/in-progress sessions of any mode per user.
 func (service *SessionService) CountUnfinishedBatch(
 	ctx context.Context,
 	userIDs []int64,
@@ -20,7 +19,6 @@ func (service *SessionService) CountUnfinishedBatch(
 	)
 }
 
-// OldestUnfinished returns the user's highest-priority unfinished session of any mode.
 func (service *SessionService) OldestUnfinished(
 	ctx context.Context,
 	userID int64,
@@ -31,7 +29,6 @@ func (service *SessionService) OldestUnfinished(
 	)
 }
 
-// ListByStatus returns the user's sessions of any mode in the given status.
 func (service *SessionService) ListByStatus(
 	ctx context.Context,
 	userID int64,
@@ -44,12 +41,10 @@ func (service *SessionService) ListByStatus(
 	)
 }
 
-// ListInProgressQuizzes returns in-progress Quiz sessions of all users.
 func (service *SessionService) ListInProgressQuizzes(ctx context.Context) ([]model.Session, error) {
 	return service.sessionRepository.ListInProgress(ctx)
 }
 
-// DueReviewCount returns how many SRS items are due for the user's language/level scope.
 func (service *SessionService) DueReviewCount(
 	ctx context.Context,
 	userID int64,

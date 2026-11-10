@@ -4,7 +4,6 @@ import "time"
 
 const DefaultQuestionEaseFactor = 2.5
 
-// UserQuestionProgress is the per-user SRS and aggregate state for one shared Question.
 type UserQuestionProgress struct {
 	UserID         int64      `db:"user_id"          json:"user_id"`
 	QuestionID     int        `db:"question_id"      json:"question_id"`
@@ -19,7 +18,10 @@ type UserQuestionProgress struct {
 	UpdatedAt      time.Time  `db:"updated_at"       json:"updated_at"`
 }
 
-func NewUserQuestionProgress(userID int64, questionID int) UserQuestionProgress {
+func NewUserQuestionProgress(
+	userID int64,
+	questionID int,
+) UserQuestionProgress {
 	return UserQuestionProgress{
 		UserID:     userID,
 		QuestionID: questionID,

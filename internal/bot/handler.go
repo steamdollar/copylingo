@@ -19,13 +19,9 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// brTagPattern matches <br>, <br/>, <br /> (any case). Telegram's HTML parse mode
-// rejects <br> ("Unsupported start tag"), so we convert it to a literal newline
-// before sending. This protects every outgoing message, including question prompts
-// stored in the DB with <br> hints.
+// brTagPattern matches <br> variants. Telegram HTML parse mode rejects them ("Unsupported start tag").
 var brTagPattern = regexp.MustCompile(`(?i)<br\s*/?>`)
 
-// sanitizeTelegramHTML makes text safe for ParseMode=HTML messages.
 func sanitizeTelegramHTML(text string) string {
 	return brTagPattern.ReplaceAllString(
 		text,
@@ -33,7 +29,6 @@ func sanitizeTelegramHTML(text string) string {
 	)
 }
 
-// BotAPI defines the interface for Telegram bot interactions to allow mocking.
 type BotAPI interface {
 	Send(chattable tgbotapi.Chattable) (tgbotapi.Message, error)
 	Request(chattable tgbotapi.Chattable) (*tgbotapi.APIResponse, error)
@@ -41,8 +36,6 @@ type BotAPI interface {
 	StopReceivingUpdates()
 }
 
-// commandSession is the part of service.SessionService the main menu and
-// the /study, /test commands use.
 type commandSession interface {
 	DueReviewCount(
 		ctx context.Context,
@@ -62,8 +55,6 @@ type commandSession interface {
 	) (*model.Session, error)
 }
 
-// userStatsReader computes the numbers behind /stats, /streak and the
-// stats menu tabs.
 type userStatsReader interface {
 	GetUserStats(
 		ctx context.Context,
@@ -75,7 +66,6 @@ type userStatsReader interface {
 	) ([]model.LevelProgress, error)
 }
 
-// inputClearer drops a chat's pending typed answer and LLM mode on /exit.
 type inputClearer interface {
 	ClearInput(
 		ctx context.Context,
@@ -84,7 +74,6 @@ type inputClearer interface {
 	) error
 }
 
-// BotDependencies wires the router; every dependency is required.
 type BotDependencies struct {
 	Telegram        *TelegramClient
 	User            userReader
@@ -97,8 +86,6 @@ type BotDependencies struct {
 	LLMQuestionFlow *LLMQuestionFlow
 }
 
-// Bot routes Telegram updates to the feature flows and serves the menu,
-// stats, streak, help, exit, study and test commands itself.
 type Bot struct {
 	telegram        *TelegramClient
 	user            userReader
@@ -110,15 +97,11 @@ type Bot struct {
 	settingsFlow    *SettingsFlow
 	llmQuestionFlow *LLMQuestionFlow
 	stopChannel     chan struct{}
-	// loopDone closes when Start's polling loop returns. Stop waits for it
-	// before waiting on handlers so no handler is added after that wait.
+	// loopDone closes when Start's polling loop returns. Stop waits on it before handlers so none is added late.
 	loopDone chan struct{}
-	// handlers tracks in-flight handleUpdate goroutines for Stop.
 	handlers sync.WaitGroup
 }
 
-// NewBot builds the router over flows that cmd/server has already assembled
-// on one shared TelegramClient.
 func NewBot(dependencies BotDependencies) *Bot {
 	return &Bot{
 		telegram:        dependencies.Telegram,
@@ -135,18 +118,13 @@ func NewBot(dependencies BotDependencies) *Bot {
 	}
 }
 
-// Start polls Telegram updates and handles each in its own goroutine until
-// Stop. It blocks, so callers run it in a goroutine.
 func (bot *Bot) Start() {
 	defer close(bot.loopDone)
 	defer log.Println("Telegram bot stopped")
 
-	// when bot starts, it fetches messges from user that was stored in telegram while bot was offline,
-	// and handle them with handleUpdate function.
 	pollConfig := tgbotapi.NewUpdate(0)
 	pollConfig.Timeout = 60
 
-	// 업데이트 받는 go chan 생성
 	updates := bot.telegram.Updates(pollConfig)
 
 	for {
@@ -167,9 +145,8 @@ func (bot *Bot) Start() {
 	}
 }
 
-// Stop ends polling, then waits until the polling loop has exited and every
-// in-flight update handler has returned, so the caller can close DB/Redis
-// afterwards. It gives up when ctx ends. Stop must follow Start.
+// Stop waits for the polling loop and in-flight handlers so callers can close DB/Redis afterwards.
+// It must follow Start.
 func (bot *Bot) Stop(ctx context.Context) error {
 	close(bot.stopChannel)
 	bot.telegram.StopUpdates()
@@ -199,13 +176,11 @@ func (bot *Bot) handleUpdate(update tgbotapi.Update) {
 	)
 
 	if update.Message != nil {
-		// text input handle
 		bot.handleMessage(
 			ctx,
 			update.Message,
 		)
 	} else if update.CallbackQuery != nil {
-		// button click handle
 		bot.handleCallback(
 			ctx,
 			update.CallbackQuery,
@@ -224,7 +199,6 @@ func (bot *Bot) handleUpdate(update tgbotapi.Update) {
 
 func telegramUpdateAttributes(update tgbotapi.Update) []slog.Attr {
 	interactionID := observability.NewInteractionID("tg")
-	// updateID: a unique ID for each update received by the bot.
 	if update.UpdateID > 0 {
 		interactionID = fmt.Sprintf(
 			"tg-%d",
@@ -399,7 +373,6 @@ func (bot *Bot) handleMessage(
 	ctx context.Context,
 	message *tgbotapi.Message,
 ) {
-	// if it is nor bot command, check if it is active question answer, if not, ignore or route to chat.
 	if !message.IsCommand() {
 		if handled := bot.llmQuestionFlow.handleLLMQuestion(
 			ctx,
@@ -407,23 +380,20 @@ func (bot *Bot) handleMessage(
 		); handled {
 			return
 		}
-		// Route plain text to session flow for FillBlank questions
 		if bot.sessionFlow.HandleTextInput(
 			ctx,
 			message,
 		) {
 			return
 		}
-		// No question is waiting for typed input: bring an in-progress Quiz
-		// back to its current position instead of leaving the user stuck.
+		// No pending text input: resume an in-progress Quiz instead of leaving the user stuck.
 		if bot.sessionFlow.ResumeQuizFromText(
 			ctx,
 			message,
 		) {
 			return
 		}
-		// Nothing to resume, so the bot sends no reply. Log it so a "the bot
-		// went silent" report can be told apart from a failed send.
+		// No reply is sent. Log it to tell "bot went silent" from a failed send.
 		slog.InfoContext(
 			ctx,
 			"Text message ignored: no pending text input",
@@ -541,8 +511,6 @@ func (bot *Bot) handleCallback(
 			ctx,
 			callbackQuery,
 		)
-		// 학습 세션 시작
-		// e.g. session:50:start
 	case strings.HasPrefix(
 		data,
 		callbackPrefixSession,
@@ -741,8 +709,6 @@ func (bot *Bot) handleStatsCallback(
 	)
 }
 
-// handleStatsProgressCallback shows the progress tab: per level, the share of
-// materials the user has studied at least once.
 func (bot *Bot) handleStatsProgressCallback(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -806,8 +772,6 @@ func (bot *Bot) handleStatsProgressCallback(
 	)
 }
 
-// statsTabKeyboard renders the 정답률 | 진도 tabs, marking the tab whose
-// callback is activeCallback, above the home button.
 func statsTabKeyboard(activeCallback string) tgbotapi.InlineKeyboardMarkup {
 	messages := botMessagesByLocale[botDefaultLocale]
 	tabLabel := func(
@@ -849,7 +813,6 @@ func statsTabKeyboard(activeCallback string) tgbotapi.InlineKeyboardMarkup {
 	)
 }
 
-// progressBar draws percent as 10 cells, one filled cell per full 10%.
 func progressBar(percent int) string {
 	const progressBarCells = 10
 	filledCells := percent / 10
@@ -1054,7 +1017,6 @@ func (bot *Bot) handleTest(
 	ctx context.Context,
 	message *tgbotapi.Message,
 ) {
-	// 1. Ensure user exists
 	user, err := bot.user.GetUser(
 		ctx,
 		message.From.ID,
@@ -1076,7 +1038,6 @@ func (bot *Bot) handleTest(
 		return
 	}
 
-	// 2. Build a morning session (9 new + 6 review)
 	session, err := bot.session.BuildMorningQuiz(
 		ctx,
 		*user,
@@ -1107,7 +1068,6 @@ func (bot *Bot) handleTest(
 		return
 	}
 
-	// 3. Push the session immediately
 	if err := bot.sessionFlow.PushSession(
 		ctx,
 		user.ID,
@@ -1145,7 +1105,6 @@ func (bot *Bot) handleTest(
 	)
 }
 
-// languageDisplayName returns a human-readable name for the language code.
 func languageDisplayName(code string) string {
 	messages := botMessagesByLocale[botDefaultLocale]
 	switch code {

@@ -36,7 +36,6 @@ func TestSlotColumn_MapsCorrectly(t *testing.T) {
 		}
 	}
 
-	// Invalid slot should error
 	if _, err := slotColumn("unknown_slot"); err == nil {
 		t.Error("expected error for unknown_slot, got nil")
 	}

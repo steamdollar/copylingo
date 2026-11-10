@@ -1,7 +1,4 @@
-// Package bootstrap holds the setup code more than one cmd/ binary needs:
-// opening connections and mapping config to external client options
-// (ADR-069). Each binary still decides what it builds and how it reacts to a
-// failure. Nothing under internal/ imports it.
+// Package bootstrap holds setup shared by more than one cmd/ binary (ADR-069); nothing under internal/ imports it.
 package bootstrap
 
 import (
@@ -14,8 +11,7 @@ import (
 	"github.com/lsj/copylingo/internal/external"
 )
 
-// OpenDB connects to PostgreSQL. Pool tuning stays with the caller because
-// only the long-running server needs it.
+// OpenDB leaves pool tuning to the caller; only the long-running server needs it.
 func OpenDB(dbConfig config.DBConfig) (*sqlx.DB, error) {
 	db, err := sqlx.Connect(
 		"postgres",
@@ -30,8 +26,7 @@ func OpenDB(dbConfig config.DBConfig) (*sqlx.DB, error) {
 	return db, nil
 }
 
-// NewAudioStore builds the S3-compatible object store that holds listening
-// audio. The server reads clips from it; the admin tool writes them (ADR-082).
+// NewAudioStore builds the listening-audio store: the server reads clips, the admin tool writes them (ADR-082).
 func NewAudioStore(storageConfig config.StorageConfig) *external.S3AudioStore {
 	return external.NewS3AudioStore(external.S3Options{
 		Endpoint:     storageConfig.Endpoint,

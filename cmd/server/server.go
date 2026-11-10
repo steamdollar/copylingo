@@ -6,16 +6,13 @@ import (
 	"github.com/lsj/copylingo/internal/redisstore"
 )
 
-// botComponents is the Telegram side initializeApp assembles. It stays inside
-// cmd/server: each consumer receives only the flow it calls (ADR-059 §8.3).
+// botComponents is the Telegram side initializeApp assembles; each consumer receives only the flow it calls.
 type botComponents struct {
 	router      *bot.Bot
 	sessionFlow *bot.SessionFlow
 	studyFlow   *bot.StudyFlow
 }
 
-// initializeBot creates one Telegram client, each feature flow over the services
-// and Redis interaction state it uses, and the router over the flows.
 func initializeBot(
 	appConfig *config.Config,
 	appServices services,

@@ -41,7 +41,6 @@ func TestHandleExit(t *testing.T) {
 		t.Error("active text question still exists")
 	}
 
-	// Verify message sent
 	if len(mockAPI.sentMessages) == 0 {
 		t.Fatal("expected a message to be sent, but none were")
 	}
@@ -104,8 +103,7 @@ func TestClearInlineKeyboardOmitsReplyMarkup(t *testing.T) {
 	}
 }
 
-// blockingUpdatesAPI feeds updates from a test channel and holds every Send
-// until release closes, so the handler of a delivered update stays in flight.
+// blockingUpdatesAPI holds every Send until release closes, so a delivered update's handler stays in flight.
 type blockingUpdatesAPI struct {
 	mockBotAPI
 	updates chan tgbotapi.Update

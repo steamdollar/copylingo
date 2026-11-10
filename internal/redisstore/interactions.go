@@ -20,7 +20,6 @@ const (
 	activeQuestionTTL = time.Hour
 )
 
-// Interactions shares one Redis client across input, draft, and Mini App state.
 type Interactions struct {
 	redisClient redis.Cmdable
 }

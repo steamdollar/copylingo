@@ -2,8 +2,7 @@ package model
 
 import "time"
 
-// TipCandidate is a raw user LLM question/answer pair. The name predates the
-// retired tips feature (ADR-075); it is kept to match the tip_candidates table.
+// TipCandidate keeps its pre-ADR-075 name to match the tip_candidates table.
 type TipCandidate struct {
 	ID               int       `db:"id"                json:"id"`
 	UserID           int64     `db:"user_id"           json:"user_id"`

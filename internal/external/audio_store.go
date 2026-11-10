@@ -15,12 +15,10 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-// AudioContentType is the MIME type stored for OGG/Opus voice clips.
 const AudioContentType = "audio/ogg"
 
-// AudioKey builds the content-addressed object key for a synthesized clip:
-// tts/{lang}/{voice}/{sha256(script)}.ogg (ADR-032). Identical scripts collapse
-// to one object regardless of which question referenced them.
+// AudioKey builds the content-addressed key tts/{lang}/{voice}/{sha256(script)}.ogg, so identical scripts share one
+// object (ADR-032).
 func AudioKey(
 	language,
 	voice,
@@ -43,16 +41,13 @@ func keySegment(segment string) string {
 	return segment
 }
 
-// S3AudioStore is the object store for TTS audio (ADR-032), targeting any
-// S3-compatible backend (local MinIO, prod AWS S3) via an endpoint swap.
-// Built on aws-sdk-go-v2.
+// S3AudioStore targets any S3-compatible backend (local MinIO, prod AWS S3) via an endpoint swap (ADR-032).
 type S3AudioStore struct {
 	client *s3.Client
 	bucket string
 }
 
-// S3Options are the settings NewS3AudioStore needs. An empty Endpoint uses the
-// AWS default for Region; UsePathStyle is true for MinIO.
+// An empty Endpoint uses the AWS default for Region; UsePathStyle is true for MinIO.
 type S3Options struct {
 	Endpoint     string
 	Region       string
@@ -62,9 +57,7 @@ type S3Options struct {
 	UsePathStyle bool
 }
 
-// NewS3AudioStore constructs an S3 client from static credentials and an optional
-// custom endpoint (empty => AWS default for the region). Path-style addressing is
-// required by MinIO and harmless to leave off for AWS.
+// NewS3AudioStore builds the client from static credentials; path-style is required by MinIO, harmless for AWS.
 func NewS3AudioStore(options S3Options) *S3AudioStore {
 	awsConfig := aws.Config{
 		Region: options.Region,
@@ -168,8 +161,7 @@ func (store *S3AudioStore) Get(
 	return data, nil
 }
 
-// isNotFound recognizes the S3 "object absent" errors across backends so Exists
-// can return (false, nil) instead of surfacing them.
+// isNotFound recognizes S3 "object absent" errors across backends so Exists can return (false, nil).
 func isNotFound(err error) bool {
 	var apiErr smithy.APIError
 	if errors.As(

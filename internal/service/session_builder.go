@@ -22,17 +22,12 @@ var defaultCategoryOrder = []model.QuestionCategory{
 	model.CategoryHandwriting,
 	model.CategoryVocabulary,
 	model.CategoryGrammar,
-	// Listening joins the relay; GetNewQuestions only returns listening items
-	// whose audio is already generated (audio_path IS NOT NULL), so audio-less
-	// questions are never scheduled (ADR-031/032).
+	// Listening joins the relay; GetNewQuestions only returns items with generated audio (audio_path IS NOT NULL).
 	model.CategoryListening,
-	// Reading joins the relay; GetNewQuestions only returns reading items whose
-	// passage material the user already studied, and every session caps reading
-	// at one question — passages take longer to solve (ADR-036).
+	// Reading joins the relay; it needs an already-studied passage and every session caps it at one question (ADR-036).
 	model.CategoryReading,
 }
 
-// sessionBuilderService creates learning sessions with appropriate question mix.
 type sessionBuilderService struct {
 	questionRepository        QuestionRepository
 	sessionRepository         SessionRepository
@@ -72,8 +67,7 @@ func (service *sessionBuilderService) BuildMorningSession(
 	)
 }
 
-// BuildEveningSession creates an evening session with vocabulary and listening reservations, total 17 questions.
-// It matches the morning size so new quiz questions keep pace with daily Study (ADR-078).
+// BuildEveningSession matches the morning size (17) so new quiz questions keep pace with daily Study (ADR-078).
 func (service *sessionBuilderService) BuildEveningSession(
 	ctx context.Context,
 	userID int64,
@@ -94,7 +88,6 @@ func (service *sessionBuilderService) BuildEveningSession(
 	)
 }
 
-// BuildReviewSession creates an on-demand review session from SRS due items.
 func (service *sessionBuilderService) BuildReviewSession(
 	ctx context.Context,
 	userID int64,
@@ -284,8 +277,7 @@ func (service *sessionBuilderService) buildSession(
 		)
 
 		exhausted := make(map[string]bool)
-		// fetchNew appends up to count new questions from scope and reports how
-		// many it actually added.
+		// fetchNew appends up to count new questions from scope and returns how many it added.
 		fetchNew := func(
 			scope []string,
 			category model.QuestionCategory,

@@ -2,7 +2,6 @@ package model
 
 import "time"
 
-// SessionSlot represents one of the four personalized daily schedule slots.
 type SessionSlot string
 
 const (
@@ -12,7 +11,6 @@ const (
 	SessionSlotEveningQuiz  SessionSlot = "evening_quiz"
 )
 
-// User represents a Telegram user enrolled in the learning system.
 type User struct {
 	ID                 int64      `db:"id"                   json:"id"`                   // Telegram user ID
 	Username           string     `db:"username"             json:"username"`             // Telegram username

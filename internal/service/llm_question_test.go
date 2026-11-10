@@ -25,7 +25,6 @@ func (fake *fakeTipCandidates) CreateCandidate(
 	return fake.err
 }
 
-// fakeLearningQuestionLLM returns a fixed answer or error.
 type fakeLearningQuestionLLM struct {
 	answer string
 	err    error

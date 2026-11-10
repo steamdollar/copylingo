@@ -6,8 +6,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// NewQuizSessions selects the Quiz state type and key for the shared store.
-// The caller must provide an initialized Redis client.
 func NewQuizSessions(redisClient sessionRedis) *SessionStore[model.QuizActiveSessionState] {
 	return newSessionStore[model.QuizActiveSessionState](
 		redisClient,
@@ -27,8 +25,6 @@ func NewQuizSessions(redisClient sessionRedis) *SessionStore[model.QuizActiveSes
 	)
 }
 
-// NewStudySessions selects the Study state type and key for the shared store.
-// The caller must provide an initialized Redis client.
 func NewStudySessions(redisClient sessionRedis) *SessionStore[model.StudyActiveSessionState] {
 	return newSessionStore[model.StudyActiveSessionState](
 		redisClient,

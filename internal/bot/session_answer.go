@@ -59,9 +59,7 @@ func (flow *SessionFlow) processAnswer(
 	)
 }
 
-// HandleTextInput intercepts text messages if there is an active text question.
-// It returns false (message not consumed) when the active question can no
-// longer be resolved from the Quiz working set.
+// Returns false when the active question can no longer be resolved from the Quiz working set.
 func (flow *SessionFlow) HandleTextInput(
 	ctx context.Context,
 	message *tgbotapi.Message,
@@ -124,12 +122,9 @@ func (flow *SessionFlow) HandleTextInput(
 	return true
 }
 
-// ResumeQuizFromText answers plain text that no question is waiting for while
-// a Quiz is in progress. A text answer clears the pending input before its
-// result is sent, so a lost result message (e.g. Telegram 429) left no button
-// to continue and every retyped answer was dropped. Instead, it reports the
-// last answered question and re-sends the next unanswered one, the same screen
-// the menu resume shows (ADR-071). It returns false when no Quiz is in progress.
+// A text answer clears pending input before its result is sent, so a lost result (e.g. Telegram 429)
+// left no continue button. This reports the last answered question and re-sends the next unanswered one
+// (ADR-071). False when no Quiz is in progress.
 func (flow *SessionFlow) ResumeQuizFromText(
 	ctx context.Context,
 	message *tgbotapi.Message,
@@ -171,7 +166,6 @@ func (flow *SessionFlow) ResumeQuizFromText(
 		session.ID,
 	)
 	if err != nil {
-		// The working set expired, so there is no position to resume from.
 		flow.telegram.SendMessageWithKeyboard(
 			message.Chat.ID,
 			messages.activeSessionUnavailable,
@@ -205,8 +199,7 @@ func (flow *SessionFlow) ResumeQuizFromText(
 	return true
 }
 
-// quizResumeNotice repeats the last answered question's result, because the
-// message that carried it may never have reached the user.
+// Repeats the last result because the message that carried it may never have reached the user.
 func quizResumeNotice(
 	state *model.QuizActiveSessionState,
 	nextIndex int,
@@ -232,9 +225,6 @@ func quizResumeNotice(
 	)
 }
 
-// handleQuizAnswerError maps a rejected answer to its screen: a stale answer
-// re-renders the next unanswered question, unexpected grading failures are
-// logged, and unresolvable targets are ignored.
 func (flow *SessionFlow) handleQuizAnswerError(
 	ctx context.Context,
 	chatID int64,
@@ -341,7 +331,6 @@ func (flow *SessionFlow) renderQuizAnswerResult(
 		)
 	}
 
-	// "다음/결과" 버튼과 owner 전용 "질문" 버튼을 한 row에 나란히 둔다.
 	row := tgbotapi.NewInlineKeyboardRow(
 		tgbotapi.NewInlineKeyboardButtonData(
 			nextLabel,
@@ -396,10 +385,7 @@ func (flow *SessionFlow) renderQuizAnswerResult(
 	}
 }
 
-// ShowHandwritingGraded swaps the keyboard of a handwriting question message
-// once the Mini App has graded it: "next question" plus the linked-material
-// action. The Mini App calls it in the background, so failures are logged
-// under handwriting.cleanup.* instead of returned.
+// Runs in the background from the Mini App, so failures are logged under handwriting.cleanup.* instead of returned.
 func (flow *SessionFlow) ShowHandwritingGraded(
 	ctx context.Context,
 	sessionID,
@@ -439,8 +425,7 @@ func (flow *SessionFlow) ShowHandwritingGraded(
 		return
 	}
 
-	// The "next" callback carries the question position, so re-read progress
-	// instead of trusting the Mini App request.
+	// The "next" callback carries the question position, so re-read progress instead of trusting the Mini App request.
 	state, err := flow.session.QuizProgress(
 		ctx,
 		sessionID,
@@ -492,8 +477,6 @@ func (flow *SessionFlow) ShowHandwritingGraded(
 	}
 }
 
-// handwritingGradedKeyboard replaces the Mini App answer button after
-// grading. The linked-material action stays available.
 func (flow *SessionFlow) handwritingGradedKeyboard(
 	sessionID,
 	questionIndex int,
@@ -530,9 +513,6 @@ func (flow *SessionFlow) handwritingGradedKeyboard(
 	return markup
 }
 
-// redirectToNextUnansweredQuestion repairs delayed answer callbacks by
-// rendering the current working-set position. When every item is answered,
-// showQuestion renders the existing result button.
 func (flow *SessionFlow) redirectToNextUnansweredQuestion(
 	ctx context.Context,
 	chatID int64,

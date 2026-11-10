@@ -2,7 +2,6 @@ package model
 
 import "time"
 
-// SessionType defines the type of learning session.
 type SessionType string
 
 const (
@@ -13,7 +12,6 @@ const (
 	SessionStudy   SessionType = "study"
 )
 
-// SessionMode separates the interaction model from the session purpose.
 type SessionMode string
 
 const (
@@ -25,7 +23,6 @@ func (mode SessionMode) IsValid() bool {
 	return mode == SessionModeQuiz || mode == SessionModeStudy
 }
 
-// SessionStatus defines the current state of a session.
 type SessionStatus string
 
 const (
@@ -35,12 +32,10 @@ const (
 	SessionExpired    SessionStatus = "expired"
 )
 
-// Session represents a persisted learning session.
 type Session struct {
-	ID     int   `db:"id"      json:"id"`
-	UserID int64 `db:"user_id" json:"user_id"`
-	// Type captures product intent such as morning, evening, review, or study.
-	Type SessionType `db:"type" json:"type"`
+	ID     int         `db:"id"      json:"id"`
+	UserID int64       `db:"user_id" json:"user_id"`
+	Type   SessionType `db:"type"    json:"type"`
 	// Mode selects the runtime flow and child table: quiz uses session_questions,
 	// study uses session_materials.
 	Mode           SessionMode   `db:"mode"            json:"mode"`
@@ -52,7 +47,6 @@ type Session struct {
 	CreatedAt      time.Time     `db:"created_at"      json:"created_at"`
 }
 
-// SessionQuestion represents a question entry within a session, including the user's answer.
 type SessionQuestion struct {
 	ID            int     `db:"id"             json:"id"`
 	SessionID     int     `db:"session_id"     json:"session_id"`
@@ -63,7 +57,6 @@ type SessionQuestion struct {
 	IsCorrect     *bool   `db:"is_correct"     json:"is_correct"`  // NULL = not answered yet
 }
 
-// SessionMaterial represents a material entry within a study session.
 type SessionMaterial struct {
 	ID            int        `db:"id"             json:"id"`
 	SessionID     int        `db:"session_id"     json:"session_id"`
@@ -73,7 +66,6 @@ type SessionMaterial struct {
 	CreatedAt     time.Time  `db:"created_at"     json:"created_at"`
 }
 
-// StudySessionMaterial keeps the ordered session material and its material copy together.
 type StudySessionMaterial struct {
 	SessionMaterial SessionMaterial `json:"session_material"`
 	Material        Material        `json:"material"`

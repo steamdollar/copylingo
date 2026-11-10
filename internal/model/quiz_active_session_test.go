@@ -4,11 +4,9 @@ import (
 	"testing"
 )
 
-// boolPointer is a local helper for building *bool fields.
 func boolPointer(value bool) *bool { return &value }
 
-// activeStateWith builds an QuizActiveSessionState from is_correct markers.
-// nil = unanswered, true/false = answered correct/wrong. QuestionID is index+1.
+// activeStateWith builds state from is_correct markers: nil = unanswered, true/false = answered. QuestionID is index+1.
 func activeStateWith(marks ...*bool) *QuizActiveSessionState {
 	items := make(
 		[]QuizActiveSessionQuestion,

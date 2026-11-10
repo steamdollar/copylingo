@@ -2,19 +2,24 @@ package config
 
 import (
 	"os"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
 
-func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnvironment(t *testing.T) {
-	t.Setenv(
-		"COPYLINGO_TELEGRAM_TOKEN",
-		"test-token",
-	)
-	t.Setenv(
-		"COPYLINGO_LLM_API_KEY",
-		"test-key",
-	)
+func setRequiredEnvironment(t *testing.T) {
+	t.Helper()
+	for _, key := range requiredKeys {
+		t.Setenv(
+			environmentVariableName(key),
+			"test-"+key,
+		)
+	}
+}
+
+func TestLoadPrefersDotEnvOverInheritedEnvironment(t *testing.T) {
+	setRequiredEnvironment(t)
 	t.Setenv(
 		"COPYLINGO_SERVER_PUBLIC_BASE_URL",
 		"https://old.trycloudflare.com",
@@ -52,14 +57,7 @@ func TestLoadPrefersDotEnvPublicBaseURLOverInheritedEnvironment(t *testing.T) {
 }
 
 func TestLoadUsesEnvironmentPublicBaseURLWhenDotEnvMissing(t *testing.T) {
-	t.Setenv(
-		"COPYLINGO_TELEGRAM_TOKEN",
-		"test-token",
-	)
-	t.Setenv(
-		"COPYLINGO_LLM_API_KEY",
-		"test-key",
-	)
+	setRequiredEnvironment(t)
 	t.Setenv(
 		"COPYLINGO_SERVER_PUBLIC_BASE_URL",
 		"https://env.trycloudflare.com",
@@ -85,14 +83,7 @@ func TestLoadUsesEnvironmentPublicBaseURLWhenDotEnvMissing(t *testing.T) {
 }
 
 func TestLoadLoggingDefaults(t *testing.T) {
-	t.Setenv(
-		"COPYLINGO_TELEGRAM_TOKEN",
-		"test-token",
-	)
-	t.Setenv(
-		"COPYLINGO_LLM_API_KEY",
-		"test-key",
-	)
+	setRequiredEnvironment(t)
 	t.Chdir(t.TempDir())
 
 	appConfig, err := Load()
@@ -133,14 +124,7 @@ func TestLoadLoggingDefaults(t *testing.T) {
 }
 
 func TestLoadLLMDefaults(t *testing.T) {
-	t.Setenv(
-		"COPYLINGO_TELEGRAM_TOKEN",
-		"test-token",
-	)
-	t.Setenv(
-		"COPYLINGO_LLM_API_KEY",
-		"test-key",
-	)
+	setRequiredEnvironment(t)
 	t.Chdir(t.TempDir())
 
 	appConfig, err := Load()
@@ -181,14 +165,7 @@ func TestLoadLLMDefaults(t *testing.T) {
 }
 
 func TestLoadLLMTTSEnvironmentOverrides(t *testing.T) {
-	t.Setenv(
-		"COPYLINGO_TELEGRAM_TOKEN",
-		"test-token",
-	)
-	t.Setenv(
-		"COPYLINGO_LLM_API_KEY",
-		"test-key",
-	)
+	setRequiredEnvironment(t)
 	t.Setenv(
 		"COPYLINGO_LLM_TTS_MODEL",
 		"test-tts-model",
@@ -234,14 +211,7 @@ func TestLoadLLMTTSEnvironmentOverrides(t *testing.T) {
 }
 
 func TestLoadLoggingEnvironmentOverrides(t *testing.T) {
-	t.Setenv(
-		"COPYLINGO_TELEGRAM_TOKEN",
-		"test-token",
-	)
-	t.Setenv(
-		"COPYLINGO_LLM_API_KEY",
-		"test-key",
-	)
+	setRequiredEnvironment(t)
 	t.Setenv(
 		"COPYLINGO_LOGGING_DIR",
 		"./custom-logs",
@@ -313,14 +283,7 @@ func TestLoadRejectsInvalidLoggingConfig(t *testing.T) {
 		t.Run(
 			tt.name,
 			func(t *testing.T) {
-				t.Setenv(
-					"COPYLINGO_TELEGRAM_TOKEN",
-					"test-token",
-				)
-				t.Setenv(
-					"COPYLINGO_LLM_API_KEY",
-					"test-key",
-				)
+				setRequiredEnvironment(t)
 				t.Setenv(
 					tt.key,
 					tt.value,
@@ -335,24 +298,71 @@ func TestLoadRejectsInvalidLoggingConfig(t *testing.T) {
 	}
 }
 
-func TestLoadRequiresLLMAPIKey(t *testing.T) {
+func TestLoadRejectsMissingRequiredKeys(t *testing.T) {
+	setRequiredEnvironment(t)
 	t.Setenv(
-		"COPYLINGO_TELEGRAM_TOKEN",
-		"test-token",
+		"COPYLINGO_DB_HOST",
+		"",
 	)
 	t.Setenv(
 		"COPYLINGO_LLM_API_KEY",
-		"",
+		" ",
 	)
 	t.Chdir(t.TempDir())
 
-	if _, err := Load(); err == nil || !strings.Contains(
-		err.Error(),
-		"llm.api_key is required",
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want missing required config")
+	}
+	for _, name := range []string{"COPYLINGO_DB_HOST", "COPYLINGO_LLM_API_KEY"} {
+		if !strings.Contains(
+			err.Error(),
+			name,
+		) {
+			t.Errorf(
+				"Load() error = %v, want it to name %s",
+				err,
+				name,
+			)
+		}
+	}
+}
+
+// TestEveryConfigFieldIsListedOnce: a Config field missing from the key lists would never be read from env.
+func TestEveryConfigFieldIsListedOnce(t *testing.T) {
+	listedCount := map[string]int{}
+	for key := range defaults {
+		listedCount[key]++
+	}
+	for _, key := range slices.Concat(
+		requiredKeys,
+		optionalKeys,
 	) {
-		t.Fatalf(
-			"Load() error = %v, want llm.api_key is required",
-			err,
+		listedCount[key]++
+	}
+
+	configType := reflect.TypeFor[Config]()
+	for sectionIndex := range configType.NumField() {
+		section := configType.Field(sectionIndex)
+		for fieldIndex := range section.Type.NumField() {
+			key := section.Tag.Get("mapstructure") + "." + section.Type.Field(fieldIndex).Tag.Get("mapstructure")
+			if listedCount[key] != 1 {
+				t.Errorf(
+					"%s is listed %d times, want exactly once",
+					key,
+					listedCount[key],
+				)
+			}
+			delete(
+				listedCount,
+				key,
+			)
+		}
+	}
+	for key := range listedCount {
+		t.Errorf(
+			"%s is listed but is not a Config field",
+			key,
 		)
 	}
 }

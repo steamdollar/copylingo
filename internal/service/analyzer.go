@@ -35,7 +35,6 @@ type materialProgressRepository interface {
 	) ([]model.LevelProgress, error)
 }
 
-// AnalyzerService provides learning analytics and recommendations.
 type AnalyzerService struct {
 	userRepository            analyzerUserRepository
 	sessionQuestionRepository sessionStatsRepository
@@ -54,7 +53,6 @@ func NewAnalyzerService(
 	}
 }
 
-// GetUserStats returns comprehensive learning statistics.
 func (service *AnalyzerService) GetUserStats(
 	ctx context.Context,
 	userID int64,
@@ -95,7 +93,6 @@ func (service *AnalyzerService) GetUserStats(
 		ListeningAccuracy:  categoryAccuracy[string(model.CategoryListening)],
 	}
 
-	// Overall accuracy
 	if todayTotal > 0 {
 		stats.OverallAccuracy = float64(todayCorrect) / float64(todayTotal) * 100
 	}
@@ -103,9 +100,7 @@ func (service *AnalyzerService) GetUserStats(
 	return stats, nil
 }
 
-// GetLevelProgress returns, for each level of the user's language, the share
-// of materials studied at least once. Japanese levels run NZ → N1; other
-// languages keep the repository's lexical order.
+// Japanese levels run NZ → N1; other languages keep the repository's lexical order.
 func (service *AnalyzerService) GetLevelProgress(
 	ctx context.Context,
 	userID int64,
@@ -131,8 +126,7 @@ func (service *AnalyzerService) GetLevelProgress(
 		return nil, err
 	}
 
-	// Languages without a known level order rank every level equally, so the
-	// stable sort keeps the repository order.
+	// Unknown-order languages rank every level equally, so the stable sort keeps repository order.
 	slices.SortStableFunc(
 		progress,
 		func(

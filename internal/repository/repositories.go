@@ -6,7 +6,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Repositories holds the DB adapters for their shared pool.
 type Repositories struct {
 	User               *UserRepository
 	Content            *ContentRepository
@@ -20,7 +19,6 @@ type Repositories struct {
 	Tip                *TipRepository
 }
 
-// NewRepositories creates all repositories with the given DB connection.
 func NewRepositories(db *sqlx.DB) *Repositories {
 	return &Repositories{
 		User:               NewUserRepository(db),
@@ -36,7 +34,6 @@ func NewRepositories(db *sqlx.DB) *Repositories {
 	}
 }
 
-// timeNow returns current time (extracted for testability).
 func timeNow() time.Time {
 	return time.Now()
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// captureJSONLogs routes the default slog logger into a buffer for one test.
 func captureJSONLogs(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	output := &bytes.Buffer{}
@@ -29,7 +28,6 @@ func captureJSONLogs(t *testing.T) *bytes.Buffer {
 	return output
 }
 
-// findLogEntry returns the first JSON log line whose event matches.
 func findLogEntry(
 	t *testing.T,
 	output *bytes.Buffer,

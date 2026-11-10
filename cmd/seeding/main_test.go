@@ -13,14 +13,10 @@ import (
 
 const japanese = "ja"
 
-// The data/<language>/<level>.json files are the source of truth, so
-// these checks catch a malformed or regressed file at test time instead of at
-// seed time. They inspect the loaded records, i.e. exactly what the seeder
-// consumes.
+// data/<language>/<level>.json is the source of truth; these checks catch a bad file at test time, not seed time.
 
-// TestRecordIntegrity checks every level file (ADR-066). Keys are the
-// upsert identity, so they must be unique across levels. Only listening
-// questions may sit outside a material.
+// TestRecordIntegrity checks every level file. Keys are the upsert identity, so they must be unique across
+// levels. Only listening questions may sit outside a material.
 func TestRecordIntegrity(t *testing.T) {
 	t.Parallel()
 
@@ -163,10 +159,8 @@ func assertMaterialPayload(
 	}
 }
 
-// TestKanjiNotes checks the optional vocabulary "kanji_notes" (ADR-073). The
-// key is omitted rather than null or empty, notes decode strictly, and each
-// kanji's note is identical in every word that uses it, so a fix made in one
-// word but not the others fails here.
+// TestKanjiNotes checks the optional vocabulary "kanji_notes": the key is omitted rather than null or empty,
+// notes decode strictly, and a kanji's note is identical in every word that uses it.
 func TestKanjiNotes(t *testing.T) {
 	t.Parallel()
 
@@ -247,10 +241,8 @@ func TestKanjiNotes(t *testing.T) {
 	}
 }
 
-// kanjiNoteProblem returns why a note breaks the schema rules, or "".
 func kanjiNoteProblem(note model.KanjiNote) string {
-	// A note may leave explanation_ko empty when its parts line says all
-	// there is (ADR-080); a standalone kanji has nothing else to show.
+	// A note may leave explanation_ko empty when its parts line says all there is.
 	if !note.Type.Valid() || len(note.Parts) == 0 && strings.TrimSpace(note.ExplanationKo) == "" {
 		return "needs a valid type, and explanation_ko when it has no parts"
 	}
@@ -277,8 +269,7 @@ func kanjiNoteProblem(note model.KanjiNote) string {
 		}
 	}
 	if note.Type == model.KanjiNotePhonoSemantic {
-		// A sound part outside the phone-safe ranges is left out of parts,
-		// so the explanation has to say where it is (ADR-080).
+		// A sound part outside the phone-safe ranges is left out of parts, so the explanation has to say where it is.
 		if sound == nil && !hasForm && strings.TrimSpace(note.ExplanationKo) == "" {
 			return "phono_semantic needs a sound or form part, or an explanation of the sound part it cannot show"
 		}
@@ -288,9 +279,8 @@ func kanjiNoteProblem(note model.KanjiNote) string {
 	return ""
 }
 
-// radicalBases lists the kanji each radical variant may stand for as a
-// part's base (ADR-080). A meaning part always names it, except 月 and 王,
-// which also write the moon and the king.
+// radicalBases lists the kanji each radical variant may stand for as a part's base. A meaning part always
+// names it, except 月 and 王, which also write the moon and the king.
 var radicalBases = map[string][]string{
 	"扌": {"手"},
 	"氵": {"水"},
@@ -312,7 +302,6 @@ var radicalBases = map[string][]string{
 	"王": {"玉"},
 }
 
-// radicalBaseProblem returns why a part's base breaks radicalBases, or "".
 func radicalBaseProblem(part model.KanjiPart) string {
 	bases, isVariant := radicalBases[part.Part]
 	switch {
@@ -335,10 +324,8 @@ func radicalBaseProblem(part model.KanjiPart) string {
 	return ""
 }
 
-// TestKanjiReadings checks the optional vocabulary "kanji_readings"
-// (ADR-074). Entries decode strictly and follow the word's kanji in order, and
-// each kanji lists the same on'yomi and 훈음 (ADR-076) in every word, so its
-// title and "이 한자의 음독" line never change between cards.
+// TestKanjiReadings checks the optional vocabulary "kanji_readings": entries decode strictly and follow the
+// word's kanji in order, and each kanji lists the same on'yomi and 훈음 in every word.
 func TestKanjiReadings(t *testing.T) {
 	t.Parallel()
 
@@ -428,7 +415,6 @@ func TestKanjiReadings(t *testing.T) {
 	}
 }
 
-// kanjiReadingProblem returns why a reading breaks the schema rules, or "".
 func kanjiReadingProblem(reading model.KanjiReading) string {
 	if !reading.Type.Valid() || reading.Reading == "" || strings.TrimFunc(
 		reading.Reading,

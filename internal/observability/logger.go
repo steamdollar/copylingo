@@ -18,7 +18,7 @@ type LoggerOptions struct {
 	Stderr        io.Writer
 }
 
-// NewLogger constructs a JSON logger. File setup failures degrade to stdout-only logging.
+// NewLogger falls back to stdout-only logging when file setup fails.
 func NewLogger(options LoggerOptions) (*slog.Logger, func(), error) {
 	level, err := ParseLevel(options.Level)
 	if err != nil {

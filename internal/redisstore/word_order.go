@@ -14,7 +14,6 @@ const (
 	wordOrderDraftTTL = 24 * time.Hour
 )
 
-// GetWordOrderDraft restores the selected word indices for an unfinished answer.
 func (interactions *Interactions) GetWordOrderDraft(
 	ctx context.Context,
 	sessionID,

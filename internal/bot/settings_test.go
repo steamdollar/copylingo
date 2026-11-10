@@ -151,7 +151,6 @@ func TestHandleSettingsCommand(t *testing.T) {
 		)
 	}
 
-	// Verify keyboard buttons
 	markup, ok := sentMessage.ReplyMarkup.(tgbotapi.InlineKeyboardMarkup)
 	if !ok {
 		t.Fatalf(
@@ -270,7 +269,6 @@ func TestHandleSettingsCallback_SlotPicker(t *testing.T) {
 		t.Fatal("expected reply markup")
 	}
 
-	// Verify time buttons exist
 	foundTime := false
 	foundOff := false
 	foundAllToggle := false
@@ -370,7 +368,6 @@ func TestHandleSettingsCallback_SetSlotTime(t *testing.T) {
 		)
 	}
 
-	// Verify message was re-rendered with new time
 	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
@@ -418,7 +415,6 @@ func TestHandleSettingsCallback_DisableSlotTime(t *testing.T) {
 		)
 	}
 
-	// Verify message displays 꺼짐
 	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
@@ -472,7 +468,6 @@ func TestHandleSettingsCallback_Timezone(t *testing.T) {
 		)
 	}
 
-	// Verify timezone options
 	markup := editMessage.ReplyMarkup
 	foundTokyo := false
 	foundNY := false
@@ -516,7 +511,6 @@ func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
 		)
 	}
 
-	// Verify settings overview shows updated timezone
 	editMessage, ok := mockAPI.sentMessages[0].(tgbotapi.EditMessageTextConfig)
 	if !ok {
 		t.Fatalf(
@@ -538,7 +532,6 @@ func TestHandleSettingsCallback_SetTimezone(t *testing.T) {
 func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
 	flow, repository, _ := newSettingsTestFlow()
 
-	// Invalid slot
 	callbackQuery := &tgbotapi.CallbackQuery{
 		ID:   "cb_inv_slot",
 		Data: "settings:slot:invalid_slot",
@@ -553,7 +546,6 @@ func TestHandleSettingsCallback_InvalidInputs(t *testing.T) {
 		callbackQuery,
 	)
 
-	// Invalid timezone
 	timezoneCallback := &tgbotapi.CallbackQuery{
 		ID:   "cb_inv_tz",
 		Data: "settings:set_tz:Invalid/Location_999",

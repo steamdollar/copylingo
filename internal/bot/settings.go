@@ -12,8 +12,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// settingsUser loads the user behind an update and saves their push
-// schedule and timezone.
 type settingsUser interface {
 	GetUser(
 		ctx context.Context,
@@ -33,15 +31,12 @@ type settingsUser interface {
 	) error
 }
 
-// SettingsFlowDependencies wires SettingsFlow; every dependency is required.
 type SettingsFlowDependencies struct {
 	Telegram           *TelegramClient
 	User               settingsUser
 	MaterialPreference materialPreferenceList
 }
 
-// SettingsFlow handles the /settings screens: push schedule, timezone, and
-// the list of materials whose review mode the user changed.
 type SettingsFlow struct {
 	telegram           *TelegramClient
 	user               settingsUser
@@ -56,7 +51,6 @@ func NewSettingsFlow(dependencies SettingsFlowDependencies) *SettingsFlow {
 	}
 }
 
-// handleSettingsCommand handles /settings command by displaying the schedule configuration menu.
 func (flow *SettingsFlow) handleSettingsCommand(
 	ctx context.Context,
 	message *tgbotapi.Message,
@@ -91,7 +85,6 @@ func (flow *SettingsFlow) handleSettingsCommand(
 	)
 }
 
-// handleSettingsCallback routes callbacks related to push schedule & timezone settings.
 func (flow *SettingsFlow) handleSettingsCallback(
 	ctx context.Context,
 	callbackQuery *tgbotapi.CallbackQuery,
@@ -590,7 +583,6 @@ func buildSlotPickerKeyboard(
 	}
 
 	var rows [][]tgbotapi.InlineKeyboardButton
-	// Group into rows of 4
 	for i := 0; i < len(times); i += 4 {
 		end := i + 4
 		if end > len(times) {
@@ -617,7 +609,6 @@ func buildSlotPickerKeyboard(
 		)
 	}
 
-	// Action row: OFF button
 	rows = append(
 		rows,
 		tgbotapi.NewInlineKeyboardRow(
@@ -632,7 +623,6 @@ func buildSlotPickerKeyboard(
 		),
 	)
 
-	// Navigation row
 	var navigationRow []tgbotapi.InlineKeyboardButton
 	if !isAll {
 		navigationRow = append(

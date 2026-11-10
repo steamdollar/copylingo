@@ -8,7 +8,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// ContentSaveResult summarizes a batch while keeping individual failures visible.
 type ContentSaveResult struct {
 	Saved      int
 	Duplicates int
@@ -26,7 +25,6 @@ type contentRepository interface {
 	) (bool, error)
 }
 
-// ContentService owns duplicate detection and persistence for collected content.
 type ContentService struct {
 	repository contentRepository
 }

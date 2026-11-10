@@ -9,7 +9,6 @@ import (
 	"github.com/lsj/copylingo/internal/model"
 )
 
-// Mock NHK API Client
 type mockNHKClient struct {
 	articles map[string][]external.NHKArticleMeta
 	bodies   map[string]string
@@ -38,7 +37,6 @@ func (mock *mockNHKClient) FetchArticleBody(
 	return body, nil
 }
 
-// Mock Fetcher
 type mockFetcher struct {
 	name     string
 	contents []RawContent
@@ -50,7 +48,6 @@ func (mock *mockFetcher) Fetch(ctx context.Context) ([]RawContent, error) {
 	return mock.contents, mock.err
 }
 
-// Mock Processor
 type mockProcessor struct {
 	err error
 }
@@ -76,7 +73,6 @@ func (mock *mockProcessor) Process(
 	return contents, nil
 }
 
-// Mock Saver
 type mockSaver struct {
 	result SaveResult
 	err    error
@@ -88,8 +84,6 @@ func (mock *mockSaver) Save(
 ) (SaveResult, error) {
 	return mock.result, mock.err
 }
-
-// Tests
 
 func TestNHKFetcher_Fetch(t *testing.T) {
 	client := &mockNHKClient{
@@ -364,7 +358,6 @@ func TestOrchestrator_RunAll_FetcherError(t *testing.T) {
 func TestOrchestrator_RunAll_MultiplePipelines(t *testing.T) {
 	orchestrator := NewOrchestrator()
 
-	// First pipeline - success
 	orchestrator.Register(
 		&mockFetcher{name: "p1", contents: []RawContent{{SourceURL: "https://1.com"}}},
 		&mockProcessor{},
@@ -387,7 +380,6 @@ func TestOrchestrator_RunAll_MultiplePipelines(t *testing.T) {
 		)
 	}
 
-	// First should succeed
 	if results[0].Err != nil {
 		t.Errorf(
 			"first pipeline should succeed, got error: %v",
@@ -395,7 +387,6 @@ func TestOrchestrator_RunAll_MultiplePipelines(t *testing.T) {
 		)
 	}
 
-	// Second should fail
 	if results[1].Err == nil {
 		t.Error("second pipeline should fail")
 	}

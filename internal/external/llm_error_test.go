@@ -10,7 +10,6 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-// newTestLLMClient builds a DefaultLLMClient pointed at the given httptest server URL.
 func newTestLLMClient(serverURL string) *DefaultLLMClient {
 	clientConfig := openai.DefaultConfig("test-api-key")
 	clientConfig.BaseURL = serverURL + "/v1"

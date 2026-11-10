@@ -15,8 +15,6 @@ import (
 	"github.com/lsj/copylingo/internal/service"
 )
 
-// quizSession is the Quiz part of service.SessionService used by the Mini App:
-// grading a handwriting submission.
 type quizSession interface {
 	SubmitHandwriting(
 		ctx context.Context,
@@ -24,9 +22,8 @@ type quizSession interface {
 	) (*service.HandwritingSubmitResult, error)
 }
 
-// handwritingScreen is the bot-side Telegram message of a handwriting
-// question. The bot owns finding the message, re-reading progress, and
-// building the keyboard; the Mini App only reports that grading finished.
+// handwritingScreen: the bot owns finding the Telegram message, progress and keyboard; the Mini App only
+// reports that grading finished.
 type handwritingScreen interface {
 	ShowHandwritingGraded(
 		ctx context.Context,
@@ -66,8 +63,6 @@ func NewHandler(dependencies HandlerDependencies) *Handler {
 	}
 }
 
-// RegisterRoutes serves the handwriting Mini App assets and its API on handler,
-// which cmd/server builds with its dependencies.
 func RegisterRoutes(
 	router *gin.Engine,
 	handler *Handler,
@@ -166,7 +161,6 @@ func (handler *Handler) SubmitHandwriting(ginContext *gin.Context) {
 		result.IsCorrect,
 	)
 
-	// Refresh Telegram message buttons in background
 	go handler.refreshHandwritingMessage(
 		context.WithoutCancel(ctx),
 		request.SessionID,
@@ -179,8 +173,7 @@ func (handler *Handler) SubmitHandwriting(ginContext *gin.Context) {
 	)
 }
 
-// renderAndSubmit turns the strokes into the PNG the service grades. Strokes
-// are this Mini App's input format, so the service only ever sees the image.
+// renderAndSubmit renders strokes first so the service only ever sees the image.
 func (handler *Handler) renderAndSubmit(
 	ctx context.Context,
 	userID int64,

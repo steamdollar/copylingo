@@ -9,8 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// TransactionDB gives service mocks a real database/sql transaction boundary
-// without executing SQL or depending on a running database.
+// TransactionDB gives service mocks a real sql transaction boundary without running SQL or a database.
 func TransactionDB() *sqlx.DB {
 	return sqlx.NewDb(
 		sql.OpenDB(transactionConnector{}),

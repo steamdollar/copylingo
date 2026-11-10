@@ -2,7 +2,6 @@ package model
 
 import "time"
 
-// MaterialReviewMode is a user's explicit learning preference, not evidence of mastery.
 type MaterialReviewMode string
 
 const (

@@ -46,7 +46,6 @@ func (flow *SessionFlow) showQuestion(
 		return
 	}
 
-	// All questions answered, show finish button
 	if questionIndex >= len(state.Items) {
 		keyboard := tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
@@ -80,7 +79,6 @@ func (flow *SessionFlow) showQuestion(
 	question := item.Question
 
 	// TODO: err handling
-	// render question text and keyboard by question type
 	text, keyboard, done := flow.renderByType(
 		ctx,
 		chatID,
@@ -94,8 +92,7 @@ func (flow *SessionFlow) showQuestion(
 	if done {
 		return
 	}
-	// Keep the current question intact; changing its linked material setting
-	// only affects which questions future sessions may select.
+	// Keep the current question intact. The material setting only affects which questions future sessions may select.
 	if question.MaterialID != nil {
 		if keyboard == nil {
 			keyboard = &tgbotapi.InlineKeyboardMarkup{}
@@ -115,7 +112,6 @@ func (flow *SessionFlow) showQuestion(
 		)
 	}
 
-	// err handling after rendering question
 	if editMessageID != nil {
 		flow.telegram.EditMessage(
 			chatID,
@@ -139,8 +135,7 @@ func (flow *SessionFlow) showQuestion(
 	}
 }
 
-// renderByType builds the question text and keyboard for the given question type.
-// Returns (text, keyboard, done): done=true means the message was already sent (or should be skipped) — caller must return.
+// done=true means the message was already sent (or should be skipped), so the caller must return.
 func (flow *SessionFlow) renderByType(
 	ctx context.Context,
 	chatID int64,
@@ -152,8 +147,7 @@ func (flow *SessionFlow) renderByType(
 	isReview bool,
 ) (string, *tgbotapi.InlineKeyboardMarkup, bool) {
 	messages := botMessagesByLocale[botDefaultLocale]
-	// Sessions mix the current level with adjacent ones (ADR-046), so the header
-	// names each question's level; questions without one omit the marker.
+	// Sessions mix adjacent levels (ADR-046), so the header names each question's level when it has one.
 	levelTag := ""
 	if question.ProficiencyLevel != "" {
 		levelTag = fmt.Sprintf(
@@ -176,7 +170,7 @@ func (flow *SessionFlow) renderByType(
 
 	switch question.Type {
 	case model.QuestionKanaHandwriting:
-		// cells = answer 글자 수(촉음은 다음 글자와 같은 셀). 정답 문자열 자체는 cheat 방지를 위해 client로 보내지 않고, 길이만 전달해 캔버스 폭을 글자 수에 비례시킨다.
+		// cells = 정답 글자 수(촉음은 다음 글자와 같은 셀). 정답 문자열은 cheat 방지를 위해 client로 보내지 않고 길이만 전달한다.
 		cells := handwritingCellCount(question.CorrectAnswer)
 		miniAppURL, err := flow.handwritingMiniAppURL(
 			sessionID,
@@ -224,8 +218,7 @@ func (flow *SessionFlow) renderByType(
 			)
 		}
 		if editMessageID != nil {
-			// Web App 버튼은 별도 메시지로 두는 편이 Mini App 왕복 흐름을 추적하기 쉽다.
-			// 이전 메시지는 재사용하지 않고 짧은 안내 문구로 축약한다.
+			// Web App 버튼은 별도 메시지로 두고, 이전 메시지는 짧은 안내 문구로 축약한다.
 			flow.telegram.EditMessage(
 				chatID,
 				*editMessageID,
@@ -277,9 +270,7 @@ func (flow *SessionFlow) renderByType(
 		return "", nil, true
 
 	case model.QuestionListening:
-		// Deliver the audio as a separate voice message, then render the
-		// comprehension question + options through the shared MCQ path (grading
-		// reuses the exact-match option flow — no new grader, ADR-031).
+		// Voice message first, then the question via the shared MCQ path. Grading reuses the option flow (ADR-031).
 		if !flow.sendListeningAudio(
 			ctx,
 			chatID,
@@ -334,9 +325,7 @@ func (flow *SessionFlow) renderByType(
 	}
 }
 
-// handwritingCellCount returns the number of writing cells for a Japanese answer.
-// Sokuon (small っ/ッ) is written within the following kana's cell, so it does
-// not receive a separate slot in the handwriting pad.
+// Sokuon (small っ/ッ) shares the following kana's cell.
 func handwritingCellCount(answer string) int {
 	cells := 0
 	for _, character := range answer {
@@ -348,12 +337,8 @@ func handwritingCellCount(answer string) int {
 	return cells
 }
 
-// buildMCQ renders the option picker and returns (optionList, keyboard).
-// Short options stay on a two-column keyboard and optionList is empty.
-// Telegram draws button labels on one line and truncates long ones, so when
-// any option is too wide, the full options are listed in the message text and
-// the buttons carry only their numbers. Shared by plain multiple-choice and
-// listening comprehension.
+// Short options use a two-column keyboard and optionList is empty. Telegram truncates long button labels,
+// so wide options are listed in the message text and the buttons carry only numbers.
 func buildMCQ(
 	sessionID,
 	questionID int,
@@ -438,10 +423,8 @@ func buildMCQ(
 	return "", &tgbotapi.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
-// sendListeningAudio delivers a listening question's clip as a Telegram voice
-// message. It prefers the cached file_id and falls back to fetching the object
-// from the store and uploading it, caching the returned file_id (ADR-032).
-// Returns false when audio is unavailable so the caller can degrade gracefully.
+// Prefers the cached file_id, else uploads from the store and caches the new one (ADR-032).
+// False if audio is unavailable.
 func (flow *SessionFlow) sendListeningAudio(
 	ctx context.Context,
 	chatID int64,
@@ -451,7 +434,6 @@ func (flow *SessionFlow) sendListeningAudio(
 		return false
 	}
 
-	// Fast path: re-send by cached file_id (no store fetch, no re-upload).
 	if question.AudioFileID != nil && *question.AudioFileID != "" {
 		if err := flow.telegram.SendVoiceFileID(
 			chatID,
