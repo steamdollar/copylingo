@@ -25,7 +25,7 @@ type app struct {
 	scheduler *scheduler.Scheduler
 	refresher *bot.SessionFlow
 	server    *http.Server
-	closers   []io.Closer // closed in order by Close
+	closers   []io.Closer // closed in order when Run returns
 }
 
 func initializeApp(appConfig *config.Config) (_ *app, err error) {
@@ -101,8 +101,11 @@ func initializeApp(appConfig *config.Config) (_ *app, err error) {
 }
 
 // Run binds the HTTP port first so a port conflict starts nothing. It returns after ctx is canceled or
-// the HTTP server fails, once shutdown has drained in-flight work.
+// the HTTP server fails, once shutdown has drained in-flight work and DB/Redis are closed.
 func (application *app) Run(ctx context.Context) error {
+	// Deferred so DB/Redis close after shutdown, and also on an early listen failure.
+	defer closeAll(application.closers)
+
 	listener, err := net.Listen(
 		"tcp",
 		application.server.Addr,
@@ -146,7 +149,7 @@ func (application *app) Run(ctx context.Context) error {
 }
 
 // shutdown stops Telegram updates, drains HTTP, then stops the scheduler, each within one shared
-// shutdownTimeout, so Close does not close DB/Redis under running work unless the timeout runs out.
+// shutdownTimeout, so Run does not close DB/Redis under running work unless the timeout runs out.
 func (application *app) shutdown() {
 	log.Println("Shutting down...")
 
@@ -176,10 +179,6 @@ func (application *app) shutdown() {
 			err,
 		)
 	}
-}
-
-func (application *app) Close() {
-	closeAll(application.closers)
 }
 
 // closeAll logs close failures so one failure does not keep the rest open.

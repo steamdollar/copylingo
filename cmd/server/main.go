@@ -52,8 +52,6 @@ func run() error {
 			err,
 		)
 	}
-	defer app.Close()
-
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		syscall.SIGINT,
